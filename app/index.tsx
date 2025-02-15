@@ -1,33 +1,37 @@
-import { Image, KeyboardAvoidingView, Platform, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import CustomTextInput from "./components/CustomTextInput";
+import CustomButton from "./components/CustomButton";
 
-export default function Index(){
+export default function Index() {
   return (
-    <View style={styles.background}>
-      <StatusBar hidden={true}/>
-      <View style={styles.logoContainer}>
-        <Image source={require("../assets/images/pattern.png")} style={styles.pattern}></Image>
-        <Image source={require("../assets/images/jamat-logo.png")} style={styles.logo}></Image>
-        <Text style={styles.title}>ای تنظیم ڈائری</Text>
-      </View>
-      <View style={styles.loginContainer}>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputText}>فون نمبر</Text>
-          <TextInput style={styles.inputField} placeholder="اپنا فون نمبر درج کریں" placeholderTextColor={"#2D2327"}></TextInput>
+    <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={{flexGrow: 1}}>
+        <StatusBar hidden={true}/>
+        <View style={styles.background}>
+          <View style={styles.logoContainer}>
+            <Image source={require("../assets/images/pattern.png")} style={styles.pattern}></Image>
+            <Image source={require("../assets/images/jamat-logo.png")} style={styles.logo}></Image>
+            <Text style={styles.title}>ای تنظیم ڈائری</Text>
+          </View>
+          <View style={styles.loginContainer}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputText}>فون نمبر</Text>
+              <CustomTextInput placeholder="اپنا فون نمبر درج کریں" placeholderTextColor={"#2D2327"}></CustomTextInput>
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputText}>پاسوڑڈ</Text>
+              <CustomTextInput placeholder="********" placeholderTextColor={"#2D2327"} secureTextEntry={true}></CustomTextInput>
+            </View>
+            <View style={styles.resetPass}>
+              <Pressable onPress={() => console.log("password reset")}>
+                <Text style={styles.resetPass}>پاس ورڈ ری سیٹ کریں</Text>
+              </Pressable>
+            </View>
+            <CustomButton text={"لاگ اِن کریں"} onPress={() => console.log("login")}></CustomButton>
+          </View>
         </View>
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputText}>پاسوڑڈ</Text>
-          <TextInput style={styles.inputField} placeholder="********" placeholderTextColor={"#2D2327"} secureTextEntry={true}></TextInput>
-        </View>
-        <View style={styles.resetPass}>
-          <Pressable onPress={() => console.log("password reset")}>
-            <Text style={styles.resetPass}>پاس ورڈ ری سیٹ کریں</Text>
-          </Pressable>
-        </View>
-        <Pressable style={styles.loginButton}>
-          <Text style={styles.loginButtonText}>لاگ اِن کریں</Text>
-        </Pressable>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -78,36 +82,10 @@ const styles = StyleSheet.create({
     fontFamily: "JameelNoori",
     color: "#2D2327"
   },
-  inputField: {
-    fontSize: 16,
-    fontFamily: "JameelNoori",
-    backgroundColor: "#F7F7F7",
-    borderColor: "#EBEBEB",
-    borderWidth: 1,
-    borderRadius: 8,
-    width: "100%",
-    padding: 12,
-    height: 48,
-    textAlign: "right",
-  },
   resetPass: {
     fontSize: 12,
     fontFamily: "JameelNoori",
     color: "#2D2327",
     alignSelf: "flex-start",
   },
-  loginButton: {
-    marginTop: 30,
-    width: "100%",
-    alignItems: "center",
-    backgroundColor: "#008CFF",
-    padding: 12,
-    borderRadius: 8,
-    height: 48
-  },
-  loginButtonText: {
-    fontSize: 16,
-    fontFamily: "JameelNoori",
-    color: "white"
-  }
 })
