@@ -26,6 +26,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.anonymous.etanzeem_diary_app"/>
+        <data android:scheme="exp+etanzeemdiaryapp"/>
       </intent-filter>
     </activity>
   </application>

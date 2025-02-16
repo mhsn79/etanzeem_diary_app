@@ -26,14 +26,14 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
 const styles = StyleSheet.create({
   inputField: {
     fontSize: 16,
-    fontFamily: "JameelNoori",
+    fontFamily: "JameelNooriNastaleeq",
     backgroundColor: "#F7F7F7",
     borderColor: "#EBEBEB",
     borderWidth: 1,
     borderRadius: 8,
     width: "100%",
     padding: 12,
-    height: 48,
+    height: 56,
     textAlign: "right",
     writingDirection: "rtl"
   },

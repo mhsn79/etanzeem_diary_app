@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontFamily: "JameelNoori",
+    fontFamily: "JameelNooriNastaleeq",
     color: "white"
   },
   disabledText: {

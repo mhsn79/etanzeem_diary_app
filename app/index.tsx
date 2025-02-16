@@ -25,7 +25,7 @@ export default function Index() {
             <View style={styles.resetPass}>
               <Pressable onPress={() => console.log("password reset")}>
                 <Text style={styles.resetPass}>پاس ورڈ ری سیٹ کریں</Text>
-              </Pressable>
+              </Pressable >
             </View>
             <CustomButton text={"لاگ اِن کریں"} onPress={() => console.log("login")}></CustomButton>
           </View>
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     top: 45,
     color: "white",
     fontSize: 30,
-    fontFamily: "JameelNoori"
+    fontFamily: "JameelNooriNastaleeq"
   },
   pattern: {
     width: "100%",
@@ -74,17 +74,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     alignItems: "flex-end",
     width: "100%",
-    height: 84,
     gap: 10
   },
   inputText: {
     fontSize: 16,
-    fontFamily: "JameelNoori",
+    fontFamily: "JameelNooriNastaleeq",
     color: "#2D2327"
   },
   resetPass: {
     fontSize: 12,
-    fontFamily: "JameelNoori",
+    fontFamily: "JameelNooriNastaleeq",
     color: "#2D2327",
     alignSelf: "flex-start",
   },
