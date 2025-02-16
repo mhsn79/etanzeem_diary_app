@@ -16,6 +16,7 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
         focused && styles.focused,
         error && styles.error
       ]}
+      autoCapitalize="none"
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       {...rest}>
