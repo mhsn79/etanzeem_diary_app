@@ -1,46 +1,62 @@
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
 import CustomTextInput from "./components/CustomTextInput";
 import CustomButton from "./components/CustomButton";
 import { useState } from "react";
 import { router } from 'expo-router';
 import { createDirectus, authentication, rest } from '@directus/sdk';
+import i18n from "./i18n";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React from "react";
 
 const client = createDirectus('http://174.138.29.121:8055')
   .with(authentication('json'))
   .with(rest());
 
-async function loginUser(email: string, password: string, setEmailErr: Function, setPassErr: Function, setErrText: Function){
+async function loginUser(email: string, password: string, setEmailErr: Function, setPassErr: Function, setErrText: Function) {
 
   setEmailErr(false);
   setPassErr(false);
   setErrText("");
 
-  if(email.length === 0){
+  if (email.length === 0) {
     setEmailErr(true);
-    setErrText("email is required");
+    setErrText(i18n.t('email_is_required'));
     return;
   }
-  else if(password.length === 0){
+  else if (password.length === 0) {
     setPassErr(true);
-    setErrText("password is required");
+    setErrText(i18n.t('password_is_required'));
     return;
   }
 
   const result = await client.login(email, password).then((value) => value, (err) => err);
   console.log(result);
 
-  if(result.errors){
+  if (result.errors) {
     setEmailErr(true);
     setPassErr(true);
-    setErrText("invalid credentials");
+    setErrText(i18n.t('invalid_credentials'));
     return;
   }
 
-  router.replace("/home")
+  router.replace("/Dashboard")
 
 }
 
 export default function Index() {
+  const insets = useSafeAreaInsets();
+  const [currentLanguage, setCurrentLanguage] = React.useState(i18n.locale);
+
+  const changeLanguage = async (languageCode: string) => {
+    try {
+      await AsyncStorage.setItem('userLanguage', languageCode);
+      i18n.locale = languageCode;
+      setCurrentLanguage(languageCode);
+    } catch (error) {
+      console.error('Error saving language preference:', error);
+    }
+  };
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,20 +65,32 @@ export default function Index() {
   const [errText, setErrText] = useState("");
 
   return (
-    <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView contentContainerStyle={{flexGrow: 1}}>
-        <StatusBar hidden={true}/>
-        <View style={styles.background}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <StatusBar hidden={true} />
+      <View style={styles.background}>
           <View style={styles.logoContainer}>
             <Image source={require("../assets/images/pattern.png")} style={styles.pattern}></Image>
             <Image source={require("../assets/images/jamat-logo.png")} style={styles.logo}></Image>
-            <Text style={styles.title}>ای تنظیم ڈائری</Text>
+            <Text style={styles.title}>{i18n.t('appname')}</Text>
+            {/* , width: 50, height: 50, backgroundColor: "#008CFF", borderColor: "gray", shadowColor: "black", alignContent: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, */}
+            <View style={[{ position: "absolute", top: 20, right: 20 }]}>
+              <CustomButton
+                text={(currentLanguage === "ur" ? "En" : "ار")}
+                textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
+                viewStyle={[{ width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
+                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
+                onPress={() => {
+                  changeLanguage(currentLanguage === "ur" ? "en" : "ur");
+                }}
+              />
+            </View>
           </View>
           <View style={styles.loginContainer}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputText}>ای میل</Text>
+              <Text style={styles.inputText}>{i18n.t('email')}</Text>
               <CustomTextInput
-                placeholder="اپنی ای میل درج کریں"
+                placeholder={i18n.t('enter_your_email')}
                 placeholderTextColor={"#2D2327"}
                 onChangeText={newText => setEmail(newText)}
                 value={email}
@@ -70,7 +98,7 @@ export default function Index() {
               ></CustomTextInput>
             </View>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputText}>پاسوڑڈ</Text>
+              <Text style={styles.inputText}>{i18n.t('password')}</Text>
               <CustomTextInput
                 placeholder="********"
                 placeholderTextColor={"#2D2327"}
@@ -83,10 +111,10 @@ export default function Index() {
             <Text style={styles.errText}>{errText}</Text>
             <View style={styles.resetPass}>
               <Pressable onPress={() => console.log("password reset")}>
-                <Text style={styles.resetPass}>پاس ورڈ ری سیٹ کریں</Text>
+                <Text style={styles.resetPass}>{i18n.t('reset_your_password')}</Text>
               </Pressable >
             </View>
-            <CustomButton text={"لاگ اِن کریں"} onPress={() => loginUser(email, password, setEmailErr, setPassErr, setErrText)}></CustomButton>
+            <CustomButton text={i18n.t('login')} textStyle={undefined} onPress={() => loginUser(email, password, setEmailErr, setPassErr, setErrText)} viewStyle={undefined}></CustomButton>
           </View>
         </View>
       </ScrollView>

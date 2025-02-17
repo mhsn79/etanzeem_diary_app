@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Pressable, PressableProps, StyleSheet, Text } from "react-native";
+import { ImageStyle, Pressable, PressableProps, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 
 interface CustomButtonProps extends PressableProps {
   text: String;
+  viewStyle: [ViewStyle] | undefined;
+  textStyle: [TextStyle] | undefined;
 }
 
-export default function CustomButton({ text , ...rest }: CustomButtonProps) {
+export default function CustomButton({ text, viewStyle, textStyle, ...rest }: CustomButtonProps) {
 
   const [pressed, setPressed] = useState(false);
 
@@ -16,11 +18,12 @@ export default function CustomButton({ text , ...rest }: CustomButtonProps) {
       style={[
         styles.button,
         pressed && styles.buttonPressed,
-        !rest.onPress && styles.disabled
+        !rest.onPress && styles.disabled,
+        viewStyle
       ]}
       disabled={!rest.onPress}
       {...rest}>
-      <Text style={[styles.buttonText, !rest.onPress && styles.disabledText]}>{text}</Text>
+      <Text style={[styles.buttonText, !rest.onPress && styles.disabledText, textStyle]}>{text}</Text>
     </Pressable>
   );
 }
