@@ -9,7 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
 
-const client = createDirectus('http://174.138.29.121:8055')
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL as string;
+
+const client = createDirectus(BASE_URL)
   .with(authentication('json'))
   .with(rest());
 
