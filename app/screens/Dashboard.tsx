@@ -2,10 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from './i18n';
-import Dropdown from "./components/DropDown";
-import CustomButton from './components/CustomButton';
+import i18n from '../i18n';
+import Dropdown from "../components/DropDown";
+import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { routeToScreen } from 'expo-router/build/useScreens';
+import UnitSelection from './UnitSelection';
+import { router } from 'expo-router';
 
 const Dashboard: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -67,7 +70,7 @@ const Dashboard: React.FC = () => {
       <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
         {/* Top Line: Small logo + App name */}
         <View style={styles.header}>
-          <Image source={require('../assets/images/icon.png')} style={styles.logo} />
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={styles.appName}>{i18n.t('appname')}</Text>
           {/* <View style={[{ position: "absolute", top: 20, right: 20 }]}> */}
           <CustomButton
@@ -90,7 +93,7 @@ const Dashboard: React.FC = () => {
           </TouchableOpacity>
           <View style={styles.userInfo}>
             {/* User Picture */}
-            <Image source={require('../assets/images/icon.png')} style={styles.userImage} />
+            <Image source={require('../../assets/images/icon.png')} style={styles.userImage} />
             <View style={styles.userDetails}>
               <Text style={styles.locationName}>{i18n.t('location')}</Text>
               <View style={styles.detailsRow}>
@@ -125,13 +128,17 @@ const Dashboard: React.FC = () => {
         {/* Rows of Boxes (Dark Gray Background) */}
         <View style={styles.boxRow}>
           <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('workforce')}</Text>
-            <Text style={styles.boxContent}>{i18n.t('arakan')} 50</Text>
+            <TouchableOpacity onPress={() => router.push("/screens/Workforce")}>
+              <Text style={styles.boxTitle}>{i18n.t('workforce')}</Text>
+            </TouchableOpacity>
+            <Text style={styles.boxContent}>{i18n.t('arkan')} 50</Text>
             <Text style={styles.boxContent}>{i18n.t('increase')} 5</Text>
             <Text style={styles.boxContent}>{i18n.t('target')} 10</Text>
           </View>
-          <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('sub_units')}</Text>
+          <View style={styles.box}>            
+            <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
+              <Text style={styles.boxTitle}>{i18n.t('sub_units')}</Text>
+            </TouchableOpacity>
             <Text style={styles.boxContent}>{i18n.t('wards')} 5</Text>
             <Text style={styles.boxContent}>-</Text>
             <Text style={styles.boxContent}>-</Text>
