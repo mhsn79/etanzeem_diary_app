@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '../i18n';
-import Dropdown from "../components/DropDown";
+import CustomDropdown from "../components/CustomDropdown";
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { routeToScreen } from 'expo-router/build/useScreens';
@@ -47,6 +47,18 @@ const Dashboard: React.FC = () => {
     { label: i18n.t('last_year'), value: 'last_year' },
     { label: i18n.t('last_2_years'), value: 'last_2_years' },
   ]);
+
+  const durationItemNames = [
+    i18n.t('last_2_weeks'),
+    i18n.t('last_4_weeks'),
+    i18n.t('this_month'),
+    i18n.t('last_month'),
+    i18n.t('last_3_months'),
+    i18n.t('last_6_months'),
+    i18n.t('this_year'),
+    i18n.t('last_year'),
+    i18n.t('last_2_years'),
+  ];
 
   useEffect(() => {
     // Load saved language preference
@@ -111,15 +123,15 @@ const Dashboard: React.FC = () => {
         {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
         <View style={styles.boxRow}>
           <View style={[styles.box, { position: 'static' }]}>
-            <Dropdown
-              data={durationItems}
-              onChange={console.log}
+            <CustomDropdown
+              options={durationItemNames}
+              onSelect={console.log}
               placeholder={i18n.t('select_duration')}
             />
           </View>
 
           <View style={styles.box}>
-            <TouchableOpacity style={styles.reportButton}>
+            <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
               <Text style={styles.reportButtonText}>{i18n.t('generate_report')}</Text>
             </TouchableOpacity>
           </View>
