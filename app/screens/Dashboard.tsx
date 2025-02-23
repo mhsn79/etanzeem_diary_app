@@ -1,355 +1,635 @@
-// Dashboard.tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, FlatList, StatusBar, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '../i18n';
 import CustomDropdown from "../components/CustomDropdown";
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { routeToScreen } from 'expo-router/build/useScreens';
-import UnitSelection from './UnitSelection';
+import { Ionicons } from '@expo/vector-icons'; // Assuming you're using Expo
 import { router } from 'expo-router';
+import Spacer from '../components/Spacer';
+import SmallTarazu from "../../assets/images/small-tarazu.svg";
+import LocationIcon from "../../assets/images/location-icon.svg";
+import UserIcon from "../../assets/images/user-icon.svg"
+import ReportIcon1 from "../../assets/images/report-icon-1.svg"
+import LeftUpArrowWhite from "../../assets/images/left-up-arrow-white.svg";
+import LeftUpArrowBlue from "../../assets/images/left-up-arrow-blue.svg";
 
-const Dashboard: React.FC = () => {
-  const insets = useSafeAreaInsets();
+const Dashboard = () => {
+    const insets = useSafeAreaInsets(); // Get safe area insets
 
-  const [currentLanguage, setCurrentLanguage] = React.useState(i18n.locale);
-  const [direction, setDirection] = useState(currentLanguage === "ur" ? 'rtl' : 'ltr');
+    const [currentLanguage, setCurrentLanguage] = React.useState(i18n.locale);
+    const [direction, setDirection] = useState(currentLanguage === "ur" ? 'rtl' : 'ltr');
 
-  const changeLanguage = async (languageCode: string) => {
-    try {
-      await AsyncStorage.setItem('userLanguage', languageCode);
-      i18n.locale = languageCode;
-      setCurrentLanguage(languageCode);
-    } catch (error) {
-      console.error('Error saving language preference:', error);
-    }
-  };
-
-  const changeDirection = async (dir: string) => {
-    try {
-      setDirection(dir);
-    } catch (error) {
-      console.error('Error saving language preference:', error);
-    }
-  };
-
-  const [durationOpen, setDurationOpen] = useState(false);
-  const [durationValue, setDurationValue] = useState(null);
-  const [durationItems, setDurationItems] = useState([
-    { label: i18n.t('last_2_weeks'), value: 'last_2_weeks' },
-    { label: i18n.t('last_4_weeks'), value: 'last_4_weeks' },
-    { label: i18n.t('this_month'), value: 'this_month' },
-    { label: i18n.t('last_month'), value: 'last_month' },
-    { label: i18n.t('last_3_months'), value: 'last_3_months' },
-    { label: i18n.t('last_6_months'), value: 'last_6_months' },
-    { label: i18n.t('this_year'), value: 'this_year' },
-    { label: i18n.t('last_year'), value: 'last_year' },
-    { label: i18n.t('last_2_years'), value: 'last_2_years' },
-  ]);
-
-  const durationItemNames = [
-    i18n.t('last_2_weeks'),
-    i18n.t('last_4_weeks'),
-    i18n.t('this_month'),
-    i18n.t('last_month'),
-    i18n.t('last_3_months'),
-    i18n.t('last_6_months'),
-    i18n.t('this_year'),
-    i18n.t('last_year'),
-    i18n.t('last_2_years'),
-  ];
-
-  useEffect(() => {
-    // Load saved language preference
-    const loadLanguagePreference = async () => {
-      try {
-        const savedLanguage = await AsyncStorage.getItem('userLanguage');
-        if (savedLanguage) {
-          i18n.locale = savedLanguage;
+    const changeLanguage = async (languageCode: string) => {
+        try {
+            await AsyncStorage.setItem('userLanguage', languageCode);
+            i18n.locale = languageCode;
+            setCurrentLanguage(languageCode);
+        } catch (error) {
+            console.error('Error saving language preference:', error);
         }
-        console.log('savedLanguage', i18n.locale)
-      } catch (error) {
-        console.error('Error loading language preference:', error);
-      }
     };
 
-    loadLanguagePreference();
-  }, []);
+    const changeDirection = async (dir: string) => {
+        try {
+            setDirection(dir);
+        } catch (error) {
+            console.error('Error saving language preference:', error);
+        }
+    };
 
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
-        {/* Top Line: Small logo + App name */}
-        <View style={styles.header}>
-          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
-          <Text style={styles.appName}>{i18n.t('appname')}</Text>
-          {/* <View style={[{ position: "absolute", top: 20, right: 20 }]}> */}
-          <CustomButton
-            text={(currentLanguage === "ur" ? "En" : "ار")}
-            textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
-            viewStyle={[{ marginTop: 0, width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-            // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
-            onPress={() => {
-              changeLanguage(currentLanguage === "ur" ? "en" : "ur");
-              changeDirection(currentLanguage === "ur" ? "rtl" : "ltr");
-            }}
-          />
-          {/* </View> */}
-        </View>
+    let scheduleForToday = [
+        { "eventName": "Event 1", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
+        { "eventName": "Event 2", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
+        { "eventName": "Event 3", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
+        { "eventName": "Event 4", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
+        { "eventName": "Event 5", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }
+    ];
 
-        {/* Blue Rounded Rectangle (User Info) */}
-        <View style={styles.userInfoContainer}>
-          <TouchableOpacity style={styles.arrowButton}>
-            <Text style={styles.arrowText}>↑</Text>
-          </TouchableOpacity>
-          <View style={styles.userInfo}>
-            {/* User Picture */}
-            <Image source={require('../../assets/images/icon.png')} style={styles.userImage} />
-            <View style={styles.userDetails}>
-              <Text style={styles.locationName}>{i18n.t('location')}</Text>
-              <View style={styles.detailsRow}>
-                <Text style={styles.iconText}>🟡</Text>
-                <Text style={styles.detailsText}>{i18n.t('address')}</Text>
-              </View>
-              <View style={styles.detailsRow}>
-                <Text style={styles.iconText}>🟡</Text>
-                <Text style={styles.detailsText}>{i18n.t('username')}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+    const [durationOpen, setDurationOpen] = useState(false);
+    const [durationValue, setDurationValue] = useState(null);
+    const [durationItems, setDurationItems] = useState([
+        { label: i18n.t('last_2_weeks'), value: 'last_2_weeks' },
+        { label: i18n.t('last_4_weeks'), value: 'last_4_weeks' },
+        { label: i18n.t('this_month'), value: 'this_month' },
+        { label: i18n.t('last_month'), value: 'last_month' },
+        { label: i18n.t('last_3_months'), value: 'last_3_months' },
+        { label: i18n.t('last_6_months'), value: 'last_6_months' },
+        { label: i18n.t('this_year'), value: 'this_year' },
+        { label: i18n.t('last_year'), value: 'last_year' },
+        { label: i18n.t('last_2_years'), value: 'last_2_years' },
+    ]);
 
-        {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
-        <View style={styles.boxRow}>
-          <View style={[styles.box, { position: 'static' }]}>
-            <CustomDropdown
-              options={durationItemNames}
-              onSelect={console.log}
-              placeholder={i18n.t('select_duration')}
-            />
-          </View>
+    const durationItemNames = [
+        i18n.t('last_2_weeks'),
+        i18n.t('last_4_weeks'),
+        i18n.t('this_month'),
+        i18n.t('last_month'),
+        i18n.t('last_3_months'),
+        i18n.t('last_6_months'),
+        i18n.t('this_year'),
+        i18n.t('last_year'),
+        i18n.t('last_2_years'),
+    ];
 
-          <View style={styles.box}>
-            <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
-              <Text style={styles.reportButtonText}>{i18n.t('generate_report')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+    // Get the current date
+    const currentDate = new Date();
 
-        {/* Rows of Boxes (Dark Gray Background) */}
-        <View style={styles.boxRow}>
-          <View style={styles.box}>
-            <TouchableOpacity onPress={() => router.push("/screens/Workforce")}>
-              <Text style={styles.boxTitle}>{i18n.t('workforce')}</Text>
-            </TouchableOpacity>
-            <Text style={styles.boxContent}>{i18n.t('arkan')} 50</Text>
-            <Text style={styles.boxContent}>{i18n.t('increase')} 5</Text>
-            <Text style={styles.boxContent}>{i18n.t('target')} 10</Text>
-          </View>
-          <View style={styles.box}>            
-            <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
-              <Text style={styles.boxTitle}>{i18n.t('sub_units')}</Text>
-            </TouchableOpacity>
-            <Text style={styles.boxContent}>{i18n.t('wards')} 5</Text>
-            <Text style={styles.boxContent}>-</Text>
-            <Text style={styles.boxContent}>-</Text>
-          </View>
-        </View>
-        <View style={styles.boxRow}>
-          <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('activities')}</Text>
-            <Text style={styles.boxContent}>{i18n.t('organizational')} 1</Text>
-            <Text style={styles.boxContent}>{i18n.t('invitational')} 1</Text>
-            <Text style={styles.boxContent}>{i18n.t('training')} 1</Text>
-          </View>
-          <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('upper_management')}</Text>
-            <Text style={styles.boxContent}>{i18n.t('activities')} 1</Text>
-            <Text style={styles.boxContent}>{i18n.t('participation')} 1</Text>
-            <Text style={styles.boxContent}>-</Text>
-          </View>
-        </View>
-        <View style={styles.boxRow}>
-          <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('visits')}</Text>
-            <Text style={styles.boxContent}>{i18n.t('meetings')} 1</Text>
-            <Text style={styles.boxContent}>-</Text>
-            <Text style={styles.boxContent}>-</Text>
-          </View>
-          <View style={styles.box}>
-            <Text style={styles.boxTitle}>{i18n.t('money')}</Text>
-            <Text style={styles.boxContent}>{i18n.t('income')} 0</Text>
-            <Text style={styles.boxContent}>{i18n.t('expenses')} 0</Text>
-            <Text style={styles.boxContent}>-</Text>
-          </View>
-        </View>
+    // Format the date as "February 23, 2025"
+    const formattedDate = currentDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
 
-        {/* Full Width White Button */}
-        <TouchableOpacity style={styles.bottomButton}>
-          <Text style={styles.bottomButtonText}></Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
+    let colorScheme = useColorScheme();
+    let styles = colorScheme === "dark" ? darkThemeStyles : lightThemeStyles
+
+    useEffect(() => {
+        // Load saved language preference
+        const loadLanguagePreference = async () => {
+          try {
+            const savedLanguage = await AsyncStorage.getItem('userLanguage');
+            if (savedLanguage) {
+              i18n.locale = savedLanguage;
+            }
+            console.log('savedLanguage', i18n.locale)
+          } catch (error) {
+            console.error('Error loading language preference:', error);
+          }
+        };
+    
+        loadLanguagePreference();
+      }, []);
+    
+    return (
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            {/* <View style={{ flex: 1 }}> */}
+            <StatusBar hidden />
+            {/* Header section */}
+            <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB" }}>
+                <View style={[styles.header, { paddingTop: 0, height: 300, alignItems: 'center' }]}>
+                    <View style={[styles.headerContent, { paddingTop: insets.top }]}>
+                        <Ionicons
+                            name="arrow-back"
+                            size={24}
+                            color="black"
+                            onPress={() => router.back()} // Navigate to Home screen on press
+                        />
+                        <Spacer height={30}></Spacer>
+                        <View style={{ flexDirection: "row", alignContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: "white", paddingEnd: 5 }}>{i18n.t('e-tanzeem')}</Text>
+                            <SmallTarazu style={{ width: 34, height: 32 }} />
+                        </View>
+                        <Spacer height={30}></Spacer>
+                        <CustomButton
+                                text={(currentLanguage === "ur" ? "En" : "ار")}
+                                textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
+                                viewStyle={[{ marginTop: 0, width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
+                                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
+                                onPress={() => {
+                                  changeLanguage(currentLanguage === "ur" ? "en" : "ur");
+                                  changeDirection(currentLanguage === "ur" ? "rtl" : "ltr");
+                                }}
+                              />
+                    </View>
+                    {/* Image section */}
+                    <View style={[styles.imageContainer, { paddingTop: 10, marginTop: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%" }]}>
+                        <View style={{ flex: 1, paddingRight: 15 }}>
+                            <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
+                                <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
+                                    <Spacer height={10}></Spacer>
+                                    <LeftUpArrowWhite style={{ width: 17, height: 17 }} />
+                                    <Text style={{ color: "white", fontSize: 18, marginStart: 10 }}>UC</Text>
+                                </View>
+                            </TouchableOpacity>
+                            <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
+                                <View style={{ flex: 1, width: "100%" }} />
+                                <Text style={{ color: "white", fontSize: 18 }}>Zone</Text>
+                                <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
+                            </View>
+                            <TouchableOpacity onPress={() => router.push("/screens/Profile")}>
+                                <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
+                                    <Spacer height={10} width={"100%"}></Spacer>
+                                    <Text style={{ color: "white", fontSize: 18 }}>Nazim</Text>
+                                    <UserIcon style={{ width: 14, height: 15, marginStart: 10 }} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                        <Image
+                            source={require('../../assets/images/icon.png')}
+                            style={[styles.logo]}
+                        />
+                    </View>
+                    <View style={{ position: "absolute", padding: 5, marginTop: 200, width: "100%" }}>
+                        {/* Schedule */}
+                        <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 160, borderRadius: 15, width: "100%", padding: 5 }}>
+                            {/* Schedule Heading */}
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
+                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>Today's Schedule</Text>
+                                <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
+                                    <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>View All</Text>
+                                </TouchableOpacity>
+                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{formattedDate}</Text>
+                            </View>
+                            {/* Schedule Details */}
+                            <ScrollView>
+                                {scheduleForToday.map((item, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        onPress={() => console.log(item)}>
+                                        <View key={index} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
+                                            <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{index + 1}</Text>
+                                            <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{item.eventName}</Text>
+                                            <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{item.startTime}</Text>
+                                            {/* <Text style={{ color: (colorScheme === "dark") ? "white" : "black"}}>{item.endTime}</Text> */}
+                                            <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{item.location}</Text>
+                                            {/* <Text style={{ color: (colorScheme === "dark") ? "white" : "black"}}>{item.description}</Text> */}
+                                            {/* <Text style={{ color: (colorScheme === "dark") ? "white" : "black"}}>{item.type}</Text> */}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={{ margin: 15, marginTop: 75, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
+                    {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
+                    <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
+                        <TouchableOpacity style={[styles.reportButton, { flexDirection: "row", height: 48, padding: 10 }]} onPress={() => router.push("/screens/Reports")}>
+                            <Text style={styles.reportButtonText}>{i18n.t('generate_report')}</Text>
+                            <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
+                        </TouchableOpacity>
+                        <View style={{ width: 150 }}>
+                            <CustomDropdown
+                                viewStyle={[{ backgroundColor: "transparent" }]}
+                                options={durationItemNames}
+                                onSelect={console.log}
+                                placeholder={i18n.t('select_duration')}
+                                textStyle={[{ color: (colorScheme === 'dark') ? "#FFB30F" : "#0BA241" }]} />
+                        </View>
+                    </View>
+
+                    {/* Rows of Boxes (Dark Gray Background) */}
+                    <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: 0 }]} style={{ height: 280 }}>
+                        {/* <View> */}
+                        <View style={styles.boxRow}>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/Workforce")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('workforce')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>50</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('arkan')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>5</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('increase')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>10</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('target')}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('sub_units')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>5</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('wards')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={styles.boxRow}>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('activities')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>1</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('organizational')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>1</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('invitational')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>1</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('training')}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('upper_management')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>1</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('activities')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>1</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('participation')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={styles.boxRow}>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/Meetings")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('visits')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('meetings')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                            </View>
+                            <View style={styles.box}>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <LeftUpArrowBlue />
+                                    <TouchableOpacity onPress={() => router.push("/screens/Income")}>
+                                        <Text style={styles.boxTitle}>{i18n.t('money')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>0</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('income')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>0</Text>
+                                    <Text style={styles.boxContent}>{i18n.t('expenses')}</Text>
+                                </View>
+                                <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                                    <Text style={styles.boxContent}>-</Text>
+                                    <Text style={styles.boxContent}>-</Text>
+                                </View>
+                            </View>
+                        </View>
+                        {/* </View> */}
+                    </ScrollView>
+                </View>
+            </View >
+        </KeyboardAvoidingView >
+    );
 };
 
-const styles = StyleSheet.create({
-  triggerStyle: {
-    height: 40,
-    backgroundColor: 'gray', // colors.primary,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: 100,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
-  },
-  triggerText: {
-    fontSize: 16,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  logo: {
-    width: 40,
-    height: 40,
-    marginRight: 10,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  userInfoContainer: {
-    backgroundColor: '#1E90FF',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  arrowButton: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 5,
-  },
-  arrowText: {
-    color: '#1E90FF',
-    fontSize: 20,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  userImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-  },
-  userDetails: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-  },
-  locationName: {
-    color: '#fff',
-    fontSize: 18,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconText: {
-    color: 'yellow',
-    marginRight: 5,
-  },
-  detailsText: {
-    color: '#fff',
-  },
-  reportContainer: {
-    backgroundColor: '#d3d3d3',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
-  },
-  picker: {
-    marginBottom: 10,
-    height: 40,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-  },
-  reportButton: {
-    backgroundColor: '#1E90FF',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  reportButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  boxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  box: {
-    backgroundColor: '#333',
-    width: '48%',
-    borderRadius: 10,
-    padding: 15,
-  },
-  boxTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  boxContent: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  bottomButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1E90FF',
-    marginTop: 30,
-  },
-  bottomButtonText: {
-    color: '#1E90FF',
-    fontSize: 16,
-  },
-  languageButton: {
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#f0f0f0',
-  },
-  selectedLanguage: {
-    backgroundColor: '#007AFF',
-  },
-  languageText: {
-    fontSize: 16,
-  },
-  selectedLanguageText: {
-    color: 'white',
-  },
+const darkThemeStyles = StyleSheet.create({
+    header: {
+        backgroundColor: '#23242D',
+        height: 100, // Adjust the height of your header
+        // justifyContent: 'center',
+        paddingHorizontal: 15,
+    },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerTextContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerText: {
+        color: 'white',
+        paddingEnd: 5,
+        fontSize: 18,
+    },
+    imageContainer: {
+        // alignItems: 'center', // Center the image
+        // marginTop: -30, // To overlap slightly above the header (optional)
+    },
+    logo: {
+        width: 85, // Adjust your image size
+        height: 85, // Adjust your image size
+        resizeMode: 'contain', // Ensure it fits inside the container
+    },
+    boxRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    box: {
+        backgroundColor: '#23242D',
+        width: '48%',
+        borderRadius: 10,
+        padding: 15,
+    },
+    boxTitle: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginBottom: 5,
+    },
+    boxContent: {
+        color: '#575862',
+        fontSize: 14,
+    },
+    reportButton: {
+        backgroundColor: '#1E90FF',
+        borderRadius: 8,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    reportButtonText: {
+        color: '#fff',
+        fontSize: 16,
+    }
 });
+
+const lightThemeStyles = StyleSheet.create({
+    header: {
+        backgroundColor: '#008cff',
+        height: 100, // Adjust the height of your header
+        // justifyContent: 'center',
+        paddingHorizontal: 15,
+    },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerTextContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerText: {
+        color: '#1E90FF',
+        paddingEnd: 5,
+        fontSize: 18,
+    },
+    imageContainer: {
+        // alignItems: 'center', // Center the image
+        // marginTop: -30, // To overlap slightly above the header (optional)
+    },
+    logo: {
+        width: 85, // Adjust your image size
+        height: 85, // Adjust your image size
+        resizeMode: 'contain', // Ensure it fits inside the container
+    },
+    boxRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    box: {
+        backgroundColor: "#FFFFFF",
+        width: '48%',
+        borderRadius: 10,
+        padding: 15,
+    },
+    boxTitle: {
+        color: '#1E90FF',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginBottom: 5,
+    },
+    boxContent: {
+        color: '#000',
+        fontSize: 14,
+    },
+    reportButton: {
+        backgroundColor: '#1E90FF',
+        borderRadius: 8,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    reportButtonText: {
+        color: '#fff',
+        fontSize: 16,
+    }
+});
+
+const otherStyles = StyleSheet.create({
+    triggerStyle: {
+      height: 40,
+      backgroundColor: 'gray', // colors.primary,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: 100,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 5,
+    },
+    triggerText: {
+      fontSize: 16,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: '#fff',
+      padding: 20,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    logo: {
+      width: 40,
+      height: 40,
+      marginRight: 10,
+    },
+    appName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    userInfoContainer: {
+      backgroundColor: '#1E90FF',
+      borderRadius: 15,
+      padding: 15,
+      marginBottom: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    arrowButton: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      backgroundColor: '#fff',
+      borderRadius: 15,
+      padding: 5,
+    },
+    arrowText: {
+      color: '#1E90FF',
+      fontSize: 20,
+    },
+    userInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    userImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: 15,
+    },
+    userDetails: {
+      flexDirection: 'column',
+      justifyContent: 'center',
+    },
+    locationName: {
+      color: '#fff',
+      fontSize: 18,
+    },
+    detailsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    iconText: {
+      color: 'yellow',
+      marginRight: 5,
+    },
+    detailsText: {
+      color: '#fff',
+    },
+    reportContainer: {
+      backgroundColor: '#d3d3d3',
+      borderRadius: 15,
+      padding: 15,
+      marginBottom: 20,
+    },
+    picker: {
+      marginBottom: 10,
+      height: 40,
+      backgroundColor: '#fff',
+      borderRadius: 8,
+    },
+    reportButton: {
+      backgroundColor: '#1E90FF',
+      borderRadius: 8,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    reportButtonText: {
+      color: '#fff',
+      fontSize: 16,
+    },
+    boxRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    box: {
+      backgroundColor: '#333',
+      width: '48%',
+      borderRadius: 10,
+      padding: 15,
+    },
+    boxTitle: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 16,
+      marginBottom: 5,
+    },
+    boxContent: {
+      color: '#fff',
+      fontSize: 14,
+    },
+    bottomButton: {
+      backgroundColor: '#fff',
+      paddingVertical: 15,
+      alignItems: 'center',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#1E90FF',
+      marginTop: 30,
+    },
+    bottomButtonText: {
+      color: '#1E90FF',
+      fontSize: 16,
+    },
+    languageButton: {
+      padding: 15,
+      borderRadius: 8,
+      marginBottom: 10,
+      backgroundColor: '#f0f0f0',
+    },
+    selectedLanguage: {
+      backgroundColor: '#007AFF',
+    },
+    languageText: {
+      fontSize: 16,
+    },
+    selectedLanguageText: {
+      color: 'white',
+    },
+  });
 
 export default Dashboard;

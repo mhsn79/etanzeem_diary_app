@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TouchableWithoutFeedback, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TouchableWithoutFeedback, Dimensions, TextStyle, ViewStyle } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome'; // Import FontAwesome icon library
+import Spacer from './Spacer';
 
 interface CustomDropdownProps {
   options: string[]; // List of options for the dropdown
   onSelect: (selectedItem: string) => void; // Callback when an item is selected
   placeholder?: string; // Placeholder text when no item is selected
+  viewStyle: [ViewStyle?];
+  textStyle: [TextStyle?];
 }
 
-const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, onSelect, placeholder = 'Select an option' }) => {
+const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, onSelect, placeholder = 'Select an option', viewStyle, textStyle, ...rest }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
 
@@ -21,20 +24,20 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, onSelect, plac
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, viewStyle]}>
       {/* Touchable area that triggers the dropdown */}
-      <TouchableOpacity onPress={toggleDropdown} style={styles.input}>
-        <Text style={styles.inputText}>
-          {selectedValue ? selectedValue : placeholder}
-        </Text>
-        
+      <TouchableOpacity onPress={toggleDropdown} style={[styles.input, viewStyle]}>
         {/* Arrow indicator */}
         <Icon
           name={isOpen ? 'chevron-up' : 'chevron-down'}  // Toggle arrow based on dropdown state
           size={20}
-          color="#333"
-          style={styles.arrowIcon}
+          // color="#333"
+          style={[styles.arrowIcon, textStyle]}
         />
+
+        <Text style={[styles.inputText, textStyle]}>
+          {selectedValue ? selectedValue : placeholder}
+        </Text>
       </TouchableOpacity>
 
       {/* Dropdown List */}
@@ -50,7 +53,10 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, onSelect, plac
                 style={styles.dropdownItem}
                 onPress={() => handleSelect(item)}
               >
-                <Text style={styles.dropdownText}>{item}</Text>
+                <View style={{ flexDirection: "row" }}>
+                  <Spacer height={10} />
+                  <Text style={styles.dropdownText}>{item}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -112,7 +118,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    backgroundColor: '#fff',
+    backgroundColor: '#0ff',
   },
   dropdownText: {
     fontSize: 16,

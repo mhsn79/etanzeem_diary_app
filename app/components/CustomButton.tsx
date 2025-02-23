@@ -3,8 +3,8 @@ import { ImageStyle, Pressable, PressableProps, StyleSheet, Text, TextStyle, Vie
 
 interface CustomButtonProps extends PressableProps {
   text: String;
-  viewStyle: [ViewStyle] | undefined;
-  textStyle: [TextStyle] | undefined;
+  viewStyle: [ViewStyle?];
+  textStyle: [TextStyle?];
 }
 
 export default function CustomButton({ text, viewStyle, textStyle, ...rest }: CustomButtonProps) {
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontFamily: "JameelNooriNastaleeq",
+    fontFamily: "29LT Kaff", // "JameelNooriNastaleeq",
     color: "white"
   },
   disabledText: {
