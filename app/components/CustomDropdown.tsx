@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    backgroundColor: '#0ff',
+    backgroundColor: '#fff',
   },
   dropdownText: {
     fontSize: 16,
