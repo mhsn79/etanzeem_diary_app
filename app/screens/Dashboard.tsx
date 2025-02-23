@@ -112,12 +112,12 @@ const Dashboard = () => {
             <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB" }}>
                 <View style={[styles.header, { paddingTop: 0, height: 300, alignItems: 'center' }]}>
                     <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-                        <Ionicons
+                        {/* <Ionicons
                             name="arrow-back"
                             size={24}
                             color="black"
                             onPress={() => router.back()} // Navigate to Home screen on press
-                        />
+                        /> */}
                         <Spacer height={30}></Spacer>
                         <View style={{ flexDirection: "row", alignContent: "center", alignItems: "center" }}>
                             <Text style={{ color: "white", paddingEnd: 5 }}>{i18n.t('e-tanzeem')}</Text>
@@ -142,18 +142,18 @@ const Dashboard = () => {
                                 <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10}></Spacer>
                                     <LeftUpArrowWhite style={{ width: 17, height: 17 }} />
-                                    <Text style={{ color: "white", fontSize: 18, marginStart: 10 }}>UC</Text>
+                                    <Text style={{ color: "white", fontSize: 18, marginStart: 10 }}>{i18n.t('uc')}</Text>
                                 </View>
                             </TouchableOpacity>
                             <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
                                 <View style={{ flex: 1, width: "100%" }} />
-                                <Text style={{ color: "white", fontSize: 18 }}>Zone</Text>
+                                <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</Text>
                                 <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
                             </View>
                             <TouchableOpacity onPress={() => router.push("/screens/Profile")}>
                                 <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10} width={"100%"}></Spacer>
-                                    <Text style={{ color: "white", fontSize: 18 }}>Nazim</Text>
+                                    <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</Text>
                                     <UserIcon style={{ width: 14, height: 15, marginStart: 10 }} />
                                 </View>
                             </TouchableOpacity>
@@ -168,9 +168,9 @@ const Dashboard = () => {
                         <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 160, borderRadius: 15, width: "100%", padding: 5 }}>
                             {/* Schedule Heading */}
                             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
-                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>Today's Schedule</Text>
+                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t("schedule_for_today")}</Text>
                                 <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
-                                    <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>View All</Text>
+                                    <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t('view-all')}</Text>
                                 </TouchableOpacity>
                                 <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{formattedDate}</Text>
                             </View>
