@@ -8,6 +8,7 @@ import { Appearance, useColorScheme } from 'react-native';
 import CustomDropdown from '../components/CustomDropdown';
 import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
 import { router } from 'expo-router';
+import CustomTabbar from '../components/CustomTabbar';
 
 export default function UnitSelection() {
   const insets = useSafeAreaInsets();
@@ -31,24 +32,22 @@ export default function UnitSelection() {
           <View style={styles.ddcontainer}>
             <Text style={styles.ddheader}>{i18n.t('district')}</Text>
             <CustomDropdown
-              options={[i18n.t('district')+' 1', i18n.t('district')+' 2', i18n.t('district')+' 3']}
-              onSelect={handleSelection}
-            />
+              options={[i18n.t('district') + ' 1', i18n.t('district') + ' 2', i18n.t('district') + ' 3']}
+              onSelect={handleSelection} viewStyle={[]} textStyle={[]}            />
           </View>
           <View style={styles.ddcontainer}>
             <Text style={styles.ddheader}>{i18n.t('zone')}</Text>
             <CustomDropdown
-              options={[i18n.t('zone')+' 1', i18n.t('zone')+' 2', i18n.t('zone')+' 3']}
-              onSelect={handleSelection}
-            />
+              options={[i18n.t('zone') + ' 1', i18n.t('zone') + ' 2', i18n.t('zone') + ' 3']}
+              onSelect={handleSelection} viewStyle={[]} textStyle={[]}            />
           </View>
           <View style={styles.ddcontainer}>
             <Text style={styles.ddheader}>{i18n.t('uc')}</Text>
             <CustomDropdown
-              options={[i18n.t('uc')+' 1', i18n.t('uc')+' 2', i18n.t('uc')+' 3']}
-              onSelect={handleSelection}
-            />
+              options={[i18n.t('uc') + ' 1', i18n.t('uc') + ' 2', i18n.t('uc') + ' 3']}
+              onSelect={handleSelection} viewStyle={[]} textStyle={[]}            />
           </View>
+          <CustomTabbar />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

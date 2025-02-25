@@ -123,7 +123,7 @@ export default function LoginScreen() {
                 <Text style={styles.resetPass}>{i18n.t('reset_your_password')}</Text>
               </Pressable >
             </View>
-            <CustomButton text={i18n.t('login')} textStyle={undefined} onPress={() => loginUser(email, password, setEmailErr, setPassErr, setErrText)} viewStyle={undefined}></CustomButton>
+            <CustomButton text={i18n.t('login')} textStyle={[]} onPress={() => loginUser(email, password, setEmailErr, setPassErr, setErrText)} viewStyle={[]}></CustomButton>
           </View>
         </View>
       </ScrollView>
