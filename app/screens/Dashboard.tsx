@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, FlatList, StatusBar, useColorScheme } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '../i18n';
 import CustomDropdown from "../components/CustomDropdown";
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { routeToScreen } from 'expo-router/build/useScreens';
-import { Ionicons } from '@expo/vector-icons'; // Assuming you're using Expo
 import { router } from 'expo-router';
 import Spacer from '../components/Spacer';
 import SmallTarazu from "../../assets/images/small-tarazu.svg";
@@ -100,10 +98,10 @@ const Dashboard = () => {
             console.error('Error loading language preference:', error);
           }
         };
-    
+
         loadLanguagePreference();
       }, []);
-    
+
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             {/* <View style={{ flex: 1 }}> */}
@@ -128,7 +126,7 @@ const Dashboard = () => {
                                 text={(currentLanguage === "ur" ? "En" : "ار")}
                                 textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
                                 viewStyle={[{ marginTop: 0, width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-                                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
+                                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50,
                                 onPress={() => {
                                   changeLanguage(currentLanguage === "ur" ? "en" : "ur");
                                   changeDirection(currentLanguage === "ur" ? "rtl" : "ltr");

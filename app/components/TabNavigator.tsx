@@ -8,6 +8,7 @@ import Arkan from '../screens/Arkan';
 import Reports from '../screens/Reports';
 import Dashboard from '../screens/Dashboard';
 import i18n from '../i18n';
+import UnitSelection from '../screens/UnitSelection';
 
 const Tab = createBottomTabNavigator();
 

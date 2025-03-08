@@ -8,7 +8,7 @@ type SpacerProps = {
 };
 
 const Spacer: React.FC<SpacerProps> = ({ height = 20, backgroundColor = "transparent", width = "100%" }) => {
-  return <View style={{ flex: 1, height, width, backgroundColor }} />;
+  return <View style={{ height, width, backgroundColor }} />;
 };
 
 export default Spacer;
