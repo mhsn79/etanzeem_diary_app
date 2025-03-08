@@ -8,7 +8,7 @@ export default function RootLayout(){
         headerShown: false,
       }}
     >
-      <Stack.Screen name="Dashboard"/>
+      <Stack.Screen name="screens/Dashboard"/>
     </Stack>
   )
 }
