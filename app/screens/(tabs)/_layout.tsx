@@ -12,13 +12,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Reports"
         options={{
-          tabBarLabel: "کارکردگی رپورٹس"
+          tabBarLabel: "کارکردگی"
         }}
       />
       <Tabs.Screen
         name="Activities"
         options={{
-          tabBarLabel: "سرگرمیاں (شیڈول)"
+          tabBarLabel: "سرگرمیاں"
         }}
       />
       <Tabs.Screen
@@ -30,7 +30,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Dashboard"
         options={{
-          tabBarLabel: "ڈیش بوڑڈ"
+          tabBarLabel: "ڈیش بورڈ"
         }}
       />
     </Tabs>

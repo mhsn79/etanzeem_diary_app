@@ -15,16 +15,16 @@ function getIcon(label: string, focused?: boolean) {
     return (
         focused
         ? <>
-            {label === 'ڈیش بوڑڈ' && <HomeIconWhite style={{ width: 25, height: 25 }} />}
+            {label === 'ڈیش بورڈ' && <HomeIconWhite style={{ width: 25, height: 25 }} />}
             {label === 'ارکان' && <ArkanIconWhite style={{ width: 25, height: 25 }} />}
-            {label === 'سرگرمیاں (شیڈول)' && <ActivitiesIconWhite style={{ width: 25, height: 25 }} />}
-            {label === 'کارکردگی رپورٹس' && <ReportIcon2White style={{ width: 25, height: 25 }} />}
+            {label === 'سرگرمیاں' && <ActivitiesIconWhite style={{ width: 25, height: 25 }} />}
+            {label === 'کارکردگی' && <ReportIcon2White style={{ width: 25, height: 25 }} />}
         </>
         : <>
-            {label === 'ڈیش بوڑڈ' && <HomeIconBlack style={{ width: 25, height: 25 }} />}
+            {label === 'ڈیش بورڈ' && <HomeIconBlack style={{ width: 25, height: 25 }} />}
             {label === 'ارکان' && <ArkanIconBlack style={{ width: 25, height: 25 }} />}
-            {label === 'سرگرمیاں (شیڈول)' && <ActivitiesIconBlack style={{ width: 25, height: 25 }} />}
-            {label === 'کارکردگی رپورٹس' && <ReportIcon2Black style={{ width: 25, height: 25 }} />}
+            {label === 'سرگرمیاں' && <ActivitiesIconBlack style={{ width: 25, height: 25 }} />}
+            {label === 'کارکردگی' && <ReportIcon2Black style={{ width: 25, height: 25 }} />}
         </>
     );
 }
