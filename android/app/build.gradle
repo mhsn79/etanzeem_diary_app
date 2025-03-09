@@ -86,9 +86,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.etanzeem_diary_app'
+    namespace 'com.jiislamabad.etanzeemdiaryapp'
     defaultConfig {
-        applicationId 'com.anonymous.etanzeem_diary_app'
+        applicationId 'com.jiislamabad.etanzeemdiaryapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

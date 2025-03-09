@@ -1,10 +1,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View } from 'react-native';
-import i18n from '../i18n';
-import CustomButton from '../components/CustomButton';
+import i18n from '../../i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { commonStyles, lightThemeStyles, darkThemeStyles } from '../_layout';
-import { Appearance, useColorScheme } from 'react-native';
 
 export default function Arkan() {
   const insets = useSafeAreaInsets();

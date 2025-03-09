@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from '../i18n';
-import CustomDropdown from "../components/CustomDropdown";
-import CustomButton from '../components/CustomButton';
+import i18n from '../../i18n';
+import CustomDropdown from "../../components/CustomDropdown";
+import CustomButton from '../../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Spacer from '../components/Spacer';
-import SmallTarazu from "../../assets/images/small-tarazu.svg";
-import LocationIcon from "../../assets/images/location-icon.svg";
-import UserIcon from "../../assets/images/user-icon.svg"
-import ReportIcon1 from "../../assets/images/report-icon-1.svg"
-import LeftUpArrowWhite from "../../assets/images/left-up-arrow-white.svg";
-import LeftUpArrowBlue from "../../assets/images/left-up-arrow-blue.svg";
+import Spacer from '../../components/Spacer';
+import SmallTarazu from "../../../assets/images/small-tarazu.svg";
+import LocationIcon from "../../../assets/images/location-icon.svg";
+import UserIcon from "../../../assets/images/user-icon.svg"
+import ReportIcon1 from "../../../assets/images/report-icon-1.svg"
+import LeftUpArrowWhite from "../../../assets/images/left-up-arrow-white.svg";
+import LeftUpArrowBlue from "../../../assets/images/left-up-arrow-blue.svg";
 
 const Dashboard = () => {
     const insets = useSafeAreaInsets(); // Get safe area insets
@@ -157,7 +157,7 @@ const Dashboard = () => {
                             </TouchableOpacity>
                         </View>
                         <Image
-                            source={require('../../assets/images/icon.png')}
+                            source={require('../../../assets/images/icon.png')}
                             style={[styles.logo]}
                         />
                     </View>
@@ -472,162 +472,5 @@ const lightThemeStyles = StyleSheet.create({
     }
 });
 
-const otherStyles = StyleSheet.create({
-    triggerStyle: {
-      height: 40,
-      backgroundColor: 'gray', // colors.primary,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      width: 100,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      borderRadius: 5,
-    },
-    triggerText: {
-      fontSize: 16,
-    },
-    container: {
-      flex: 1,
-      backgroundColor: '#fff',
-      padding: 20,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 20,
-    },
-    logo: {
-      width: 40,
-      height: 40,
-      marginRight: 10,
-    },
-    appName: {
-      fontSize: 24,
-      fontWeight: 'bold',
-    },
-    userInfoContainer: {
-      backgroundColor: '#1E90FF',
-      borderRadius: 15,
-      padding: 15,
-      marginBottom: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      position: 'relative',
-    },
-    arrowButton: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      backgroundColor: '#fff',
-      borderRadius: 15,
-      padding: 5,
-    },
-    arrowText: {
-      color: '#1E90FF',
-      fontSize: 20,
-    },
-    userInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    userImage: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      marginRight: 15,
-    },
-    userDetails: {
-      flexDirection: 'column',
-      justifyContent: 'center',
-    },
-    locationName: {
-      color: '#fff',
-      fontSize: 18,
-    },
-    detailsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    iconText: {
-      color: 'yellow',
-      marginRight: 5,
-    },
-    detailsText: {
-      color: '#fff',
-    },
-    reportContainer: {
-      backgroundColor: '#d3d3d3',
-      borderRadius: 15,
-      padding: 15,
-      marginBottom: 20,
-    },
-    picker: {
-      marginBottom: 10,
-      height: 40,
-      backgroundColor: '#fff',
-      borderRadius: 8,
-    },
-    reportButton: {
-      backgroundColor: '#1E90FF',
-      borderRadius: 8,
-      paddingVertical: 10,
-      alignItems: 'center',
-    },
-    reportButtonText: {
-      color: '#fff',
-      fontSize: 16,
-    },
-    boxRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 10,
-    },
-    box: {
-      backgroundColor: '#333',
-      width: '48%',
-      borderRadius: 10,
-      padding: 15,
-    },
-    boxTitle: {
-      color: '#fff',
-      fontWeight: 'bold',
-      fontSize: 16,
-      marginBottom: 5,
-    },
-    boxContent: {
-      color: '#fff',
-      fontSize: 14,
-    },
-    bottomButton: {
-      backgroundColor: '#fff',
-      paddingVertical: 15,
-      alignItems: 'center',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#1E90FF',
-      marginTop: 30,
-    },
-    bottomButtonText: {
-      color: '#1E90FF',
-      fontSize: 16,
-    },
-    languageButton: {
-      padding: 15,
-      borderRadius: 8,
-      marginBottom: 10,
-      backgroundColor: '#f0f0f0',
-    },
-    selectedLanguage: {
-      backgroundColor: '#007AFF',
-    },
-    languageText: {
-      fontSize: 16,
-    },
-    selectedLanguageText: {
-      color: 'white',
-    },
-  });
 
 export default Dashboard;

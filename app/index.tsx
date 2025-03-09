@@ -1,13 +1,10 @@
 import { useState } from "react";
-import React from "react";
-import TabNavigator from "./components/TabNavigator";
-import LoginScreen from "./screens/LoginScreen";
+import { Redirect } from "expo-router";
 
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   return (
-    isLoggedIn ? <TabNavigator /> : <LoginScreen />
+    isLoggedIn ? <Redirect href={'/screens/Dashboard'}/> : <Redirect href={'/screens/LoginScreen'}/>
   );
 }
-

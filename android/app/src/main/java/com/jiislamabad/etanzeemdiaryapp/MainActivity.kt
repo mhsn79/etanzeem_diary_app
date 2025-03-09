@@ -1,4 +1,4 @@
-package com.anonymous.etanzeem_diary_app
+package com.jiislamabad.etanzeemdiaryapp
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'etanzeem_diary_app'
+rootProject.name = 'e-tanzeem-diary'
 
 dependencyResolutionManagement {
   versionCatalogs {

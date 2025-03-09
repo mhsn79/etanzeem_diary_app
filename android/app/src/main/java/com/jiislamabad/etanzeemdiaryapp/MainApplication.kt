@@ -1,4 +1,4 @@
-package com.anonymous.etanzeem_diary_app
+package com.jiislamabad.etanzeemdiaryapp
 
 import android.app.Application
 import android.content.res.Configuration

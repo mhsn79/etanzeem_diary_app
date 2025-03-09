@@ -1,10 +1,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, TouchableOpacity } from 'react-native';
-import i18n from '../i18n';
-import CustomButton from '../components/CustomButton';
+import i18n from '../../i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { commonStyles, lightThemeStyles, darkThemeStyles } from '../_layout';
-import { Appearance, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
 import { router } from 'expo-router';
 
@@ -16,22 +13,22 @@ export default function Activities() {
     { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
     { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
     { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }, 
+    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
     { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
     { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
     { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
     { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }, 
+    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
     { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
     { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
     { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
     { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }, 
+    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
     { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
     { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
     { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
     { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }    
+    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }
 ]
 
 // Get the current date
