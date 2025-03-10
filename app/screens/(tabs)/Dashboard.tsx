@@ -173,17 +173,28 @@ const Dashboard = () => {
                 <View style={{ margin: 15, marginTop: 60, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
-                        <TouchableOpacity style={[styles.reportButton, { flexDirection: "row", height: 48, padding: 10 }]} onPress={() => router.push("/screens/Reports")}>
+                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
                             <Text style={styles.reportButtonText}>{i18n.t('generate_report')}</Text>
                             <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
                         </TouchableOpacity>
                         <View style={{ width: 150 }}>
                             <CustomDropdown
-                                viewStyle={[{ backgroundColor: "transparent" }]}
+                                viewStyle={[{ 
+                                    backgroundColor: "transparent", 
+                                    height: 48,
+                                    // justifyContent: 'center',
+                                    // alignItems: 'center'
+                                }]}
                                 options={durationItemNames}
                                 onSelect={console.log}
                                 placeholder={i18n.t('select_duration')}
-                                textStyle={[{ color: (colorScheme === 'dark') ? "#FFB30F" : "#0BA241" }]} />
+                                textStyle={[{ 
+                                    color: (colorScheme === 'dark') ? "#FFB30F" : "#0BA241",
+                                    lineHeight: 28,
+                                    includeFontPadding: false,
+                                    textAlignVertical: 'center',
+                                    padding: 0
+                                }]} />
                         </View>
                     </View>
 
@@ -377,12 +388,18 @@ const darkThemeStyles = StyleSheet.create({
     reportButton: {
         backgroundColor: '#1E90FF',
         borderRadius: 8,
-        paddingVertical: 10,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        height: 48,
+        paddingHorizontal: 15,
     },
     reportButtonText: {
         color: '#fff',
         fontSize: 16,
+        lineHeight: 20,
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     }
 });
 
@@ -439,12 +456,18 @@ const lightThemeStyles = StyleSheet.create({
     reportButton: {
         backgroundColor: '#1E90FF',
         borderRadius: 8,
-        paddingVertical: 10,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        height: 48,
+        paddingHorizontal: 15,
     },
     reportButtonText: {
         color: '#fff',
         fontSize: 16,
+        lineHeight: 20,
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     }
 });
 
