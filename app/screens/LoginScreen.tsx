@@ -43,7 +43,7 @@ async function loginUser(email: string, password: string, setEmailErr: Function,
     return;
   }
 
-  router.replace("/components/CustomTabbar")
+  router.replace("/")
 }
 
 export default function LoginScreen() {
@@ -83,7 +83,7 @@ export default function LoginScreen() {
             <Image source={require("../../assets/images/jamat-logo.png")} style={styles.logo}></Image>
             <Text style={styles.title}>{i18n.t('appname')}</Text>
             {/* , width: 50, height: 50, backgroundColor: "#008CFF", borderColor: "gray", shadowColor: "black", alignContent: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, */}
-            <View style={[{ position: "absolute", top: 20, right: 20 }]}>
+            {/* <View style={[{ position: "absolute", top: 20, right: 20 }]}>
               <CustomButton
                 text={(currentLanguage === "ur" ? "En" : "ار")}
                 textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
@@ -93,7 +93,7 @@ export default function LoginScreen() {
                   changeLanguage(currentLanguage === "ur" ? "en" : "ur");
                 }}
               />
-            </View>
+            </View> */}
           </View>
           <View style={styles.loginContainer}>
             <View style={styles.inputContainer}>

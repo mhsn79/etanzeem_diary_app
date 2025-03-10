@@ -1,3 +1,4 @@
+import React from 'react';
 import HomeIconBlack from "../../assets/images/home-icon-black.svg";
 import ArkanIconBlack from "../../assets/images/arkan-icon-black.svg";
 import ActivitiesIconBlack from "../../assets/images/activities-icon-black.svg";
@@ -10,6 +11,7 @@ import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { TouchableOpacity } from "react-native";
 import { View, Text, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 function getIcon(label: string, focused?: boolean) {
     return (
@@ -35,7 +37,6 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
   return (
     <View style={[styles.bar, {paddingBottom: insets.bottom}]}>
       {state.routes.map((route, index) => {
-
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 
@@ -44,10 +45,11 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
 
         const onPress = () => {
           const event = navigation.emit({
-            type: "tabPress",
+            type: 'tabPress',
             target: route.key,
             canPreventDefault: true,
           });
+
           if (!isFocused && !event.defaultPrevented) {
             navigation.navigate(route.name);
           }

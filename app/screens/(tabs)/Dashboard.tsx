@@ -108,48 +108,24 @@ const Dashboard = () => {
             <StatusBar hidden />
             {/* Header section */}
             <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB" }}>
-                <View style={[styles.header, { paddingTop: 0, height: 300, alignItems: 'center' }]}>
-                    <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-                        {/* <Ionicons
-                            name="arrow-back"
-                            size={24}
-                            color="black"
-                            onPress={() => router.back()} // Navigate to Home screen on press
-                        /> */}
-                        <Spacer height={30}></Spacer>
-                        <View style={{ flexDirection: "row", alignContent: "center", alignItems: "center" }}>
-                            <Text style={{ color: "white", paddingEnd: 5 }}>{i18n.t('e-tanzeem')}</Text>
-                            <SmallTarazu style={{ width: 34, height: 32 }} />
-                        </View>
-                        <Spacer height={30}></Spacer>
-                        <CustomButton
-                                text={(currentLanguage === "ur" ? "En" : "ار")}
-                                textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
-                                viewStyle={[{ marginTop: 0, width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-                                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50,
-                                onPress={() => {
-                                  changeLanguage(currentLanguage === "ur" ? "en" : "ur");
-                                  changeDirection(currentLanguage === "ur" ? "rtl" : "ltr");
-                                }}
-                              />
-                    </View>
+                <View style={[styles.header, { paddingTop: 0, height: 250, alignItems: 'center' }]}>
                     {/* Image section */}
                     <View style={[styles.imageContainer, { paddingTop: 10, marginTop: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%" }]}>
-                        <View style={{ flex: 1, paddingRight: 15 }}>
+                        <View style={{ flex: 1, paddingRight: 75 }}>
                             <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
-                                <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
+                                <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10}></Spacer>
                                     <LeftUpArrowWhite style={{ width: 17, height: 17 }} />
                                     <Text style={{ color: "white", fontSize: 18, marginStart: 10 }}>{i18n.t('uc')}</Text>
                                 </View>
                             </TouchableOpacity>
-                            <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
-                                <View style={{ flex: 1, width: "100%" }} />
+                            <View style={[{ flexDirection: "row", alignItems: "center" }]}>
+                                <Spacer height={10} width={"100%"}></Spacer>
                                 <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</Text>
                                 <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
                             </View>
                             <TouchableOpacity onPress={() => router.push("/screens/Profile")}>
-                                <View style={[styles.imageContainer, { flexDirection: "row", alignItems: "center" }]}>
+                                <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10} width={"100%"}></Spacer>
                                     <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</Text>
                                     <UserIcon style={{ width: 14, height: 15, marginStart: 10 }} />
@@ -161,7 +137,7 @@ const Dashboard = () => {
                             style={[styles.logo]}
                         />
                     </View>
-                    <View style={{ position: "absolute", padding: 5, marginTop: 200, width: "100%" }}>
+                    <View style={{ position: "absolute", padding: 5, marginTop: 150, width: "100%" }}>
                         {/* Schedule */}
                         <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 160, borderRadius: 15, width: "100%", padding: 5 }}>
                             {/* Schedule Heading */}
@@ -194,7 +170,7 @@ const Dashboard = () => {
                     </View>
                 </View>
 
-                <View style={{ margin: 15, marginTop: 75, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
+                <View style={{ margin: 15, marginTop: 60, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
                         <TouchableOpacity style={[styles.reportButton, { flexDirection: "row", height: 48, padding: 10 }]} onPress={() => router.push("/screens/Reports")}>

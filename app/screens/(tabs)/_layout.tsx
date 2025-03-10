@@ -7,6 +7,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
       }}
+      initialRouteName="Dashboard"
       tabBar={(props) => <TabBar {...props}/>}
     >
       <Tabs.Screen
