@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, TouchableWithoutFeedback, Scr
 import Icon from 'react-native-vector-icons/FontAwesome'; // Import FontAwesome icon library
 import Spacer from './Spacer';
 import i18n from '../i18n';
+import UrduText from './UrduText';
 
 interface CustomDropdownProps {
   options: string[]; // List of options for the dropdown
@@ -56,7 +57,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
           ...viewStyle
         ]}
       >
-        <Text style={[
+        <UrduText style={[
           styles.inputText,
           {
             color: themeStyles.textColor,
@@ -66,7 +67,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
           ...textStyle
         ]}>
           {selectedValue || placeholder}
-        </Text>
+        </UrduText>
         
         <Icon
           name={isOpen ? 'chevron-up' : 'chevron-down'}
@@ -111,7 +112,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
                   ]}
                   onPress={() => handleSelect(item)}
                 >
-                  <Text style={[
+                  <UrduText style={[
                     styles.dropdownText,
                     {
                       color: themeStyles.textColor,
@@ -120,7 +121,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     }
                   ]}>
                     {item}
-                  </Text>
+                  </UrduText>
                 </TouchableOpacity>
               ))}
             </ScrollView>

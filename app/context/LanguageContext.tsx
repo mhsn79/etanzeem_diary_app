@@ -2,31 +2,45 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '../i18n';
 import { TextStyle, I18nManager } from 'react-native';
+import * as Font from 'expo-font';
 
 interface LanguageContextType {
   currentLanguage: string;
   changeLanguage: (languageCode: string) => Promise<void>;
-  getTextStyle: (baseStyle?: TextStyle) => TextStyle;
+  isFontLoaded: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState('ur');
+  const [isFontLoaded, setIsFontLoaded] = useState(false);
 
   useEffect(() => {
-    const loadLanguagePreference = async () => {
+    const loadFontAndLanguage = async () => {
       try {
-        // Always set Urdu as default
+        // Set Urdu as default
         i18n.locale = 'ur';
         setCurrentLanguage('ur');
         await AsyncStorage.setItem('userLanguage', 'ur');
+        
+        // Force RTL for Urdu
+        I18nManager.allowRTL(true);
+        I18nManager.forceRTL(true);
+
+        // Load font
+        await Font.loadAsync({
+          'JameelNooriNastaleeq': require('../../assets/fonts/JameelNooriNastaleeq.ttf'),
+          'noori-kasheed': require('../../assets/fonts/noori-kasheed.ttf'),
+        });
+        setIsFontLoaded(true);
+
       } catch (error) {
-        console.error('Error setting language preference:', error);
+        console.error('Error in loadFontAndLanguage:', error);
       }
     };
 
-    loadLanguagePreference();
+    loadFontAndLanguage();
   }, []);
 
   const changeLanguage = async (languageCode: string) => {
@@ -41,17 +55,12 @@ const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     }
   };
 
-  const getTextStyle = (baseStyle: TextStyle = {}): TextStyle => {
-    return {
-      ...baseStyle,
-      fontFamily: 'JameelNooriNastaleeq',
-      writingDirection: 'rtl',
-      textAlign: 'right',
-    };
-  };
+  if (!isFontLoaded) {
+    return null; // Or a loading component
+  }
 
   return (
-    <LanguageContext.Provider value={{ currentLanguage, changeLanguage, getTextStyle }}>
+    <LanguageContext.Provider value={{ currentLanguage, changeLanguage, isFontLoaded }}>
       {children}
     </LanguageContext.Provider>
   );

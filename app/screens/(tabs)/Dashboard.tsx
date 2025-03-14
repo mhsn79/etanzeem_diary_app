@@ -13,6 +13,7 @@ import UserIcon from "../../../assets/images/user-icon.svg"
 import ReportIcon1 from "../../../assets/images/report-icon-1.svg"
 import LeftUpArrowWhite from "../../../assets/images/left-up-arrow-white.svg";
 import LeftUpArrowBlue from "../../../assets/images/left-up-arrow-blue.svg";
+import UrduText from '../../components/UrduText';
 
 const Dashboard = () => {
     const insets = useSafeAreaInsets(); // Get safe area insets
@@ -116,18 +117,18 @@ const Dashboard = () => {
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10}></Spacer>
                                     <LeftUpArrowWhite style={{ width: 17, height: 17 }} />
-                                    <Text style={{ color: "white", fontSize: 18, marginStart: 10 }}>{i18n.t('uc')}</Text>
+                                    <UrduText kasheedaStyle={true} style={{ color: "white", fontSize: 18, marginStart: 10 }}>{i18n.t('uc')}</UrduText>
                                 </View>
                             </TouchableOpacity>
                             <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                 <Spacer height={10} width={"100%"}></Spacer>
-                                <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</Text>
+                                <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</UrduText>
                                 <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
                             </View>
                             <TouchableOpacity onPress={() => router.push("/screens/Profile")}>
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10} width={"100%"}></Spacer>
-                                    <Text style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</Text>
+                                    <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</UrduText>
                                     <UserIcon style={{ width: 14, height: 15, marginStart: 10 }} />
                                 </View>
                             </TouchableOpacity>
@@ -142,11 +143,11 @@ const Dashboard = () => {
                         <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 160, borderRadius: 15, width: "100%", padding: 5 }}>
                             {/* Schedule Heading */}
                             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
-                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t("schedule_for_today")}</Text>
+                                <UrduText style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t("schedule_for_today")}</UrduText>
                                 <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
-                                    <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t('view-all')}</Text>
+                                    <UrduText style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t('view-all')}</UrduText>
                                 </TouchableOpacity>
-                                <Text style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{formattedDate}</Text>
+                                <UrduText style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{formattedDate}</UrduText>
                             </View>
                             {/* Schedule Details */}
                             <ScrollView>
@@ -174,7 +175,7 @@ const Dashboard = () => {
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
                         <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
-                            <Text style={styles.reportButtonText}>{i18n.t('generate_report')}</Text>
+                            <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
                             <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
                         </TouchableOpacity>
                         <View style={{ width: 150 }}>
@@ -206,40 +207,40 @@ const Dashboard = () => {
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Workforce")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('workforce')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('workforce')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>50</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('arkan')}</Text>
+                                    <UrduText style={styles.boxContent}>50</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('arkan')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>5</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('increase')}</Text>
+                                    <UrduText style={styles.boxContent}>5</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('increase')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>10</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('target')}</Text>
+                                    <UrduText style={styles.boxContent}>10</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('target')}</UrduText>
                                 </View>
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('sub_units')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('sub_units')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>5</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('wards')}</Text>
+                                    <UrduText style={styles.boxContent}>5</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('wards')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                             </View>
                         </View>
@@ -248,40 +249,40 @@ const Dashboard = () => {
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('activities')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('activities')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>1</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('organizational')}</Text>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('organizational')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>1</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('invitational')}</Text>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('invitational')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>1</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('training')}</Text>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('training')}</UrduText>
                                 </View>
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('upper_management')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('upper_management')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>1</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('activities')}</Text>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('activities')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>1</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('participation')}</Text>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('participation')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                             </View>
                         </View>
@@ -290,40 +291,40 @@ const Dashboard = () => {
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Meetings")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('visits')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('visits')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('meetings')}</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('meetings')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Income")}>
-                                        <Text style={styles.boxTitle}>{i18n.t('money')}</Text>
+                                        <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('money')}</UrduText>
                                     </TouchableOpacity>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>0</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('income')}</Text>
+                                    <UrduText style={styles.boxContent}>0</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('income')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>0</Text>
-                                    <Text style={styles.boxContent}>{i18n.t('expenses')}</Text>
+                                    <UrduText style={styles.boxContent}>0</UrduText>
+                                    <UrduText style={styles.boxContent}>{i18n.t('expenses')}</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <Text style={styles.boxContent}>-</Text>
-                                    <Text style={styles.boxContent}>-</Text>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
+                                    <UrduText style={styles.boxContent}>-</UrduText>
                                 </View>
                             </View>
                         </View>
@@ -377,7 +378,7 @@ const darkThemeStyles = StyleSheet.create({
     },
     boxTitle: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: 'regular',
         fontSize: 16,
         marginBottom: 5,
     },
@@ -445,7 +446,7 @@ const lightThemeStyles = StyleSheet.create({
     },
     boxTitle: {
         color: '#1E90FF',
-        fontWeight: 'bold',
+        fontWeight: 'regular',
         fontSize: 16,
         marginBottom: 5,
     },

@@ -42,7 +42,7 @@ function CustomHeader({ navigation, route }: HeaderProps) {
   
   const handleBack = () => {
     // When not in tabs, go back to Dashboard tab
-    router.push('/screens/(tabs)/Dashboard');
+    router.back()
   };
 
   // Only show back button on non-tab screens (except login)
@@ -138,20 +138,6 @@ function DrawerContent(props: DrawerContentComponentProps) {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    'JameelNooriNastaleeq': require('../assets/fonts/JameelNooriNastaleeq.ttf'),
-  });
-
-  useEffect(() => {
-    if (!fontsLoaded) {
-      return;
-    }
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
-
   return (
     <LanguageProvider>
       <Drawer
@@ -165,7 +151,7 @@ export default function RootLayout() {
           drawerType: 'front',
         }}
       >
-        <Drawer.Screen name="(tabs)" options={{ drawerLabel: 'Home' }} />
+        <Drawer.Screen name="screens/(tabs)" options={{ drawerLabel: 'Home' }} />
         <Drawer.Screen name="screens/Income" options={{ drawerLabel: 'Income' }} />
         <Drawer.Screen name="screens/LoginScreen" options={{ 
           drawerLabel: 'Login',

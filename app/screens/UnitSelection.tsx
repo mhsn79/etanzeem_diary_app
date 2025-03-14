@@ -1,11 +1,12 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, StatusBar } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, StatusBar } from 'react-native';
 import i18n from '../i18n';
 import CustomDropdown from '../components/CustomDropdown';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import CustomTabbar from '../components/CustomTabbar';
+// import CustomTabbar from '../components/CustomTabbar';
 import Spacer from '../components/Spacer';
+import UrduText from '../components/UrduText';
 
 export default function UnitSelection() {
 
@@ -19,9 +20,9 @@ export default function UnitSelection() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[{ flexGrow: 1 }]} style={styles.container}>
           <View style={styles.topContainer}>
-            <Text style={[styles.text, { fontSize: 20 }]}>تنظیمی ہیئت</Text>
+            <UrduText style={[styles.text, { fontSize: 20 }]}>تنظیمی ہیئت</UrduText>
             <Spacer height={40}/>
-            <Text style={[styles.text, { fontSize: 28 }]}>یونٹ سیلیکشن برائے بالائی نظم۔</Text>
+            <UrduText style={[styles.text, { fontSize: 28 }]}>یونٹ سیلیکشن برائے بالائی نظم۔</UrduText>
             <CustomDropdown
               options={[]} //TODO: fetch from directus
               onSelect={handleSelection}
@@ -45,27 +46,27 @@ export default function UnitSelection() {
             />
           </View>
           <View style={styles.bottomContainer}>
-            <Text style={{ color: "#008CFF", fontSize: 24, fontFamily: "JameelNooriNastaleeq" }}>تفصیل کا عنوان</Text>
+            <UrduText style={{ color: "#008CFF", fontSize: 24 }}>تفصیل کا عنوان</UrduText>
             <View style={styles.detailsContainer}>
               <View style={styles.detail}>
-                <Text style={styles.detailText}>ارکان</Text>
-                <Text style={styles.detailText}>50</Text>
+                <UrduText style={styles.detailText}>ارکان</UrduText>
+                <UrduText style={styles.detailText}>50</UrduText>
               </View>
               <View style={styles.detail}>
-                <Text style={styles.detailText}>ممبران</Text>
-                <Text style={styles.detailText}>500</Text>
+                <UrduText style={styles.detailText}>ممبران</UrduText>
+                <UrduText style={styles.detailText}>500</UrduText>
               </View>
               <View style={styles.detail}>
-                <Text style={styles.detailText}>ووٹرز</Text>
-                <Text style={styles.detailText}>5000</Text>
+                <UrduText style={styles.detailText}>ووٹرز</UrduText>
+                <UrduText style={styles.detailText}>5000</UrduText>
               </View>
               <View style={styles.detail}>
-                <Text style={styles.detailText}>وارڈز جن میں نظم قائم ہے</Text>
-                <Text style={styles.detailText}>4</Text>
+                <UrduText style={styles.detailText}>وارڈز جن میں نظم قائم ہے</UrduText>
+                <UrduText style={styles.detailText}>4</UrduText>
               </View>
               <View style={styles.detail}>
-                <Text style={styles.detailText}>بلاک کوڈز</Text>
-                <Text style={styles.detailText}>10</Text>
+                <UrduText style={styles.detailText}>بلاک کوڈز</UrduText>
+                <UrduText style={styles.detailText}>10</UrduText>
               </View>
             </View>
           </View>
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: "white",
-    fontFamily: "JameelNooriNastaleeq"
+    fontFamily: "JameelNooriNastaleeq",
   },
   dropdown: {
     height: 55,
