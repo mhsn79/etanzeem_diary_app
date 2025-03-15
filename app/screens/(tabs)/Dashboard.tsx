@@ -109,9 +109,9 @@ const Dashboard = () => {
             <StatusBar hidden />
             {/* Header section */}
             <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB" }}>
-                <View style={[styles.header, { paddingTop: 0, height: 250, alignItems: 'center' }]}>
+                <View style={[styles.header, { paddingTop: 0, height: 200, alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }]}>
                     {/* Image section */}
-                    <View style={[styles.imageContainer, { paddingTop: 10, marginTop: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%" }]}>
+                    <View style={[styles.imageContainer, { padding: 5, marginTop: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%" }]}>
                         <View style={{ flex: 1, paddingRight: 75 }}>
                             <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
@@ -138,9 +138,9 @@ const Dashboard = () => {
                             style={[styles.logo]}
                         />
                     </View>
-                    <View style={{ position: "absolute", padding: 5, marginTop: 150, width: "100%" }}>
+                    <View style={{ position: "absolute", padding: 5, marginTop: 130, width: "100%" }}>
                         {/* Schedule */}
-                        <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 160, borderRadius: 15, width: "100%", padding: 5 }}>
+                        <View style={{ backgroundColor: (colorScheme === "dark") ? "#008cff" : "#FFFFFF", height: 100, borderRadius: 15, width: "100%", padding: 5 }}>
                             {/* Schedule Heading */}
                             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
                                 <UrduText style={{ color: (colorScheme === "dark") ? "white" : "black" }}>{i18n.t("schedule_for_today")}</UrduText>
@@ -171,7 +171,7 @@ const Dashboard = () => {
                     </View>
                 </View>
 
-                <View style={{ margin: 15, marginTop: 60, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
+                <View style={{ margin: 15, marginTop: 40, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
                         <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
@@ -200,7 +200,7 @@ const Dashboard = () => {
                     </View>
 
                     {/* Rows of Boxes (Dark Gray Background) */}
-                    <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: 0 }]} style={{ height: 280 }}>
+                    <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: 0 }]} style={{ height: 320 }}>
                         {/* <View> */}
                         <View style={styles.boxRow}>
                             <View style={styles.box}>
