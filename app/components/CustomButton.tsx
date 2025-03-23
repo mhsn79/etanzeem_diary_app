@@ -30,7 +30,6 @@ export default function CustomButton({ text, viewStyle, textStyle, ...rest }: Cu
 
 const styles = StyleSheet.create({
   button: {
-    marginTop: 30,
     width: "100%",
     alignItems: "center",
     backgroundColor: "#008CFF",

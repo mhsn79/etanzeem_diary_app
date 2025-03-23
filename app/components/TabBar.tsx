@@ -12,6 +12,7 @@ import { TouchableOpacity } from "react-native";
 import { View, Text, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import i18n from '../i18n';
 
 function getIcon(label: string, focused?: boolean) {
     return (
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   tabBarButtonFocused: {
-      flexDirection: "row-reverse",
+      flexDirection: "row",
       alignItems: 'center',
       justifyContent: 'space-evenly',
       backgroundColor: "#246BF8",

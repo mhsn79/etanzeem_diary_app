@@ -34,7 +34,6 @@ async function loginUser(email: string, password: string, setEmailErr: Function,
   }
 
   const result = await client.login(email, password).then((value) => value, (err) => err);
-  console.log(result);
 
   if (result.errors) {
     setEmailErr(true);
@@ -70,7 +69,7 @@ export default function LoginScreen() {
   // useEffect(() => {
   //   setTimeout(() => {
   //     router.replace("/TestScreen")
-  //   }, 2000);  // Show for 2 seconds    
+  //   }, 2000);  // Show for 2 seconds
   // }, []);
 
   return (
@@ -88,7 +87,7 @@ export default function LoginScreen() {
                 text={(currentLanguage === "ur" ? "En" : "ار")}
                 textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
                 viewStyle={[{ width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
+                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50,
                 onPress={() => {
                   changeLanguage(currentLanguage === "ur" ? "en" : "ur");
                 }}

@@ -180,8 +180,8 @@ const Dashboard = () => {
                         </TouchableOpacity>
                         <View style={{ width: 150 }}>
                             <CustomDropdown
-                                viewStyle={[{ 
-                                    backgroundColor: "transparent", 
+                                viewStyle={[{
+                                    backgroundColor: "transparent",
                                     height: 48,
                                     // justifyContent: 'center',
                                     // alignItems: 'center'
@@ -189,7 +189,7 @@ const Dashboard = () => {
                                 options={durationItemNames}
                                 onSelect={console.log}
                                 placeholder={i18n.t('select_duration')}
-                                textStyle={[{ 
+                                textStyle={[{
                                     color: (colorScheme === 'dark') ? "#FFB30F" : "#0BA241",
                                     lineHeight: 28,
                                     includeFontPadding: false,
