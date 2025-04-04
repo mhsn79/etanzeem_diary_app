@@ -39,7 +39,8 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/JameelNooriNastaleeq.ttf"
+            "./assets/fonts/JameelNooriNastaleeq.ttf",
+            "./assets/fonts/noori-kasheed.ttf"
           ]
         }
       ],

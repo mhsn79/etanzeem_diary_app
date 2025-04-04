@@ -30,7 +30,6 @@ export default function CustomButton({ text, viewStyle, textStyle, ...rest }: Cu
 
 const styles = StyleSheet.create({
   button: {
-    marginTop: 30,
     width: "100%",
     alignItems: "center",
     backgroundColor: "#008CFF",
@@ -46,7 +45,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontFamily: "29LT Kaff", // "JameelNooriNastaleeq",
+    fontFamily: "JameelNooriNastaleeq",
     color: "white"
   },
   disabledText: {

@@ -34,7 +34,6 @@ async function loginUser(email: string, password: string, setEmailErr: Function,
   }
 
   const result = await client.login(email, password).then((value) => value, (err) => err);
-  console.log(result);
 
   if (result.errors) {
     setEmailErr(true);
@@ -43,7 +42,7 @@ async function loginUser(email: string, password: string, setEmailErr: Function,
     return;
   }
 
-  router.replace("/components/CustomTabbar")
+  router.replace("/")
 }
 
 export default function LoginScreen() {
@@ -70,7 +69,7 @@ export default function LoginScreen() {
   // useEffect(() => {
   //   setTimeout(() => {
   //     router.replace("/TestScreen")
-  //   }, 2000);  // Show for 2 seconds    
+  //   }, 2000);  // Show for 2 seconds
   // }, []);
 
   return (
@@ -83,17 +82,17 @@ export default function LoginScreen() {
             <Image source={require("../../assets/images/jamat-logo.png")} style={styles.logo}></Image>
             <Text style={styles.title}>{i18n.t('appname')}</Text>
             {/* , width: 50, height: 50, backgroundColor: "#008CFF", borderColor: "gray", shadowColor: "black", alignContent: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, */}
-            <View style={[{ position: "absolute", top: 20, right: 20 }]}>
+            {/* <View style={[{ position: "absolute", top: 20, right: 20 }]}>
               <CustomButton
                 text={(currentLanguage === "ur" ? "En" : "ار")}
                 textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
                 viewStyle={[{ width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50, 
+                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50,
                 onPress={() => {
                   changeLanguage(currentLanguage === "ur" ? "en" : "ur");
                 }}
               />
-            </View>
+            </View> */}
           </View>
           <View style={styles.loginContainer}>
             <View style={styles.inputContainer}>
