@@ -8,7 +8,7 @@ export default function Index() {
   return (
     <>
       <StatusBar translucent backgroundColor="transparent"/>
-      { isLoggedIn ? <Redirect href={'/screens/Workforce'} /> : <Redirect href={'/screens/LoginScreen'} /> }
+      { isLoggedIn ? <Redirect href={'/screens/Dashboard'} /> : <Redirect href={'/screens/LoginScreen'} /> }
     </>
   );
 }

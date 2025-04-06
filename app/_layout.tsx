@@ -110,7 +110,79 @@ function DrawerContent(props: DrawerContentComponentProps) {
             }}
           >
             <UrduText style={styles.drawerText}>
-              {currentLanguage === 'ur' ? 'Home' : 'ہوم'}
+              {i18n.t('dashboard')}
+              </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/UnitSelection');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+              {i18n.t('unit_selection')}
+            </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/Workforce');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+              {i18n.t('workforce')}
+            </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/(tabs)/Activities');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+              {i18n.t('activities')}
+            </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/(tabs)/Arkan');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+            {i18n.t('arkan')}
+            </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/Rukun');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+            {i18n.t('rukun')}
+            </UrduText>
+          </Pressable>
+
+          <Pressable 
+            style={styles.drawerItem} 
+            onPress={() => {
+              navigation.closeDrawer();
+              router.replace('/screens/Profile');
+            }}
+          >
+            <UrduText style={styles.drawerText}>
+            {i18n.t('profile')}
             </UrduText>
           </Pressable>
 
@@ -119,7 +191,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
             onPress={handleLanguageToggle}
           >
             <UrduText style={styles.drawerText}>
-              {currentLanguage === 'ur' ? 'Change Language' : 'زبان تبدیل کریں'}
+            {i18n.t('switch_language')}
             </UrduText>
           </Pressable>
 
@@ -128,7 +200,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
             onPress={handleLogout}
           >
             <UrduText style={styles.drawerText}>
-              {currentLanguage === 'ur' ? 'Logout' : 'لاگ آؤٹ'}
+            {i18n.t('logout')}
             </UrduText>
           </Pressable>
         </>
