@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { StyleSheet, TextInput, TextInputProps } from "react-native";
+import { ImageStyle, StyleSheet, TextInput, TextInputProps, TextStyle, ViewStyle } from "react-native";
+import { ImageSource } from "react-native-vector-icons/Icon";
 
 interface CustomTextInputProps extends TextInputProps {
   error?: boolean;
+  viewStyle?: [ViewStyle?];
+  textStyle?: [TextStyle?];
+  iconImage?: ImageSource;
+  iconStyle?: [ImageStyle?];
 }
 
 export default function CustomTextInput({ error, ...rest }: CustomTextInputProps) {

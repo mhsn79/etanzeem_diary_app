@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from '../../i18n';
-import CustomDropdown from "../../components/CustomDropdown";
-import CustomButton from '../../components/CustomButton';
+import i18n from '@/app/i18n';
+import CustomDropdown from "@/app/components/CustomDropdown";
+import CustomButton from '@/app/components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Spacer from '../../components/Spacer';
-import SmallTarazu from "../../../assets/images/small-tarazu.svg";
-import LocationIcon from "../../../assets/images/location-icon.svg";
-import UserIcon from "../../../assets/images/user-icon.svg"
-import ReportIcon1 from "../../../assets/images/report-icon-1.svg"
-import LeftUpArrowWhite from "../../../assets/images/left-up-arrow-white.svg";
-import LeftUpArrowBlue from "../../../assets/images/left-up-arrow-blue.svg";
-import UrduText from '../../components/UrduText';
+import Spacer from '@/app/components/Spacer';
+import SmallTarazu from "@/assets/images/small-tarazu.svg";
+import LocationIcon from "@/assets/images/location-icon-yellow.svg";
+import UserIcon from "@/assets/images/user-icon.svg";
+import ReportIcon1 from "@/assets/images/report-icon-1.svg";
+import LeftUpArrowWhite from "@/assets/images/left-up-arrow-white.svg";
+import LeftUpArrowBlue from "@/assets/images/left-up-arrow-blue.svg";
+import UrduText from '@/app/components/UrduText';
 
 const Dashboard = () => {
     const insets = useSafeAreaInsets(); // Get safe area insets
@@ -125,7 +125,7 @@ const Dashboard = () => {
                                 <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</UrduText>
                                 <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
                             </View>
-                            <TouchableOpacity onPress={() => router.push("/screens/Profile")}>
+                            <TouchableOpacity onPress={() => router.push("/screens/ProfileView")}>
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
                                     <Spacer height={10} width={"100%"}></Spacer>
                                     <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</UrduText>

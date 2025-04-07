@@ -14,6 +14,8 @@ import { useLanguage } from "../app/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
+import { useNavigationState } from '@react-navigation/native';
+import { Directions } from "react-native-gesture-handler";
 
 // Force RTL layout for the entire app
 I18nManager.allowRTL(true);
@@ -32,6 +34,26 @@ type HeaderProps = {
 };
 
 function CustomHeader({ navigation, route }: HeaderProps) {
+  const state = useNavigationState((state) => state);
+  const currentRoute = state?.routes[state.index];
+
+  // You can get the path of the current route
+  // const fullPath = currentRoute ? currentRoute.name : 'No route';
+
+  // Helper function to recursively get nested routes
+  const getFullPath = (state: any) => {
+    const route = state.routes[state.index];
+    let fullPath = route.name;
+
+    if (route.state) {
+      // If there's a nested navigator, recursively find the full path
+      fullPath += '/' + getFullPath(route.state);
+    }
+
+    return fullPath;
+  };
+
+  const fullPath = state ? getFullPath(state) : 'No route';
   const { currentLanguage, changeLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -39,7 +61,7 @@ function CustomHeader({ navigation, route }: HeaderProps) {
   // Simplified navigation logic
   const isLoginScreen = route.name === "screens/LoginScreen";
   const isInTabs = route.name === "screens/(tabs)";
-  
+
   const handleBack = () => {
     // When not in tabs, go back to Dashboard tab
     router.back()
@@ -50,8 +72,8 @@ function CustomHeader({ navigation, route }: HeaderProps) {
 
   return (
     <View style={[
-      styles.headerContainer, 
-      { 
+      fullPath === 'screens/(tabs)/Arkan' ? styles.headerContainerSubscreen : styles.headerContainer,
+      {
         paddingTop: insets.top,
       }
     ]}>
@@ -61,11 +83,11 @@ function CustomHeader({ navigation, route }: HeaderProps) {
             <Ionicons name="menu" size={24} color="white" />
           </Pressable>
         </View>
-        
+
         <View style={styles.titleContainer}>
-          <SmallTarazu style={{ width: 24, height: 24 }} />
+          {fullPath !== 'screens/(tabs)/Arkan' && <SmallTarazu style={{ width: 24, height: 24 }} />}
           <UrduText style={[styles.title, { color: "white" }]}>
-            {i18n.t('e-tanzeem')}
+            {fullPath === 'screens/(tabs)/Arkan' ? i18n.t('arkan') : i18n.t('e-tanzeem')}
           </UrduText>
         </View>
 
@@ -102,8 +124,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
     <View style={styles.drawer}>
       {!isLoginScreen && (
         <>
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/');
@@ -111,11 +133,11 @@ function DrawerContent(props: DrawerContentComponentProps) {
           >
             <UrduText style={styles.drawerText}>
               {i18n.t('dashboard')}
-              </UrduText>
+            </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/screens/UnitSelection');
@@ -126,8 +148,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/screens/Workforce');
@@ -138,8 +160,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/screens/(tabs)/Activities');
@@ -150,57 +172,57 @@ function DrawerContent(props: DrawerContentComponentProps) {
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/screens/(tabs)/Arkan');
             }}
           >
             <UrduText style={styles.drawerText}>
-            {i18n.t('arkan')}
+              {i18n.t('arkan')}
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
               router.replace('/screens/Rukun');
             }}
           >
             <UrduText style={styles.drawerText}>
-            {i18n.t('rukun')}
+              {i18n.t('rukun')}
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={() => {
               navigation.closeDrawer();
-              router.replace('/screens/Profile');
+              router.replace('/screens/ProfileView');
             }}
           >
             <UrduText style={styles.drawerText}>
-            {i18n.t('profile')}
+              {i18n.t('profile')}
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={handleLanguageToggle}
           >
             <UrduText style={styles.drawerText}>
-            {i18n.t('switch_language')}
+              {i18n.t('switch_language')}
             </UrduText>
           </Pressable>
 
-          <Pressable 
-            style={styles.drawerItem} 
+          <Pressable
+            style={styles.drawerItem}
             onPress={handleLogout}
           >
             <UrduText style={styles.drawerText}>
-            {i18n.t('logout')}
+              {i18n.t('logout')}
             </UrduText>
           </Pressable>
         </>
@@ -225,13 +247,13 @@ export default function RootLayout() {
       >
         <Drawer.Screen name="screens/(tabs)" options={{ drawerLabel: 'Home' }} />
         <Drawer.Screen name="screens/Income" options={{ drawerLabel: 'Income' }} />
-        <Drawer.Screen name="screens/LoginScreen" options={{ 
+        <Drawer.Screen name="screens/LoginScreen" options={{
           drawerLabel: 'Login',
           headerShown: false,
           swipeEnabled: false,
         }} />
         <Drawer.Screen name="screens/Meetings" options={{ drawerLabel: 'Meetings' }} />
-        <Drawer.Screen name="screens/Profile" options={{ drawerLabel: 'Profile' }} />
+        <Drawer.Screen name="screens/ProfileView" options={{ drawerLabel: 'Profile' }} />
         <Drawer.Screen name="screens/UnitSelection" options={{ drawerLabel: 'Units' }} />
         <Drawer.Screen name="screens/Workforce" options={{ drawerLabel: 'Workforce' }} />
       </Drawer>
@@ -241,7 +263,14 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   headerContainer: {
+    backgroundColor: '#1E90FF'
+  },
+  headerContainerSubscreen: {
     backgroundColor: '#1E90FF',
+    borderBottomWidth: 25,
+    borderColor: '#1E90FF',
+    borderBottomStartRadius: 20,
+    borderBottomEndRadius: 20,
   },
   header: {
     flexDirection: 'row',
@@ -249,7 +278,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    height: 56,
+    height: 56
   },
   leftSection: {
     width: 40,
