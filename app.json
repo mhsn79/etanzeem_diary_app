@@ -31,7 +31,8 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 800,
+          "imageHight":500,
           "resizeMode": "contain"
         }
       ],
@@ -57,6 +58,9 @@
         "projectId": "c94ec490-9e85-465c-bc59-cc7825b5312a",
         "owner": "jiislamabad"
       }
-    }
+    },
+    "assets": [
+      "./assets/images/splash-icon.png"
+    ]
   }
 }
