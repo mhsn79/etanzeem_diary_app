@@ -42,7 +42,7 @@ async function loginUser(email: string, password: string, setEmailErr: Function,
     return;
   }
 
-  router.replace("/")
+  router.replace("/screens/Dashboard")
 }
 
 export default function LoginScreen() {
@@ -59,8 +59,8 @@ export default function LoginScreen() {
     }
   };
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("sohail-abubaker@pixelpk.com");
+  const [password, setPassword] = useState("12345678");
   const [emailErr, setEmailErr] = useState(false);
   const [passErr, setPassErr] = useState(false);
   const [errText, setErrText] = useState("");

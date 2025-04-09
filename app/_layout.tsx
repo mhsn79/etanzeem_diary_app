@@ -1,12 +1,9 @@
 import { Stack, useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import React from 'react';
 import { I18nManager, StyleSheet, Pressable, useColorScheme } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
-import { Drawer } from 'expo-router/drawer';
-import type { DrawerContentComponentProps, DrawerNavigationOptions } from '@react-navigation/drawer';
-import type { ParamListBase, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LanguageProvider from "../app/context/LanguageContext";
@@ -15,7 +12,7 @@ import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
 import { useNavigationState } from '@react-navigation/native';
-import { Directions } from "react-native-gesture-handler";
+import Menu from './components/Menu';
 
 // Force RTL layout for the entire app
 I18nManager.allowRTL(true);
@@ -30,15 +27,13 @@ type HeaderProps = {
       state?: any;
     };
   };
-  options: DrawerNavigationOptions;
+  options: any;
 };
 
 function CustomHeader({ navigation, route }: HeaderProps) {
+  const [menuVisible, setMenuVisible] = useState(false);
   const state = useNavigationState((state) => state);
   const currentRoute = state?.routes[state.index];
-
-  // You can get the path of the current route
-  // const fullPath = currentRoute ? currentRoute.name : 'No route';
 
   // Helper function to recursively get nested routes
   const getFullPath = (state: any) => {
@@ -79,9 +74,15 @@ function CustomHeader({ navigation, route }: HeaderProps) {
     ]}>
       <View style={styles.header}>
         <View style={styles.leftSection}>
-          <Pressable onPress={() => navigation.openDrawer()} style={styles.iconButton}>
-            <Ionicons name="menu" size={24} color="white" />
-          </Pressable>
+          {showBackButton ? (
+            <Pressable onPress={handleBack} style={styles.iconButton}>
+              <Ionicons name="chevron-forward" size={24} color="white" />
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setMenuVisible(true)} style={styles.iconButton}>
+              <Ionicons name="menu" size={24} color="white" />
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.titleContainer}>
@@ -92,9 +93,9 @@ function CustomHeader({ navigation, route }: HeaderProps) {
         </View>
 
         <View style={styles.rightSection}>
-          {showBackButton && (
-            <Pressable onPress={handleBack} style={styles.iconButton}>
-              <Ionicons name="chevron-forward" size={24} color="white" />
+          {!isLoginScreen && (
+            <Pressable onPress={() => router.push('/screens/ProfileView')} style={styles.iconButton}>
+              <Ionicons name="person-circle-outline" size={28} color="white" />
             </Pressable>
           )}
         </View>
@@ -103,160 +104,36 @@ function CustomHeader({ navigation, route }: HeaderProps) {
   );
 }
 
-function DrawerContent(props: DrawerContentComponentProps) {
-  const { currentLanguage, changeLanguage } = useLanguage();
-  const { state, navigation } = props;
-  const isLoginScreen = state.routes[state.index].name === "screens/LoginScreen";
-  const router = useRouter();
-
-  const handleLanguageToggle = () => {
-    changeLanguage(currentLanguage === 'en' ? 'ur' : 'en');
-  };
-
-  const handleLogout = () => {
-    navigation.closeDrawer();
-    setTimeout(() => {
-      router.replace('/screens/LoginScreen');
-    }, 100);
-  };
-
-  return (
-    <View style={styles.drawer}>
-      {!isLoginScreen && (
-        <>
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('dashboard')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/UnitSelection');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('unit_selection')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/Workforce');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('workforce')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/(tabs)/Activities');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('activities')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/(tabs)/Arkan');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('arkan')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/Rukun');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('rukun')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={() => {
-              navigation.closeDrawer();
-              router.replace('/screens/ProfileView');
-            }}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('profile')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={handleLanguageToggle}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('switch_language')}
-            </UrduText>
-          </Pressable>
-
-          <Pressable
-            style={styles.drawerItem}
-            onPress={handleLogout}
-          >
-            <UrduText style={styles.drawerText}>
-              {i18n.t('logout')}
-            </UrduText>
-          </Pressable>
-        </>
-      )}
-    </View>
-  );
-}
-
 export default function RootLayout() {
   return (
     <LanguageProvider>
-      <Drawer
-        drawerContent={(props) => <DrawerContent {...props} />}
+      <Stack
         screenOptions={{
           header: (props) => <CustomHeader {...props} />,
-          drawerPosition: 'left',
-          drawerStyle: {
-            width: '70%',
+          headerStyle: {
+            backgroundColor: '#1E90FF',
           },
-          drawerType: 'front',
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          animation: 'slide_from_right',
+          animationDuration: 200,
         }}
       >
-        <Drawer.Screen name="screens/(tabs)" options={{ drawerLabel: 'Home' }} />
-        <Drawer.Screen name="screens/Income" options={{ drawerLabel: 'Income' }} />
-        <Drawer.Screen name="screens/LoginScreen" options={{
-          drawerLabel: 'Login',
-          headerShown: false,
-          swipeEnabled: false,
-        }} />
-        <Drawer.Screen name="screens/Meetings" options={{ drawerLabel: 'Meetings' }} />
-        <Drawer.Screen name="screens/ProfileView" options={{ drawerLabel: 'Profile' }} />
-        <Drawer.Screen name="screens/UnitSelection" options={{ drawerLabel: 'Units' }} />
-        <Drawer.Screen name="screens/Workforce" options={{ drawerLabel: 'Workforce' }} />
-      </Drawer>
+        <Stack.Screen name="splash" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/Income" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/Meetings" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/ProfileView" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/UnitSelection" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/Workforce" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/RukunView" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/RukunAddEdit" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/ProfileEdit" options={{ headerShown: true }} />
+      </Stack>
     </LanguageProvider>
   );
 }
@@ -304,23 +181,5 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  drawer: {
-    flex: 1,
-    paddingTop: 40,
-    backgroundColor: '#fff',
-    alignItems: 'flex-start',
-  },
-  drawerItem: {
-    width: '100%',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  drawerText: {
-    fontSize: 18,
-    textAlign: 'right',
-    fontFamily: 'JameelNooriNastaleeq',
   },
 });
