@@ -23,7 +23,7 @@ const COLORS = {
 
 // Typography
 const TYPOGRAPHY = {
-  fonts: {
+  fontFamily: {
     regular: 'JameelNooriNastaleeq',
     bold: 'JameelNooriNastaleeq',
     kasheeda: 'noori-kasheed',

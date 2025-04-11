@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '../../i18n';
 import UrduText from '../../components/UrduText';
 import { useLanguage } from '../../context/LanguageContext';
-import { FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Header from '../../components/Header';
 import ReportActionButton from './components/ReportActionButton';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
 import ReportCard from './components/ReportCard';
-import { useRouter, useNavigation } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 const ReportsScreen = () => {
   const insets = useSafeAreaInsets();
   const { currentLanguage } = useLanguage();
-  const navigation = useNavigation();
+  const router = useRouter();
   const isRTL = currentLanguage === 'ur';
   const [selectedTab, setSelectedTab] = useState(0);
 
@@ -25,8 +25,11 @@ const ReportsScreen = () => {
   ];
 
   const handleBack = () => {
-    // Handle back navigation
-    navigation.goBack();
+    router.back();
+  };
+
+  const handleViewAllReports = () => {
+    router.push('/screens/(stack)/AllReportsScreen');
   };
 
   const handleEdit = () => {
@@ -47,7 +50,7 @@ const ReportsScreen = () => {
       style={styles.container}
     >
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top,backgroundColor:COLORS.primary }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top, backgroundColor: COLORS.primary }]}
         showsVerticalScrollIndicator={false}
       >
         <Header
@@ -70,10 +73,8 @@ const ReportsScreen = () => {
                   <View style={styles.reportSummaryItemValueContainerItem}>
                     <UrduText style={styles.reportSummaryItemValue}>متوقع  تکمیل</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-
                     <UrduText style={styles.reportSummaryItemValue}> 15 مارچ 2024</UrduText>
                   </View>
-
                 </View>
                 <View style={styles.reportSummaryItemValueContainer}>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -82,12 +83,10 @@ const ReportsScreen = () => {
                     <UrduText style={styles.reportSummaryItemValue}> % 50 مکمل </UrduText>
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={[styles.reportSummaryItemValue, { color: '#E63946' }]} >3 دن باقی ہیں</UrduText>
+                    <UrduText style={[styles.reportSummaryItemValue, { color: '#E63946' }]}>3 دن باقی ہیں</UrduText>
                   </View>
-
                 </View>
 
-                {/* Progress indicator for both platforms */}
                 <View style={styles.progressContainer}>
                   <View style={styles.progressBar}>
                     <View style={[styles.progressFill, { width: '70%' }]} />
@@ -109,23 +108,25 @@ const ReportsScreen = () => {
                     onPress={handleSubmit}
                   />
                 </View>
-
               </View>
-
             </View>
-
           </View>
         </View>
 
-        {/* Add your report content here */}
         <View style={styles.reportSection}>
           <TabGroup
             tabs={tabs}
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
           />
-          <UrduText style={styles.sectionTitle}>تمام رپورٹس دیکھیں</UrduText>
+          <TouchableOpacity 
+            onPress={handleViewAllReports}
+            style={styles.viewAllButton}
+          >
+            <UrduText style={styles.sectionTitle}>تمام رپورٹس دیکھیں</UrduText>
+          </TouchableOpacity>
         </View>
+
         <View style={styles.reportContainer}>
           <ReportCard
             title="ماہانہ کارکردگی رپورٹ ۔  ماہ مارچ 2025ء"
@@ -158,6 +159,7 @@ const ReportsScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: COLORS.background,
   },
   scrollContent: {
@@ -259,6 +261,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
     textDecorationLine: 'underline',
+    color: COLORS.primary,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingVertical: SPACING.sm,
   },
   buttonContainer: {
     flexDirection: 'row',

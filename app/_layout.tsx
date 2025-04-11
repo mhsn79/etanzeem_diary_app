@@ -125,7 +125,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
         <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/(stack)/ReportsScreen" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
         <Stack.Screen name="screens/Income" options={{ headerShown: true }} />
         <Stack.Screen name="screens/Meetings" options={{ headerShown: true }} />
         <Stack.Screen name="screens/ProfileView" options={{ headerShown: true }} />
