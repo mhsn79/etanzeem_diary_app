@@ -174,7 +174,7 @@ const Dashboard = () => {
                 <View style={{ margin: 15, marginTop: 40, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
-                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/Reports")}>
+                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/ReportsScreen")}>
                             <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
                             <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
                         </TouchableOpacity>

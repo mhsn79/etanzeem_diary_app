@@ -12,7 +12,7 @@ import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
 import { useNavigationState } from '@react-navigation/native';
-import Menu from './components/Menu';
+
 
 // Force RTL layout for the entire app
 I18nManager.allowRTL(true);
@@ -125,6 +125,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
         <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/(stack)/ReportsScreen" options={{ headerShown: false }} />
         <Stack.Screen name="screens/Income" options={{ headerShown: true }} />
         <Stack.Screen name="screens/Meetings" options={{ headerShown: true }} />
         <Stack.Screen name="screens/ProfileView" options={{ headerShown: true }} />
