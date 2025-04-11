@@ -7,6 +7,7 @@ import Header from '../../components/Header';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
 import { useNavigation } from 'expo-router';
 import ReportCard from './components/ReportCard';
+import FilterModal from '../../components/FilterModal';
 
 interface ReportItem {
   id: string;
@@ -75,9 +76,23 @@ const AllReportsScreen = () => {
   const navigation = useNavigation();
   const isRTL = currentLanguage === 'ur';
   const [searchText, setSearchText] = useState('');
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  const handleFilterPress = () => {
+    setIsFilterModalVisible(true);
+  };
+
+  const handleCloseFilter = () => {
+    setIsFilterModalVisible(false);
+  };
+
+  const handleApplyFilter = (selectedTime: string, startDate: Date, endDate: Date) => {
+    // Handle filter application here
+    console.log('Applying filter:', { selectedTime, startDate, endDate });
   };
 
   // Memoized render item function
@@ -127,9 +142,9 @@ const AllReportsScreen = () => {
               onChangeText={setSearchText}
               textAlign={isRTL ? 'right' : 'left'}
             />
-            <TouchableOpacity style={styles.filterIcon}>
-            <MaterialCommunityIcons name="tune-vertical-variant" size={24} color="black" />    
-                    </TouchableOpacity>
+            <TouchableOpacity style={styles.filterIcon} onPress={handleFilterPress}>
+              <MaterialCommunityIcons name="tune-vertical-variant" size={24} color={COLORS.black} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -146,6 +161,12 @@ const AllReportsScreen = () => {
         maxToRenderPerBatch={5}
         windowSize={5}
         initialNumToRender={5}
+      />
+
+      <FilterModal
+        visible={isFilterModalVisible}
+        onClose={handleCloseFilter}
+        onApplyFilter={handleApplyFilter}
       />
     </KeyboardAvoidingView>
   );

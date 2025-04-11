@@ -18,6 +18,8 @@ const COLORS = {
   success: '#0BA241',
   border: '#E0E0E0',
   lightGray: '#E0E0E0',
+  lightGray2: '#D7D7D7',
+  lightPrimary: 'rgba(0, 140, 255, 0.1)',
   shadow: 'rgba(0, 0, 0, 0.1)',
 };
 
@@ -43,6 +45,7 @@ const TYPOGRAPHY = {
 const SPACING = {
   xs: hp('0.5%'),
   sm: hp('1%'),
+  sm2: hp('1.5%'),
   md: hp('2%'),
   lg: hp('3%'),
   xl: hp('4%'),

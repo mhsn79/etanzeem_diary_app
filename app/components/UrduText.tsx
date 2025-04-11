@@ -5,18 +5,21 @@ import { useLanguage } from '../context/LanguageContext';
 interface UrduTextProps extends TextProps {
   children: React.ReactNode;
   kasheedaStyle?: boolean;
+  numberOfLines?: number;
 }
 
-const UrduText: React.FC<UrduTextProps> = ({ style, children, kasheedaStyle = false, ...props }) => {
+const UrduText: React.FC<UrduTextProps> = ({ style, children, kasheedaStyle = false, numberOfLines, ...props }) => {
   const { currentLanguage } = useLanguage();
 
   return (
     <Text 
+      numberOfLines={numberOfLines}
       style={[
         styles.baseText,
         currentLanguage === 'ur' && styles.urduText,
         kasheedaStyle && styles.kasheedaText,
         style
+
       ]} 
       {...props}
     >
