@@ -37,6 +37,20 @@ export default function StackLayout() {
           title: 'تمام رپورٹس دیکھیں',
         }}
       />
+      <Stack.Screen 
+        name="SubmittedReportScreen" 
+        options={{
+          title: 'جمع شدہ رپورٹس',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="CreateReportScreen" 
+        options={{
+          title: 'رپورٹ بنائیں',
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 } 

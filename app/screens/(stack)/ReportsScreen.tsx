@@ -33,6 +33,7 @@ const ReportsScreen = () => {
   };
 
   const handleEdit = () => {
+    router.push('/screens/(stack)/SubmittedReportScreen');
     // Handle edit action
   };
 
@@ -42,6 +43,10 @@ const ReportsScreen = () => {
 
   const handleSubmit = () => {
     // Handle submit action
+  };
+
+  const handleCreateReport = () => {
+    router.push('/screens/(stack)/CreateReportScreen');
   };
 
   return (
@@ -153,6 +158,12 @@ const ReportsScreen = () => {
           />
         </View>
       </ScrollView>
+      <TouchableOpacity 
+        style={styles.overlayButton}
+        onPress={handleCreateReport}
+      >
+        <Ionicons name="add" size={24} color={COLORS.background} />
+      </TouchableOpacity>
     </KeyboardAvoidingView>
   );
 };
@@ -298,6 +309,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.md,
+  },
+  overlayButton: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    right: SPACING.xl,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.medium,
   },
 });
 

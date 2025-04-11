@@ -8,6 +8,7 @@ import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../.
 import { useNavigation } from 'expo-router';
 import ReportCard from './components/ReportCard';
 import FilterModal from '../../components/FilterModal';
+import ScreenLayout from '@/app/components/ScreenLayout';
 
 interface ReportItem {
   id: string;
@@ -115,21 +116,12 @@ const AllReportsScreen = () => {
   ), []);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      {/* Static Header Section */}
-      <View style={[styles.headerSection, { paddingTop: insets.top }]}>
-        <Header
-          title="تمام رپورٹس دیکھیں"
-          onBack={handleBack}
-          borderRadius={BORDER_RADIUS.md}
-          containerStyle={{ backgroundColor: COLORS.primary }}
-        />
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
+   <ScreenLayout
+    title="جمع شدہ رپورٹس"
+    onBack={handleBack}
+   >
+     {/* Search Bar */}
+     <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <TouchableOpacity style={styles.searchIcon}>
               <Ionicons name="search" size={24} color={COLORS.textSecondary} />
@@ -147,8 +139,6 @@ const AllReportsScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
-
       {/* FlatList for Report Cards */}
       <FlatList<ReportItem>
         data={REPORTS_DATA}
@@ -168,7 +158,7 @@ const AllReportsScreen = () => {
         onClose={handleCloseFilter}
         onApplyFilter={handleApplyFilter}
       />
-    </KeyboardAvoidingView>
+    </ScreenLayout>
   );
 };
 
