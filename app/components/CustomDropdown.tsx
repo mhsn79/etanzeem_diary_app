@@ -52,7 +52,8 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
           {
             backgroundColor: themeStyles.backgroundColor,
             borderColor: themeStyles.borderColor,
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            // flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: 'row'
           },
           ...viewStyle
         ]}
@@ -106,7 +107,8 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     {
                       backgroundColor: themeStyles.dropdownBg,
                       borderBottomColor: themeStyles.borderColor,
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      // flexDirection: isRTL ? 'row-reverse' : 'row',
+                      flexDirection: 'row'
                     },
                     index === options.length - 1 && { borderBottomWidth: 0 }
                   ]}

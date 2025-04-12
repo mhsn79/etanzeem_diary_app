@@ -89,54 +89,54 @@ const Dashboard = () => {
     useEffect(() => {
         // Load saved language preference
         const loadLanguagePreference = async () => {
-          try {
-            const savedLanguage = await AsyncStorage.getItem('userLanguage');
-            if (savedLanguage) {
-              i18n.locale = savedLanguage;
+            try {
+                const savedLanguage = await AsyncStorage.getItem('userLanguage');
+                if (savedLanguage) {
+                    i18n.locale = savedLanguage;
+                }
+                console.log('savedLanguage', i18n.locale)
+            } catch (error) {
+                console.error('Error loading language preference:', error);
             }
-            console.log('savedLanguage', i18n.locale)
-          } catch (error) {
-            console.error('Error loading language preference:', error);
-          }
         };
 
         loadLanguagePreference();
-      }, []);
+    }, []);
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             {/* <View style={{ flex: 1 }}> */}
             <StatusBar hidden />
             {/* Header section */}
-            <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB" }}>
-                <View style={[styles.header, { paddingTop: 0, height: 200, alignItems: 'center', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }]}>
+            <View style={{ backgroundColor: (colorScheme === "dark") ? "#23242D" : "#EBEBEB", direction: i18n.locale == 'ur' ? 'rtl' : 'ltr' }}>
+                <View style={[styles.header, { paddingTop: 0, height: 200, alignItems: 'center', borderBottomStartRadius: 20, borderBottomEndRadius: 20 }]}>
                     {/* Image section */}
                     <View style={[styles.imageContainer, { padding: 5, marginTop: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%" }]}>
-                        <View style={{ flex: 1, paddingRight: 75 }}>
+                        <Image
+                            source={require('@/assets/images/icon.png')}
+                            style={[styles.logo]}
+                        />
+                        <View style={{ flex: 1 }}>
                             <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
-                                    <Spacer height={10}></Spacer>
+                                    <UrduText kasheedaStyle={true} style={{ color: "white", fontSize: 24, marginHorizontal: 10 }}>{i18n.t('uc')}</UrduText>
                                     <LeftUpArrowWhite style={{ width: 17, height: 17 }} />
-                                    <UrduText kasheedaStyle={true} style={{ color: "white", fontSize: 18, marginStart: 10 }}>{i18n.t('uc')}</UrduText>
+                                    <Spacer height={10}></Spacer>
                                 </View>
                             </TouchableOpacity>
                             <View style={[{ flexDirection: "row", alignItems: "center" }]}>
-                                <Spacer height={10} width={"100%"}></Spacer>
+                                <LocationIcon style={{ width: 13, height: 16, marginHorizontal: 10 }} />
                                 <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('zone')}</UrduText>
-                                <LocationIcon style={{ width: 13, height: 16, marginStart: 10 }} />
+                                <Spacer height={10} width={"100%"}></Spacer>
                             </View>
                             <TouchableOpacity onPress={() => router.push("/screens/ProfileView")}>
                                 <View style={[{ flexDirection: "row", alignItems: "center" }]}>
-                                    <Spacer height={10} width={"100%"}></Spacer>
+                                    <UserIcon style={{ width: 14, height: 15, marginHorizontal: 10 }} />
                                     <UrduText style={{ color: "white", fontSize: 18 }}>{i18n.t('nazim')}</UrduText>
-                                    <UserIcon style={{ width: 14, height: 15, marginStart: 10 }} />
+                                    <Spacer height={10} width={"100%"}></Spacer>
                                 </View>
                             </TouchableOpacity>
                         </View>
-                        <Image
-                            source={require('../../../assets/images/icon.png')}
-                            style={[styles.logo]}
-                        />
                     </View>
                     <View style={{ position: "absolute", padding: 5, marginTop: 130, width: "100%" }}>
                         {/* Schedule */}
@@ -174,10 +174,6 @@ const Dashboard = () => {
                 <View style={{ margin: 15, marginTop: 40, borderRadius: 10, backgroundColor: (colorScheme === 'dark') ? "#373842" : 'transparent', padding: 10 }}>
                     {/* Light Gray Rounded Rectangle: Duration Dropdown + Generate Report */}
                     <View style={[styles.boxRow, { width: "100%", alignItems: "center" }]}>
-                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/ReportsScreen")}>
-                            <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
-                            <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
-                        </TouchableOpacity>
                         <View style={{ width: 150 }}>
                             <CustomDropdown
                                 viewStyle={[{
@@ -197,6 +193,10 @@ const Dashboard = () => {
                                     padding: 0
                                 }]} />
                         </View>
+                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/ReportsScreen")}>
+                            <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
+                            <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Rows of Boxes (Dark Gray Background) */}
@@ -205,34 +205,34 @@ const Dashboard = () => {
                         <View style={styles.boxRow}>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Workforce")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('workforce')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>50</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('arkan')}</UrduText>
+                                    <UrduText style={styles.boxContent}>50</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>5</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('increase')}</UrduText>
+                                    <UrduText style={styles.boxContent}>5</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>10</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('target')}</UrduText>
+                                    <UrduText style={styles.boxContent}>10</UrduText>
                                 </View>
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('sub_units')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>5</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('wards')}</UrduText>
+                                    <UrduText style={styles.boxContent}>5</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <UrduText style={styles.boxContent}>-</UrduText>
@@ -247,38 +247,38 @@ const Dashboard = () => {
                         <View style={styles.boxRow}>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Activities")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('activities')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>1</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('organizational')}</UrduText>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>1</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('invitational')}</UrduText>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>1</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('training')}</UrduText>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
                                 </View>
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/UnitSelection")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('upper_management')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>1</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('activities')}</UrduText>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <UrduText style={styles.boxContent}>1</UrduText>
                                     <UrduText style={styles.boxContent}>{i18n.t('participation')}</UrduText>
+                                    <UrduText style={styles.boxContent}>1</UrduText>
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <UrduText style={styles.boxContent}>-</UrduText>
@@ -289,10 +289,10 @@ const Dashboard = () => {
                         <View style={styles.boxRow}>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Meetings")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('visits')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <UrduText style={styles.boxContent}>-</UrduText>
@@ -309,10 +309,10 @@ const Dashboard = () => {
                             </View>
                             <View style={styles.box}>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
-                                    <LeftUpArrowBlue />
                                     <TouchableOpacity onPress={() => router.push("/screens/Income")}>
                                         <UrduText kasheedaStyle={true} style={styles.boxTitle}>{i18n.t('money')}</UrduText>
                                     </TouchableOpacity>
+                                    <LeftUpArrowBlue style={[{ transform: [{ rotateY: ((i18n.locale == 'ur') ? "0deg" : "180deg") }] }]} />
                                 </View>
                                 <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                                     <UrduText style={styles.boxContent}>0</UrduText>
