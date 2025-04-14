@@ -132,14 +132,6 @@ export default function RootLayout() {
         <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
         <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
         <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
-        <Stack.Screen name="screens/Income" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/Meetings" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/ProfileView" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/UnitSelection" options={{ headerShown: true, header: (props) => <CustomHeader {...props} title="تنظیمی ہیئت" /> }} />
-        <Stack.Screen name="screens/Workforce" options={{ headerShown: true, header: (props) => <CustomHeader {...props} title="افرادی قوت" /> }} />
-        <Stack.Screen name="screens/RukunView" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/RukunAddEdit" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/ProfileEdit" options={{ headerShown: true }} />
       </Stack>
     </LanguageProvider>
   );
