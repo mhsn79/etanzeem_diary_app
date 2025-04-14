@@ -8,10 +8,16 @@ import { router } from 'expo-router';
 import Spacer from '../components/Spacer';
 import UrduText from '../components/UrduText';
 
+interface Option {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export default function UnitSelection() {
 
-  const handleSelection = (selectedItem: string) => {
-    console.log('Selected item:', selectedItem);
+  const handleSelection = (option: Option) => {
+    console.log('Selected item:', option.value);
   };
 
   return (

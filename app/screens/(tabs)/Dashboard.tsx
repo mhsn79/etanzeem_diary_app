@@ -62,15 +62,15 @@ const Dashboard = () => {
     ]);
 
     const durationItemNames = [
-        i18n.t('last_2_weeks'),
-        i18n.t('last_4_weeks'),
-        i18n.t('this_month'),
-        i18n.t('last_month'),
-        i18n.t('last_3_months'),
-        i18n.t('last_6_months'),
-        i18n.t('this_year'),
-        i18n.t('last_year'),
-        i18n.t('last_2_years'),
+        { id: '1', label: i18n.t('last_2_weeks'), value: 'last_2_weeks' },
+        { id: '2', label: i18n.t('last_4_weeks'), value: 'last_4_weeks' },
+        { id: '3', label: i18n.t('this_month'), value: 'this_month' },
+        { id: '4', label: i18n.t('last_month'), value: 'last_month' },
+        { id: '5', label: i18n.t('last_3_months'), value: 'last_3_months' },
+        { id: '6', label: i18n.t('last_6_months'), value: 'last_6_months' },
+        { id: '7', label: i18n.t('this_year'), value: 'this_year' },
+        { id: '8', label: i18n.t('last_year'), value: 'last_year' },
+        { id: '9', label: i18n.t('last_2_years'), value: 'last_2_years' },
     ];
 
     // Get the current date
