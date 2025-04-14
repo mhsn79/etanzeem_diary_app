@@ -105,7 +105,6 @@ export default function Workforce() {
         />
 
         <View style={styles.topContainer}>
-          <Text style={styles.topText}>افرادی قوت</Text>
           <View style={styles.quwatContainer}>
             <View style={styles.quwatBox}>
               <Image source={require('../../assets/images/green-arkan-icon.png')} style={styles.quwatIcon}/>
@@ -170,7 +169,7 @@ const styles = StyleSheet.create({
   },
   topContainer: {
     backgroundColor: '#008CFF',
-    height: "35%",
+    height: "28%",
     borderBottomRightRadius: 20,
     borderBottomLeftRadius: 20,
     alignItems: 'center',
@@ -183,7 +182,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   quwatContainer: {
-    height: "60%",
+    height: "75%",
     flexDirection: "row-reverse",
     gap: 20,
     marginBottom: 5

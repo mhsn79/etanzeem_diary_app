@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 // import CustomTabbar from '../components/CustomTabbar';
 import Spacer from '../components/Spacer';
 import UrduText from '../components/UrduText';
+import { COLORS, SPACING } from '../constants/theme';
 
 interface Option {
   id: string;
@@ -23,14 +24,13 @@ export default function UnitSelection() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={[{ flexGrow: 1 }]} style={styles.container}>
-        <View style={styles.topContainer}>
-          <UrduText style={[styles.text, { fontSize: 20 }]}>تنظیمی ہیئت</UrduText>
-          <Spacer height={40}/>
-          <UrduText style={[styles.text, { fontSize: 28 }]}>یونٹ سیلیکشن برائے بالائی نظم۔</UrduText>
+        <View style={styles.topContainer}>  
+          <UrduText style={[styles.text, { fontSize: 28 ,marginBottom: SPACING.md}]}>یونٹ سیلیکشن برائے بالائی نظم۔</UrduText>
           <CustomDropdown
             options={[]} //TODO: fetch from directus
             onSelect={handleSelection}
             viewStyle={[styles.dropdown]}
+            dropdownContainerStyle={styles.dropdownContainer}
             textStyle={[styles.dropdownText]}
             placeholder='ضلع:'
           />
@@ -39,6 +39,8 @@ export default function UnitSelection() {
             onSelect={handleSelection}
             viewStyle={[styles.dropdown]}
             textStyle={[styles.dropdownText]}
+            dropdownContainerStyle={styles.dropdownContainer}
+
             placeholder='زون نمبر:'
           />
           <CustomDropdown
@@ -46,6 +48,7 @@ export default function UnitSelection() {
             onSelect={handleSelection}
             viewStyle={[styles.dropdown]}
             textStyle={[styles.dropdownText]}
+            dropdownContainerStyle={styles.dropdownContainer}
             placeholder=' یوسی:'
           />
         </View>
@@ -74,13 +77,7 @@ export default function UnitSelection() {
             </View>
           </View>
         </View>
-        <View style={styles.backButton}>
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            onPress={() => router.back()}
-          />
-        </View>
+  
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -90,24 +87,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  backButton: {
-    backgroundColor: '#ffffff',
-    position: 'absolute',
-    top: 50,
-    left: 15,
-    width: 47,
-    height: 47,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8
-  },
+
   topContainer: {
     backgroundColor: '#008CFF',
-    height: "50%",
+    height: "40%",
     borderBottomRightRadius: 20,
     borderBottomLeftRadius: 20,
     alignItems: 'center',
-    paddingTop: 62,
+    paddingTop: SPACING.lg,
     paddingLeft: 16,
     paddingRight: 16
   },
@@ -115,9 +102,17 @@ const styles = StyleSheet.create({
     color: "white",
     fontFamily: "JameelNooriNastaleeq",
   },
+
   dropdown: {
     height: 55,
-    marginBottom: 0
+    marginBottom: SPACING.sm,
+  },
+  dropdownContainer: {
+    width: "100%",
+    height: 55,
+    borderRadius: 10,
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.white
   },
   dropdownText: {
     fontSize: 20,

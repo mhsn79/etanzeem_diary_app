@@ -10,6 +10,7 @@ const COLORS = {
   primary: '#008CFF',
   secondary: '#E9E9E9',
   tertiary: '#0BA241',
+  orange: '#FFA500',
   background: '#FFFFFF',
   black: '#000000',
   white: '#FFFFFF',

@@ -1,7 +1,7 @@
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import React from 'react';
-import { I18nManager, StyleSheet, Pressable, useColorScheme } from "react-native";
+import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
 import { useNavigationState } from '@react-navigation/native';
+import { COLORS, SPACING } from "./constants/theme";
 
 
 // Force RTL layout for the entire app
@@ -28,9 +29,10 @@ type HeaderProps = {
     };
   };
   options: any;
+  title?: string;
 };
 
-function CustomHeader({ navigation, route }: HeaderProps) {
+function CustomHeader({ navigation, route, title }: HeaderProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const state = useNavigationState((state) => state);
   const currentRoute = state?.routes[state.index];
@@ -39,6 +41,7 @@ function CustomHeader({ navigation, route }: HeaderProps) {
   const getFullPath = (state: any) => {
     const route = state.routes[state.index];
     let fullPath = route.name;
+    console.log('================', title);
 
     if (route.state) {
       // If there's a nested navigator, recursively find the full path
@@ -74,29 +77,32 @@ function CustomHeader({ navigation, route }: HeaderProps) {
     ]}>
       <View style={styles.header}>
         <View style={styles.leftSection}>
-          {showBackButton ? (
-            <Pressable onPress={handleBack} style={styles.iconButton}>
-              <Ionicons name="chevron-forward" size={24} color="white" />
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => setMenuVisible(true)} style={styles.iconButton}>
-              <Ionicons name="menu" size={24} color="white" />
-            </Pressable>
-          )}
+
         </View>
 
         <View style={styles.titleContainer}>
-          {fullPath !== 'screens/(tabs)/Arkan' && <SmallTarazu style={{ width: 24, height: 24 }} />}
-          <UrduText style={[styles.title, { color: "white" }]}>
-            {fullPath === 'screens/(tabs)/Arkan' ? i18n.t('arkan') : i18n.t('e-tanzeem')}
-          </UrduText>
+          {title ? <UrduText style={[styles.title, { color: "white" }]}>{title}</UrduText> :
+            <>
+              {fullPath !== 'screens/(tabs)/Arkan' && <SmallTarazu style={{ width: 24, height: 24 }} />}
+              <UrduText style={[styles.title, { color: "white" }]}>
+                {fullPath === 'screens/(tabs)/Arkan' ? i18n.t('arkan') : i18n.t('e-tanzeem')}
+              </UrduText>
+            </>
+          }
         </View>
 
         <View style={styles.rightSection}>
-          {!isLoginScreen && (
+
+
+          {isInTabs && (
             <Pressable onPress={() => router.push('/screens/ProfileView')} style={styles.iconButton}>
-              <Ionicons name="person-circle-outline" size={28} color="white" />
+              <Ionicons name="person-circle-outline" size={42} color={COLORS.orange} />
             </Pressable>
+          )}
+          {showBackButton && (
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <Ionicons name="arrow-forward" size={24} color="black" />
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -129,8 +135,8 @@ export default function RootLayout() {
         <Stack.Screen name="screens/Income" options={{ headerShown: true }} />
         <Stack.Screen name="screens/Meetings" options={{ headerShown: true }} />
         <Stack.Screen name="screens/ProfileView" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/UnitSelection" options={{ headerShown: true }} />
-        <Stack.Screen name="screens/Workforce" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/UnitSelection" options={{ headerShown: true, header: (props) => <CustomHeader {...props} title="تنظیمی ہیئت" /> }} />
+        <Stack.Screen name="screens/Workforce" options={{ headerShown: true, header: (props) => <CustomHeader {...props} title="افرادی قوت" /> }} />
         <Stack.Screen name="screens/RukunView" options={{ headerShown: true }} />
         <Stack.Screen name="screens/RukunAddEdit" options={{ headerShown: true }} />
         <Stack.Screen name="screens/ProfileEdit" options={{ headerShown: true }} />
@@ -151,7 +157,7 @@ const styles = StyleSheet.create({
     borderBottomEndRadius: 20,
   },
   header: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -182,5 +188,13 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backButton: {
+    padding: SPACING.sm,
+    backgroundColor: COLORS.background,
+    borderRadius: 7,
+    position: 'absolute',
+    left: SPACING.xs,
+    bottom: -SPACING.md,
   },
 });
