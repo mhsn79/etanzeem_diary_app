@@ -11,6 +11,7 @@ import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
 import ReportCard from './components/ReportCard';
 import { useRouter } from 'expo-router';
+import { ROUTES } from '../../constants/navigation';
 
 const ReportsScreen = () => {
   const insets = useSafeAreaInsets();
@@ -29,12 +30,11 @@ const ReportsScreen = () => {
   };
 
   const handleViewAllReports = () => {
-    router.push('/screens/(stack)/AllReportsScreen');
+    router.push(ROUTES.ALL_REPORTS);
   };
 
   const handleEdit = () => {
-    router.push('/screens/(stack)/SubmittedReportScreen');
-    // Handle edit action
+    router.push(ROUTES.SUBMITTED_REPORT);
   };
 
   const handleOpen = () => {
@@ -46,7 +46,7 @@ const ReportsScreen = () => {
   };
 
   const handleCreateReport = () => {
-    router.push('/screens/(stack)/CreateReportScreen');
+    router.push(ROUTES.CREATE_REPORT);
   };
 
   return (

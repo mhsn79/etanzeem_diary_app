@@ -7,21 +7,36 @@ const STANDARD_SCREEN_WIDTH = 375;
 
 // Color palette
 const COLORS = {
+  // Primary colors
   primary: '#008CFF',
   secondary: '#E9E9E9',
   tertiary: '#0BA241',
   orange: '#FFA500',
+  
+  // Background colors
   background: '#FFFFFF',
   black: '#000000',
   white: '#FFFFFF',
+  
+  // Text colors
+  textPrimary: '#000000',
   textSecondary: '#666666',
+  
+  // Status colors
   error: '#E63946',
   success: '#0BA241',
+  warning: '#FFA500',
+  info: '#008CFF',
+  
+  // Border and divider colors
   border: '#E0E0E0',
   lightGray: '#E0E0E0',
   lightGray2: '#D7D7D7',
+  
+  // Transparent colors
   lightPrimary: 'rgba(0, 140, 255, 0.1)',
   shadow: 'rgba(0, 0, 0, 0.1)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
 };
 
 // Typography
@@ -40,6 +55,15 @@ const TYPOGRAPHY = {
     xxl: RFValue(20, STANDARD_SCREEN_HEIGHT),
     xxxl: RFValue(22, STANDARD_SCREEN_HEIGHT),
   },
+  lineHeight: {
+    xs: RFValue(14, STANDARD_SCREEN_HEIGHT),
+    sm: RFValue(16, STANDARD_SCREEN_HEIGHT),
+    md: RFValue(18, STANDARD_SCREEN_HEIGHT),
+    lg: RFValue(20, STANDARD_SCREEN_HEIGHT),
+    xl: RFValue(22, STANDARD_SCREEN_HEIGHT),
+    xxl: RFValue(24, STANDARD_SCREEN_HEIGHT),
+    xxxl: RFValue(26, STANDARD_SCREEN_HEIGHT),
+  },
 };
 
 // Spacing
@@ -57,17 +81,12 @@ const SPACING = {
 
 // Border radius
 const BORDER_RADIUS = {
+  xs: wp('1%'),
   sm: wp('2%'),
   md: wp('4%'),
   lg: wp('6%'),
   xl: wp('8%'),
-};
-
-export {
-  COLORS,
-  TYPOGRAPHY,
-  SPACING,
-  BORDER_RADIUS,
+  round: 9999,
 };
 
 // Sizes
@@ -97,6 +116,12 @@ const SIZES = {
   card: {
     width: wp('90%'),
     padding: hp('2%'),
+  },
+  
+  // Modal sizes
+  modal: {
+    width: wp('85%'),
+    height: hp('45%'),
   },
 };
 
@@ -134,6 +159,38 @@ const SHADOWS = {
   },
 };
 
+// Animation
+const ANIMATION = {
+  duration: {
+    fast: 200,
+    normal: 300,
+    slow: 500,
+  },
+  easing: {
+    default: 'ease-in-out',
+  },
+};
+
+// Z-index
+const Z_INDEX = {
+  modal: 1000,
+  dropdown: 999,
+  overlay: 998,
+  header: 100,
+  footer: 100,
+};
+
+export {
+  COLORS,
+  TYPOGRAPHY,
+  SPACING,
+  BORDER_RADIUS,
+  SIZES,
+  SHADOWS,
+  ANIMATION,
+  Z_INDEX,
+};
+
 // Example usage:
 /*
 import { COLORS, TYPOGRAPHY, SPACING, SIZES, BORDER_RADIUS, SHADOWS } from '../constants/theme';
@@ -157,8 +214,3 @@ const styles = StyleSheet.create({
   },
 });
 */ 
-
-export {
-  SIZES,
-  SHADOWS,
-}; 

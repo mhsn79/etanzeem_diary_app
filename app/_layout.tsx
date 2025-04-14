@@ -41,7 +41,6 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
   const getFullPath = (state: any) => {
     const route = state.routes[state.index];
     let fullPath = route.name;
-    console.log('================', title);
 
     if (route.state) {
       // If there's a nested navigator, recursively find the full path
