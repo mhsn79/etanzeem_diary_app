@@ -49,6 +49,9 @@ const SPACING = {
   md: hp('2%'),
   lg: hp('3%'),
   xl: hp('4%'),
+  xxl: hp('5%'),
+  xxxl: hp('6%'),
+  xxxxl: hp('7%'),
 };
 
 // Border radius

@@ -6,6 +6,7 @@ import UrduText from '@/app/components/UrduText';
 import { View, StyleSheet, FlatList } from 'react-native';
 import FormInput from '@/app/components/FormInput';
 import CustomButton from '@/app/components/CustomButton';
+import Dialog from '@/app/components/Dialog';
 
 const reportSections = [
   {
@@ -67,6 +68,7 @@ const yearOptions = [
 
 const SubmittedReportScreen = () => {
   const navigation = useNavigation();
+  const [showDialog, setShowDialog] = useState(false);
   const [reportData, setReportData] = useState({
     zone: '',
     totalPopulation: '',
@@ -91,10 +93,19 @@ const SubmittedReportScreen = () => {
 
   const handleSave = () => {
     // Handle save logic
+    setShowDialog(true);
     console.log('Saving report data:', reportData);
   };
 
+  const handleDialogConfirm = () => {
+    setShowDialog(false);
+    // Handle continue logic here
+    console.log('Continuing with report data:', reportData);
+  };
 
+  const handleDialogCancel = () => {
+    setShowDialog(false);
+  };
 
   const renderSection = ({ item }: { item: typeof reportSections[0] }) => (
     <View style={styles.section}>
@@ -115,7 +126,6 @@ const SubmittedReportScreen = () => {
   return (
     <ScreenLayout title="جمع شدہ رپورٹس" onBack={handleBack}>
       <View style={styles.container}>
-   
         <FlatList
           data={reportSections}
           renderItem={renderSection}
@@ -130,9 +140,19 @@ const SubmittedReportScreen = () => {
             viewStyle={[{ backgroundColor: COLORS.primary, flex: 1, marginHorizontal: SPACING.sm }]}
             textStyle={[{ color: COLORS.white }]}
           />
-     
         </View>
       </View>
+
+      <Dialog
+        visible={showDialog}
+        onConfirm={handleDialogConfirm}
+        onCancel={handleDialogCancel}
+        title="رپورٹ جمع کروانے کی تصدیق"
+        description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔"
+        confirmText="ہاں، جمع کریں"
+        cancelText="نہیں، واپس جائیں"
+        showSuccessIcon={true}
+      />
     </ScreenLayout>
   );
 };

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
-
+import SuccessIcon from "../../assets/images/checkmark-badge.svg";
 interface DialogProps {
   visible: boolean;
   onConfirm: () => void;
@@ -19,6 +19,7 @@ interface DialogProps {
   confirmText?: string;
   cancelText?: string;
   showWarningIcon?: boolean;
+  showSuccessIcon?: boolean;
 }
 
 const Dialog: React.FC<DialogProps> = ({
@@ -29,7 +30,8 @@ const Dialog: React.FC<DialogProps> = ({
   description = 'کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔',
   confirmText = 'ہاں، جمع کریں',
   cancelText = 'نہیں، واپس جائیں',
-  showWarningIcon = true,
+  showWarningIcon = false,
+  showSuccessIcon = false,
 }) => {
   return (
     <Modal
@@ -42,11 +44,16 @@ const Dialog: React.FC<DialogProps> = ({
         <View style={styles.container}>
           {/* Warning Icon */}
           {showWarningIcon && (
-            <View style={styles.iconContainer}>
+            <View style={styles.warningIconContainer}>
               <Text style={styles.warningIcon}>⚠️</Text>
             </View>
           )}
 
+          {showSuccessIcon && (
+            <View style={styles.successIconContainer}>
+              <SuccessIcon />
+            </View>
+          )}
           {/* Title */}
           <UrduText style={styles.title}>{title}</UrduText>
 
@@ -97,24 +104,35 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     ...SHADOWS.medium,
   },
-  iconContainer: {
+  warningIconContainer: {
+      alignSelf: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+    },
+  successIconContainer: {
+    alignSelf: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
+    width: 60 ,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.tertiary,
+    justifyContent: 'center',
   },
   warningIcon: {
-    fontSize: 40,
+    fontSize: 60,
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontFamily: TYPOGRAPHY.fontFamily.bold,
-    color: COLORS.black,
+    color: COLORS.primary,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   description: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    color: COLORS.black,
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
@@ -145,19 +163,21 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    bottom: -SPACING.xl,
+    bottom: -SPACING.xxxxl,
     alignSelf: 'center',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
+    width: 50 ,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: COLORS.white,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.small,
   },
   closeIcon: {
-    fontSize: 20,
-    color: COLORS.textSecondary,
+    fontSize: 16,
+    color: COLORS.white,
   },
 });
 

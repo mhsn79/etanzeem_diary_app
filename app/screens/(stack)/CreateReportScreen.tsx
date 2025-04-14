@@ -8,6 +8,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import { TabGroup } from '@/app/components/Tab';
 import UrduText from '@/app/components/UrduText';
 import CustomButton from '@/app/components/CustomButton';
+import Dialog from '@/app/components/Dialog';
 
 const reportSections = [
   {
@@ -58,13 +59,11 @@ const reportSections = [
       }
     ]
   }
-];  const handleContinue = () => {
-  // Handle continue logic
-  console.log('Continuing with report data:');
-};
+];
 
 const CreateReportScreen = () => {
   const navigation = useNavigation();
+  const [showDialog, setShowDialog] = useState(false);
   const [reportData, setReportData] = useState({
     zone: '',
     totalPopulation: '',
@@ -130,6 +129,20 @@ const CreateReportScreen = () => {
     </View>
   );
 
+  const handleContinue = () => {
+    setShowDialog(true);
+  };
+
+  const handleDialogConfirm = () => {
+    setShowDialog(false);
+    // Handle continue logic here
+    console.log('Continuing with report data:', reportData);
+  };
+
+  const handleDialogCancel = () => {
+    setShowDialog(false);
+  };
+
   return (
     <ScreenLayout title="رپورٹ بنائیں" onBack={handleBack}>
       <View style={styles.container}>
@@ -160,16 +173,26 @@ const CreateReportScreen = () => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
-             <View style={styles.buttonContainer}>
+        <View style={styles.buttonContainer}>
           <CustomButton
             text="جاری رکھیں"
             onPress={handleContinue}
             viewStyle={[{ backgroundColor: COLORS.primary, flex: 1, marginHorizontal: SPACING.sm }]}
             textStyle={[{ color: COLORS.white }]}
           />
-     
         </View>
       </View>
+
+      <Dialog
+        visible={showDialog}
+        onConfirm={handleDialogConfirm}
+        onCancel={handleDialogCancel}
+        title="رپورٹ جمع کروانے کی تصدیق"
+        description="کیا آپ واقعی اس رپورٹ کو جمع کروانا چاہتے ہیں؟ ایک بار جمع ہونے کے بعد، آپ اسے صرف ایڈمن کی اجازت سے ایڈٹ کر سکیں گے"
+        confirmText="ہاں، جمع کروائیں"
+        cancelText="نہیں، واپس جائیں"
+        showWarningIcon={true}
+      />
     </ScreenLayout>
   );
 };
