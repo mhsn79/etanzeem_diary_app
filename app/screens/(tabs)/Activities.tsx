@@ -1,88 +1,114 @@
-import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, TouchableOpacity } from 'react-native';
-import i18n from '../../i18n';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import ActivityCard from '../../components/ActivityCard';
+import ScreenLayout from '../../components/ScreenLayout';
+import { TabGroup } from '@/app/components/Tab';
+import { COLORS, SHADOWS, SPACING } from '@/app/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
-import { router } from 'expo-router';
 
 export default function Activities() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();  // Router is imported here
+  const [selectedTab, setSelectedTab] = useState(0);
 
-  let scheduleForToday = [
-    { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
-    { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
-    { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
-    { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
-    { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
-    { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
-    { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
-    { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
-    { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
-    { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
-    { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
-    { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" },
-    { "eventName": "Event 1", "date": "2025-02-23", "startTime": "10:00 AM", "endTime": "12:00 PM", "location": "Room 101", "description": "Description for Event 1", "type": "type-1" },
-    { "eventName": "Event 2", "date": "2025-02-23", "startTime": "2:00 PM", "endTime": "4:00 PM", "location": "Room 102", "description": "Description for Event 2", "type": "type-2" },
-    { "eventName": "Event 3", "date": "2025-02-23", "startTime": "5:00 PM", "endTime": "7:00 PM", "location": "Room 103", "description": "Description for Event 3", "type": "type-3" },
-    { "eventName": "Event 4", "date": "2025-02-23", "startTime": "8:00 PM", "endTime": "10:00 PM", "location": "Room 104", "description": "Description for Event 4", "type": "type-4" },
-    { "eventName": "Event 5", "date": "2025-02-23", "startTime": "11:00 PM", "endTime": "1:00 AM", "location": "Room 105", "description": "Description for Event 5", "type": "type-5" }
-]
+  const tabs = [
+    { label: 'شیڈول', value: 0 },
+    { label: 'سرگرمی', value: 1 },
+  ];
 
-// Get the current date
-const currentDate = new Date();
+  const activities = [
+    {
+      id: '1',
+      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ مارچ 2025ء',
+      location: 'وارڈ نمبر 3',
+      status: '% 50 مکمل',
+      daysRemaining: '3 دن باقی ہیں',
+    },
+    {
+      id: '2',
+      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ اپریل 2025ء',
+      location: 'وارڈ نمبر 4',
+      status: '% 75 مکمل',
+      daysRemaining: '2 دن باقی ہیں',
+    },
+    {
+      id: '3',
+      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ مئی 2025ء',
+      location: 'وارڈ نمبر 5',
+      status: '% 25 مکمل',
+      daysRemaining: '5 دن باقی ہیں',
+    },
+    {
+      id: '4',
+      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ جون 2025ء',
+      location: 'وارڈ نمبر 6',
+      status: '% 90 مکمل',
+      daysRemaining: '1 دن باقی ہیں',
+    },
+  ];
 
-// Format the date as "February 23, 2025"
-const formattedDate = currentDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-});
+  const handleCreateActivity = () => {
+    // Use router.push to navigate to the screen
+    router.push('/screens/ScheduleActivitiesScreen');  // This is where we navigate
+  };
 
-return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
-        <Ionicons
-          name="arrow-back" // The back arrow icon
-          size={24}
-          color="black" // You can customize the color here
-          style={{ marginLeft: 15 }} // Adjust the position of the button
-          onPress={() => router.back()} // Navigate to Home screen on press
+  return (
+    <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+      <ScrollView style={styles.container}>
+        <TabGroup
+          tabs={tabs}
+          selectedTab={selectedTab}
+          onTabChange={setSelectedTab}
         />
-        <View>
-          <Text>{i18n.t('activities')}</Text>
+        <View style={styles.content}>
+          <FlatList
+            data={activities} // The array of activity objects
+            keyExtractor={(item) => item.id} // Unique key for each item
+            renderItem={({ item }) => (
+              <ActivityCard
+                key={item.id}
+                title={item.title}
+                location={item.location}
+                status={item.status}
+                daysRemaining={item.daysRemaining}
+                handleLeft={() => {}}
+                handleMiddle={() => {}}
+                handleRight={() => {}}
+              />
+            )}
+          />
         </View>
-
-        <ScrollView>
-          {scheduleForToday.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => console.log(item)}
-            >
-              <View key={index} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 10 }}>
-                <Text>{index + 1}</Text>
-                <Text>{item.eventName}</Text>
-                <Text>{item.date}</Text>
-                <Text>{item.startTime}</Text>
-                {/* <Text>{item.endTime}</Text> */}
-                <Text>{item.location}</Text>
-                {/* <Text>{item.description}</Text> */}
-                {/* <Text>{item.type}</Text> */}
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
       </ScrollView>
-    </KeyboardAvoidingView>
+      <TouchableOpacity style={styles.overlayButton} onPress={handleCreateActivity}>
+        <Ionicons name="add" size={24} color={COLORS.white} />
+      </TouchableOpacity>
+    </ScreenLayout>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  }
+    backgroundColor: COLORS.background,
+    paddingTop: SPACING.lg,
+    marginHorizontal: SPACING.md,
+  },
+  content: {
+    paddingBottom: 20,
+  },
+  overlayButton: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    right: SPACING.xl,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.medium,
+    zIndex: 1,
+  },
 });

@@ -182,6 +182,12 @@ export default function StackLayout() {
           headerShown: false,
         }} 
       />
+      <Stack.Screen 
+        name={SCREENS.SCHEDULE_ACTIVITIES_SCREEN}
+        options={{ 
+          headerShown: false,
+        }} 
+      />
       
     </Stack>
   );

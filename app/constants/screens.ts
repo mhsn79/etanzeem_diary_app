@@ -1,3 +1,5 @@
+import ScheduleActivitiesScreen from "../screens/(stack)/ScheduleActivitiesScreen";
+
 // Screen Groups
 export const SCREEN_GROUPS = {
   AUTH: 'auth',
@@ -25,6 +27,7 @@ export const SCREENS = {
   SUBMITTED_REPORT: 'SubmittedReportScreen',
   MEETING_SCREEN: 'MeetingScreen',
   ACTIVITY_SCREEN: 'ActivityScreen',
+  SCHEDULE_ACTIVITIES_SCREEN:'ScheduleActivitiesScreen',
   INCOME: 'Income',
   MEETINGS: 'Meetings',
   UNIT_SELECTION: 'UnitSelection',
@@ -52,6 +55,7 @@ export const SCREEN_PATHS = {
   SUBMITTED_REPORT: `/${SCREEN_GROUPS.STACK}/${SCREENS.SUBMITTED_REPORT}`,
   MEETING_SCREEN: `/${SCREEN_GROUPS.STACK}/${SCREENS.MEETING_SCREEN}`,
   ACTIVITY_SCREEN: `/${SCREEN_GROUPS.STACK}/${SCREENS.ACTIVITY_SCREEN}`,
+  SCHEDULE_ACTIVITIES_SCREEN: `/${SCREEN_GROUPS.STACK}/${SCREENS.SCHEDULE_ACTIVITIES_SCREEN}`,
   INCOME: `/${SCREEN_GROUPS.STACK}/${SCREENS.INCOME}`,
   MEETINGS: `/${SCREEN_GROUPS.STACK}/${SCREENS.MEETINGS}`,
   UNIT_SELECTION: `/${SCREEN_GROUPS.STACK}/${SCREENS.UNIT_SELECTION}`,
@@ -75,6 +79,8 @@ export const SCREEN_TITLES = {
   [SCREENS.WORKFORCE]: 'افرادی قوت',
   [SCREENS.RUKUN_VIEW]: 'ارکان',
   [SCREENS.RUKUN_ADD_EDIT]: 'رکن شامل کریں',
+  [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں'
+
 } as const;
 
 // Type Definitions

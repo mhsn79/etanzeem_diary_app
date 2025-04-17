@@ -8,7 +8,7 @@ export default function TabLayout() {
         headerShown: false,
       }}
       initialRouteName="Dashboard"
-      tabBar={(props) => <TabBar {...props}/>}
+      tabBar={(props) => <TabBar {...props} />}
     >
       <Tabs.Screen
         name="Reports"
@@ -19,7 +19,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Activities"
         options={{
-          tabBarLabel: "سرگرمیاں"
+          tabBarLabel: "سرگرمیاں",
+          headerShown: false
         }}
       />
       <Tabs.Screen

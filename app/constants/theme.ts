@@ -29,8 +29,8 @@ const COLORS = {
   info: '#008CFF',
   
   // Border and divider colors
-  border: '#E0E0E0',
-  lightGray: '#E0E0E0',
+  border: '##EBEBEB',
+  lightGray: '#EBEBEB',
   lightGray2: '#D7D7D7',
   
   // Transparent colors
@@ -101,6 +101,7 @@ const SIZES = {
     width: wp('80%'),
   },
   icon: {
+    sSmall:wp('4%'),
     small: wp('5%'),
     medium: wp('7%'),
     large: wp('10%'),
