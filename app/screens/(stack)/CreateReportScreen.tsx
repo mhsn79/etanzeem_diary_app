@@ -184,9 +184,9 @@ const CreateReportScreen = () => {
       </View>
 
       <Dialog
+        onClose={() => setShowDialog(false)}
         visible={showDialog}
         onConfirm={handleDialogConfirm}
-        onCancel={handleDialogCancel}
         title="رپورٹ جمع کروانے کی تصدیق"
         description="کیا آپ واقعی اس رپورٹ کو جمع کروانا چاہتے ہیں؟ ایک بار جمع ہونے کے بعد، آپ اسے صرف ایڈمن کی اجازت سے ایڈٹ کر سکیں گے"
         confirmText="ہاں، جمع کروائیں"

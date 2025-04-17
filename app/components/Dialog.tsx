@@ -9,30 +9,59 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
-import SuccessIcon from "../../assets/images/checkmark-badge.svg";
+import { SuccessIcon, WarningIcon } from '../constants/images'; // Import multiple SVGs
+import { AntDesign } from '@expo/vector-icons';
+
+// Map of icon types to components
+const ICON_MAP = {
+  success: SuccessIcon,
+  warning: WarningIcon,
+  // Add other icons as needed
+};
+
 interface DialogProps {
   visible: boolean;
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  onClose: () => void;
   title?: string;
+  titleStyle?: any;
   description?: string;
   confirmText?: string;
   cancelText?: string;
   showWarningIcon?: boolean;
-  showSuccessIcon?: boolean;
+  showSuccessIcon?: boolean; 
+  upperRightIcon?: boolean;
+  lowerRightIcon?: boolean;
+  confirmButtonStyle?: any;
+  cancelButtonStyle?: any;
+  confirmTextStyle?: any;
+  cancelTextStyle?: any;
+  descriptionStyle?: any;
 }
 
 const Dialog: React.FC<DialogProps> = ({
   visible,
   onConfirm,
   onCancel,
-  title = 'رپورٹ جمع کروانے کی تصدیق',
-  description = 'کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔',
-  confirmText = 'ہاں، جمع کریں',
-  cancelText = 'نہیں، واپس جائیں',
+  onClose,
+  title = '',
+  titleStyle = {},
+  description = '',
+  confirmText = '',
+  cancelText = '',
   showWarningIcon = false,
   showSuccessIcon = false,
+  upperRightIcon = false,
+  lowerRightIcon = false,
+  confirmButtonStyle,
+  cancelButtonStyle,
+  confirmTextStyle,
+  cancelTextStyle,
+  descriptionStyle = {},
 }) => {
+  // const IconComponent = iconType ? ICON_MAP[iconType] : null;
+
   return (
     <Modal
       visible={visible}
@@ -42,7 +71,7 @@ const Dialog: React.FC<DialogProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Warning Icon */}
+          {/* Icon */}
           {showWarningIcon && (
             <View style={styles.warningIconContainer}>
               <Text style={styles.warningIcon}>⚠️</Text>
@@ -54,34 +83,49 @@ const Dialog: React.FC<DialogProps> = ({
               <SuccessIcon />
             </View>
           )}
+
           {/* Title */}
-          <UrduText style={styles.title}>{title}</UrduText>
+          {title && (
+            <UrduText style={[styles.title, titleStyle]}>{title}</UrduText>
+          )}
 
           {/* Description */}
-          <UrduText style={styles.description}>{description}</UrduText>
+          {description && (
+            <UrduText style={[styles.description, descriptionStyle]}>{description}</UrduText>
+          )}
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={styles.confirmButton}
+              style={[styles.confirmButton, confirmButtonStyle]}
               onPress={onConfirm}
             >
-              <UrduText style={styles.confirmButtonText}>{confirmText}</UrduText>
+              <View style={styles.confirmButtonContent}>
+                {upperRightIcon && (
+                  <AntDesign style={{ marginRight: SPACING.sm }} name="calendar" size={24} color={COLORS.white} />
+                )}
+                <UrduText style={[styles.confirmButtonText, confirmTextStyle]}>{confirmText}</UrduText>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onCancel}
+              style={[styles.cancelButton, cancelButtonStyle]}
+              onPress={() => {
+                onCancel && onCancel();
+                onClose && onClose();
+              }}
             >
-              <UrduText style={styles.cancelButtonText}>{cancelText}</UrduText>
+              <View style={styles.cancelButtonContent}>
+                {lowerRightIcon && (
+                  <AntDesign style={{ marginRight: SPACING.sm }} name="calendar" size={24} color="black" />
+                )}
+                <UrduText style={[styles.cancelButtonText, cancelTextStyle]}>{cancelText}</UrduText>
+              </View>
             </TouchableOpacity>
           </View>
 
           {/* Close Button */}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onCancel}
-          >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -105,15 +149,15 @@ const styles = StyleSheet.create({
     ...SHADOWS.medium,
   },
   warningIconContainer: {
-      alignSelf: 'center',
-      alignItems: 'center',
-      marginBottom: SPACING.md,
-    },
+    alignSelf: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
   successIconContainer: {
     alignSelf: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
-    width: 60 ,
+    width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: COLORS.tertiary,
@@ -165,7 +209,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -SPACING.xxxxl,
     alignSelf: 'center',
-    width: 50 ,
+    width: 50,
     height: 50,
     borderRadius: 25,
     borderWidth: 1,
@@ -179,6 +223,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
   },
+  confirmButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 });
 
-export default Dialog; 
+export default Dialog;

@@ -169,6 +169,20 @@ export default function StackLayout() {
           )
         }} 
       />
+      <Stack.Screen 
+        name={SCREENS.MEETING_SCREEN}
+        options={{ 
+          headerShown: false,
+          
+        }} 
+      />
+      <Stack.Screen 
+        name={SCREENS.ACTIVITY_SCREEN}
+        options={{ 
+          headerShown: false,
+        }} 
+      />
+      
     </Stack>
   );
 } 

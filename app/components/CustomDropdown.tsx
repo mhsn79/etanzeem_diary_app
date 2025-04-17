@@ -18,7 +18,9 @@ interface CustomDropdownProps {
   textStyle?: object;
   selectedValue?: string;
   dropdownContainerStyle?: object;
+  dropdownTitle?: string;
 }
+
 
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
   options,
@@ -28,6 +30,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   viewStyle,
   textStyle,
   selectedValue,
+  dropdownTitle
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
@@ -42,6 +45,9 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
   return (
     <View style={[styles.container, viewStyle]}>
+      {dropdownTitle && (
+        <UrduText style={styles.dropdownTitle}>{dropdownTitle}</UrduText>
+      )}
       <TouchableOpacity
         style={[
           styles.dropdownContainer,
@@ -100,12 +106,18 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     width: '100%',
-    marginBottom:SPACING.sm
+    marginBottom: SPACING.sm
+  },
+  dropdownTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.black,
+    textAlign: 'left',
+    marginBottom: SPACING.sm,
   },
   dropdownContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height:55,
+    height: 55,
     justifyContent: 'space-between',
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.lg,

@@ -146,7 +146,7 @@ const SubmittedReportScreen = () => {
       <Dialog
         visible={showDialog}
         onConfirm={handleDialogConfirm}
-        onCancel={handleDialogCancel}
+        onClose={() => setShowDialog(false)}
         title="رپورٹ جمع کروانے کی تصدیق"
         description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔"
         confirmText="ہاں، جمع کریں"

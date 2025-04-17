@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/app/i18n';
 import CustomDropdown from "@/app/components/CustomDropdown";
@@ -14,6 +14,10 @@ import ReportIcon1 from "@/assets/images/report-icon-1.svg";
 import LeftUpArrowWhite from "@/assets/images/left-up-arrow-white.svg";
 import LeftUpArrowBlue from "@/assets/images/left-up-arrow-blue.svg";
 import UrduText from '@/app/components/UrduText';
+import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
+import { AntDesign } from '@expo/vector-icons';
+import { SCREENS, SCREEN_PATHS, getScreenPath } from '@/app/constants/screens';
+import Dialog from '@/app/components/Dialog';
 
 const Dashboard = () => {
     const insets = useSafeAreaInsets(); // Get safe area insets
@@ -102,6 +106,22 @@ const Dashboard = () => {
 
         loadLanguagePreference();
     }, []);
+
+    const [showDialog, setShowDialog] = useState(false);
+
+    const handleAddNew = () => {
+        setShowDialog(true);
+    };
+
+    const handleMeetingSchedule = () => {
+        setShowDialog(false);
+        router.push('/screens/MeetingScreen');
+    };
+
+    const handleActivitySchedule = () => {
+        setShowDialog(false);
+        router.push('/screens/ActivityScreen');
+    };
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -332,6 +352,40 @@ const Dashboard = () => {
                     </ScrollView>
                 </View>
             </View >
+
+            {/* Floating Action Button */}
+            <Pressable
+                style={[
+                    styles.overlayButton,
+                    {
+                        bottom: insets.bottom + SPACING.xl,
+                        right: SPACING.xl,
+                    }
+                ]}
+                onPress={handleAddNew}
+            >
+                <AntDesign name="plus" size={24} color={COLORS.white} />
+            </Pressable>
+
+            {/* Schedule Dialog */}
+            <Dialog
+                visible={showDialog}
+                onConfirm={handleMeetingSchedule}
+                onCancel={handleActivitySchedule}
+                onClose={() => setShowDialog(false)}
+                title="کسی ایک آپشن کا انتخاب کریں."
+                titleStyle={styles.titleStyle}
+                confirmText="ملاقات شیڈول کریں"
+                cancelText="سرگرمی شیڈول کریں"
+                showWarningIcon={false}
+                showSuccessIcon={false}
+                lowerRightIcon={true}
+                upperRightIcon={true}
+                confirmButtonStyle={styles.confirmButtonStyle}
+                cancelButtonStyle={styles.cancelButtonStyle}
+                confirmTextStyle={styles.confirmTextStyle}
+                cancelTextStyle={styles.cancelTextStyle}
+            />
         </KeyboardAvoidingView >
     );
 };
@@ -401,7 +455,39 @@ const darkThemeStyles = StyleSheet.create({
         lineHeight: 20,
         includeFontPadding: false,
         textAlignVertical: 'center',
-    }
+    },
+    overlayButton: {
+        position: 'absolute',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: COLORS.tertiary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    confirmButtonStyle: {
+        backgroundColor: COLORS.primary,
+        width: '100%',
+        paddingVertical: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+    },
+    cancelButtonStyle: {
+        width: '100%',
+        paddingVertical: SPACING.md,
+        borderRadius: BORDER_RADIUS.md,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    confirmTextStyle: {
+        color: COLORS.white,
+    },
+    cancelTextStyle: {
+        color: COLORS.black,
+    },
+    titleStyle: {
+        textAlign: 'left',
+    },
 });
 
 const lightThemeStyles = StyleSheet.create({
@@ -469,7 +555,43 @@ const lightThemeStyles = StyleSheet.create({
         lineHeight: 20,
         includeFontPadding: false,
         textAlignVertical: 'center',
-    }
+    },
+
+    overlayButton: {
+        position: 'absolute',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: COLORS.tertiary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    titleStyle: {
+        textAlign: 'left',
+        color: COLORS.black,
+        fontSize: TYPOGRAPHY.fontSize.lg,
+        lineHeight: TYPOGRAPHY.lineHeight.xl,
+        fontFamily: TYPOGRAPHY.fontFamily.bold,
+    },
+    confirmButtonStyle: {
+        backgroundColor: COLORS.primary,
+        width: '100%',
+     
+        borderRadius: BORDER_RADIUS.md,
+    },
+    cancelButtonStyle: {
+        width: '100%',
+        borderRadius: BORDER_RADIUS.md,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    confirmTextStyle: {
+        color: COLORS.white,
+    },
+    cancelTextStyle: {
+        color: COLORS.black,
+    },
 });
 
 

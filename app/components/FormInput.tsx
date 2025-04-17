@@ -12,6 +12,7 @@ interface FormInputProps {
   direction?: 'rtl' | 'ltr';
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   maxLength?: number;
+  rightIcon?: React.ReactNode;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -23,6 +24,7 @@ const FormInput: React.FC<FormInputProps> = ({
   direction = 'rtl',
   keyboardType = 'default',
   maxLength,
+  rightIcon,
 }) => {
   return (
     <View style={styles.container}>
@@ -30,20 +32,27 @@ const FormInput: React.FC<FormInputProps> = ({
         {mainTitle && <UrduText style={styles.mainTitle}>{mainTitle}</UrduText>}
         <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
       </View>
-      <TextInput
-        style={[
-          styles.input,
-          { textAlign: direction === 'rtl' ? 'right' : 'left' }
-        ]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-      
-        placeholderTextColor={COLORS.textSecondary}
-        keyboardType={keyboardType}
-        maxLength={maxLength}
-        textAlignVertical="center"
-      />
+      <View style={styles.inputContainer}>
+      {rightIcon && (
+          <View style={styles.iconContainer}>
+            {rightIcon}
+          </View>
+        )}
+        <TextInput
+          style={[
+            styles.input,
+            { textAlign: direction === 'rtl' ? 'right' : 'left' }
+          ]}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.textSecondary}
+          keyboardType={keyboardType}
+          maxLength={maxLength}
+          textAlignVertical="center"
+        />
+    
+      </View>
     </View>
   );
 };
@@ -54,7 +63,7 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: SPACING.sm,
-    lineHeight:40,
+    lineHeight: 40,
   },
   mainTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
@@ -62,23 +71,33 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginBottom: SPACING.xs,
     textAlign: 'left',
-    lineHeight:40
+    lineHeight: 40
   },
   inputTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
     textAlign: 'left',
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.lg,
-    height:55,
+    ...SHADOWS.small,
+  },
+  input: {
+    flex: 1,
+    height: 55,
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
-    fontFamily:TYPOGRAPHY.fontFamily.regular,
-    paddingHorizontal:SPACING.md,
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
+    paddingHorizontal: SPACING.md,
     color: COLORS.black,
-    ...SHADOWS.small,
+  },
+  iconContainer: {
+    paddingHorizontal: SPACING.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
