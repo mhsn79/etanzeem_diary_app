@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import UrduText from './UrduText';
 import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
 
@@ -36,7 +36,8 @@ const Header: React.FC<HeaderProps> = ({
       <View style={[styles.content, contentStyle]}>
         {showBack && (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-forward" size={24} color="black" />
+<FontAwesome6 name="arrow-right-long" size={24} color="black" />
+
           </TouchableOpacity>
         )}
         <UrduText style={[styles.title, titleStyle]}>{title}</UrduText>

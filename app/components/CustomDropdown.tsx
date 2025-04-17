@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useRef, useMemo } from 'react';
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  Modal,
+  FlatList,
+  Dimensions,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
-import { Ionicons } from '@expo/vector-icons';
 
-interface Option {
+export interface Option {
   id: string;
   label: string;
   value: string;
@@ -14,13 +22,37 @@ interface CustomDropdownProps {
   options: Option[];
   onSelect: (option: Option) => void;
   placeholder?: string;
+  /** Extra styles for the touchable */
   viewStyle?: object;
+  /** Extra styles for the selected‑text */
   textStyle?: object;
+  /** Currently‑selected value (controlled) */
   selectedValue?: string;
+  /** Extra styles for the dropdown touchable container */
   dropdownContainerStyle?: object;
   dropdownTitle?: string;
+  /** Max height (px) of the list before it starts scrolling */
+  maxHeight?: number;
 }
 
+/**
+ * CustomDropdown — *modal* implementation.
+ * --------------------------------------------------------------
+ * Fixes two issues present in the in‑place <ScrollView> variant:
+ *   • Last dropdown’s list could not scroll because it was clipped by the
+ *     parent <ScrollView>.
+ *   • Second‑last dropdown’s list was hidden under the last dropdown —
+ *     z‑index chaos inside nested views.
+ *
+ * We now render the list in a **transparent Modal** at the root of the app.
+ * This guarantees:
+ *   • Full‑screen overlay — z‑order always sits above everything.
+ *   • Independent scrolling using FlatList.
+ *   • Smart placement *above* or *below* the trigger, depending on available
+ *     space, so nothing gets cut off.
+ */
+const ROW_HEIGHT = 48;
+const WINDOW = Dimensions.get('window');
 
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
   options,
@@ -30,83 +62,110 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   viewStyle,
   textStyle,
   selectedValue,
-  dropdownTitle
+  dropdownTitle,
+  maxHeight = 200,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
     options.find(opt => opt.value === selectedValue) || null
   );
+  const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const triggerRef = useRef<View | null>(null);
+
+  const open = () => {
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setLayout({ x, y, width, height });
+      setIsOpen(true);
+    });
+  };
+
+  const close = () => setIsOpen(false);
 
   const handleSelect = (option: Option) => {
     setSelectedOption(option);
     onSelect(option);
-    setIsOpen(false);
+    close();
   };
 
+  // --------------------------- PLACEMENT -----------------------------------
+  const placement = useMemo(() => {
+    const spaceBelow = WINDOW.height - (layout.y + layout.height);
+    const neededHeight = Math.min(maxHeight, options.length * ROW_HEIGHT);
+    const showAbove = spaceBelow < neededHeight && layout.y > neededHeight;
+    return {
+      top: showAbove ? layout.y - neededHeight : layout.y + layout.height,
+      maxHeight: neededHeight,
+    };
+  }, [layout, options.length, maxHeight]);
+
+  // ---------------------------- RENDER -------------------------------------
   return (
     <View style={[styles.container, viewStyle]}>
-      {dropdownTitle && (
-        <UrduText style={styles.dropdownTitle}>{dropdownTitle}</UrduText>
-      )}
+      {dropdownTitle && <UrduText style={styles.dropdownTitle}>{dropdownTitle}</UrduText>}
+
+      {/* TRIGGER */}
       <TouchableOpacity
-        style={[
-          styles.dropdownContainer,
-          // isOpen && styles.dropdownContainerFocused,
-          dropdownContainerStyle
-        ]}
-        onPress={() => setIsOpen(!isOpen)}
+        ref={triggerRef}
+        style={[styles.trigger, dropdownContainerStyle]}
+        onPress={open}
+        activeOpacity={0.8}
       >
-        <UrduText style={[styles.selectedText, textStyle]}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </UrduText>
-        <Ionicons
-          name={isOpen ? 'chevron-up' : 'chevron-down'}
-          size={24}
-          color={COLORS.black}
-        />
+        <UrduText style={[styles.selectedText, textStyle]}> {selectedOption ? selectedOption.label : placeholder} </UrduText>
+        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color={COLORS.black} />
       </TouchableOpacity>
 
-      {isOpen && (
-        <>
-          <TouchableWithoutFeedback onPress={() => setIsOpen(false)}>
-            <View style={styles.modalOverlay} />
-          </TouchableWithoutFeedback>
-          <View style={styles.dropdownList}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              style={styles.scrollView}
-            >
-              {options.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.optionItem,
-                    selectedOption?.id === item.id && styles.selectedOption
-                  ]}
-                  onPress={() => handleSelect(item)}
+      {/* LIST (Modal) */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={close}
+      >
+        {/* Overlay to capture taps outside */}
+        <TouchableWithoutFeedback onPress={close}>
+          <View style={styles.overlay} />
+        </TouchableWithoutFeedback>
+
+        {/* Positioned list */}
+        <View
+          style={[
+            styles.listWrapper,
+            {
+              top: placement.top,
+              left: layout.x,
+              width: layout.width,
+              maxHeight: placement.maxHeight,
+            },
+          ]}
+        >
+          <FlatList
+            data={options}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.optionItem, selectedOption?.id === item.id && styles.selectedOption]}
+                onPress={() => handleSelect(item)}
+              >
+                <UrduText
+                  style={[styles.optionText, selectedOption?.id === item.id && styles.selectedOptionText]}
                 >
-                  <UrduText style={[
-                    styles.optionText,
-                    selectedOption?.id === item.id && styles.selectedOptionText
-                  ]}>
-                    {item.label}
-                  </UrduText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </>
-      )}
+                  {item.label}
+                </UrduText>
+              </TouchableOpacity>
+            )}
+            bounces={false}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
 
+// ------------------------- STYLES ------------------------------------------
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
     width: '100%',
-    marginBottom: SPACING.sm
+    marginBottom: SPACING.sm,
   },
   dropdownTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -114,59 +173,41 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     marginBottom: SPACING.sm,
   },
-  dropdownContainer: {
+  trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 55,
     justifyContent: 'space-between',
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.sm,
     paddingHorizontal: SPACING.md,
   },
-  // dropdownContainerFocused: {
-  //   borderColor: COLORS.primary,
-  //   backgroundColor: COLORS.lightPrimary,
-  // },
   selectedText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     flex: 1,
     textAlign: 'left',
   },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    zIndex: 998,
-    borderRadius: BORDER_RADIUS.lg,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  dropdownList: {
+  listWrapper: {
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg,
-    maxHeight: 200,
     borderWidth: 1,
     borderColor: COLORS.white,
     ...SHADOWS.medium,
     zIndex: 1000,
-    // marginTop: SPACING.xs,
-  },
-  scrollView: {
-    maxHeight: 200,
+    overflow: 'hidden',
   },
   optionItem: {
-    padding: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    height: ROW_HEIGHT,
+    justifyContent: 'center',
     paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
   },
   selectedOption: {
     backgroundColor: COLORS.lightPrimary,
@@ -175,6 +216,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     textAlign: 'left',
+
   },
   selectedOptionText: {
     color: COLORS.primary,

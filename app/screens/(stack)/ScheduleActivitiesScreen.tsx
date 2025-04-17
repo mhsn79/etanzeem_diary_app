@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
         padding: SPACING.md,
         backgroundColor: COLORS.background,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: COLORS.lightGray,
     },
 });
 

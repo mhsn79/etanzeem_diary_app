@@ -127,12 +127,11 @@ const styles = StyleSheet.create({
   /** Platform‑specific padding for header */
   headerPadding: Platform.select({
     ios: {
-      paddingTop: SPACING.sm,
-      paddingBottom: SPACING.lg,
+      paddingBottom: SPACING.sm,
     },
     default: {
-      paddingTop: SPACING.xl,
-      paddingBottom: SPACING.md,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.sm,
     },
   }),
   /** Fills the translucent iOS status‑bar area */
