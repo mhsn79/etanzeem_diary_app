@@ -8,8 +8,8 @@ interface HeaderProps {
   title: string;
   onBack?: () => void;
   showBack?: boolean;
-  containerStyle?: ViewStyle;
-  contentStyle?: ViewStyle;
+  containerStyle?: object;
+  contentStyle?: object;
   titleStyle?: TextStyle;
   borderRadius?: number;
 }
