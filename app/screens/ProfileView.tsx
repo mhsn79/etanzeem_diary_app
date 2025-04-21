@@ -11,17 +11,26 @@ import { profileData } from '@/app/data/profile';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from "@/src/types/RootStackParamList";
 import { RouteProp } from '@react-navigation/native';
+import { useDispatch } from 'react-redux';
+import { logout } from '@/app/features/auth/authSlice';
+import { AppDispatch } from '@/app/store';
 
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunView'>;
 
 export default function ProfileView() {
   const insets = useSafeAreaInsets();
+  const dispatch = useDispatch<AppDispatch>();
 
   // Set up navigation
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleEdit = () => {
-    navigation.navigate('screens/ProfileEdit', profileData);
+    navigation.navigate('screens/ProfileEdit', { profile: profileData });
+  }
+
+  const handleLogout = () => {
+    dispatch(logout());
+    router.replace('/screens/LoginScreen');
   }
 
   return (
@@ -79,6 +88,14 @@ export default function ProfileView() {
               {i18n.t("email")}: {profileData.email}
             </Text>
           </View>
+          <View style={styles.logoutContainer}>
+            <CustomButton 
+              text={i18n.t("logout")} 
+              onPress={handleLogout}
+              style={styles.logoutButton}
+
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -117,5 +134,14 @@ const styles = StyleSheet.create({
     fontFamily: "JameelNooriNastaleeq",
     fontSize: 16,
     marginVertical: 5,
+  },
+  logoutContainer: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutButton: {
+    backgroundColor: '#EA5455',
   }
 });

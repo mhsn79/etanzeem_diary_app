@@ -10,7 +10,7 @@ type RootState = ReturnType<typeof rootReducer>;
 const persistConfig: PersistConfig<RootState> = {
   key: 'root',
   storage: mmkvStorage,
-  whitelist: ['auth'],
+  whitelist: ['auth', 'activities'],
 };
 
 // Create the persisted reducer

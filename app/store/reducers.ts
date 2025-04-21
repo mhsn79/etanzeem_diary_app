@@ -1,9 +1,11 @@
 import { combineReducers } from '@reduxjs/toolkit';
 import authReducer from '../features/auth/authSlice'; // Import the auth slice
+import activitiesReducer from '../features/activities/activitySlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
   auth: authReducer, // Include the auth slice
+  activities: activitiesReducer,
 });
 
 export default rootReducer; 

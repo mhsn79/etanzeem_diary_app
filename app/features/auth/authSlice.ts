@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '../../store';
 import { createDirectus, rest, authentication } from '@directus/sdk';
+import { clearActivities } from '../activities/activitySlice';
 
 // Define the Directus client
 const directus = createDirectus('http://139.59.232.231:8055')

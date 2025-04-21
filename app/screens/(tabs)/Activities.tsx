@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, View, TouchableOpacity, FlatList, ActivityIndicator, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import ActivityCard from '../../components/ActivityCard';
@@ -7,52 +7,65 @@ import ScreenLayout from '../../components/ScreenLayout';
 import { TabGroup } from '@/app/components/Tab';
 import { COLORS, SHADOWS, SPACING } from '@/app/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '@/app/store';
+import { fetchActivities, selectActivities, selectActivitiesStatus, selectActivitiesError } from '@/app/features/activities/activitySlice';
 
 export default function Activities() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();  // Router is imported here
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const [selectedTab, setSelectedTab] = useState(0);
+
+  // Get activities data from Redux store
+  const activities = useSelector(selectActivities);
+  const status = useSelector(selectActivitiesStatus);
+  const error = useSelector(selectActivitiesError);
+
+  // Fetch activities when component mounts
+  useEffect(() => {
+    dispatch(fetchActivities());
+  }, [dispatch]);
 
   const tabs = [
     { label: 'شیڈول', value: 0 },
     { label: 'سرگرمی', value: 1 },
   ];
 
-  const activities = [
-    {
-      id: '1',
-      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ مارچ 2025ء',
-      location: 'وارڈ نمبر 3',
-      status: '% 50 مکمل',
-      daysRemaining: '3 دن باقی ہیں',
-    },
-    {
-      id: '2',
-      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ اپریل 2025ء',
-      location: 'وارڈ نمبر 4',
-      status: '% 75 مکمل',
-      daysRemaining: '2 دن باقی ہیں',
-    },
-    {
-      id: '3',
-      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ مئی 2025ء',
-      location: 'وارڈ نمبر 5',
-      status: '% 25 مکمل',
-      daysRemaining: '5 دن باقی ہیں',
-    },
-    {
-      id: '4',
-      title: 'ماہانہ کارکردگی سرگرمی ۔ ماہ جون 2025ء',
-      location: 'وارڈ نمبر 6',
-      status: '% 90 مکمل',
-      daysRemaining: '1 دن باقی ہیں',
-    },
-  ];
-
   const handleCreateActivity = () => {
-    // Use router.push to navigate to the screen
-    router.push('/screens/ScheduleActivitiesScreen');  // This is where we navigate
+    router.push('/screens/ScheduleActivitiesScreen');
   };
+
+  // Format activity data for display
+  const formatActivityData = (activity: any) => ({
+    id: activity.id.toString(),
+    title: activity.activity_details || 'N/A',
+    location: activity.location_coordinates || 'N/A',
+    status: activity.status || 'N/A',
+    daysRemaining: activity.activity_date_and_time 
+      ? new Date(activity.activity_date_and_time).toLocaleDateString()
+      : 'N/A',
+  });
+
+  if (status === 'loading') {
+    return (
+      <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </ScreenLayout>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Failed to load activities'}</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
@@ -64,8 +77,8 @@ export default function Activities() {
         />
         <View style={styles.content}>
           <FlatList
-            data={activities} // The array of activity objects
-            keyExtractor={(item) => item.id} // Unique key for each item
+            data={activities.map(formatActivityData)}
+            keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ActivityCard
                 key={item.id}
@@ -110,5 +123,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...SHADOWS.medium,
     zIndex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  errorText: {
+    color: COLORS.error,
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
