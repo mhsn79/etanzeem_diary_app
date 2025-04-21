@@ -104,5 +104,9 @@
     "whatsapp": "WhatsApp",
     "whatsapp_number": "WhatsApp Number",
     "workforce": "Workforce",
-    "zone": "Zone"
+    "zone": "Zone",
+   " email_must_contain_at_symbol": "Email must contain `@`",
+    "email_must_contain_dot":      "Email must contain `.`",
+   " password_is_required":           " Password is required",
+    "password_must_be_at_least_8_characters":"Password must be at least 8 characters"
 }

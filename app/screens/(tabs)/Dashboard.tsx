@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme, Pressable } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/app/i18n';
 import CustomDropdown from "@/app/components/CustomDropdown";
 import CustomButton from '@/app/components/CustomButton';
@@ -25,15 +24,7 @@ const Dashboard = () => {
     const [currentLanguage, setCurrentLanguage] = React.useState(i18n.locale);
     const [direction, setDirection] = useState(currentLanguage === "ur" ? 'rtl' : 'ltr');
 
-    const changeLanguage = async (languageCode: string) => {
-        try {
-            await AsyncStorage.setItem('userLanguage', languageCode);
-            i18n.locale = languageCode;
-            setCurrentLanguage(languageCode);
-        } catch (error) {
-            console.error('Error saving language preference:', error);
-        }
-    };
+
 
     const changeDirection = async (dir: string) => {
         try {
@@ -92,19 +83,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         // Load saved language preference
-        const loadLanguagePreference = async () => {
-            try {
-                const savedLanguage = await AsyncStorage.getItem('userLanguage');
-                if (savedLanguage) {
-                    i18n.locale = savedLanguage;
-                }
-                console.log('savedLanguage', i18n.locale)
-            } catch (error) {
-                console.error('Error loading language preference:', error);
-            }
-        };
-
-        loadLanguagePreference();
+    
     }, []);
 
     const [showDialog, setShowDialog] = useState(false);

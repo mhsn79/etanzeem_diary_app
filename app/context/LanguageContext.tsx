@@ -1,8 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18n from '../i18n';
-import { TextStyle, I18nManager } from 'react-native';
+import { I18nManager } from 'react-native';
 import * as Font from 'expo-font';
+
+import i18n from '../i18n';
+import { mmkvStorage } from '../store/mmkvStorage';
 
 interface LanguageContextType {
   currentLanguage: string;
@@ -13,51 +14,54 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentLanguage, setCurrentLanguage] = useState('ur');
+  const [currentLanguage, setCurrentLanguage] = useState<string>('ur');
   const [isFontLoaded, setIsFontLoaded] = useState(false);
 
+  /* -------------------------------------------------------------
+     Load persisted language + fonts on first mount
+  -------------------------------------------------------------- */
   useEffect(() => {
-    const loadFontAndLanguage = async () => {
+    const init = async () => {
       try {
-        // Set Urdu as default
-        i18n.locale = 'ur';
-        setCurrentLanguage('ur');
-        await AsyncStorage.setItem('userLanguage', 'ur');
-        
-        // Force RTL for Urdu
-        I18nManager.allowRTL(true);
-        I18nManager.forceRTL(true);
+        const storedLang = await mmkvStorage.getItem('userLanguage');
+        const lang = storedLang ?? 'ur';
 
-        // Load font
+        i18n.locale = lang;
+        setCurrentLanguage(lang);
+
+        // Handle RTL dynamically
+        I18nManager.allowRTL(true);
+        I18nManager.forceRTL(lang === 'ur');
+
         await Font.loadAsync({
-          'JameelNooriNastaleeq': require('../../assets/fonts/JameelNooriNastaleeq.ttf'),
+          JameelNooriNastaleeq: require('../../assets/fonts/JameelNooriNastaleeq.ttf'),
           'noori-kasheed': require('../../assets/fonts/noori-kasheed.ttf'),
         });
-        setIsFontLoaded(true);
 
-      } catch (error) {
-        console.error('Error in loadFontAndLanguage:', error);
+        setIsFontLoaded(true);
+      } catch (e) {
+        console.error('[LanguageProvider] init error:', e);
       }
     };
 
-    loadFontAndLanguage();
+    init();
   }, []);
 
+  /* -------------------------------------------------------------
+     Change language on demand
+  -------------------------------------------------------------- */
   const changeLanguage = async (languageCode: string) => {
     try {
-      await AsyncStorage.setItem('userLanguage', languageCode);
+      await mmkvStorage.setItem('userLanguage', languageCode);
       i18n.locale = languageCode;
       setCurrentLanguage(languageCode);
-      // Update RTL setting based on language
       I18nManager.forceRTL(languageCode === 'ur');
-    } catch (error) {
-      console.error('Error saving language preference:', error);
+    } catch (e) {
+      console.error('[LanguageProvider] changeLanguage error:', e);
     }
   };
 
-  if (!isFontLoaded) {
-    return null; // Or a loading component
-  }
+  if (!isFontLoaded) return null;           // or a splash/loading component
 
   return (
     <LanguageContext.Provider value={{ currentLanguage, changeLanguage, isFontLoaded }}>
@@ -66,13 +70,12 @@ const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   );
 };
 
+/* ---------- Public hook -------------------------------------------------- */
 export const useLanguage = () => {
-  const context = useContext(LanguageContext);
-  if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
-  return context;
+  const ctx = useContext(LanguageContext);
+  if (!ctx) throw new Error('useLanguage must be used within a LanguageProvider');
+  return ctx;
 };
 
 export { LanguageProvider };
-export default LanguageProvider; 
+export default LanguageProvider;

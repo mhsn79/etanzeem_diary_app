@@ -1,199 +1,212 @@
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
-import CustomTextInput from "../components/CustomTextInput";
-import CustomButton from "../components/CustomButton";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router } from 'expo-router';
-import { createDirectus, authentication, rest } from '@directus/sdk';
-import i18n from "../i18n";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React from "react";
-// import { Appearance, useColorScheme } from 'react-native';
+import i18n from '../i18n';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL as string;
+import CustomTextInput from '../components/CustomTextInput';
+import CustomButton from '../components/CustomButton';
+import Toast from '../components/Toast';
 
-const client = createDirectus(BASE_URL)
-  .with(authentication('json'))
-  .with(rest());
+import { useAppDispatch, useAppSelector } from '../../src/hooks/redux';
+import {
+  login,
+  selectAuthStatus,
+  selectIsAuthed,
+} from '../features/auth/authSlice';
 
-async function loginUser(email: string, password: string, setEmailErr: Function, setPassErr: Function, setErrText: Function) {
+/* ------------------------------------------------------------------ */
+/*                        FIELD‑LEVEL VALIDATORS                      */
+/* ------------------------------------------------------------------ */
+const validateEmail = (email: string): string | null => {
+  if (!email) return i18n.t('email_is_required');
+  if (!email.includes('@')) return i18n.t('email_must_contain_at_symbol');
+  if (!email.includes('.')) return i18n.t('email_must_contain_dot');
+  return null;
+};
 
-  setEmailErr(false);
-  setPassErr(false);
-  setErrText("");
+const validatePassword = (password: string): string | null => {
+  if (!password) return i18n.t('password_is_required');
+  if (password.length < 8)
+    return i18n.t('password_must_be_at_least_8_characters');
+  return null;
+};
 
-  if (email.length === 0) {
-    setEmailErr(true);
-    setErrText(i18n.t('email_is_required'));
-    return;
-  }
-  else if (password.length === 0) {
-    setPassErr(true);
-    setErrText(i18n.t('password_is_required'));
-    return;
-  }
-
-  const result = await client.login(email, password).then((value) => value, (err) => err);
-
-  if (result.errors) {
-    setEmailErr(true);
-    setPassErr(true);
-    setErrText(i18n.t('invalid_credentials'));
-    return;
-  }
-
-  router.replace("/screens/Dashboard")
-}
-
+/* ------------------------------------------------------------------ */
+/*                              SCREEN                                */
+/* ------------------------------------------------------------------ */
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const [currentLanguage, setCurrentLanguage] = React.useState(i18n.locale);
+  const dispatch = useAppDispatch();
 
-  const changeLanguage = async (languageCode: string) => {
-    try {
-      await AsyncStorage.setItem('userLanguage', languageCode);
-      i18n.locale = languageCode;
-      setCurrentLanguage(languageCode);
-    } catch (error) {
-      console.error('Error saving language preference:', error);
-    }
-  };
+  const status  = useAppSelector(selectAuthStatus);
+  const isAuthed = useAppSelector(selectIsAuthed);
 
+  /* Form state */
   const [email, setEmail] = useState("sohail-abubaker@pixelpk.com");
   const [password, setPassword] = useState("12345678");
-  const [emailErr, setEmailErr] = useState(false);
-  const [passErr, setPassErr] = useState(false);
-  const [errText, setErrText] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
 
-  // useEffect(() => {
-  //   setTimeout(() => {
-  //     router.replace("/TestScreen")
-  //   }, 2000);  // Show for 2 seconds
-  // }, []);
+  /* Error state (separate) */
+  const [emailError, setEmailError]       = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  /* Redirect when auth succeeds */
+  useEffect(() => {
+    if (isAuthed) router.replace('/screens/Dashboard');
+  }, [isAuthed]);
+
+  /* Submit */
+  const handleLogin = () => {
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+
+    setEmailError(eErr);
+    setPasswordError(pErr);
+
+    if (eErr || pErr) return; // stop if any field invalid
+
+    dispatch(login({ email, password }));
+  };
+
+  /* ---------------------------------------------------------------- */
+  /*                             RENDER                               */
+  /* ---------------------------------------------------------------- */
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <StatusBar hidden={true} />
+        <StatusBar hidden />
         <View style={styles.background}>
+          {/* Logo & Banner */}
           <View style={styles.logoContainer}>
-            <Image source={require("../../assets/images/pattern.png")} style={styles.pattern}></Image>
-            <Image source={require("../../assets/images/jamat-logo.png")} style={styles.logo}></Image>
+            <Image
+              source={require('../../assets/images/pattern.png')}
+              style={styles.pattern}
+            />
+            <Image
+              source={require('../../assets/images/jamat-logo.png')}
+              style={styles.logo}
+            />
             <Text style={styles.title}>{i18n.t('appname')}</Text>
-            {/* , width: 50, height: 50, backgroundColor: "#008CFF", borderColor: "gray", shadowColor: "black", alignContent: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, */}
-            {/* <View style={[{ position: "absolute", top: 20, right: 20 }]}>
-              <CustomButton
-                text={(currentLanguage === "ur" ? "En" : "ار")}
-                textStyle={[{ fontFamily: "Tahoma", fontSize: 16 }]}
-                viewStyle={[{ width: 50, height: 50, padding: 5, opacity: 0.5, borderWidth: 1, borderColor: "black", direction: (currentLanguage === "ur" ? "rtl" : "ltr") }]}
-                // , shadowColor: "black", shadowRadius: 1, shadowOpacity: 50,
-                onPress={() => {
-                  changeLanguage(currentLanguage === "ur" ? "en" : "ur");
-                }}
-              />
-            </View> */}
           </View>
+
+          {/* Login form */}
           <View style={styles.loginContainer}>
+            {/* E‑mail field */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('email')}</Text>
               <CustomTextInput
                 placeholder={i18n.t('enter_your_email')}
-                placeholderTextColor={"#2D2327"}
-                onChangeText={newText => setEmail(newText)}
+                placeholderTextColor="#2D2327"
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (emailError) setEmailError(null); // clear on edit
+                }}
                 value={email}
-                error={emailErr}
-              ></CustomTextInput>
+                error={!!emailError}
+              />
+              {emailError && <Text style={styles.errText}>{emailError}</Text>}
             </View>
+
+            {/* Password field */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('password')}</Text>
               <CustomTextInput
                 placeholder="********"
-                placeholderTextColor={"#2D2327"}
-                secureTextEntry={true}
-                onChangeText={newPass => setPassword(newPass)}
+                placeholderTextColor="#2D2327"
+                secureTextEntry
+                onChangeText={(v) => {
+                  setPassword(v);
+                  if (passwordError) setPasswordError(null);
+                }}
                 value={password}
-                error={passErr}
-              ></CustomTextInput>
+                error={!!passwordError}
+              />
+              {passwordError && (
+                <Text style={styles.errText}>{passwordError}</Text>
+              )}
             </View>
-            <Text style={styles.errText}>{errText}</Text>
+
+            {/* Forgot password */}
             <View style={styles.resetPass}>
-              <Pressable onPress={() => console.log("password reset")}>
-                <Text style={styles.resetPass}>{i18n.t('reset_your_password')}</Text>
-              </Pressable >
+              <Pressable onPress={() => console.log('password reset')}>
+                <Text style={styles.resetPassText}>
+                  {i18n.t('reset_your_password')}
+                </Text>
+              </Pressable>
             </View>
-            <CustomButton text={i18n.t('login')} textStyle={[]} onPress={() => loginUser(email, password, setEmailErr, setPassErr, setErrText)} viewStyle={[]}></CustomButton>
+
+            {/* Submit */}
+            {status === 'loading' ? (
+              <ActivityIndicator size="large" color="#008CFF" />
+            ) : (
+              <CustomButton text={i18n.t('login')} onPress={handleLogin} />
+            )}
           </View>
         </View>
       </ScrollView>
+
+      {/* Toast for API errors */}
+      <Toast />
     </KeyboardAvoidingView>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*                                STYLES                              */
+/* ------------------------------------------------------------------ */
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    backgroundColor: "#008CFF"
-  },
-  logoContainer: {
-    justifyContent: "center",
-    alignItems: "center"
-  },
+  background: { flex: 1, backgroundColor: '#008CFF' },
+  logoContainer: { justifyContent: 'center', alignItems: 'center' },
   title: {
-    position: "absolute",
+    position: 'absolute',
     top: 45,
-    color: "white",
+    color: 'white',
     fontSize: 30,
-    fontFamily: "JameelNooriNastaleeq"
+    fontFamily: 'JameelNooriNastaleeq',
   },
-  pattern: {
-    width: "100%",
-    height: "auto",
-    aspectRatio: 1,
-    opacity: 0.5
-  },
-  logo: {
-    position: "absolute",
-  },
+  pattern: { width: '100%', aspectRatio: 1, opacity: 0.5 },
+  logo: { position: 'absolute' },
   loginContainer: {
     flex: 1,
-    backgroundColor: "#EBEBEB",
+    backgroundColor: '#EBEBEB',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    alignItems: "center",
+    alignItems: 'center',
     gap: 10,
     paddingTop: 60,
-    padding: 25
-
+    padding: 25,
   },
-  inputContainer: {
-    alignItems: "flex-end",
-    width: "100%",
-    gap: 10
-  },
+  inputContainer: { width: '100%', gap: 10 },
   inputText: {
     fontSize: 16,
-    fontFamily: "JameelNooriNastaleeq",
-    color: "#2D2327"
+    fontFamily: 'JameelNooriNastaleeq',
+    color: '#2D2327',
+    alignSelf: 'flex-end',
   },
   errText: {
-    alignSelf: "flex-end",
-    color: "#EA5455"
-  },
-  resetPass: {
-    fontSize: 12,
+    alignSelf: 'flex-start',
+    color: '#EA5455',
+    fontSize: 16,
     fontFamily: "JameelNooriNastaleeq",
-    color: "#2D2327",
-    alignSelf: "flex-start",
   },
-  ddcontainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  ddheader: {
-    fontSize: 24,
-    marginBottom: 20,
+  resetPass: { alignSelf: 'flex-start' },
+  resetPassText: {
+    fontSize: 12,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: '#2D2327',
   },
 });

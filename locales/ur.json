@@ -104,5 +104,8 @@
     "whatsapp": "واتس ایپ",
     "whatsapp_number": "واٹس ایپ نمبر",
     "workforce": "افرادی قوت",
-    "zone": "زون"
+    "zone": "زون",
+    "email_must_contain_at_symbol": "ای میل میں @ کا نشان ہونا ضروری ہے",
+    "email_must_contain_dot": "ای میل میں \".\" کا نشان ہونا ضروری ہے",
+    "password_must_be_at_least_8_characters": "پاس ورڈ کم از کم 8 حروف پر مشتمل ہونا چاہیے"
 }

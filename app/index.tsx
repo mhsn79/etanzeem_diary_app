@@ -1,15 +1,10 @@
-import React from 'react';
-import { useState } from "react";
-import { Redirect } from "expo-router";
-import { StatusBar } from "react-native";
+import { Redirect } from 'expo-router';
+import { useAppSelector } from '@/src/hooks/redux';
+import { selectIsAuthed } from '@/app/features/auth/authSlice';
 
 export default function Index() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  return (
-    <>
-      <StatusBar translucent backgroundColor="transparent"/>
-      { isLoggedIn ? <Redirect href={'/screens/Dashboard'} />: <Redirect href="/screens/LoginScreen" /> }
-    </>
-  );
+  const isAuthed = useAppSelector(selectIsAuthed);
+  return isAuthed
+    ? <Redirect href="/screens/Dashboard" />
+    : <Redirect href="/screens/LoginScreen" />;
 }

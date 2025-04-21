@@ -22,6 +22,8 @@
     <string>1.0.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
+
+    <!-- URL schemes -->
     <key>CFBundleURLTypes</key>
     <array>
       <dict>
@@ -38,30 +40,52 @@
         </array>
       </dict>
     </array>
+
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+
+    <!-- ▸▸▸  ATS section updated  ◂◂◂ -->
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
+
+      <!-- Allow plain‑HTTP traffic to the API host on port 8055 -->
+      <key>NSExceptionDomains</key>
+      <dict>
+        <key>139.59.232.231</key>
+        <dict>
+          <key>NSExceptionAllowsInsecureHTTPLoads</key>
+          <true/>
+          <key>NSIncludesSubdomains</key>
+          <true/>
+        </dict>
+      </dict>
     </dict>
+    <!-- ▸▸▸  end ATS section ◂◂◂ -->
+
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
     </array>
+
+    <!-- bundled fonts -->
     <key>UIAppFonts</key>
     <array>
       <string>JameelNooriNastaleeq.ttf</string>
       <string>noori-kasheed.ttf</string>
     </array>
+
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
+
+    <!-- device + orientation -->
     <key>UIRequiredDeviceCapabilities</key>
     <array>
       <string>arm64</string>

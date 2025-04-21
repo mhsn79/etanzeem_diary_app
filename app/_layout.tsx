@@ -1,5 +1,7 @@
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
 import React from 'react';
 import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity } from "react-native";
 import { useFonts } from 'expo-font';
@@ -13,6 +15,7 @@ import UrduText from "./components/UrduText";
 import i18n from './i18n';
 import { useNavigationState } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
+import { store, persistor } from '@/app/store';              // ← adjust paths if needed
 
 
 // Force RTL layout for the entire app
@@ -111,6 +114,8 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
 
 export default function RootLayout() {
   return (
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
     <LanguageProvider>
       <Stack
         screenOptions={{
@@ -129,10 +134,12 @@ export default function RootLayout() {
         <Stack.Screen name="splash" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="screens/(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
         <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
       </Stack>
     </LanguageProvider>
+    </PersistGate>
+    </Provider>
   );
 }
 

@@ -1,0 +1,12 @@
+{
+  "email_is_required": "Email is required",
+  "email_must_contain_at_symbol": "Email must contain @ symbol",
+  "email_must_contain_dot": "Email must contain a dot",
+  "email_must_be_at_least_5_characters": "Email must be at least 5 characters long",
+  "password_is_required": "Password is required",
+  "password_must_be_at_least_8_characters": "Password must be at least 8 characters long",
+  "password_must_contain_uppercase": "Password must contain at least one uppercase letter",
+  "password_must_contain_lowercase": "Password must contain at least one lowercase letter",
+  "password_must_contain_number": "Password must contain at least one number",
+  "password_must_contain_special_character": "Password must contain at least one special character"
+} 
