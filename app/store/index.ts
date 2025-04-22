@@ -1,33 +1,45 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, PersistConfig } from 'redux-persist';
-import { mmkvStorage } from './mmkvStorage'; // Use the custom storage adapter
+import { mmkvStorage, STORAGE_KEYS } from './mmkvStorage';
 import rootReducer from './reducers';
+import directus from '../services/directus';
 
-// Define the RootState type explicitly to handle persisted state
-type RootState = ReturnType<typeof rootReducer>;
+// Define the RootState type explicitly
+export type RootState = ReturnType<typeof rootReducer>;
 
-// Persist configuration with proper typing
+// Enhanced persist configuration with proper typing
 const persistConfig: PersistConfig<RootState> = {
   key: 'root',
   storage: mmkvStorage,
-  whitelist: ['auth', 'activities'],
+  whitelist: [STORAGE_KEYS.AUTH, STORAGE_KEYS.ACTIVITIES],
+  // Add version control for migrations
+  version: 1,
+  // Add state reconciler for better state management
+  stateReconciler: (inboundState, originalState) => ({
+    ...originalState,
+    ...inboundState,
+  }),
 };
 
 // Create the persisted reducer
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
-// Configure store
+// Configure store with enhanced middleware
 const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore redux-persist actions to avoid serializability warnings
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
-        // Ignore specific paths in the state that might be non-serializable
-        ignoredPaths: ['auth.user'], // If user object has non-serializable fields
+        ignoredPaths: ['auth.user'],
       },
-    }), // Thunk is included by default
+      // Add additional middleware for better error handling
+      thunk: {
+        extraArgument: { directus },
+      },
+    }),
+  // Enable dev tools in development
+  devTools: process.env.NODE_ENV !== 'production',
 });
 
 // Create persistor
@@ -36,4 +48,3 @@ const persistor = persistStore(store);
 // Export store, persistor, and types
 export { store, persistor };
 export type AppDispatch = typeof store.dispatch;
-export type { RootState };

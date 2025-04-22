@@ -1,10 +1,10 @@
 import { Redirect } from 'expo-router';
-import { useAppSelector } from '@/src/hooks/redux';
-import { selectIsAuthed } from '@/app/features/auth/authSlice';
+import { useAppSelector } from '../src/hooks/useAppSelector';
+import { selectIsAuthenticated } from './features/auth/authSlice';
 
 export default function Index() {
-  const isAuthed = useAppSelector(selectIsAuthed);
-  return isAuthed
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  return isAuthenticated
     ? <Redirect href="/screens/Dashboard" />
     : <Redirect href="/screens/LoginScreen" />;
 }

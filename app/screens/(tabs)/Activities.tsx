@@ -7,20 +7,20 @@ import ScreenLayout from '../../components/ScreenLayout';
 import { TabGroup } from '@/app/components/Tab';
 import { COLORS, SHADOWS, SPACING } from '@/app/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/app/store';
-import { fetchActivities, selectActivities, selectActivitiesStatus, selectActivitiesError } from '@/app/features/activities/activitySlice';
+import { useAppDispatch } from '@/src/hooks/useAppDispatch';
+import { useAppSelector } from '@/src/hooks/useAppSelector';
+import { fetchActivities, selectAllActivities, selectActivitiesStatus, selectActivitiesError } from '@/app/features/activities/activitySlice';
 
 export default function Activities() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
   const [selectedTab, setSelectedTab] = useState(0);
 
   // Get activities data from Redux store
-  const activities = useSelector(selectActivities);
-  const status = useSelector(selectActivitiesStatus);
-  const error = useSelector(selectActivitiesError);
+  const activities = useAppSelector(selectAllActivities);
+  const status = useAppSelector(selectActivitiesStatus);
+  const error = useAppSelector(selectActivitiesError);
 
   // Fetch activities when component mounts
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function Activities() {
 
   return (
     <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
-      <ScrollView style={styles.container}>
+      <View style={styles.container}>
         <TabGroup
           tabs={tabs}
           selectedTab={selectedTab}
@@ -91,9 +91,11 @@ export default function Activities() {
                 handleRight={() => {}}
               />
             )}
+            contentContainerStyle={styles.flatListContent}
+            showsVerticalScrollIndicator={false}
           />
         </View>
-      </ScrollView>
+      </View>
       <TouchableOpacity style={styles.overlayButton} onPress={handleCreateActivity}>
         <Ionicons name="add" size={24} color={COLORS.white} />
       </TouchableOpacity>
@@ -109,6 +111,9 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
   },
   content: {
+    flex: 1,
+  },
+  flatListContent: {
     paddingBottom: 20,
   },
   overlayButton: {

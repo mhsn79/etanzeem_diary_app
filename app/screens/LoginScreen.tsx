@@ -19,11 +19,12 @@ import CustomTextInput from '../components/CustomTextInput';
 import CustomButton from '../components/CustomButton';
 import Toast from '../components/Toast';
 
-import { useAppDispatch, useAppSelector } from '../../src/hooks/redux';
+import { useAppDispatch } from '../../src/hooks/useAppDispatch';
+import { useAppSelector } from '../../src/hooks/useAppSelector';
 import {
   login,
   selectAuthStatus,
-  selectIsAuthed,
+  selectIsAuthenticated,
 } from '../features/auth/authSlice';
 
 /* ------------------------------------------------------------------ */
@@ -50,21 +51,21 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
 
-  const status  = useAppSelector(selectAuthStatus);
-  const isAuthed = useAppSelector(selectIsAuthed);
+  const status = useAppSelector(selectAuthStatus);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   /* Form state */
   const [email, setEmail] = useState("sohail-abubaker@pixelpk.com");
   const [password, setPassword] = useState("12345678");
 
   /* Error state (separate) */
-  const [emailError, setEmailError]       = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   /* Redirect when auth succeeds */
   useEffect(() => {
-    if (isAuthed) router.replace('/screens/Dashboard');
-  }, [isAuthed]);
+    if (isAuthenticated) router.replace('/screens/Dashboard');
+  }, [isAuthenticated]);
 
   /* Submit */
   const handleLogin = () => {

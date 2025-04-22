@@ -13,7 +13,7 @@ import { useLanguage } from "../app/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
-import { useNavigationState } from '@react-navigation/native';
+import { useNavigationState,getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
 import { store, persistor } from '@/app/store';              // ← adjust paths if needed
 
@@ -134,7 +134,13 @@ export default function RootLayout() {
         <Stack.Screen name="splash" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
+        <Stack.Screen name="screens/(tabs)" 
+         options={({ route }) => {
+          // If no tab is focused yet, you’ll get undefined: default to TRUE.
+          const focused = getFocusedRouteNameFromRoute(route);
+          const hideForActivities = focused === "Activities";
+          return { headerShown: !hideForActivities };
+        }} />
         <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
       </Stack>
     </LanguageProvider>
