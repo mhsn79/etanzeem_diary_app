@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -7,6 +7,7 @@ import {
   Modal,
   FlatList,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
@@ -33,6 +34,8 @@ interface CustomDropdownProps {
   dropdownTitle?: string;
   /** Max height (px) of the list before it starts scrolling */
   maxHeight?: number;
+  /** Whether the dropdown is in loading state */
+  loading?: boolean;
 }
 
 /**
@@ -64,6 +67,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   selectedValue,
   dropdownTitle,
   maxHeight = 200,
+  loading = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
@@ -72,7 +76,14 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const triggerRef = useRef<View | null>(null);
 
+  // Update selected option when selectedValue changes
+  useEffect(() => {
+    setSelectedOption(options.find(opt => opt.value === selectedValue) || null);
+  }, [selectedValue, options]);
+
   const open = () => {
+    if (loading) return; // Don't open if loading
+    
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setLayout({ x, y, width, height });
       setIsOpen(true);
@@ -109,9 +120,14 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         style={[styles.trigger, dropdownContainerStyle]}
         onPress={open}
         activeOpacity={0.8}
+        disabled={loading}
       >
         <UrduText style={[styles.selectedText, textStyle]}> {selectedOption ? selectedOption.label : placeholder} </UrduText>
-        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color={COLORS.black} />
+        {loading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        ) : (
+          <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={24} color={COLORS.black} />
+        )}
       </TouchableOpacity>
 
       {/* LIST (Modal) */}

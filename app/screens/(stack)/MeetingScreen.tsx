@@ -6,7 +6,7 @@ import ScreenLayout from '@/app/components/ScreenLayout';
 import { useNavigation } from 'expo-router';
 import CustomDropdown from '@/app/components/CustomDropdown';
 import FormInput from '@/app/components/FormInput';
-import DateTimePickerModal from './DateTimePickerModal';
+import DateTimePickerModal from './components/DateTimePickerModal';
 import CustomButton from '@/app/components/CustomButton';
 import { Ionicons } from '@expo/vector-icons';
 

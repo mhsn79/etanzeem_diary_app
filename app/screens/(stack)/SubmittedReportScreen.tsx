@@ -147,8 +147,8 @@ const SubmittedReportScreen = () => {
         visible={showDialog}
         onConfirm={handleDialogConfirm}
         onClose={() => setShowDialog(false)}
-        title="رپورٹ جمع کروانے کی تصدیق"
-        description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔"
+        title="مبارک ہو! آپ کی رپورٹ  جمع کر دی گئی ہے!"
+        description="آپ کی رپورٹ کامیابی سے سبمٹ ہو چکی ہے۔ آپ چاہیں تو جمع شدہ رپورٹ دیکھ سکتے ہیں یا واپس ہوم پیج پر جا سکتے ہیں۔"
         confirmText="ہاں، جمع کریں"
         cancelText="نہیں، واپس جائیں"
         showSuccessIcon={true}

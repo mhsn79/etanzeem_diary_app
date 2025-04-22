@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import UrduText from './UrduText';
 import ActivityActionButton from './ActivityActionButton';
 import { COLORS, SIZES, SPACING, TYPOGRAPHY } from '../constants/theme';
@@ -9,13 +9,27 @@ interface ActivityCardProps {
   title: string;
   location: string;
   status: string;
-  daysRemaining: string;
+  dateTime: string;
+  attendance: string;
+  dateCreated: string;
+  dateUpdated: string;
   handleRight: () => void;
   handleMiddle: () => void;
   handleLeft: () => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ title, location, status, daysRemaining, handleLeft, handleMiddle, handleRight }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({
+  title,
+  location,
+  status,
+  dateTime,
+  attendance,
+  dateCreated,
+  dateUpdated,
+  handleLeft,
+  handleMiddle,
+  handleRight,
+}) => {
   return (
     <View style={styles.cardContainer}>
       <View style={styles.titleContainer}>
@@ -25,7 +39,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ title, location, status, da
         </TouchableOpacity>
       </View>
       <View style={styles.detailsContainer}>
-        <UrduText style={styles.detail}>تاریخ وقت: {location}</UrduText>
+        <UrduText style={styles.detail}>تاریخ وقت: {dateTime}</UrduText>
         <UrduText style={styles.detail}>مقام: {location}</UrduText>
       </View>
       <View style={styles.chairmenContainer}>
