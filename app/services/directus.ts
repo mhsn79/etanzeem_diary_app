@@ -3,7 +3,7 @@ import { store } from '../store';
 import { selectAccessToken } from '../features/auth/authSlice';
 
 // Get the API base URL from environment variables
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL||'http://139.59.232.231:8055' ;
 
 // Create a custom storage implementation that gets tokens from Redux
 class ReduxStorage implements AuthenticationStorage {
