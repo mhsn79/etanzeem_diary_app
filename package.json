@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
-    "android:build":"cd android && ./gradlew assembleRelease && cd ..",
+    "android:build": "cd android && ./gradlew assembleRelease && cd ..",
     "postinstall": "node -e \"try { require('child_process').execSync('cd ios && pod install', { stdio: 'inherit' }); } catch (e) { console.log('Skipping pod install: ' + e.message); }\""
   },
   "jest": {
@@ -29,7 +29,7 @@
     "dayjs": "^1.11.7",
     "expo": "~52.0.36",
     "expo-blur": "~14.0.3",
-    "expo-constants": "~17.0.6",
+    "expo-constants": "~17.0.8",
     "expo-dev-client": "~5.0.12",
     "expo-font": "~13.0.3",
     "expo-haptics": "~14.0.1",
@@ -62,7 +62,9 @@
     "react-native-webview": "13.12.5",
     "react-redux": "^8.0.5",
     "redux-persist": "^6.0.0",
-    "redux-thunk": "^3.1.0"
+    "redux-thunk": "^3.1.0",
+    "expo-notifications": "~0.29.14",
+    "expo-device": "~7.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -16,6 +16,7 @@ import i18n from './i18n';
 import { useNavigationState,getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
 import { store, persistor } from '@/app/store';              // ← adjust paths if needed
+import { usePushNotifications } from "@/src/hooks/usePushNotifications";
 
 
 // Force RTL layout for the entire app
@@ -113,6 +114,10 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
 }
 
 export default function RootLayout() {
+  const token = usePushNotifications();
+  console.log('token',token);
+  
+
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>

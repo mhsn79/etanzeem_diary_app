@@ -18,7 +18,9 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.jiislamabad.etanzeemdiaryapp"
+      "package": "com.jiislamabad.etanzeemdiaryapp",
+      "googleServicesFile": "./google-services.json"
+
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +29,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications", 
       [
         "expo-splash-screen",
         {

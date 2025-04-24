@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "204298925584",
+    "project_id": "etanzeem-7451e",
+    "storage_bucket": "etanzeem-7451e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:204298925584:android:bd6d9659dc1e1de31b7c95",
+        "android_client_info": {
+          "package_name": "com.jiislamabad.etanzeemdiaryapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_yzzz25nfYwlkbRFFSd7qkWffTdfPrrg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
