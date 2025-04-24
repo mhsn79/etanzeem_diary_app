@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 
-import i18n from '../i18n';
+
 import { profileData } from '@/app/data/profile';
 import { logout } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store';
@@ -22,7 +22,7 @@ import FormInput from '@/app/components/FormInput';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS, SPACING } from '../constants/theme';
+import i18n from '@/app/i18n';
 
 /* ──────────────────────
    Helper for read-only text fields
@@ -42,7 +42,7 @@ const StaticField = (label: string, value: string) => (
    ────────────────────── */
 const AVATAR_SIZE = 120;         // keep in sync with styles.avatar
 
-export default function ProfileView() {
+export default function RukanDetails() {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
@@ -94,15 +94,12 @@ export default function ProfileView() {
           ]}
         />
 
-
-
-<View style={styles.logoutContainer}>        <CustomButton
-          text={'لاگ آؤٹ'}
+        <CustomButton
+          text={i18n.t('logout')}
           onPress={handleLogout}
           viewStyle={[styles.logoutBtn]}
-      
+          textStyle={[styles.logoutBtnText]}
         />
-</View>
       </ScrollView>
     </View>
   );
@@ -141,14 +138,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-
   /* buttons */
-  logoutContainer: {
-    marginVertical: 32,
-  
-  },
   logoutBtn: {
-    backgroundColor:COLORS.error,
-  
+    backgroundColor: '#EA5455',
+    marginTop: 32,
+    alignSelf: 'center',
+    color: '#fff',
+  },
+  logoutBtnText: {
+    color: '#fff',
   },
 });

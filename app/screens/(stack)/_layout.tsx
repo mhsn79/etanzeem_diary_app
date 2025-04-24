@@ -170,6 +170,12 @@ export default function StackLayout() {
         }} 
       />
       <Stack.Screen 
+        name={SCREENS.RUKAN_DETAILS}
+        options={{ 
+          headerShown: false
+        }} 
+      />
+      <Stack.Screen 
         name={SCREENS.MEETING_SCREEN}
         options={{ 
           headerShown: false,

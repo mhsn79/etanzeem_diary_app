@@ -57,4 +57,5 @@ export const COMMON_IMAGES = {
   whatsapp: require('../../assets/images/whatsapp-icon.png'),
   transfer: require('../../assets/images/transfer-icon.png'),
   pattern: require('../../assets/images/pattern.png'),
+  profileBackground: require('../../assets/images/profile-background.png'),
 };

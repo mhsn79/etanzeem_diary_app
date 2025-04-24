@@ -13,6 +13,7 @@ interface FormInputProps {
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   maxLength?: number;
   rightIcon?: React.ReactNode;
+  editable?: boolean;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -25,6 +26,7 @@ const FormInput: React.FC<FormInputProps> = ({
   keyboardType = 'default',
   maxLength,
   rightIcon,
+  editable = true,
 }) => {
   return (
     <View style={styles.container}>
@@ -50,6 +52,7 @@ const FormInput: React.FC<FormInputProps> = ({
           keyboardType={keyboardType}
           maxLength={maxLength}
           textAlignVertical="center"
+          editable={editable}
         />
     
       </View>
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.lightGray,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.sm,
     ...SHADOWS.small,
   },
   input: {

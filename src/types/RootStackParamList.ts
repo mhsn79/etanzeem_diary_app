@@ -7,4 +7,5 @@ export type RootStackParamList = {
     'screens/RukunAddEdit': { rukun?: RukunData | any };
     'screens/ProfileView': { profile?: RukunData | any };
     'screens/ProfileEdit': { profile?: any };
+    'screens/(stack)/RukanDetails': { rukun: RukunData };
 };

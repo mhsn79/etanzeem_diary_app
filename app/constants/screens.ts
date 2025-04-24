@@ -34,6 +34,7 @@ export const SCREENS = {
   WORKFORCE: 'Workforce',
   RUKUN_VIEW: 'RukunView',
   RUKUN_ADD_EDIT: 'RukunAddEdit',
+  RUKAN_DETAILS: 'RukanDetails',
 } as const;
 
 // Screen Paths
@@ -62,6 +63,7 @@ export const SCREEN_PATHS = {
   WORKFORCE: `/${SCREEN_GROUPS.STACK}/${SCREENS.WORKFORCE}`,
   RUKUN_VIEW: `/${SCREEN_GROUPS.STACK}/${SCREENS.RUKUN_VIEW}`,
   RUKUN_ADD_EDIT: `/${SCREEN_GROUPS.STACK}/${SCREENS.RUKUN_ADD_EDIT}`,
+  RUKAN_DETAILS: `/${SCREEN_GROUPS.STACK}/${SCREENS.RUKAN_DETAILS}`,
 } as const;
 
 // Screen Titles (in Urdu)
@@ -79,7 +81,8 @@ export const SCREEN_TITLES = {
   [SCREENS.WORKFORCE]: 'افرادی قوت',
   [SCREENS.RUKUN_VIEW]: 'ارکان',
   [SCREENS.RUKUN_ADD_EDIT]: 'رکن شامل کریں',
-  [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں'
+  [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں',
+  [SCREENS.RUKAN_DETAILS]: 'رکن کی تفصیلات'
 
 } as const;
 
