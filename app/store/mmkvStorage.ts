@@ -6,6 +6,7 @@ import { Storage } from 'redux-persist';
 export const STORAGE_KEYS = {
   AUTH: 'auth',
   ACTIVITIES: 'activities',
+  PERSONS: 'persons',
 } as const;
 
 type StorageKeys = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];

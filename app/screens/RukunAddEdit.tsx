@@ -8,7 +8,7 @@ import CustomButton from '../components/CustomButton';
 import { Linking, TouchableOpacity } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from "@/src/types/RootStackParamList";
+import { RootStackParamList } from "../../src/types/RootStackParamList";
 
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunAddEdit'>;
 
@@ -31,13 +31,13 @@ export default function RukunAddEdit() {
         <View style={[{direction: i18n.locale === 'ur' ? 'rtl' : 'ltr'}]}>
           <Pressable onPress={handlePictureUpdate}>
             <Image
-              source={require('@/assets/images/edit-icon-2.png')}
+              source={require('../../assets/images/edit-icon-2.png')}
               style={[{ width: 20, height: 20 }]}
             />
           </Pressable>
           <View style={[styles.imageContainer, { padding: 10, alignContent: "center", alignItems: "center", marginTop: 10 }]}>
             <Image
-              source={require('@/assets/images/avatar.png')}
+              source={require('../../assets/images/avatar.png')}
               style={[styles.logo]}
             />
           </View>
@@ -47,7 +47,7 @@ export default function RukunAddEdit() {
               {/* <Spacer height={10} width={"100%"}></Spacer> */}
               {/* <UrduText style={{ color: "white", fontSize: 18 }}>{address}</UrduText> */}
               <Image
-                source={require('@/assets/images/location-icon-blue.png')}
+                source={require('../../assets/images/location-icon-blue.png')}
                 style={[{ height: 16, width: 16 }]}
               />
               <Text style={[{ flexWrap: 'wrap' }]}>{rukun.address}</Text>
