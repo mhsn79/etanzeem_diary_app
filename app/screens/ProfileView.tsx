@@ -71,6 +71,11 @@ export default function ProfileView() {
   // Combine user data from API with static profile data
   // Use API data if available, otherwise fall back to static data
   const displayData = useMemo<ExtendedProfileData>(() => {
+    // Log avatar URL for debugging
+    if (userData?.avatar) {
+      console.log('Avatar URL:', `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055'}/assets/${userData.avatar}`);
+    }
+    
     if (!userData) return profileData as ExtendedProfileData;
 
     // Format the name based on first_name and last_name
@@ -118,6 +123,20 @@ export default function ProfileView() {
       <ProfileHeader
         title={i18n.t('profile')}
         backgroundSource={COMMON_IMAGES.profileBackground}
+        avatarSource={
+          userData?.avatar 
+            ? { 
+                uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055'}/assets/${userData.avatar}?cache=${Date.now()}`,
+                cache: 'web',
+                headers: {
+                  Accept: 'image/jpeg, image/png, image/jpg',
+                  'Cache-Control': 'no-cache',
+                  Pragma: 'no-cache',
+                  Expires: '0',
+                }
+              }
+            : require('@/assets/images/avatar.png')
+        }
       />
 
       {/*──────────── Content ────────────*/}

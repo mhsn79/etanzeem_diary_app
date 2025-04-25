@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ViewStyle,
   TouchableOpacity,
   ImageSourcePropType,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6, Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { router } from 'expo-router';
 
 import { COLORS, SPACING } from '../constants/theme';
 import UrduText from './UrduText';
+import RemoteImage from './RemoteImage';
 
 interface ProfileHeaderProps {
   title: string;
@@ -42,6 +44,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   showCamera = true,
 }) => {
   const insets = useSafeAreaInsets();
+  
+  console.log('Avatar source:', avatarSource);
 
   return (
     <View style={[styles.headerWrapper, { height: HEADER_HEIGHT }]}>
@@ -76,8 +80,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           { top: HEADER_HEIGHT * 0.95 - AVATAR_SIZE / 2 }
         ]}
       >
-        <Image
+        <RemoteImage
           source={avatarSource}
+          fallbackSource={require('@/assets/images/avatar.png')}
           style={[
             styles.avatar, 
             { 
@@ -86,7 +91,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               borderRadius: AVATAR_SIZE / 2 
             }
           ]}
+          showLoadingIndicator={true}
         />
+        
         {showCamera && (
           <Pressable style={styles.cameraBadge} onPress={onCameraPress}>
             <Ionicons name="camera" size={22} color={COLORS.white} />
@@ -100,7 +107,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 const styles = StyleSheet.create({
   headerWrapper: {
     // height is set dynamically via props
-    paddingTop:30
+    paddingTop: 30
   },
   headerBg: {
     ...StyleSheet.absoluteFillObject,

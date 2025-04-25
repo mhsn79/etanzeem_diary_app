@@ -23,6 +23,7 @@ export interface User {
   role?: string;
   status?: string;
   last_access?: string;
+  avatar?: string;
   // Add any other fields that might be in the user data
 }
 
