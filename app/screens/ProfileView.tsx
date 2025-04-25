@@ -1,5 +1,5 @@
 // app/screens/ProfileView.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,12 +9,32 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
 import { profileData } from '@/app/data/profile';
-import { logout } from '@/app/features/auth/authSlice';
+import { logout, selectUser } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store';
+
+// Define an extended profile data interface to include additional fields
+interface ExtendedProfileData {
+  id: number;
+  name: string;
+  address: string;
+  phone: string;
+  whatsApp: string;
+  sms: string;
+  picture: null | string;
+  parent: string;
+  dob: string;
+  cnic: string;
+  unit: string;
+  status: string;
+  email: string;
+  // Additional fields from API
+  role?: string;
+  lastAccess?: string;
+}
 
 import CustomButton from '@/app/components/CustomButton';
 import CustomDropdown from '@/app/components/CustomDropdown';
@@ -27,11 +47,11 @@ import { COLORS, SPACING } from '../constants/theme';
 /* ──────────────────────
    Helper for read-only text fields
    ────────────────────── */
-const StaticField = (label: string, value: string) => (
+const StaticField = (label: string, value: string | undefined) => (
   <FormInput
     key={label}
     inputTitle={label}
-    value={value}
+    value={value || 'N/A'}
     onChange={() => {}}
     editable={false}
   />
@@ -46,6 +66,42 @@ export default function ProfileView() {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
+  const userData = useSelector(selectUser);
+
+  // Combine user data from API with static profile data
+  // Use API data if available, otherwise fall back to static data
+  const displayData = useMemo<ExtendedProfileData>(() => {
+    if (!userData) return profileData as ExtendedProfileData;
+
+    // Format the name based on first_name and last_name
+    const formattedName = userData.first_name 
+      ? (userData.last_name 
+          ? `${userData.first_name} ${userData.last_name}` 
+          : userData.first_name)
+      : profileData.name;
+
+    // Format last access time if available
+    let lastAccess = 'N/A';
+    if ((userData as any).last_access) {
+      try {
+        const lastAccessDate = new Date((userData as any).last_access);
+        lastAccess = lastAccessDate.toLocaleString();
+      } catch (e) {
+        console.error('Error formatting last access date:', e);
+      }
+    }
+
+    return {
+      ...profileData,
+      name: formattedName,
+      email: userData.email || profileData.email,
+      status: userData.status || profileData.status,
+      // We can add more fields from the API response as needed
+      role: userData.role || 'N/A',
+      lastAccess,
+      // Keep the rest of the profile data for fields not provided by the API
+    } as ExtendedProfileData;
+  }, [userData]);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -62,7 +118,6 @@ export default function ProfileView() {
       <ProfileHeader
         title={i18n.t('profile')}
         backgroundSource={COMMON_IMAGES.profileBackground}
-      
       />
 
       {/*──────────── Content ────────────*/}
@@ -71,18 +126,20 @@ export default function ProfileView() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollWrapper}
       >
-        <UrduText style={styles.personName}>{profileData.name}</UrduText>
-        <UrduText style={styles.personSub}>{profileData.parent}</UrduText>
+        <UrduText style={styles.personName}>{displayData.name}</UrduText>
+        <UrduText style={styles.personSub}>{displayData.parent}</UrduText>
 
-        {StaticField(i18n.t('name'), profileData.name)}
-        {StaticField(i18n.t('parent'), profileData.parent)}
-        {StaticField(i18n.t('dob'), profileData.dob)}
-        {StaticField(i18n.t('cnic'), profileData.cnic)}
-        {StaticField(i18n.t('unit'), profileData.unit)}
-        {StaticField(i18n.t('status'), profileData.status)}
-        {StaticField(i18n.t('phone_number'), profileData.phone)}
-        {StaticField(i18n.t('whatsapp_number'), profileData.whatsApp)}
-        {StaticField(i18n.t('email'), profileData.email)}
+        {StaticField(i18n.t('name'), displayData.name)}
+        {StaticField(i18n.t('parent'), displayData.parent)}
+        {StaticField(i18n.t('dob'), displayData.dob)}
+        {StaticField(i18n.t('cnic'), displayData.cnic)}
+        {StaticField(i18n.t('unit'), displayData.unit)}
+        {StaticField(i18n.t('status'), displayData.status)}
+        {userData?.role && StaticField(i18n.t('role'), displayData.role || 'N/A')}
+        {StaticField(i18n.t('phone_number'), displayData.phone)}
+        {StaticField(i18n.t('whatsapp_number'), displayData.whatsApp)}
+        {StaticField(i18n.t('email'), displayData.email)}
+        {(userData as any)?.last_access && StaticField(i18n.t('last_login'), displayData.lastAccess || 'N/A')}
 
         <CustomDropdown
           dropdownTitle={i18n.t('language')}
@@ -96,13 +153,13 @@ export default function ProfileView() {
 
 
 
-<View style={styles.logoutContainer}>        <CustomButton
-          text={'لاگ آؤٹ'}
-          onPress={handleLogout}
-          viewStyle={[styles.logoutBtn]}
-      
-        />
-</View>
+<View style={styles.logoutContainer}>
+          <CustomButton
+            text={i18n.t('logout')}
+            onPress={handleLogout}
+            viewStyle={[styles.logoutBtn]}
+          />
+        </View>
       </ScrollView>
     </View>
   );

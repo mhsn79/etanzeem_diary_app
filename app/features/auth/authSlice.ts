@@ -22,6 +22,8 @@ export interface User {
   last_name?: string;
   role?: string;
   status?: string;
+  last_access?: string;
+  // Add any other fields that might be in the user data
 }
 
 export interface AuthTokens {
@@ -82,7 +84,7 @@ export const login = createAsyncThunk<
           'Authorization': `Bearer ${authResponse.access_token}`
         }
       }));      
-      console.log('userData', userData);
+      console.log('userData===============', JSON.stringify(userData));
 
       return {
         tokens: {

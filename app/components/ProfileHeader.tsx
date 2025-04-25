@@ -100,6 +100,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 const styles = StyleSheet.create({
   headerWrapper: {
     // height is set dynamically via props
+    paddingTop:30
   },
   headerBg: {
     ...StyleSheet.absoluteFillObject,
