@@ -22,6 +22,7 @@ import { RootStackParamList } from '@/src/types/RootStackParamList';
 import { 
   updatePerson, 
   createPerson, 
+  updatePersonImage,
   selectUpdatePersonStatus, 
   selectUpdatePersonError,
   selectCreatePersonStatus,
@@ -30,6 +31,7 @@ import {
   resetCreateStatus
 } from '@/app/features/persons/personSlice';
 import { Person, UpdatePersonPayload, CreatePersonPayload } from '@/app/models/Person';
+import { getImageUrl } from '@/app/utils/imageUpload';
 
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
@@ -73,7 +75,12 @@ export default function RukunAddEdit() {
     phone: initialRukun?.phone || '',
     whatsApp: initialRukun?.whatsApp || '',
     email: initialRukun?.email || '',
+    picture: initialRukun?.picture || '',
   });
+  
+  // Image upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -160,8 +167,49 @@ export default function RukunAddEdit() {
     navigation.goBack();
   };
   
+  // Handle image upload
+  const handleImageUpload = async (imageUri: string) => {
+    // Check if we're in edit mode and have a valid ID
+    if (!isEditMode || !('id' in formData) || !formData.id) {
+      Alert.alert(
+        i18n.t('error'),
+        i18n.t('save_profile_first')
+      );
+      return;
+    }
+    
+    try {
+      setIsUploading(true);
+      
+      // Dispatch the updatePersonImage action
+      // We've already checked that id exists and is valid above
+      await dispatch(updatePersonImage({
+        id: formData.id,
+        imageUri,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+        }
+      })).unwrap();
+      
+      // Show success message
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('image_updated_successfully')
+      );
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert(
+        i18n.t('error'),
+        typeof error === 'string' ? error : i18n.t('image_upload_failed')
+      );
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+  
   // Show loading indicator during API operations
-  const isLoading = updateStatus === 'loading' || createStatus === 'loading';
+  const isLoading = updateStatus === 'loading' || createStatus === 'loading' || isUploading;
   
   return (
     <KeyboardAvoidingView
@@ -174,17 +222,16 @@ export default function RukunAddEdit() {
           title={isEditMode ? 'رکن': i18n.t('add_rukun')}
           backgroundSource={COMMON_IMAGES.profileBackground}
           avatarSource={
-            initialRukun?.picture
-              ? { uri: initialRukun.picture }
+            formData.picture
+              ? { uri: getImageUrl(formData.picture as string) }
               : require('@/assets/images/avatar.png')
           }
           onBackPress={handleBackPress}
           showSettings={false}
-          showCamera={true}
-          onCameraPress={() => {
-            // TODO: Implement image upload functionality
-            Alert.alert(i18n.t('coming_soon'), i18n.t('feature_not_available'));
-          }}
+          showCamera={isEditMode}
+          onCameraPress={handleImageUpload}
+          personId={isEditMode && 'id' in formData ? formData.id : undefined}
+          isUploading={isUploading}
         />
 
         {/*──────────── Content ────────────*/}
@@ -227,7 +274,7 @@ export default function RukunAddEdit() {
           
           <FormInput
             inputTitle={i18n.t('unit')}
-            value={formData.unit?.toString() || ''}
+            value={formData.unit !== undefined ? formData.unit.toString() : ''}
             onChange={(value) => handleChange('unit', value)}
             placeholder={i18n.t('enter_unit')}
           />

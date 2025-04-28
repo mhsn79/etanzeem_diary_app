@@ -1,5 +1,5 @@
 // app/screens/RukunView.tsx
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -10,6 +10,7 @@ import {
   View,
   ActivityIndicator,
   GestureResponderEvent,
+  Alert,
 } from 'react-native';
 import { Linking } from 'react-native';
 import {
@@ -23,10 +24,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
 import {
   fetchPersonById,
+  updatePersonImage,
   selectPersonById,
   selectSelectedPersonStatus,
   selectSelectedPersonError,
 } from '@/app/features/persons/personSlice';
+import { getImageUrl } from '@/app/utils/imageUpload';
 
 import { COLORS, SPACING } from '@/app/constants/theme';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
@@ -59,11 +62,46 @@ export default function RukunView() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
+  // Image upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
   const status = useAppSelector(selectSelectedPersonStatus);
   const error = useAppSelector(selectSelectedPersonError);
 
   const displayPerson = person ?? rukun;
+  
+  // Handle image upload
+  const handleImageUpload = async (imageUri: string) => {
+    try {
+      setIsUploading(true);
+      
+      // Dispatch the updatePersonImage action
+      await dispatch(updatePersonImage({
+        id: rukun.id,
+        imageUri,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+        }
+      })).unwrap();
+      
+      // Show success message
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('image_updated_successfully')
+      );
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert(
+        i18n.t('error'),
+        typeof error === 'string' ? error : i18n.t('image_upload_failed')
+      );
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
 
   /* ──────────── Data fetching ────────────*/
   useEffect(() => {
@@ -150,12 +188,16 @@ export default function RukunView() {
           backgroundSource={COMMON_IMAGES.profileBackground}
           avatarSource={
             displayPerson.picture
-              ? { uri: displayPerson.picture }
+              ? { uri: getImageUrl(displayPerson.picture) }
               : require('@/assets/images/avatar.png')
           }
           showEditIcon
           onEditPress={handleEditDetails}
           showSettings={false}
+          showCamera={true}
+          onCameraPress={handleImageUpload}
+          personId={rukun.id}
+          isUploading={isUploading}
         />
 
         {/* Content */}

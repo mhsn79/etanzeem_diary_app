@@ -8,6 +8,8 @@ import {
 } from '../auth/authSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
+import { uploadImage } from '@/app/utils/imageUpload';
+import { API_BASE_URL } from '@/app/constants/api';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -54,7 +56,6 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
  * API Helper Functions
  * ────────────────────────────────────────────────────────────────────────────────
  */
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
 
 // Helper function to handle API requests with token
 const apiRequest = async <T>(
@@ -360,6 +361,74 @@ export const updatePerson = createAsyncThunk<
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to update a person's profile image
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+export interface UpdatePersonImagePayload {
+  id: number;
+  imageUri: string;
+  onProgress?: (progress: number) => void;
+}
+
+export const updatePersonImage = createAsyncThunk<
+  Person,
+  UpdatePersonImagePayload,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/updateImage', async ({ id, imageUri, onProgress }, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Updating person image:', { id, imageUri });
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded());
+
+    const auth = selectAuthState(getState());
+    let token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const updatePersonImageRequest = async (accessToken: string) => {
+      try {
+        // 1. Upload the image to get the file ID
+        const fileId = await uploadImage(imageUri, accessToken, onProgress);
+        
+        if (!fileId) {
+          throw new Error('Failed to upload image');
+        }
+        
+        console.log('Image uploaded successfully, file ID:', fileId);
+        
+        // 2. Update the person record with the new image ID
+        const apiPersonData = {
+          picture: fileId
+        };
+        
+        const response = await apiRequest<SinglePersonResponse>(
+          `/items/Person/${id}`,
+          'PATCH',
+          accessToken,
+          apiPersonData
+        );
+        
+        if (!response.data) throw new Error(`Failed to update person image with ID ${id}`);
+        
+        // Transform the response back to our expected format
+        const transformedPerson = normalizePersonData(response.data);
+        
+        return transformedPerson;
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    };
+
+    return await executeWithTokenRefresh(updatePersonImageRequest, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Update person image error:', error);
+    return rejectWithValue(error.message || `Failed to update image for person with ID ${id}`);
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
  * Slice
  * ────────────────────────────────────────────────────────────────────────────────
  */
@@ -446,6 +515,20 @@ const personsSlice = createSlice({
       .addCase(updatePerson.rejected, (state, action) => {
         state.updateStatus = 'failed';
         state.updateError = action.payload ?? 'Failed to update person';
+      })
+      
+      // Update person image
+      .addCase(updatePersonImage.pending, state => {
+        state.updateStatus = 'loading';
+        state.updateError = null;
+      })
+      .addCase(updatePersonImage.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.updateStatus = 'succeeded';
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(updatePersonImage.rejected, (state, action) => {
+        state.updateStatus = 'failed';
+        state.updateError = action.payload ?? 'Failed to update person image';
       })
       
       // Delete person
