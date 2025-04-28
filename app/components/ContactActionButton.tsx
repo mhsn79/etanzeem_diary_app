@@ -8,9 +8,12 @@ interface ContactActionButtonProps {
   onPress: (event: GestureResponderEvent) => void;
   text: string;
   iconType: 'phone' | 'whatsapp' | 'sms';
+  btnStyle?: object;
 }
 
-const ContactActionButton: React.FC<ContactActionButtonProps> = ({ onPress, text, iconType }) => {
+const ContactActionButton: React.FC<ContactActionButtonProps> = ({ onPress, text, iconType,
+  btnStyle
+ }) => {
   const getIcon = () => {
     switch (iconType) {
       case 'phone':
@@ -25,7 +28,7 @@ const ContactActionButton: React.FC<ContactActionButtonProps> = ({ onPress, text
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={onPress}>
+    <TouchableOpacity style={[styles.button,btnStyle]} onPress={onPress}>
       {getIcon()}
       <UrduText style={styles.buttonText}>{text}</UrduText>
     </TouchableOpacity>

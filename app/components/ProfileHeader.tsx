@@ -26,9 +26,10 @@ interface ProfileHeaderProps {
   onBackPress?: () => void;
   onSettingsPress?: () => void;
   onCameraPress?: () => void;
+  onEditPress?: () => void;
   showSettings?: boolean;
   showCamera?: boolean;
-  
+  showEditIcon?: boolean;
   avatarSize?: number;
 }
 const HEADER_HEIGHT = 260;
@@ -40,8 +41,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onBackPress = () => router.back(),
   onSettingsPress = () => {},
   onCameraPress = () => {},
+  onEditPress = () => {},
+  
   showSettings = true,
   showCamera = true,
+  showEditIcon,
 }) => {
   const insets = useSafeAreaInsets();
   
@@ -61,10 +65,16 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         ]}
       >
         {showSettings && (
-          <Pressable style={styles.headerIcon} onPress={onSettingsPress}>
+          <Pressable style={styles.headerIcon} onPress={onEditPress}>
             <Ionicons name="settings-outline" size={24} color="#fff" />
           </Pressable>
         )}
+        {showEditIcon && (
+          <Pressable style={styles.headerIcon} onPress={onSettingsPress}>
+            <FontAwesome6 name="edit" size={24} color="#fff" />
+          </Pressable>
+        )}
+
 
         <UrduText style={styles.headerTitle}>{title}</UrduText>
 

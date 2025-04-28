@@ -1,255 +1,293 @@
-import React, { useEffect } from 'react';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, ActivityIndicator } from 'react-native';
-import i18n from '../i18n';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RukunData } from '../models/RukunData';
-import { Line } from 'react-native-svg';
-import CustomButton from '../components/CustomButton';
-import { Linking, TouchableOpacity } from 'react-native';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+// app/screens/RukunView.tsx
+import React, { useEffect, useMemo } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  ScrollView,
+  Text,
+  View,
+  ActivityIndicator,
+} from 'react-native';
+import { Linking } from 'react-native';
+import {
+  useRoute,
+  RouteProp,
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from "../../src/types/RootStackParamList";
-import { useDispatch, useSelector } from 'react-redux';
-import { 
-  fetchPersonById, 
-  selectPersonById, 
-  selectSelectedPersonStatus, 
+
+import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
+import {
+  fetchPersonById,
+  selectPersonById,
+  selectSelectedPersonStatus,
   selectSelectedPersonError,
-} from '../features/persons/personSlice';
-import { Person } from '../models/Person';
-import { AppDispatch } from '../store';
-import { COLORS } from '../constants/theme';
+} from '@/app/features/persons/personSlice';
+
+import { COLORS, SPACING } from '@/app/constants/theme';
+import { RootStackParamList } from '@/src/types/RootStackParamList';
+import { RootState, AppDispatch } from '@/app/store';
+
+import i18n from '../i18n';
+
+// Components
+import CustomButton from '@/app/components/CustomButton';
+import UrduText from '@/app/components/UrduText';
+import ProfileHeader from '@/app/components/ProfileHeader';
+import ContactActionButton from '../components/ContactActionButton';
+import { COMMON_IMAGES } from '@/app/constants/images';
 
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunView'>;
 
+/* --------------------------
+   Typed hooks (optional)
+---------------------------*/
+const useAppDispatch = () => useDispatch<AppDispatch>();
+const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+
 export default function RukunView() {
-  const route = useRoute<RukunDetailsRouteProp>();
-  const { rukun } = route.params;
-  const rukunId = rukun.id;
-  
-  const dispatch = useDispatch<AppDispatch>();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const insets = useSafeAreaInsets();
-  
-  // Redux state
-  const person = useSelector((state) => selectPersonById(state, rukunId));
-  const status = useSelector(selectSelectedPersonStatus);
-  const error = useSelector(selectSelectedPersonError);
+  /* ──────────── Navigation & Redux ────────────*/
+  const {
+    params: { rukun },
+  } = useRoute<RukunDetailsRouteProp>();
 
-  // Fetch person data if not already in store
+  const dispatch = useAppDispatch();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const person = useAppSelector((state) => selectPersonById(state, rukun.id));
+  const status = useAppSelector(selectSelectedPersonStatus);
+  const error = useAppSelector(selectSelectedPersonError);
+
+  const displayPerson = person ?? rukun;
+
+  /* ──────────── Data fetching ────────────*/
   useEffect(() => {
-    if (rukunId && rukunId > 0) {
-      dispatch(fetchPersonById(rukunId));
+    if (!person) {
+      dispatch(fetchPersonById(rukun.id));
     }
-  }, [dispatch, rukunId]);
+  }, [dispatch, rukun.id, person]);
 
-  // Use the person from Redux if available, otherwise use the one from route params
-  const displayPerson = person || rukun;
+  /* ──────────── Hide stack header ────────────*/
+  useFocusEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  });
 
-  const handleCall = () => {
-    if (displayPerson.phone) {
-      Linking.openURL(`tel:${displayPerson.phone}`);
-    }
-  };
+  /* ──────────── Derived state ────────────*/
+  const detailRows = useMemo(
+    () => [
+      { label: i18n.t('parent'), value: displayPerson.parent },
+      { label: i18n.t('dob'), value: displayPerson.dob },
+      { label: i18n.t('cnic'), value: displayPerson.cnic },
+      { label: i18n.t('unit'), value: displayPerson.unit },
+      { label: i18n.t('status'), value: displayPerson.status },
+      { label: i18n.t('phone_number'), value: displayPerson.phone_number },
+      { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
+      { label: i18n.t('email'), value: displayPerson.email },
+    ],
+    [displayPerson],
+  );
 
-  const handleWhatsApp = () => {
-    if (displayPerson.whatsApp) {
-      Linking.openURL(`whatsapp://send?phone=${displayPerson.whatsApp}`);
-    }
-  };
+  /* ──────────── Helpers ────────────*/
+  const openLink = (url: string) =>
+    Linking.openURL(url).catch((e) => console.error('Link error', e));
 
-  const handleSMS = () => {
-    if (displayPerson.sms) {
-      Linking.openURL(`sms:${displayPerson.sms}`);
-    }
-  };
-
-  const handleTransfer = () => {
-    // Implement transfer functionality
-  };
-
-  const handleEdit = () => {
-    navigation.navigate('screens/RukunAddEdit', { rukun: displayPerson });
-  };
-
-  // Render loading state
+  /* ──────────── Async states ────────────*/
   if (status === 'loading' && !person) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <CenteredContainer>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>{i18n.t('loading')}</Text>
-      </View>
+      </CenteredContainer>
     );
   }
 
-  // Render error state
   if (status === 'failed' && error) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <CenteredContainer>
         <Text style={styles.errorText}>{error}</Text>
         <CustomButton
           text={i18n.t('try_again')}
-          onPress={() => dispatch(fetchPersonById(rukunId))}
-          style={{ marginTop: 20 }}
-          viewStyle={[styles.retryButton]}
-          textStyle={[styles.retryButtonText]}
+          onPress={() => dispatch(fetchPersonById(rukun.id))}
+          viewStyle={styles.retryBtn}
+          textStyle={styles.retryBtnText}
         />
-      </View>
+      </CenteredContainer>
     );
   }
 
+  /* ──────────── Main UI ────────────*/
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
-        <View style={[{direction: i18n.locale === 'ur' ? 'rtl' : 'ltr'}]}>
-          <Pressable onPress={handleEdit}>
-            <Image
-              source={require('../../assets/images/edit-icon-2.png')}
-              style={[{ width: 20, height: 20 }]}
+    <KeyboardAvoidingView
+      behavior={Platform.select({ ios: 'padding', android: 'height' })}
+      style={styles.flex1}
+    >
+      <View style={styles.root}>
+        {/* Header */}
+        <ProfileHeader
+          title={'رکن'}
+          backgroundSource={COMMON_IMAGES.profileBackground}
+          avatarSource={
+            displayPerson.picture
+              ? { uri: displayPerson.picture }
+              : require('@/assets/images/avatar.png')
+          }
+          showEditIcon
+          showSettings={false}
+        />
+
+        {/* Content */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          style={styles.scrollWrapper}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Name & address */}
+          <View style={styles.alignCenter}>
+            <UrduText style={styles.name}>{displayPerson.name ?? 'N/A'}</UrduText>
+
+            {!!displayPerson.address && (
+              <View style={styles.addressRow}>
+                <Image
+                  source={require('@/assets/images/location-icon-blue.png')}
+                  style={styles.locationIcon}
+                />
+                <UrduText style={styles.address}>{displayPerson.address}</UrduText>
+              </View>
+            )}
+          </View>
+
+          {/* Contact actions */}
+          <View style={styles.contactActions}>
+            <ContactActionButton
+              onPress={() => openLink(`tel:${displayPerson.phone}`)}
+              text={i18n.t('call')}
+              iconType="phone"
+              btnStyle={styles.contactBtn}
             />
-          </Pressable>
-          <View style={[styles.imageContainer, { padding: 10, alignContent: "center", alignItems: "center", marginTop: 10 }]}>
-            <Image
-              source={displayPerson.picture ? { uri: displayPerson.picture } : require('../../assets/images/avatar.png')}
-              style={[styles.logo]}
+            <ContactActionButton
+              onPress={() =>
+                openLink(`whatsapp://send?phone=${displayPerson.whatsapp_number}`)
+              }
+              text="واٹس ایپ"
+              iconType="whatsapp"
+              btnStyle={styles.contactBtn}
+            />
+            <ContactActionButton
+              onPress={() => openLink(`sms:${displayPerson.phone}`)}
+              text="ایس ایم ایس"
+              iconType="sms"
+              btnStyle={styles.contactBtn}
             />
           </View>
-          <View style={[{ alignContent: "center", alignItems: "center", marginTop: 10 }]}>
-            <Text style={[styles.nameStyle, { flex: 1, flexWrap: 'wrap', alignContent: "center", alignItems: "center", justifyContent: "center" }]}>
-              {displayPerson.name}
-            </Text>
-            <View style={[{ flex: 1, flexDirection: "row", alignItems: "center", alignContent: "center" }]}>
-              <Image
-                source={require('../../assets/images/location-icon-blue.png')}
-                style={[{ height: 16, width: 16 }]}
-              />
-              <Text style={[{ flexWrap: 'wrap' }]}>{displayPerson.address}</Text>
-            </View>
+
+          {/* Details */}
+          <View style={styles.details}>
+            {detailRows.map(({ label, value }) => (
+              <DetailRow key={label} label={label} value={value ?? '-'} />
+            ))}
           </View>
-          <View style={[{ flexDirection: "row", flex: 1 }]}>
-            {displayPerson.phone && (
-              <CustomButton
-                text={i18n.t('call')}
-                style={{ margin: 5 }}
-                viewStyle={[{ backgroundColor: '#008CFF1A', opacity: 10, borderRadius: 15, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 }]}
-                textStyle={[{ color: 'black' }]}
-                iconImage={require("../../assets/images/phone-icon.png")}
-                onPress={handleCall}
-              />
-            )}
-            {displayPerson.whatsApp && (
-              <CustomButton
-                text={i18n.t('whatsapp')}
-                style={{ margin: 5 }}
-                viewStyle={[{ backgroundColor: '#008CFF1A', opacity: 10, borderRadius: 15, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 }]}
-                textStyle={[{ color: 'black' }]}
-                iconImage={require("../../assets/images/whatsapp-icon.png")}
-                onPress={handleWhatsApp}
-              />
-            )}
-            {displayPerson.sms && (
-              <CustomButton
-                text={i18n.t('sms')}
-                style={{ margin: 5 }}
-                viewStyle={[{ backgroundColor: '#008CFF1A', opacity: 10, borderRadius: 15, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 }]}
-                textStyle={[{ color: 'black' }]}
-                iconImage={require("../../assets/images/sms-icon.png")}
-                onPress={handleSMS}
-              />
-            )}
-          </View>
-          <CustomButton
-            text={i18n.t('transfer')}
-            style={{ margin: 5 }}
-            viewStyle={[{ width: 80, backgroundColor: '#008CFF1A', opacity: 10, borderRadius: 15, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 }]}
-            textStyle={[{ color: 'black' }]}
-            iconImage={require("../../assets/images/transfer-icon.png")}
-            onPress={handleTransfer}
-          />
-          <View style={[{ flexDirection: "column", flex: 1 }]}>
-            <Text style={[styles.textItem]}>
-              {i18n.t("parent")}: {displayPerson.parent || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("dob")}: {displayPerson.dob || '-'}              
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("cnic")}: {displayPerson.cnic || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("unit")}: {displayPerson.unit || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("status")}: {displayPerson.status || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("phone_number")}: {displayPerson.phone || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("whatsapp_number")}: {displayPerson.whatsApp || '-'}
-            </Text>
-            <Text style={[styles.textItem]}>
-              {i18n.t("email")}: {displayPerson.email || '-'}
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
+/* ──────────── Helper components ────────────*/
+const CenteredContainer: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <View style={[styles.flex1, styles.center]}>{children}</View>
+);
+
+const DetailRow = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.detailRow}>
+    <UrduText style={styles.detailLabel}>{label}</UrduText>
+    <UrduText style={styles.detailValue}>{value}</UrduText>
+  </View>
+);
+
+/* ──────────── Styles ────────────*/
+const AVATAR_SIZE = 120;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    // Background styling
-  },
-  logo: {
-    width: 122,
-    height: 122,
-    resizeMode: 'contain',
-    borderColor: '#0BA241',
-    borderWidth: 1,
-    borderRadius: 65,
-    padding: 2,
-    margin: 10
-  },
-  nameStyle: {
-    color: '#008CFF',
-    fontSize: 28,
-  },
-  textItem: {
-    color: '#000000',
-    fontFamily: "JameelNooriNastaleeq",
-    fontSize: 16,
-    marginVertical: 5,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+  flex1: { flex: 1 },
+  root: { flex: 1, backgroundColor: '#fff' },
+
+  /* scroll */
+  scrollWrapper: { marginTop: AVATAR_SIZE / 2 + 20 },
+  scrollContent: { paddingBottom: 40 },
+
+  /* centered view */
+  center: { justifyContent: 'center', alignItems: 'center' },
+
+  /* header content */
+  alignCenter: { alignItems: 'center' },
+  name: {
     color: COLORS.primary,
+    fontSize: 28,
+    marginBottom: SPACING.xs,
+    fontFamily: 'JameelNooriNastaleeq',
   },
+  addressRow: { flexDirection: 'row', alignItems: 'center' },
+  locationIcon: { height: 16, width: 16, marginRight: SPACING.xs },
+  address: {
+    fontSize: 16,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.black,
+  },
+
+  /* contact */
+  contactActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: SPACING.md,
+  },
+  contactBtn: {
+    backgroundColor: COLORS.lightPrimary,
+    marginHorizontal: SPACING.sm,
+    borderRadius: 30,
+  },
+
+  /* details */
+  details: { marginTop: SPACING.md, paddingHorizontal: SPACING.lg },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 5,
+    borderBottomColor: COLORS.lightGray,
+    borderBottomWidth: 1,
+  },
+  detailLabel: {
+    color: COLORS.black,
+    fontFamily: 'JameelNooriNastaleeq',
+    fontSize: 20,
+    lineHeight: 32,
+  },
+  detailValue: {
+    color: COLORS.black,
+    fontFamily: 'JameelNooriNastaleeq',
+    fontSize: 20,
+  },
+
+  /* async states */
+  loadingText: { marginTop: SPACING.sm, fontSize: 16, color: COLORS.primary },
   errorText: {
     fontSize: 16,
-    color: COLORS.error || 'red',
+    color: COLORS.error ?? 'red',
     textAlign: 'center',
+    paddingHorizontal: SPACING.md,
   },
-  retryButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: COLORS.primary,
-    borderRadius: 50,
-    alignItems: 'center',
+  retryBtn: {
+    marginTop: 20,
+    backgroundColor: COLORS.lightPrimary,
+    borderRadius: 15,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
+  retryBtnText: {
+    fontSize: 14,
+    color: COLORS.black,
   },
 });

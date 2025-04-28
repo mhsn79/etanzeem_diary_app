@@ -5,8 +5,8 @@ import { COLORS } from "../constants/theme";
 
 interface CustomButtonProps extends PressableProps {
   text: String;
-  viewStyle?: [ViewStyle?];
-  textStyle?: [TextStyle?];
+  viewStyle?: any;
+  textStyle?: any;
   iconImage?: ImageSource;
   iconStyle?: [ImageStyle?];
   loading?: boolean;
