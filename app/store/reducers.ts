@@ -3,6 +3,7 @@ import authReducer from '../features/auth/authSlice'; // Import the auth slice
 import activitiesReducer from '../features/activities/activitySlice';
 import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
 import personsReducer from '../features/persons/personSlice';
+import reportsReducer from '../features/reports/reportsSlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
@@ -10,6 +11,7 @@ const rootReducer = combineReducers({
   activities: activitiesReducer,
   activityTypes: activityTypesReducer,
   persons: personsReducer,
+  reports: reportsReducer,
 });
 
 export default rootReducer; 

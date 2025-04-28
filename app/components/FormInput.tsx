@@ -3,7 +3,7 @@ import { View, TextInput, StyleSheet, Text } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
 
-interface FormInputProps {
+export interface FormInputProps {
   mainTitle?: string;
   inputTitle: string;
   value: string;
@@ -17,6 +17,7 @@ interface FormInputProps {
   error?: string;
   required?: boolean;
   multiline?: boolean;
+  helpText?: string;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -33,6 +34,7 @@ const FormInput: React.FC<FormInputProps> = ({
   error,
   required,
   multiline = false,
+  helpText,
 }) => {
   return (
     <View style={styles.container}>
@@ -70,6 +72,7 @@ const FormInput: React.FC<FormInputProps> = ({
         />
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
+      {helpText && <UrduText style={styles.helpText}>{helpText}</UrduText>}
     </View>
   );
 };
@@ -134,6 +137,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     marginTop: 4,
     marginLeft: 4,
+  },
+  helpText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+    marginLeft: 4,
+    textAlign: 'right',
   },
 });
 

@@ -11,7 +11,7 @@ export type RootState = ReturnType<typeof rootReducer>;
 const persistConfig: PersistConfig<RootState> = {
   key: 'root',
   storage: mmkvStorage,
-  whitelist: [STORAGE_KEYS.AUTH, STORAGE_KEYS.ACTIVITIES, STORAGE_KEYS.PERSONS],
+  whitelist: [STORAGE_KEYS.AUTH, STORAGE_KEYS.ACTIVITIES, STORAGE_KEYS.PERSONS, STORAGE_KEYS.REPORTS],
   // Add version control for migrations
   version: 1,
   // Add state reconciler for better state management
