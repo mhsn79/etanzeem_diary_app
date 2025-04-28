@@ -143,5 +143,10 @@
     "success": "کامیابی",
     "take_photo": "تصویر لیں",
     "try_again": "دوبارہ کوشش کریں",
-    "uploading_image": "تصویر اپ لوڈ ہو رہی ہے..."
+    "uploading_image": "تصویر اپ لوڈ ہو رہی ہے...",
+    "update_profile_picture_confirm": "کیا آپ اپنا پروفائل تصویر اپ ڈیٹ کرنا چاہتے ہیں؟",
+    "update": "اپ ڈیٹ",
+    "image_picker_error": "تصویر منتخب کرنے میں خرابی",
+    "failed_to_update_profile_picture": "پروفائل تصویر کو اپ ڈیٹ کرنے میں ناکامی",
+    "profile_picture_updated": "پروفائل تصویر کامیابی سے اپ ڈیٹ ہو گئی"
 }

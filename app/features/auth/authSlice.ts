@@ -3,18 +3,17 @@ import { RootState } from '../../store';
 import directus from '../../services/directus';
 import { clearActivities } from '../activities/activitySlice';
 import { AppDispatch } from '../../store';
+import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 
 // Utility function to check if a token is expired or about to expire
-// Returns true if token is expired or will expire in the next 5 minutes
 export const isTokenExpiredOrExpiring = (expiresAt: number | undefined): boolean => {
   if (!expiresAt) return true;
-  
-  // Consider token expired if it expires in less than 5 minutes
   const fiveMinutesInMs = 5 * 60 * 1000;
   return Date.now() + fiveMinutesInMs >= expiresAt;
 };
 
-// Enhanced type definitions
+// Type definitions
 export interface User {
   id: string;
   email: string;
@@ -24,7 +23,6 @@ export interface User {
   status?: string;
   last_access?: string;
   avatar?: string;
-  // Add any other fields that might be in the user data
 }
 
 export interface AuthTokens {
@@ -47,111 +45,86 @@ const initialState: AuthState = {
   error: null,
 };
 
-// Enhanced login credentials type
 export interface LoginCredentials {
   email: string;
   password: string;
 }
 
-// Enhanced auth response type
 export interface AuthResponse {
   tokens: AuthTokens;
   user: User;
 }
 
-// Enhanced login thunk with better error handling
+// Login thunk
 export const login = createAsyncThunk<
   AuthResponse,
   LoginCredentials,
   { state: RootState; rejectValue: string }
 >('auth/login', async (credentials, { rejectWithValue }) => {
   try {
-    // Authenticate with Directus
     const authResponse = await directus.login(credentials.email, credentials.password, {
       mode: 'json',
     });
-    console.log('authResponse', authResponse);
 
     if (!authResponse.access_token || !authResponse.refresh_token) {
       return rejectWithValue('Invalid authentication response');
     }
 
     try {
-      // Fetch user data with explicit authorization header
       const userData = await directus.request(() => ({
         path: '/users/me',
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authResponse.access_token}`
-        }
-      }));      
-      console.log('userData===============', JSON.stringify(userData));
+        headers: { 'Authorization': `Bearer ${authResponse.access_token}` },
+      }));
 
       return {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
-          expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000, // 1 hour default
+          expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000,
         },
         user: userData as User,
       };
     } catch (userDataError: any) {
-      console.error('Failed to fetch user data:', userDataError);
-      
-      // If we can't fetch user data but have valid tokens, create a minimal user object
       return {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
-          expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000, // 1 hour default
+          expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000,
         },
-        user: {
-          id: 'unknown',
-          email: credentials.email,
-        },
+        user: { id: 'unknown', email: credentials.email },
       };
     }
   } catch (error: any) {
-    console.error('Login error:', error);
     const errorMessage = error?.response?.data?.message || error?.message || 'Authentication failed';
     return rejectWithValue(errorMessage);
   }
 });
 
-// Enhanced refresh thunk with better error handling and fallback
+// Refresh token thunk
 export const refresh = createAsyncThunk<
   AuthResponse,
   void,
   { state: RootState; rejectValue: string }
 >('auth/refresh', async (_, { getState, rejectWithValue }) => {
-  console.log('Attempting to refresh token...');
   const state = getState();
   const refreshToken = state.auth.tokens?.refreshToken;
 
   if (!refreshToken) {
-    console.error('No refresh token available');
     return rejectWithValue('No refresh token available');
   }
 
   try {
-    // First try using the SDK
     try {
-      console.log('Refreshing token using SDK...');
       const response = await directus.refresh();
-      
       if (!response.access_token || !response.refresh_token) {
         throw new Error('Invalid refresh response from SDK');
       }
 
-      console.log('Token refreshed successfully using SDK');
-      
-      // Get user data
       const userData = await directus.request(() => ({
         path: '/users/me',
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${response.access_token}`
-        }
+        headers: { 'Authorization': `Bearer ${response.access_token}` },
       }));
 
       return {
@@ -163,19 +136,11 @@ export const refresh = createAsyncThunk<
         user: userData as User,
       };
     } catch (sdkError) {
-      // If SDK refresh fails, try manual refresh
-      console.log('SDK refresh failed, trying manual refresh...');
-      
       const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
       const response = await fetch(`${baseUrl}/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          refresh_token: refreshToken,
-          mode: 'json',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken, mode: 'json' }),
       });
 
       if (!response.ok) {
@@ -184,27 +149,21 @@ export const refresh = createAsyncThunk<
       }
 
       const json = await response.json();
-      
       if (!json.data || !json.data.access_token || !json.data.refresh_token) {
         throw new Error('Invalid manual refresh response format');
       }
-      
-      console.log('Token refreshed successfully using manual refresh');
-      
-      // Get user data with new token
+
       const userResponse = await fetch(`${baseUrl}/users/me`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${json.data.access_token}`,
-        },
+        headers: { 'Authorization': `Bearer ${json.data.access_token}` },
       });
-      
+
       if (!userResponse.ok) {
         throw new Error('Failed to fetch user data after token refresh');
       }
-      
+
       const userData = await userResponse.json();
-      
+
       return {
         tokens: {
           accessToken: json.data.access_token,
@@ -215,8 +174,111 @@ export const refresh = createAsyncThunk<
       };
     }
   } catch (error: any) {
-    console.error('Token refresh failed:', error);
     const errorMessage = error?.response?.data?.message || error?.message || 'Token refresh failed';
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Interface for updateUserAvatar parameters
+export interface UpdateUserAvatarParams {
+  imageUri: string;
+  onProgress?: (progress: number) => void;
+}
+
+// Optimized avatar update thunk
+export const updateUserAvatar = createAsyncThunk<
+  User,
+  UpdateUserAvatarParams,
+  { state: RootState; rejectValue: string }
+>('auth/updateUserAvatar', async ({ imageUri, onProgress }, { getState, rejectWithValue, dispatch }) => {
+  try {
+    const state = getState();
+    const accessToken = state.auth.tokens?.accessToken;
+    const userId = state.auth.user?.id;
+
+    if (!accessToken || !userId) {
+      return rejectWithValue('User not authenticated');
+    }
+
+    // Check token expiration and refresh if needed
+    if (isTokenExpiredOrExpiring(state.auth.tokens?.expiresAt)) {
+      await dispatch(refresh()).unwrap();
+      // Get updated token after refresh
+      const updatedState = getState();
+      if (!updatedState.auth.tokens?.accessToken) {
+        return rejectWithValue('Failed to refresh token');
+      }
+    }
+
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+    const filename = imageUri.split('/').pop() || `avatar_${Date.now()}.jpg`;
+
+    // Use Directus SDK for file upload where possible
+    let fileId: string;
+    if (Platform.OS !== 'web') {
+      // Native platforms: Use FileSystem for better progress tracking
+      const uploadResult = await FileSystem.uploadAsync(
+        `${baseUrl}/files`,
+        imageUri,
+        {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          mimeType: 'image/jpeg',
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+          parameters: { title: `User ${userId} avatar` },
+        }
+      );
+
+      if (uploadResult.status < 200 || uploadResult.status >= 300) {
+        throw new Error(`Upload failed with status ${uploadResult.status}`);
+      }
+
+      const responseData = JSON.parse(uploadResult.body);
+      fileId = responseData.data.id;
+    } else {
+      // Web: Use fetch with FormData
+      const formData = new FormData();
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      formData.append('file', blob, filename);
+
+      const uploadResponse = await fetch(`${baseUrl}/files`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status ${uploadResponse.status}`);
+      }
+
+      const uploadData = await uploadResponse.json();
+      fileId = uploadData.data.id;
+    }
+
+    if (!fileId) {
+      throw new Error('Failed to obtain file ID');
+    }
+
+    // Update user with new avatar
+    const updateResponse = await directus.request(() => ({
+      path: `/users/${userId}`,
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ avatar: fileId }),
+    }));
+
+    // Fetch updated user data
+    const userData = await directus.request(() => ({
+      path: '/users/me',
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    }));
+
+    return userData as User;
+  } catch (error: any) {
+    const errorMessage = error?.message || 'Failed to update avatar';
     return rejectWithValue(errorMessage);
   }
 });
@@ -269,13 +331,25 @@ const authSlice = createSlice({
         state.error = action.payload || 'Token refresh failed';
         state.tokens = null;
         state.user = null;
+      })
+      .addCase(updateUserAvatar.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(updateUserAvatar.fulfilled, (state, action: PayloadAction<User>) => {
+        state.status = 'succeeded';
+        state.user = action.payload;
+        state.error = null;
+      })
+      .addCase(updateUserAvatar.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload || 'Failed to update avatar';
       });
   },
 });
 
 export const { logout, clearError } = authSlice.actions;
 
-// Enhanced selectors with memoization
 export const selectAuthState = (state: RootState) => state.auth;
 export const selectIsAuthenticated = (state: RootState) => !!state.auth.tokens;
 export const selectAccessToken = (state: RootState) => state.auth.tokens?.accessToken;
@@ -283,7 +357,6 @@ export const selectUser = (state: RootState) => state.auth.user;
 export const selectAuthStatus = (state: RootState) => state.auth.status;
 export const selectAuthError = (state: RootState) => state.auth.error;
 
-// Thunk to check token expiration and refresh if needed
 export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
   void,
   void,
@@ -291,15 +364,12 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
 >('auth/checkAndRefreshTokenIfNeeded', async (_, { getState, dispatch }) => {
   const state = getState();
   const tokens = state.auth.tokens;
-  
-  // If no tokens or user is not authenticated, do nothing
+
   if (!tokens || !tokens.accessToken || !tokens.refreshToken) {
     return;
   }
-  
-  // Check if token is expired or about to expire
+
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
-    console.log('Token is expired or about to expire, refreshing...');
     await dispatch(refresh());
   }
 });

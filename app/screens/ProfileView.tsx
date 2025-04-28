@@ -1,19 +1,22 @@
 // app/screens/ProfileView.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   StyleProp,
   ViewStyle,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
+import * as ImagePicker from 'expo-image-picker';
 
 import i18n from '../i18n';
 import { profileData } from '@/app/data/profile';
-import { logout, selectUser } from '@/app/features/auth/authSlice';
+import { logout, selectUser, updateUserAvatar, selectAuthStatus } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store';
 
 // Define an extended profile data interface to include additional fields
@@ -67,6 +70,11 @@ export default function ProfileView() {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
   const userData = useSelector(selectUser);
+  const authStatus = useSelector(selectAuthStatus);
+  
+  // State for tracking image upload
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Combine user data from API with static profile data
   // Use API data if available, otherwise fall back to static data
@@ -108,6 +116,81 @@ export default function ProfileView() {
     } as ExtendedProfileData;
   }, [userData]);
 
+  // Handle image picker and upload
+  const handleImageUpload = async () => {
+    try {
+      // Request permission to access the camera roll
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          i18n.t('error'),
+          i18n.t('camera_permission_denied') || 'Permission to access camera roll was denied'
+        );
+        return;
+      }
+      
+      // Launch the image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        console.log('Image picker was cancelled');
+        return;
+      }
+      
+      const selectedImage = result.assets[0];
+      
+      // Confirm with the user
+      Alert.alert(
+        i18n.t('confirm') || 'Confirm',
+        i18n.t('update_profile_picture_confirm') || 'Do you want to update your profile picture?',
+        [
+          {
+            text: i18n.t('cancel') || 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: i18n.t('update') || 'Update',
+            onPress: async () => {
+              setIsUploading(true);
+              try {
+                await dispatch(updateUserAvatar({
+                  imageUri: selectedImage.uri,
+                  onProgress: (progress) => {
+                    setUploadProgress(progress);
+                  }
+                })).unwrap();
+                
+                Alert.alert(
+                  i18n.t('success') || 'Success',
+                  i18n.t('profile_picture_updated') || 'Profile picture updated successfully'
+                );
+              } catch (error: any) {
+                Alert.alert(
+                  i18n.t('error') || 'Error',
+                  error.message || i18n.t('failed_to_update_profile_picture') || 'Failed to update profile picture'
+                );
+              } finally {
+                setIsUploading(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert(
+        i18n.t('error') || 'Error',
+        i18n.t('image_picker_error') || 'An error occurred while picking an image'
+      );
+    }
+  };
+
   const handleLogout = () => {
     dispatch(logout());
     router.replace('/screens/LoginScreen');
@@ -137,7 +220,17 @@ export default function ProfileView() {
               }
             : require('@/assets/images/avatar.png')
         }
+        showCamera={true}
+        onCameraPress={handleImageUpload}
+        isUploading={isUploading}
       />
+      
+      {/* Loading indicator for avatar upload */}
+      {isUploading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      )}
 
       {/*──────────── Content ────────────*/}
       <ScrollView
@@ -221,10 +314,21 @@ const styles = StyleSheet.create({
   /* buttons */
   logoutContainer: {
     marginVertical: 32,
-  
   },
   logoutBtn: {
-    backgroundColor:COLORS.error,
+    backgroundColor: COLORS.error,
+  },
   
+  /* loading overlay */
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
 });
