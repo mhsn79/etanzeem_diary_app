@@ -1,5 +1,5 @@
 // app/screens/RukunView.tsx
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import {
   Text,
   View,
   ActivityIndicator,
+  GestureResponderEvent,
 } from 'react-native';
 import { Linking } from 'react-native';
 import {
@@ -66,15 +67,29 @@ export default function RukunView() {
 
   /* ──────────── Data fetching ────────────*/
   useEffect(() => {
-    if (!person) {
+    // Always fetch the latest data when the screen is focused
+    dispatch(fetchPersonById(rukun.id));
+  }, [dispatch, rukun.id]);
+  
+  // Also refetch when the screen comes into focus (e.g., after editing)
+  useFocusEffect(
+    useCallback(() => {
       dispatch(fetchPersonById(rukun.id));
-    }
-  }, [dispatch, rukun.id, person]);
+      return () => {
+        // Cleanup if needed
+      };
+    }, [dispatch, rukun.id])
+  );
 
   /* ──────────── Hide stack header ────────────*/
-  useFocusEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  });
+  useFocusEffect(
+    useCallback(() => {
+      navigation.setOptions({ headerShown: false });
+      return () => {
+        // Cleanup if needed
+      };
+    }, [navigation])
+  );
 
   /* ──────────── Derived state ────────────*/
   const detailRows = useMemo(
@@ -118,7 +133,10 @@ export default function RukunView() {
       </CenteredContainer>
     );
   }
-
+  const handleEditDetails = () => {
+    // Navigate to edit screen with the most up-to-date person data
+    navigation.navigate('screens/RukunAddEdit', { rukun: displayPerson });
+  };
   /* ──────────── Main UI ────────────*/
   return (
     <KeyboardAvoidingView
@@ -136,6 +154,7 @@ export default function RukunView() {
               : require('@/assets/images/avatar.png')
           }
           showEditIcon
+          onEditPress={handleEditDetails}
           showSettings={false}
         />
 

@@ -14,6 +14,9 @@ interface FormInputProps {
   maxLength?: number;
   rightIcon?: React.ReactNode;
   editable?: boolean;
+  error?: string;
+  required?: boolean;
+  multiline?: boolean;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -27,14 +30,23 @@ const FormInput: React.FC<FormInputProps> = ({
   maxLength,
   rightIcon,
   editable = true,
+  error,
+  required,
+  multiline = false,
 }) => {
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
         {mainTitle && <UrduText style={styles.mainTitle}>{mainTitle}</UrduText>}
-        <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
+        <View style={styles.titleRow}>
+          <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
+          {required && <Text style={styles.requiredStar}>*</Text>}
+        </View>
       </View>
-      <View style={styles.inputContainer}>
+      <View style={[
+        styles.inputContainer,
+        error ? styles.inputError : null
+      ]}>
       {rightIcon && (
           <View style={styles.iconContainer}>
             {rightIcon}
@@ -53,9 +65,11 @@ const FormInput: React.FC<FormInputProps> = ({
           maxLength={maxLength}
           textAlignVertical="center"
           editable={editable}
+          multiline={multiline}
+          numberOfLines={multiline ? 3 : 1}
         />
-    
       </View>
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };
@@ -67,6 +81,10 @@ const styles = StyleSheet.create({
   titleContainer: {
     marginBottom: SPACING.sm,
     lineHeight: 40,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   mainTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
@@ -81,12 +99,21 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'left',
   },
+  requiredStar: {
+    color: COLORS.error || 'red',
+    marginLeft: 4,
+    fontSize: TYPOGRAPHY.fontSize.md,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.sm,
     ...SHADOWS.small,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: COLORS.error || 'red',
   },
   input: {
     flex: 1,
@@ -101,6 +128,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  errorText: {
+    color: COLORS.error || 'red',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    marginTop: 4,
+    marginLeft: 4,
   },
 });
 

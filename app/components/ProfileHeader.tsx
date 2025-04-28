@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   ViewStyle,
   TouchableOpacity,
   ImageSourcePropType,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6, Ionicons } from '@expo/vector-icons';
@@ -32,8 +31,10 @@ interface ProfileHeaderProps {
   showEditIcon?: boolean;
   avatarSize?: number;
 }
+
 const HEADER_HEIGHT = 260;
-const AVATAR_SIZE = 120;  
+const AVATAR_SIZE = 120;
+
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   title,
   avatarSource = require('@/assets/images/avatar.png'),
@@ -42,14 +43,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onSettingsPress = () => {},
   onCameraPress = () => {},
   onEditPress = () => {},
-  
   showSettings = true,
   showCamera = true,
   showEditIcon,
 }) => {
   const insets = useSafeAreaInsets();
-  
-  console.log('Avatar source:', avatarSource);
 
   return (
     <View style={[styles.headerWrapper, { height: HEADER_HEIGHT }]}>
@@ -61,49 +59,54 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       <View
         style={[
           styles.headerContent,
-          { paddingTop: insets.top + 8 } as StyleProp<ViewStyle>,
+          { paddingTop: insets.top + 8 },
         ]}
       >
-        {showSettings && (
-          <Pressable style={styles.headerIcon} onPress={onEditPress}>
-            <Ionicons name="settings-outline" size={24} color="#fff" />
-          </Pressable>
-        )}
-        {showEditIcon && (
-          <Pressable style={styles.headerIcon} onPress={onSettingsPress}>
-            <FontAwesome6 name="edit" size={24} color="#fff" />
-          </Pressable>
-        )}
+        {/* Left Icons (Settings + Edit) */}
+        <View style={styles.iconGroup}>
+          {showSettings && (
+            <Pressable style={styles.headerIcon} onPress={onSettingsPress}>
+              <Ionicons name="settings-outline" size={24} color="#fff" />
+            </Pressable>
+          )}
+          {showEditIcon && (
+            <Pressable style={styles.headerIcon} onPress={onEditPress}>
+              <FontAwesome6 name="edit" size={24} color="#fff" />
+            </Pressable>
+          )}
+        </View>
 
+        {/* Centered Title */}
+        <View style={styles.titleContainer}>
+          <UrduText style={styles.headerTitle}>{title}</UrduText>
+        </View>
 
-        <UrduText style={styles.headerTitle}>{title}</UrduText>
-
+        {/* Right Icon (Back Button) */}
         <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
           <FontAwesome6 name="arrow-right-long" size={24} color="black" />
         </TouchableOpacity>
       </View>
 
       {/* avatar sits 75 % down the header */}
-      <View 
+      <View
         style={[
-          styles.avatarWrapper, 
-          { top: HEADER_HEIGHT * 0.95 - AVATAR_SIZE / 2 }
+          styles.avatarWrapper,
+          { top: HEADER_HEIGHT * 0.95 - AVATAR_SIZE / 2 },
         ]}
       >
         <RemoteImage
           source={avatarSource}
           fallbackSource={require('@/assets/images/avatar.png')}
           style={[
-            styles.avatar, 
-            { 
-              width: AVATAR_SIZE, 
-              height: AVATAR_SIZE, 
-              borderRadius: AVATAR_SIZE / 2 
-            }
+            styles.avatar,
+            {
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
+              borderRadius: AVATAR_SIZE / 2,
+            },
           ]}
           showLoadingIndicator={true}
         />
-        
         {showCamera && (
           <Pressable style={styles.cameraBadge} onPress={onCameraPress}>
             <Ionicons name="camera" size={22} color={COLORS.white} />
@@ -116,8 +119,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerWrapper: {
-    // height is set dynamically via props
-    paddingTop: 30
+    paddingTop: 30,
   },
   headerBg: {
     ...StyleSheet.absoluteFillObject,
@@ -131,10 +133,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
-  headerTitle: { 
-    color: '#fff', 
-    fontSize: 20, 
-    fontWeight: '600' 
+  iconGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   headerIcon: {
     width: 32,
@@ -144,13 +156,11 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     position: 'absolute',
-    // top is set dynamically based on headerHeight and avatarSize
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   avatar: {
-    // width, height, and borderRadius are set dynamically via props
     borderWidth: 2,
     borderColor: 'pink',
   },

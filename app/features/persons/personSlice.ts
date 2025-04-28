@@ -265,36 +265,65 @@ export const createPerson = createAsyncThunk<
  *Thunk to update an existing person
  * ────────────────────────────────────────────────────────────────────────────────
  */
-// export const updatePerson = createAsyncThunk<
-//   Person,
-//   UpdatePersonPayload,
-//   { state: RootState; dispatch: AppDispatch; rejectValue: string }
-// >('persons/update', async (personData, { getState, dispatch, rejectWithValue }) => {
-//   try {
-//     // Refresh token if needed
-//     await dispatch(checkAndRefreshTokenIfNeeded());
+export const updatePerson = createAsyncThunk<
+  Person,
+  UpdatePersonPayload,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/update', async (personData, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Updating person:', personData);
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded());
 
-//     const auth = selectAuthState(getState());
-//     let token = auth.tokens?.accessToken;
-//     if (!token) return rejectWithValue('No access token');
+    const auth = selectAuthState(getState());
+    let token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
 
-//     const { id, ...updateData } = personData;
+    const { id, ...updateData } = personData;
 
-//     const updatePerson = async (accessToken: string) => {
-//       const response = await apiRequest<SinglePersonResponse>(
-//         `/items/Person/${id}`,
-//         'PATCH',
-//         accessToken,
-//         updateData
-//       );
-//       return response.data;
-//     };
+    // Transform our data model to match the API's expected format
+    const apiPersonData: Record<string, any> = {};
+    
+    if (updateData.name !== undefined) apiPersonData.Name = updateData.name;
+    if (updateData.address !== undefined) apiPersonData.Address = updateData.address;
+    if (updateData.phone !== undefined) apiPersonData.Phone_Number = updateData.phone;
+    if (updateData.email !== undefined) apiPersonData.Email = updateData.email;
+    if (updateData.parent !== undefined) apiPersonData.Father_Name = updateData.parent;
+    if (updateData.dob !== undefined) apiPersonData.Date_of_birth = updateData.dob;
+    if (updateData.cnic !== undefined) apiPersonData.CNIC = updateData.cnic;
+    if (updateData.unit !== undefined) apiPersonData.Tanzeemi_Unit = updateData.unit;
+    if (updateData.status !== undefined) apiPersonData.status = updateData.status;
 
-//     return await executeWithTokenRefresh(updatePerson, token, dispatch, getState);
-//   } catch (error: any) {
-//     return rejectWithValue(error.message || `Failed to update person with ID ${personData.id}`);
-//   }
-// });
+    console.log('API Person Data for update:', apiPersonData);
+
+    const updatePersonRequest = async (accessToken: string) => {
+      try {
+        const response = await apiRequest<SinglePersonResponse>(
+          `/items/Person/${id}`,
+          'PATCH',
+          accessToken,
+          apiPersonData
+        );
+        
+        if (!response.data) throw new Error(`Failed to update person with ID ${id}`);
+        
+        // Transform the response back to our expected format
+        const transformedPerson = normalizePersonData(response.data);
+        
+        return transformedPerson;
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    };
+
+    return await executeWithTokenRefresh(updatePersonRequest, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Update person error:', error);
+    return rejectWithValue(error.message || `Failed to update person with ID ${personData.id}`);
+  }
+});
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -406,18 +435,18 @@ const personsSlice = createSlice({
       })
       
       // Update person
-      // .addCase(updatePerson.pending, state => {
-      //   state.updateStatus = 'loading';
-      //   state.updateError = null;
-      // })
-      // .addCase(updatePerson.fulfilled, (state, action: PayloadAction<Person>) => {
-      //   state.updateStatus = 'succeeded';
-      //   personsAdapter.upsertOne(state, action.payload);
-      // })
-      // .addCase(updatePerson.rejected, (state, action) => {
-      //   state.updateStatus = 'failed';
-      //   state.updateError = action.payload ?? 'Failed to update person';
-      // })
+      .addCase(updatePerson.pending, state => {
+        state.updateStatus = 'loading';
+        state.updateError = null;
+      })
+      .addCase(updatePerson.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.updateStatus = 'succeeded';
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(updatePerson.rejected, (state, action) => {
+        state.updateStatus = 'failed';
+        state.updateError = action.payload ?? 'Failed to update person';
+      })
       
       // Delete person
       // .addCase(deletePerson.pending, state => {

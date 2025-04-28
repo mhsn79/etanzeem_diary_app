@@ -29,7 +29,6 @@ export default function Arkan() {
   
   // Redux state
   const persons = useSelector(selectAllPersons);
-    console.log('===========000000000==222==========',persons);
 
   const status = useSelector(selectPersonsStatus);
   const error = useSelector(selectPersonsError);
@@ -50,7 +49,6 @@ export default function Arkan() {
   useEffect(() => {
     filterData(searchQuery);
   }, [persons, searchQuery]);
-console.log('===========000000000============',persons);
 
   // Filter function
   const filterData = (query: string) => {
