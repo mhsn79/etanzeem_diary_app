@@ -1,32 +1,47 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigation } from 'expo-router';
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from 'expo-router';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import ScreenLayout from '../../components/ScreenLayout';
 import FormInput from '../../components/FormInput';
 import CustomDropdown from '../../components/CustomDropdown';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import { TabGroup } from '@/app/components/Tab';
 import UrduText from '@/app/components/UrduText';
 import CustomButton from '@/app/components/CustomButton';
 import Dialog from '@/app/components/Dialog';
-import { 
-  fetchAllReportData, 
-  fetchReportSections, 
+
+import {
+  COLORS,
+  SPACING,
+  TYPOGRAPHY,
+} from '@/app/constants/theme';
+import {
+  fetchAllReportData,
+  fetchReportSections,
   fetchReportQuestions,
-  updateReportData,
-  submitReport,
-  selectTanzeemiLevels,
-  selectReportTemplates,
-  selectReportSections,
-  selectReportQuestions,
   selectCurrentReportData,
+  selectReportQuestions,
+  selectReportSections,
+  selectReportTemplates,
+  selectReportsError,
   selectReportsStatus,
-  selectReportsError
+  selectTanzeemiLevels,
+  // submitReport,
+  updateReportData,
 } from '@/app/features/reports/reportsSlice';
 import { AppDispatch } from '@/app/store';
 
-// Define field type to match the structure used in processedSections
+/* ------------------------------------------------------------------ */
+/*  Types used locally                                                */
+/* ------------------------------------------------------------------ */
+
 interface ReportField {
   id: string;
   title: string;
@@ -38,15 +53,17 @@ interface ReportField {
   options?: any[];
 }
 
-// Define section type
-interface ReportSection {
+interface ReportSectionLocal {
   id: string;
   title: string;
   fields: ReportField[];
 }
 
-// Fallback static data in case API fails
-const staticReportSections: ReportSection[] = [
+/* ------------------------------------------------------------------ */
+/*  Static fallback sections                                          */
+/* ------------------------------------------------------------------ */
+
+const staticReportSections: ReportSectionLocal[] = [
   {
     id: '1',
     title: 'بنیادی معلومات',
@@ -58,7 +75,7 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: true,
         inputType: 'number',
-        helpText: ''
+        helpText: '',
       },
       {
         id: '1.2',
@@ -67,7 +84,7 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: false,
         inputType: 'number',
-        helpText: ''
+        helpText: '',
       },
       {
         id: '1.3',
@@ -76,9 +93,9 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: false,
         inputType: 'number',
-        helpText: ''
-      }
-    ]
+        helpText: '',
+      },
+    ],
   },
   {
     id: '2',
@@ -91,7 +108,7 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: true,
         inputType: 'number',
-        helpText: ''
+        helpText: '',
       },
       {
         id: '2.2',
@@ -100,7 +117,7 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: false,
         inputType: 'number',
-        helpText: ''
+        helpText: '',
       },
       {
         id: '2.3',
@@ -109,95 +126,156 @@ const staticReportSections: ReportSection[] = [
         placeholder: '40',
         isRequired: false,
         inputType: 'number',
-        helpText: ''
-      }
-    ]
-  }
+        helpText: '',
+      },
+    ],
+  },
 ];
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
 
 const CreateReportScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
+
   const [showDialog, setShowDialog] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(
+    null,
+  );
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedZone, setSelectedZone] = useState<string>('');
-  
-  // Get data from Redux store
-  const tanzeemiLevels = useSelector(selectTanzeemiLevels);
-  const reportTemplates = useSelector(selectReportTemplates);
-  const reportSections = useSelector(selectReportSections);
-  const reportQuestions = useSelector(selectReportQuestions);
-  const reportData = useSelector(selectCurrentReportData);
-  const status = useSelector(selectReportsStatus);
-  const error = useSelector(selectReportsError);
-  
-  // Fetch all report data when component mounts
+
+  /* ------------ Redux state (immune to 'undefined') ------------- */
+  const tanzeemiLevels   = useSelector(selectTanzeemiLevels) ?? [];
+  const reportTemplates  = useSelector(selectReportTemplates) ?? [];
+  const reportSections   = useSelector(selectReportSections) ?? [];
+  const reportQuestions  = useSelector(selectReportQuestions) ?? [];
+  const reportData       = useSelector(selectCurrentReportData) ?? {};
+  const status           = useSelector(selectReportsStatus) ?? 'idle';
+  const error            = useSelector(selectReportsError) ?? null;
+
+console.log('tanzeemiLevels',tanzeemiLevels);
+console.log('reportTemplates',reportTemplates);
+console.log('reportSections',reportSections);
+console.log('reportQuestions',reportQuestions);
+  console.log('reportData',reportData);
+
+
+
+
+  /* -------------------------------------------------------------- */
+  /*  Data bootstrapping                                            */
+  /* -------------------------------------------------------------- */
   useEffect(() => {
-    dispatch(fetchAllReportData());
-  }, [dispatch]);
-  
-  // Process sections and questions into a format similar to the static data
-  const processedSections = useMemo((): ReportSection[] => {
-    if (reportSections.length === 0) {
+    // Fetch all report data when component mounts
+    console.log('CreateReportScreen: Dispatching fetchAllReportData');
+    dispatch(fetchAllReportData())
+      .unwrap()
+      .then((result) => {
+        console.log('CreateReportScreen: fetchAllReportData succeeded with data:', {
+          tanzeemiLevelsCount: result.tanzeemiLevels.length,
+          reportTemplatesCount: result.reportTemplates.length,
+          reportSectionsCount: result.reportSections.length,
+          reportQuestionsCount: result.reportQuestions.length
+        });
+      })
+      .catch((error) => {
+        console.error('CreateReportScreen: fetchAllReportData failed:', error);
+        Alert.alert('Error', 'Failed to load report data. Please try again.');
+      });
+  }, []);
+
+  /* -------------------------------------------------------------- */
+  /*  Build dynamic report sections safely                          */
+  /* -------------------------------------------------------------- */
+  const processedSections = useMemo<ReportSectionLocal[]>(() => {
+    console.log('Processing sections with data:', { 
+      sectionsLength: reportSections?.length ?? 0, 
+      questionsLength: reportQuestions?.length ?? 0 
+    });
+    
+    // If we don't have any sections from the API, use static data
+    if (!reportSections?.length) {
+      console.log('Using static report sections as fallback');
       return staticReportSections;
     }
-    
-    return reportSections.map(section => ({
-      id: section.id.toString(),
-      title: section.section_label,
-      fields: reportQuestions
-        .filter(question => question.section_id === section.id)
-        .map(question => ({
-          id: question.id.toString(),
-          title: question.question_text,
-          field: `question_${question.id}`, // Generate a field name based on question ID
-          placeholder: question.category || '',
-          isRequired: question.highlight || false,
-          inputType: question.input_type || 'text',
-          helpText: '',
-          options: undefined
-        }))
-    }));
-  }, [reportSections, reportQuestions]);
-  
-  // Generate zone options from tanzeemi levels
-  const zoneOptions = useMemo(() => {
-    if (tanzeemiLevels.length === 0) {
-      return [
-        { id: '1', label: 'زون 1', value: 'zone1' },
-        { id: '2', label: 'زون 2', value: 'zone2' },
-        { id: '3', label: 'زون 3', value: 'zone3' },
-        { id: '4', label: 'زون 4', value: 'zone4' },
-        { id: '5', label: 'زون 5', value: 'zone5' },
-      ];
-    }
-    
-    return tanzeemiLevels.map(level => ({
-      id: level.id.toString(),
-      label: level.Name,
-      value: level.id.toString()
-    }));
-  }, [tanzeemiLevels]);
-  
-  // Generate template options
-  const templateOptions = useMemo(() => {
-    if (reportTemplates.length === 0) {
-      return [{ id: '1', label: 'Default Template', value: '1' }];
-    }
-    
-    // Find the corresponding tanzeemi level for each template
-    return reportTemplates.map(template => {
-      const tanzeemiLevel = tanzeemiLevels.find(level => level.id === template.unit_level_id);
-      const templateName = tanzeemiLevel ? `${tanzeemiLevel.Name} Report Template` : `Template ${template.id}`;
+
+    // Map API sections to the format expected by the UI
+    const processed = reportSections.map((section) => {
+      // Find questions for this section
+      const sectionQuestions = (reportQuestions ?? [])
+        .filter((q) => q?.section_id === section.id);
+      
+      console.log(`Processing section ${section.id} (${section.section_label}) with ${sectionQuestions.length} questions`);
       
       return {
-        id: template.id.toString(),
-        label: templateName,
-        value: template.id.toString()
+        id: section.id.toString(),
+        title: section.section_label || `Section ${section.id}`,
+        fields: sectionQuestions.map((q) => ({
+          id: q.id.toString(),
+          title: q.question_text || `Question ${q.id}`,
+          field: `question_${q.id}`,
+          placeholder: q.category ?? '',
+          isRequired: q.highlight ?? false,
+          inputType: q.input_type ?? 'text',
+          helpText: '',
+          options: undefined,
+        })),
       };
     });
+    
+    console.log('Processed sections:', processed.length);
+    return processed;
+  }, [reportSections, reportQuestions]);
+
+  /* -------------------------------------------------------------- */
+  /*  Dropdown options                                              */
+  /* -------------------------------------------------------------- */
+  const zoneOptions = useMemo(() => {
+    console.log('Building zone options with tanzeemiLevels:', tanzeemiLevels?.length ?? 0);
+    
+    if (tanzeemiLevels?.length) {
+      return tanzeemiLevels.map((lvl) => ({
+        id: lvl.id.toString(),
+        label: lvl.Name || `Zone ${lvl.id}`,
+        value: lvl.id.toString(),
+      }));
+    }
+    
+    // Fallback static options
+    console.log('Using static zone options as fallback');
+    return [
+      { id: '1', label: 'زون 1', value: 'zone1' },
+      { id: '2', label: 'زون 2', value: 'zone2' },
+      { id: '3', label: 'زون 3', value: 'zone3' },
+      { id: '4', label: 'زون 4', value: 'zone4' },
+      { id: '5', label: 'زون 5', value: 'zone5' },
+    ];
+  }, [tanzeemiLevels]);
+
+  const templateOptions = useMemo(() => {
+    console.log('Building template options with reportTemplates:', reportTemplates?.length ?? 0);
+    
+    if (reportTemplates?.length) {
+      return reportTemplates.map((tpl) => {
+        const lvl = tanzeemiLevels?.find(
+          (l) => l.id === tpl.unit_level_id
+        );
+        
+        return {
+          id: tpl.id.toString(),
+          label: lvl ? `${lvl.Name} Report Template` : `Template ${tpl.id}`,
+          value: tpl.id.toString(),
+        };
+      });
+    }
+    
+    // Fallback static options
+    console.log('Using static template options as fallback');
+    return [{ id: '1', label: 'Default Template', value: '1' }];
   }, [reportTemplates, tanzeemiLevels]);
 
   const yearOptions = [
@@ -212,275 +290,248 @@ const CreateReportScreen = () => {
     { label: 'فارم(مکمل رپورٹ ایک ساتھ)', value: 1 },
   ];
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
+  /* -------------------------------------------------------------- */
+  /*  Handlers                                                      */
+  /* -------------------------------------------------------------- */
+  const handleBack = () => navigation.goBack();
 
-  const handleInputChange = (field: string) => (value: string) => {
+  const handleInputChange = (field: string) => (value: string) =>
     dispatch(updateReportData({ field, value }));
+
+  const handleZoneSelect = (opt: { value: string }) => {
+    setSelectedZone(opt.value);
+    dispatch(updateReportData({ field: 'zone_id', value: opt.value }));
   };
 
-  const handleZoneSelect = (option: { id: string; label: string; value: string }) => {
-    setSelectedZone(option.value);
-    dispatch(updateReportData({ field: 'zone_id', value: option.value }));
+  const handleYearSelect = (opt: { value: string }) => {
+    setSelectedYear(opt.value);
+    dispatch(updateReportData({ field: 'year', value: opt.value }));
   };
-  
-  const handleYearSelect = (option: { id: string; label: string; value: string }) => {
-    setSelectedYear(option.value);
-    dispatch(updateReportData({ field: 'year', value: option.value }));
-  };
-  
-  const handleTemplateSelect = async (option: { id: string; label: string; value: string }) => {
-    const templateId = parseInt(option.value);
-    setSelectedTemplateId(templateId);
-    dispatch(updateReportData({ field: 'template_id', value: templateId }));
-    
+
+  const handleTemplateSelect = async (opt: { value: string }) => {
+    const id = Number(opt.value);
+    console.log('Template selected:', id);
+    setSelectedTemplateId(id);
+    dispatch(updateReportData({ field: 'template_id', value: id }));
+
     try {
-      // Fetch sections for this template
-      await dispatch(fetchReportSections(templateId)).unwrap();
+      console.log('Fetching sections for template ID:', id);
+      const sectionsResult = await dispatch(fetchReportSections(id)).unwrap();
+      console.log('Sections fetched successfully:', sectionsResult.length);
       
-      // After sections are loaded, fetch all questions
-      // We'll filter them in the processedSections useMemo
-      await dispatch(fetchReportQuestions(undefined)).unwrap();
+      console.log('Fetching all questions');
+      const questionsResult = await dispatch(fetchReportQuestions(undefined)).unwrap();
+      console.log('Questions fetched successfully:', questionsResult.length);
+      
+      console.log('Template data loaded successfully');
     } catch (error) {
-      console.error('Error loading template data:', error);
+      console.error('Failed to load template data:', error);
       Alert.alert('Error', 'Failed to load template data. Please try again.');
     }
   };
 
-  const renderSection = ({ item }: { item: ReportSection }) => (
+  const renderSection = ({ item }: { item: ReportSectionLocal }) => (
     <View style={styles.section}>
       <UrduText style={styles.sectionTitle}>{item.title}</UrduText>
-      {item.fields.map(field => (
+      {item.fields.map((f) => (
         <FormInput
-          key={field.id}
-          inputTitle={field.title}
-          value={reportData[field.field as string] as string || ''}
-          onChange={handleInputChange(field.field)}
-          keyboardType={field.inputType === 'number' ? 'numeric' : 'default'}
-          placeholder={field.placeholder}
-          helpText={field.helpText}
-          required={field.isRequired}
+          key={f.id}
+          inputTitle={f.title}
+          value={String(reportData[f.field] ?? '')}
+          onChange={handleInputChange(f.field)}
+          keyboardType={f.inputType === 'number' ? 'numeric' : 'default'}
+          placeholder={f.placeholder}
+          helpText={f.helpText}
+          required={f.isRequired}
         />
       ))}
     </View>
   );
 
+  /* -------------------------------------------------------------- */
+  /*  Submission pipeline                                           */
+  /* -------------------------------------------------------------- */
+  const validateRequired = (): string[] => {
+    const missing: string[] = [];
+    processedSections.forEach((sec) =>
+      sec.fields.forEach((f) => {
+        if (f.isRequired && !reportData[f.field]) missing.push(f.title);
+      }),
+    );
+    return missing;
+  };
+
   const handleContinue = () => {
-    // Validate required fields
-    const missingFields: string[] = [];
-    
-    for (const section of processedSections) {
-      for (const field of section.fields) {
-        if (field.isRequired && !reportData[field.field]) {
-          missingFields.push(field.title);
-        }
-      }
-    }
-    
-    if (missingFields.length > 0) {
+    const missing = validateRequired();
+    if (missing.length) {
       Alert.alert(
         'Missing Required Fields',
-        `Please fill in the following required fields: ${missingFields.join(', ')}`,
-        [{ text: 'OK' }]
+        `Please fill in: ${missing.join(', ')}`,
       );
       return;
     }
-    
-    // Show confirmation dialog
     setShowDialog(true);
   };
 
   const handleDialogConfirm = async () => {
     setShowDialog(false);
-    
-    if (!selectedTemplateId) {
-      Alert.alert('Error', 'Please select a report template');
+
+    if (!selectedTemplateId || !selectedZone || !selectedYear) {
+      Alert.alert('Error', 'Please select template, zone and year.');
       return;
     }
-    
-    if (!selectedZone) {
-      Alert.alert('Error', 'Please select a zone');
-      return;
-    }
-    
-    if (!selectedYear) {
-      Alert.alert('Error', 'Please select a year');
-      return;
-    }
-    
+
     try {
-      // Submit the report with additional metadata
-      await dispatch(submitReport({
-        templateId: selectedTemplateId,
-        reportData: {
-          ...reportData,
-          zone_id: selectedZone,
-          year: selectedYear,
-          template_id: selectedTemplateId
-        }
-      })).unwrap();
-      
-      Alert.alert(
-        'Success',
-        'Report submitted successfully',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      // await dispatch(
+      //   submitReport({
+      //     templateId: selectedTemplateId,
+      //     reportData: {
+      //       ...reportData,
+      //       zone_id: selectedZone,
+      //       year: selectedYear,
+      //       template_id: selectedTemplateId,
+      //     },
+      //   }),
+      // ).unwrap();
+      Alert.alert('Success', 'Report submitted successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch {
+      Alert.alert('Error', 'Failed to submit report.');
     }
   };
 
-  const handleDialogCancel = () => {
-    setShowDialog(false);
-  };
-  
-  // Show loading indicator while fetching data
-  if (status === 'loading' && processedSections.length === 0) {
+  /* -------------------------------------------------------------- */
+  /*  Conditional rendering                                         */
+  /* -------------------------------------------------------------- */
+  if (status === 'loading' && 
+      !reportSections?.length && 
+      !tanzeemiLevels?.length && 
+      !reportTemplates?.length) {
+    console.log('Rendering loading state');
     return (
       <ScreenLayout title="رپورٹ بنائیں" onBack={handleBack}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <UrduText style={styles.loadingText}>Loading report data...</UrduText>
+          <UrduText style={styles.loadingText}>Loading report data…</UrduText>
         </View>
       </ScreenLayout>
     );
   }
-  
-  // Show error message if fetching data failed
+
   if (status === 'failed' && error) {
+    console.log('Rendering error state:', error);
     return (
       <ScreenLayout title="رپورٹ بنائیں" onBack={handleBack}>
         <View style={styles.errorContainer}>
-          <UrduText style={styles.errorText}>Failed to load report data: {error}</UrduText>
+          <UrduText style={styles.errorText}>
+            Failed to load report data: {error}
+          </UrduText>
           <CustomButton
             text="Retry"
-            onPress={() => dispatch(fetchAllReportData())}
-            viewStyle={[{ backgroundColor: COLORS.primary, marginTop: SPACING.md }]}
-            textStyle={[{ color: COLORS.white }]}
+            onPress={() => {
+              console.log('Retrying data fetch');
+              dispatch(fetchAllReportData());
+            }}
+            viewStyle={{
+              backgroundColor: COLORS.primary,
+              marginTop: SPACING.md,
+            }}
+            textStyle={{ color: COLORS.white }}
           />
         </View>
       </ScreenLayout>
     );
   }
 
+  /* -------------------------------------------------------------- */
+  /*  Main render                                                   */
+  /* -------------------------------------------------------------- */
   return (
     <ScreenLayout title="رپورٹ بنائیں" onBack={handleBack}>
       <View style={styles.container}>
-        {/* Template Selection */}
+  
         <CustomDropdown
-          dropdownTitle="رپورٹ ٹیمپلیٹ منتخب کریں"
-          options={templateOptions}
-          onSelect={handleTemplateSelect}
-          placeholder="رپورٹ ٹیمپلیٹ منتخب کریں"
-          selectedValue={selectedTemplateId?.toString() || ''}
-          dropdownContainerStyle={styles.dropdownContainer}
-        />
-        
-        {/* Zone Selection */}
-        <CustomDropdown
-          dropdownTitle="زون منتخب کریں"
           options={zoneOptions}
           onSelect={handleZoneSelect}
           placeholder="زون نمبر منتخب کریں"
           selectedValue={selectedZone}
           dropdownContainerStyle={styles.dropdownContainer}
         />
-        
-        {/* Year Selection */}
-        <CustomDropdown
-          dropdownTitle="سال منتخب کریں"
+
+         <CustomDropdown
           options={yearOptions}
           onSelect={handleYearSelect}
           placeholder="مدت  : سال"
           selectedValue={selectedYear}
           dropdownContainerStyle={styles.dropdownContainer}
         />
-        
-        {/* Report Mode Selection */}
-        <UrduText style={styles.tabTitle}>رپورٹ موڈ منتخب کریں</UrduText>
-        <TabGroup
-          tabs={tabs}
-          selectedTab={selectedTab}
-          onTabChange={setSelectedTab}
+
+    
+
+        {/* Sections */}
+        <FlatList
+          data={processedSections}
+          renderItem={renderSection}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
-        
-        {/* Report Sections and Questions */}
-        {selectedTab === 0 ? (
-          // Wizard mode - show one section at a time (to be implemented)
-          <FlatList
-            data={processedSections}
-            renderItem={renderSection}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          // Form mode - show all sections at once
-          <FlatList
-            data={processedSections}
-            renderItem={renderSection}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-        
-        {/* Continue Button */}
+
+        {/* Continue button */}
         <View style={styles.buttonContainer}>
           <CustomButton
             text="جاری رکھیں"
             onPress={handleContinue}
-            viewStyle={[{ backgroundColor: COLORS.primary, flex: 1, marginHorizontal: SPACING.sm }]}
-            textStyle={[{ color: COLORS.white }]}
+            viewStyle={{
+              backgroundColor: COLORS.primary,
+              flex: 1,
+              marginHorizontal: SPACING.sm,
+            }}
+            textStyle={{ color: COLORS.white }}
             disabled={status === 'loading'}
           />
         </View>
       </View>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation dialog */}
       <Dialog
         onClose={() => setShowDialog(false)}
         visible={showDialog}
         onConfirm={handleDialogConfirm}
-        onCancel={handleDialogCancel}
+        onCancel={() => setShowDialog(false)}
         title="رپورٹ جمع کروانے کی تصدیق"
         description="کیا آپ واقعی اس رپورٹ کو جمع کروانا چاہتے ہیں؟ ایک بار جمع ہونے کے بعد، آپ اسے صرف ایڈمن کی اجازت سے ایڈٹ کر سکیں گے"
         confirmText="ہاں، جمع کروائیں"
         cancelText="نہیں، واپس جائیں"
-        showWarningIcon={true}
+        showWarningIcon
       />
     </ScreenLayout>
   );
 };
 
+/* ------------------------------------------------------------------ */
+/*  Styles                                                            */
+/* ------------------------------------------------------------------ */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: SPACING.md,
-  },
-  dropdownContainer: {
-    marginBottom: SPACING.md,
-  },
+  container: { flex: 1, padding: SPACING.md },
+  dropdownContainer: { marginBottom: SPACING.md },
   tabTitle: {
     color: COLORS.primary,
     textAlign: 'left',
     paddingVertical: SPACING.sm,
     fontSize: TYPOGRAPHY.fontSize.lg,
   },
-  listContent: {
-    paddingBottom: SPACING.xl * 3, // Extra padding to ensure content is visible above the button
-  },
-  section: {
-    marginBottom: SPACING.lg,
-  },
+  listContent: { paddingBottom: SPACING.xl * 3 },
+  section: { marginBottom: SPACING.lg },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: COLORS.primary,
     marginBottom: SPACING.md,
     textAlign: 'left',
-    lineHeight: 40
+    lineHeight: 40,
   },
   buttonContainer: {
     position: 'absolute',
@@ -493,7 +544,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
-  // Loading styles
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -506,7 +556,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     textAlign: 'center',
   },
-  // Error styles
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -521,4 +570,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreateReportScreen; 
+export default CreateReportScreen;

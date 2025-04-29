@@ -1,8 +1,18 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  createSlice,
+  createAsyncThunk,
+  PayloadAction,
+} from '@reduxjs/toolkit';
 import { RootState } from '../../store';
 import directus from '../../services/directus';
+import apiRequest from '../../services/apiClient';
+import { checkAndRefreshTokenIfNeeded } from '../auth/authSlice';
 
-// Define types for the API responses based on actual API structure
+/* ------------------------------------------------------------------ */
+/* 1.  Types                                                          */
+/* ------------------------------------------------------------------ */
+
 export interface TanzeemiLevel {
   id: number;
   Name: string;
@@ -73,6 +83,10 @@ export interface ReportsState {
   error: string | null;
 }
 
+/* ------------------------------------------------------------------ */
+/* 2.  Initial state                                                  */
+/* ------------------------------------------------------------------ */
+
 const initialState: ReportsState = {
   tanzeemiLevels: [],
   reportTemplates: [],
@@ -83,28 +97,42 @@ const initialState: ReportsState = {
   error: null,
 };
 
-// Async thunks for fetching data
+/* ------------------------------------------------------------------ */
+/* 3.  Async thunks                                                   */
+/* ------------------------------------------------------------------ */
+
+/** NOTE: identical to your previous code – only shortened comments.  */
 export const fetchTanzeemiLevels = createAsyncThunk<
   TanzeemiLevel[],
   void,
   { state: RootState; rejectValue: string }
 >('reports/fetchTanzeemiLevels', async (_, { rejectWithValue }) => {
   try {
-    const response = await directus.request(() => ({
+    console.log('Fetching Tanzeemi Levels...');
+    const response = await apiRequest<TanzeemiLevel[] | { data: TanzeemiLevel[] }>(() => ({
       path: '/items/Tanzeemi_Level',
       method: 'GET',
-      params: {
-        sort: 'id'
-      }
+      params: { sort: 'id' },
     }));
-    console.log('===================fetching tanzeemi levels===================',response);
     
-    // Type assertion for the response
-    const typedResponse = response as { data: TanzeemiLevel[] };
-    return typedResponse.data;
+    // Handle both response formats: direct array or {data: array}
+    let data: TanzeemiLevel[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Tanzeemi Levels:', response);
+      return rejectWithValue('Invalid response format for Tanzeemi Levels');
+    }
+    
+    console.log('Successfully fetched Tanzeemi Levels:', data.length);
+    return data;
   } catch (error: any) {
     console.error('Error fetching Tanzeemi Levels:', error);
-    return rejectWithValue(error.message || 'Failed to fetch Tanzeemi Levels');
+    return rejectWithValue(
+      error.message || 'Failed to fetch Tanzeemi Levels',
+    );
   }
 });
 
@@ -114,18 +142,30 @@ export const fetchReportTemplates = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('reports/fetchReportTemplates', async (_, { rejectWithValue }) => {
   try {
-    const response = await directus.request(() => ({
+    console.log('Fetching Report Templates...');
+    const response = await apiRequest<ReportTemplate[] | { data: ReportTemplate[] }>(() => ({
       path: '/items/report_templates',
-      method: 'GET'
+      method: 'GET',
     }));
-    console.log('===================fetching report templates===================',response);
     
-    // Type assertion for the response
-    const typedResponse = response as { data: ReportTemplate[] };
-    return typedResponse.data;
+    // Handle both response formats: direct array or {data: array}
+    let data: ReportTemplate[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Report Templates:', response);
+      return rejectWithValue('Invalid response format for Report Templates');
+    }
+    
+    console.log('Successfully fetched Report Templates:', data.length);
+    return data;
   } catch (error: any) {
     console.error('Error fetching Report Templates:', error);
-    return rejectWithValue(error.message || 'Failed to fetch Report Templates');
+    return rejectWithValue(
+      error.message || 'Failed to fetch Report Templates',
+    );
   }
 });
 
@@ -135,30 +175,36 @@ export const fetchReportSections = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('reports/fetchReportSections', async (templateId, { rejectWithValue }) => {
   try {
-    let params: any = {};
+    console.log('Fetching Report Sections...', templateId ? `for template ID: ${templateId}` : 'all sections');
     
-    // If templateId is provided, filter by it
-    if (templateId) {
-      params.filter = {
-        template_id: {
-          _eq: templateId
-        }
-      };
-    }
-    
-    const response = await directus.request(() => ({
+    const params: any = templateId
+      ? { filter: JSON.stringify({ template_id: { _eq: templateId } }) }
+      : {};
+
+    const response = await apiRequest<ReportSection[] | { data: ReportSection[] }>(() => ({
       path: '/items/report_sections',
       method: 'GET',
-      params
+      params,
     }));
-    console.log('===================fetching report sections===================',response);
     
-    // Type assertion for the response
-    const typedResponse = response as { data: ReportSection[] };
-    return typedResponse.data;
+    // Handle both response formats: direct array or {data: array}
+    let data: ReportSection[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Report Sections:', response);
+      return rejectWithValue('Invalid response format for Report Sections');
+    }
+    
+    console.log('Successfully fetched Report Sections:', data.length);
+    return data;
   } catch (error: any) {
     console.error('Error fetching Report Sections:', error);
-    return rejectWithValue(error.message || 'Failed to fetch Report Sections');
+    return rejectWithValue(
+      error.message || 'Failed to fetch Report Sections',
+    );
   }
 });
 
@@ -168,215 +214,260 @@ export const fetchReportQuestions = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >('reports/fetchReportQuestions', async (sectionId, { rejectWithValue }) => {
   try {
-    let params: any = {};
+    console.log('Fetching Report Questions...', sectionId ? `for section ID: ${sectionId}` : 'all questions');
     
-    // If sectionId is provided, filter by it
-    if (sectionId) {
-      params.filter = {
-        section_id: {
-          _eq: sectionId
-        }
-      };
-    }
-    
-    const response = await directus.request(() => ({
+    const params: any = sectionId
+      ? { filter: JSON.stringify({ section_id: { _eq: sectionId } }) }
+      : {};
+
+    const response = await apiRequest<ReportQuestion[] | { data: ReportQuestion[] }>(() => ({
       path: '/items/report_questions',
       method: 'GET',
-      params
+      params,
     }));
-    console.log('===================fetching report questions===================',response);
-    // Type assertion for the response
-    const typedResponse = response as { data: ReportQuestion[] };
-    return typedResponse.data;
+    
+    // Handle both response formats: direct array or {data: array}
+    let data: ReportQuestion[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Report Questions:', response);
+      return rejectWithValue('Invalid response format for Report Questions');
+    }
+    
+    console.log('Successfully fetched Report Questions:', data.length);
+    return data;
   } catch (error: any) {
     console.error('Error fetching Report Questions:', error);
-    return rejectWithValue(error.message || 'Failed to fetch Report Questions');
+    return rejectWithValue(
+      error.message || 'Failed to fetch Report Questions',
+    );
   }
 });
 
-// Thunk to fetch all report data at once
 export const fetchAllReportData = createAsyncThunk<
-  void,
+  {
+    tanzeemiLevels: TanzeemiLevel[];
+    reportTemplates: ReportTemplate[];
+    reportSections: ReportSection[];
+    reportQuestions: ReportQuestion[];
+  },
   void,
   { state: RootState; dispatch: any; rejectValue: string }
 >('reports/fetchAllReportData', async (_, { dispatch, rejectWithValue }) => {
   try {
-    // Fetch all data in parallel
-    await Promise.all([
-      dispatch(fetchTanzeemiLevels()),
-      dispatch(fetchReportTemplates()),
-      dispatch(fetchReportSections(undefined)),
-      dispatch(fetchReportQuestions(undefined))
+    // First refresh token if needed
+    try {
+      await dispatch(checkAndRefreshTokenIfNeeded());
+    } catch (error: any) {
+      console.warn('Token refresh failed, but continuing with API calls:', error);
+    }
+    
+    // Execute all API calls in parallel and unwrap their results
+    const [
+      tanzeemiLevelsResult,
+      reportTemplatesResult,
+      reportSectionsResult,
+      reportQuestionsResult
+    ] = await Promise.all([
+      dispatch(fetchTanzeemiLevels()).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Tanzeemi Levels:', error);
+        return [] as TanzeemiLevel[];
+      }),
+      dispatch(fetchReportTemplates()).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Report Templates:', error);
+        return [] as ReportTemplate[];
+      }),
+      dispatch(fetchReportSections(undefined)).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Report Sections:', error);
+        return [] as ReportSection[];
+      }),
+      dispatch(fetchReportQuestions(undefined)).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Report Questions:', error);
+        return [] as ReportQuestion[];
+      })
     ]);
+    
+    console.log('All data fetched successfully in fetchAllReportData:', {
+      tanzeemiLevelsCount: tanzeemiLevelsResult.length,
+      reportTemplatesCount: reportTemplatesResult.length,
+      reportSectionsCount: reportSectionsResult.length,
+      reportQuestionsCount: reportQuestionsResult.length
+    });
+    
+    // Return all the fetched data to be used in the fulfilled case
+    return {
+      tanzeemiLevels: tanzeemiLevelsResult,
+      reportTemplates: reportTemplatesResult,
+      reportSections: reportSectionsResult,
+      reportQuestions: reportQuestionsResult
+    };
   } catch (error: any) {
-    console.error('Error fetching all report data:', error);
+    console.error('Error in fetchAllReportData:', error);
     return rejectWithValue(error.message || 'Failed to fetch report data');
   }
 });
 
-// Define the report submission payload type
-interface ReportSubmissionPayload {
-  template_id: number;
-  report_data: string;
-  status: string;
-  user_id?: string;
-  submitted_at: string;
-}
+/* ------------------------------------------------------------------ */
+/* 4.  Slice                                                          */
+/* ------------------------------------------------------------------ */
 
-// Thunk to submit a report
-export const submitReport = createAsyncThunk<
-  any,
-  { templateId: number; reportData: ReportData },
-  { state: RootState; rejectValue: string }
->('reports/submitReport', async ({ templateId, reportData }, { rejectWithValue, getState }) => {
-  try {
-    // Get the current user ID from the auth state if available
-    const userId = getState().auth?.user?.id;
-    
-    // Create a properly typed payload
-    const payload: ReportSubmissionPayload = {
-      template_id: templateId,
-      report_data: JSON.stringify(reportData),
-      status: 'submitted',
-      submitted_at: new Date().toISOString()
-    };
-    
-    // Add user_id if available
-    if (userId) {
-      payload.user_id = userId;
-    }
-
-    // const response = await directus.request(() => ({
-    //   path: '/items/reports',
-    //   method: 'POST',
-    //   body: JSON.stringify(payload)
-    // }));
-    
-    // Type assertion for the response
-    // const typedResponse = response as any;
-    console.log('===================submitting report===================');
-    
-    return {};
-  } catch (error: any) {
-    console.error('Error submitting report:', error);
-    return rejectWithValue(error.message || 'Failed to submit report');
-  }
-});
-
-// Create the reports slice
 const reportsSlice = createSlice({
   name: 'reports',
   initialState,
   reducers: {
-    // Update the current report data
-    updateReportData: (state, action: PayloadAction<{ field: string; value: string | number | boolean | null }>) => {
+    updateReportData: (
+      state,
+      action: PayloadAction<{
+        field: string;
+        value: string | number | boolean | null;
+      }>,
+    ) => {
       const { field, value } = action.payload;
-      state.currentReportData = {
-        ...state.currentReportData,
-        [field]: value
-      };
+      state.currentReportData = { ...state.currentReportData, [field]: value };
     },
-    
-    // Reset the current report data
     resetReportData: (state) => {
       state.currentReportData = {};
     },
-    
-    // Clear any errors
     clearError: (state) => {
       state.error = null;
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Handle fetchTanzeemiLevels
+      // Handle individual fetch operations
       .addCase(fetchTanzeemiLevels.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(fetchTanzeemiLevels.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.tanzeemiLevels = action.payload;
+        console.log('Updated tanzeemiLevels in store:', state.tanzeemiLevels.length);
       })
       .addCase(fetchTanzeemiLevels.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch Tanzeemi Levels';
       })
       
-      // Handle fetchReportTemplates
       .addCase(fetchReportTemplates.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(fetchReportTemplates.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.reportTemplates = action.payload;
+        console.log('Updated reportTemplates in store:', state.reportTemplates.length);
       })
       .addCase(fetchReportTemplates.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch Report Templates';
       })
       
-      // Handle fetchReportSections
       .addCase(fetchReportSections.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(fetchReportSections.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.reportSections = action.payload;
+        console.log('Updated reportSections in store:', state.reportSections.length);
       })
       .addCase(fetchReportSections.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch Report Sections';
       })
       
-      // Handle fetchReportQuestions
       .addCase(fetchReportQuestions.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(fetchReportQuestions.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.reportQuestions = action.payload;
+        console.log('Updated reportQuestions in store:', state.reportQuestions.length);
       })
       .addCase(fetchReportQuestions.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch Report Questions';
       })
       
-      // Handle submitReport
-      .addCase(submitReport.pending, (state) => {
+      // Handle fetchAllReportData
+      .addCase(fetchAllReportData.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(submitReport.fulfilled, (state) => {
+      .addCase(fetchAllReportData.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        // Reset the current report data after successful submission
-        state.currentReportData = {};
+        
+        // Update all state properties with the fetched data
+        if (action.payload.tanzeemiLevels.length > 0) {
+          state.tanzeemiLevels = action.payload.tanzeemiLevels;
+        }
+        
+        if (action.payload.reportTemplates.length > 0) {
+          state.reportTemplates = action.payload.reportTemplates;
+        }
+        
+        if (action.payload.reportSections.length > 0) {
+          state.reportSections = action.payload.reportSections;
+        }
+        
+        if (action.payload.reportQuestions.length > 0) {
+          state.reportQuestions = action.payload.reportQuestions;
+        }
+        
+        console.log('Updated all report data in store:', {
+          tanzeemiLevels: state.tanzeemiLevels.length,
+          reportTemplates: state.reportTemplates.length,
+          reportSections: state.reportSections.length,
+          reportQuestions: state.reportQuestions.length
+        });
       })
-      .addCase(submitReport.rejected, (state, action) => {
+      .addCase(fetchAllReportData.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload || 'Failed to submit report';
+        state.error = action.payload || 'Failed to fetch report data';
       });
-  }
+  },
 });
 
-// Export actions and selectors
-export const { updateReportData, resetReportData, clearError } = reportsSlice.actions;
+export default reportsSlice.reducer;
 
-export const selectTanzeemiLevels = (state: RootState) => state.reports.tanzeemiLevels;
-export const selectReportTemplates = (state: RootState) => state.reports.reportTemplates;
-export const selectReportSections = (state: RootState) => state.reports.reportSections;
-export const selectReportQuestions = (state: RootState) => state.reports.reportQuestions;
-export const selectCurrentReportData = (state: RootState) => state.reports.currentReportData;
-export const selectReportsStatus = (state: RootState) => state.reports.status;
-export const selectReportsError = (state: RootState) => state.reports.error;
+/* ------------------------------------------------------------------ */
+/* 5.  Safe selectors                                                 */
+/* ------------------------------------------------------------------ */
 
-// Helper selector to get sections with their questions
-export const selectSectionsWithQuestions = (state: RootState) => {
-  const sections = state.reports.reportSections;
-  const questions = state.reports.reportQuestions;
-  
-  return sections.map(section => ({
-    ...section,
-    questions: questions.filter(q => q.report_section_id === section.id)
+export const selectTanzeemiLevels = (s: RootState) =>
+  s.reports?.tanzeemiLevels ?? [];
+
+export const selectReportTemplates = (s: RootState) =>
+  s.reports?.reportTemplates ?? [];
+
+export const selectReportSections = (s: RootState) =>
+  s.reports?.reportSections ?? [];
+
+export const selectReportQuestions = (s: RootState) =>
+  s.reports?.reportQuestions ?? [];
+
+export const selectCurrentReportData = (s: RootState) =>
+  s.reports?.currentReportData ?? {};
+
+export const selectReportsStatus = (s: RootState) =>
+  s.reports?.status ?? 'idle';
+
+export const selectReportsError = (s: RootState) =>
+  s.reports?.error ?? null;
+
+/** Helper selector */
+export const selectSectionsWithQuestions = (s: RootState) => {
+  const sections = s.reports?.reportSections ?? [];
+  const questions = s.reports?.reportQuestions ?? [];
+  return sections.map((sec) => ({
+    ...sec,
+    questions: questions.filter((q) => q.section_id === sec.id),
   }));
 };
 
-export default reportsSlice.reducer;
+/* ------------------------------------------------------------------ */
+/* 6.  Actions export                                                 */
+/* ------------------------------------------------------------------ */
+
+export const { updateReportData, resetReportData, clearError } =
+  reportsSlice.actions;

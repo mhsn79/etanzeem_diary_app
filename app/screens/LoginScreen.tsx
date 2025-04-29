@@ -14,11 +14,9 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '../i18n';
-
 import CustomTextInput from '../components/CustomTextInput';
 import CustomButton from '../components/CustomButton';
 import Toast from '../components/Toast';
-
 import { useAppDispatch } from '../../src/hooks/useAppDispatch';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
 import {
@@ -26,9 +24,11 @@ import {
   selectAuthStatus,
   selectIsAuthenticated,
 } from '../features/auth/authSlice';
+import { ImageBackground } from 'react-native';
+import { COLORS } from '../constants/theme';
 
 /* ------------------------------------------------------------------ */
-/*                        FIELD‑LEVEL VALIDATORS                      */
+/*                        FIELD-LEVEL VALIDATORS                      */
 /* ------------------------------------------------------------------ */
 const validateEmail = (email: string): string | null => {
   if (!email) return i18n.t('email_is_required');
@@ -39,8 +39,7 @@ const validateEmail = (email: string): string | null => {
 
 const validatePassword = (password: string): string | null => {
   if (!password) return i18n.t('password_is_required');
-  if (password.length < 8)
-    return i18n.t('password_must_be_at_least_8_characters');
+  if (password.length < 8) return i18n.t('password_must_be_at_least_8_characters');
   return null;
 };
 
@@ -50,15 +49,12 @@ const validatePassword = (password: string): string | null => {
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-
   const status = useAppSelector(selectAuthStatus);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   /* Form state */
-  const [email, setEmail] = useState("sohail-abubaker@pixelpk.com");
-  const [password, setPassword] = useState("12345678");
-
-  /* Error state (separate) */
+  const [email, setEmail] = useState('sohail-abubaker@pixelpk.com');
+  const [password, setPassword] = useState('12345678');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -75,38 +71,44 @@ export default function LoginScreen() {
     setEmailError(eErr);
     setPasswordError(pErr);
 
-    if (eErr || pErr) return; // stop if any field invalid
+    if (eErr || pErr) return;
 
     dispatch(login({ email, password }));
   };
+
+  /* Dynamic title top value based on notch presence */
+  const titleTop = insets.top > 0 ? 65 : 45;
 
   /* ---------------------------------------------------------------- */
   /*                             RENDER                               */
   /* ---------------------------------------------------------------- */
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <StatusBar hidden />
         <View style={styles.background}>
           {/* Logo & Banner */}
           <View style={styles.logoContainer}>
-            <Image
+            <ImageBackground
               source={require('../../assets/images/pattern.png')}
               style={styles.pattern}
-            />
-            <Image
-              source={require('../../assets/images/jamat-logo.png')}
-              style={styles.logo}
-            />
-            <Text style={styles.title}>{i18n.t('appname')}</Text>
+            >
+              <View style={styles.overlay}>
+                <Image
+                  source={require('../../assets/images/jamat-logo.png')}
+                  style={styles.logo}
+                />
+                <Text style={[styles.title, { top: titleTop }]}>{i18n.t('appname')}</Text>
+              </View>
+            </ImageBackground>
           </View>
 
           {/* Login form */}
           <View style={styles.loginContainer}>
-            {/* E‑mail field */}
+            {/* Email field */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('email')}</Text>
               <CustomTextInput
@@ -114,7 +116,7 @@ export default function LoginScreen() {
                 placeholderTextColor="#2D2327"
                 onChangeText={(v) => {
                   setEmail(v);
-                  if (emailError) setEmailError(null); // clear on edit
+                  if (emailError) setEmailError(null);
                 }}
                 value={email}
                 error={!!emailError}
@@ -136,19 +138,16 @@ export default function LoginScreen() {
                 value={password}
                 error={!!passwordError}
               />
-              {passwordError && (
-                <Text style={styles.errText}>{passwordError}</Text>
-              )}
+              {passwordError && <Text style={styles.errText}>{passwordError}</Text>}
             </View>
 
             {/* Forgot password */}
-            <View style={styles.resetPass}>
-              <Pressable onPress={() => console.log('password reset')}>
-                <Text style={styles.resetPassText}>
-                  {i18n.t('reset_your_password')}
-                </Text>
-              </Pressable>
-            </View>
+            <Pressable
+              style={styles.resetPass}
+              onPress={() => console.log('password reset')}
+            >
+              <Text style={styles.resetPassText}>{i18n.t('reset_your_password')}</Text>
+            </Pressable>
 
             {/* Submit */}
             {status === 'loading' ? (
@@ -159,8 +158,6 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* Toast for API errors */}
       <Toast />
     </KeyboardAvoidingView>
   );
@@ -170,20 +167,44 @@ export default function LoginScreen() {
 /*                                STYLES                              */
 /* ------------------------------------------------------------------ */
 const styles = StyleSheet.create({
-  background: { flex: 1, backgroundColor: '#008CFF' },
-  logoContainer: { justifyContent: 'center', alignItems: 'center' },
+  container: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  background: {
+    flex: 1,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pattern: {
+    width: '100%',
+    aspectRatio: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: '#0077ff',
+    opacity: 0.8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    position: 'absolute',
+  },
   title: {
     position: 'absolute',
-    top: 45,
     color: 'white',
     fontSize: 30,
     fontFamily: 'JameelNooriNastaleeq',
+    lineHeight: 60,
+    textAlign: 'center',
   },
-  pattern: { width: '100%', aspectRatio: 1, opacity: 0.5 },
-  logo: { position: 'absolute' },
   loginContainer: {
     flex: 1,
-    backgroundColor: '#EBEBEB',
+    backgroundColor: COLORS.lightGray,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     alignItems: 'center',
@@ -191,23 +212,28 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     padding: 25,
   },
-  inputContainer: { width: '100%', gap: 10 },
+  inputContainer: {
+    width: '100%',
+    gap: 10,
+  },
   inputText: {
     fontSize: 16,
     fontFamily: 'JameelNooriNastaleeq',
     color: '#2D2327',
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
   },
   errText: {
     alignSelf: 'flex-start',
-    color: '#EA5455',
+    color: COLORS.error,
     fontSize: 16,
-    fontFamily: "JameelNooriNastaleeq",
+    fontFamily: 'JameelNooriNastaleeq',
   },
-  resetPass: { alignSelf: 'flex-start' },
+  resetPass: {
+    alignSelf: 'flex-end',
+  },
   resetPassText: {
     fontSize: 12,
     fontFamily: 'JameelNooriNastaleeq',
-    color: '#2D2327',
+    lineHeight:30
   },
 });

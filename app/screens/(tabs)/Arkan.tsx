@@ -131,13 +131,14 @@ console.log('=======================',status,error);
       </View>
     );
   }
-
+  const sefeTop = insets.top > 0 ? 20 : 10;
+  
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <FlatList
         contentContainerStyle={{ 
           flexGrow: 1, 
-          paddingTop: insets.top, 
+          paddingTop: sefeTop, 
           direction: i18n.locale === 'ur' ? 'rtl' : 'ltr',
           paddingHorizontal: 20,
           paddingBottom: 20
@@ -152,14 +153,7 @@ console.log('=======================',status,error);
                 <Text style={styles.headerCount}>{' ' + (persons ? persons.length : 0) + ' '}</Text>
                 <UrduText style={styles.headerTitle}>کل ارکان</UrduText>
               </View>
-              <CustomButton
-                text={i18n.t('add_new_rukun')}
-                style={styles.addButton}
-                viewStyle={[styles.addButtonView]}
-                textStyle={[styles.addButtonText]}
-                iconImage={require('@/assets/images/add-icon.png')}
-                onPress={handleAddNewRukun}
-              />
+        
             </View>
 
             {/* Search Bar */}
@@ -215,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
-    marginTop: 10,
+
   },
   headerTextContainer: {
     flexDirection: 'row',

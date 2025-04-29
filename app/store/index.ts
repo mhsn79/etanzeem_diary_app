@@ -1,8 +1,9 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, Middleware } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, PersistConfig } from 'redux-persist';
 import { mmkvStorage, STORAGE_KEYS } from './mmkvStorage';
 import rootReducer from './reducers';
 import directus from '../services/directus';
+import authMiddleware from './middleware/authMiddleware';
 
 // Define the RootState type explicitly
 export type RootState = ReturnType<typeof rootReducer>;
@@ -27,8 +28,8 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 // Configure store with enhanced middleware
 const store = configureStore({
   reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
+  middleware: (getDefaultMiddleware) => {
+    const middleware = getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
         ignoredPaths: ['auth.user'],
@@ -37,7 +38,11 @@ const store = configureStore({
       thunk: {
         extraArgument: { directus },
       },
-    }),
+    });
+    
+    // Add the auth middleware
+    return middleware.concat(authMiddleware as Middleware);
+  },
   // Enable dev tools in development
   devTools: process.env.NODE_ENV !== 'production',
 });
@@ -45,6 +50,8 @@ const store = configureStore({
 // Create persistor
 const persistor = persistStore(store);
 
-// Export store, persistor, and types
-export { store, persistor };
+// Define AppDispatch type
 export type AppDispatch = typeof store.dispatch;
+
+// Export store and persistor
+export { store, persistor };
