@@ -33,6 +33,8 @@ import {
   selectReportsError,
   selectReportsStatus,
   selectTanzeemiLevels,
+  selectTanzeemiUnits,
+  selectReportManagements,
   // submitReport,
   updateReportData,
 } from '@/app/features/reports/reportsSlice';
@@ -150,6 +152,8 @@ const CreateReportScreen = () => {
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
   const tanzeemiLevels   = useSelector(selectTanzeemiLevels) ?? [];
+  const tanzeemiUnits    = useSelector(selectTanzeemiUnits) ?? [];
+  const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates  = useSelector(selectReportTemplates) ?? [];
   const reportSections   = useSelector(selectReportSections) ?? [];
   const reportQuestions  = useSelector(selectReportQuestions) ?? [];
@@ -157,11 +161,13 @@ const CreateReportScreen = () => {
   const status           = useSelector(selectReportsStatus) ?? 'idle';
   const error            = useSelector(selectReportsError) ?? null;
 
-console.log('tanzeemiLevels',tanzeemiLevels);
-console.log('reportTemplates',reportTemplates);
-console.log('reportSections',reportSections);
-console.log('reportQuestions',reportQuestions);
-  console.log('reportData',reportData);
+console.log('tanzeemiLevels', tanzeemiLevels);
+console.log('tanzeemiUnits', tanzeemiUnits);
+console.log('reportManagements', reportManagements);
+console.log('reportTemplates', reportTemplates);
+console.log('reportSections', reportSections);
+console.log('reportQuestions', reportQuestions);
+console.log('reportData', reportData);
 
 
 
@@ -177,6 +183,8 @@ console.log('reportQuestions',reportQuestions);
       .then((result) => {
         console.log('CreateReportScreen: fetchAllReportData succeeded with data:', {
           tanzeemiLevelsCount: result.tanzeemiLevels.length,
+          tanzeemiUnitsCount: result.tanzeemiUnits.length,
+          reportManagementsCount: result.reportManagements.length,
           reportTemplatesCount: result.reportTemplates.length,
           reportSectionsCount: result.reportSections.length,
           reportQuestionsCount: result.reportQuestions.length
@@ -235,13 +243,13 @@ console.log('reportQuestions',reportQuestions);
   /*  Dropdown options                                              */
   /* -------------------------------------------------------------- */
   const zoneOptions = useMemo(() => {
-    console.log('Building zone options with tanzeemiLevels:', tanzeemiLevels?.length ?? 0);
+    console.log('Building zone options with tanzeemiUnits:', tanzeemiUnits?.length ?? 0);
     
-    if (tanzeemiLevels?.length) {
-      return tanzeemiLevels.map((lvl) => ({
-        id: lvl.id.toString(),
-        label: lvl.Name || `Zone ${lvl.id}`,
-        value: lvl.id.toString(),
+    if (tanzeemiUnits?.length) {
+      return tanzeemiUnits.map((unit) => ({
+        id: unit.id.toString(),
+        label: unit.Name || `Zone ${unit.id}`,
+        value: unit.id.toString(),
       }));
     }
     
@@ -254,7 +262,7 @@ console.log('reportQuestions',reportQuestions);
       { id: '4', label: 'زون 4', value: 'zone4' },
       { id: '5', label: 'زون 5', value: 'zone5' },
     ];
-  }, [tanzeemiLevels]);
+  }, [tanzeemiUnits]);
 
   const templateOptions = useMemo(() => {
     console.log('Building template options with reportTemplates:', reportTemplates?.length ?? 0);
@@ -278,12 +286,29 @@ console.log('reportQuestions',reportQuestions);
     return [{ id: '1', label: 'Default Template', value: '1' }];
   }, [reportTemplates, tanzeemiLevels]);
 
-  const yearOptions = [
-    { id: '1', label: '2024', value: '2024' },
-    { id: '2', label: '2023', value: '2023' },
-    { id: '3', label: '2022', value: '2022' },
-    { id: '4', label: '2021', value: '2021' },
-  ];
+  const yearOptions = useMemo(() => {
+    console.log('Building year options with reportManagements:', reportManagements?.length ?? 0);
+    
+    if (reportManagements?.length) {
+      // Extract unique years from reportManagements
+      const uniqueYears = [...new Set(reportManagements.map(rm => rm.year))];
+      
+      return uniqueYears.map((year, index) => ({
+        id: index.toString(),
+        label: year.toString(),
+        value: year.toString(),
+      }));
+    }
+    
+    // Fallback static options
+    console.log('Using static year options as fallback');
+    return [
+      { id: '1', label: '2025', value: '2025' },
+      { id: '2', label: '2024', value: '2024' },
+      { id: '3', label: '2023', value: '2023' },
+      { id: '4', label: '2022', value: '2022' },
+    ];
+  }, [reportManagements]);
 
   const tabs = [
     { label: 'سوال وجواب وزرڈ', value: 0 },

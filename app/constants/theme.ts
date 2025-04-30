@@ -27,6 +27,7 @@ const COLORS = {
   success: '#0BA241',
   warning: '#FFA500',
   info: '#008CFF',
+  disabled: '#CCCCCC',
   
   // Border and divider colors
   border: '##EBEBEB',

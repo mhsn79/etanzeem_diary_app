@@ -38,6 +38,7 @@ interface DialogProps {
   confirmTextStyle?: any;
   cancelTextStyle?: any;
   descriptionStyle?: any;
+  disableButtons?: boolean;
 }
 
 const Dialog: React.FC<DialogProps> = ({
@@ -59,6 +60,7 @@ const Dialog: React.FC<DialogProps> = ({
   confirmTextStyle,
   cancelTextStyle,
   descriptionStyle = {},
+  disableButtons = false,
 }) => {
   // const IconComponent = iconType ? ICON_MAP[iconType] : null;
 
@@ -97,8 +99,13 @@ const Dialog: React.FC<DialogProps> = ({
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.confirmButton, confirmButtonStyle]}
-              onPress={onConfirm}
+              style={[
+                styles.confirmButton, 
+                confirmButtonStyle,
+                disableButtons && styles.disabledButton
+              ]}
+              onPress={disableButtons ? undefined : onConfirm}
+              disabled={disableButtons}
             >
               <View style={styles.confirmButtonContent}>
                 {upperRightIcon && (
@@ -109,11 +116,16 @@ const Dialog: React.FC<DialogProps> = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.cancelButton, cancelButtonStyle]}
-              onPress={() => {
+              style={[
+                styles.cancelButton, 
+                cancelButtonStyle,
+                disableButtons && styles.disabledCancelButton
+              ]}
+              onPress={disableButtons ? undefined : () => {
                 onCancel && onCancel();
                 onClose && onClose();
               }}
+              disabled={disableButtons}
             >
               <View style={styles.cancelButtonContent}>
                 {lowerRightIcon && (
@@ -125,7 +137,11 @@ const Dialog: React.FC<DialogProps> = ({
           </View>
 
           {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={disableButtons ? undefined : onClose}
+            disabled={disableButtons}
+          >
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -232,6 +248,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  disabledButton: {
+    backgroundColor: COLORS.disabled || '#cccccc',
+    opacity: 0.7,
+  },
+  disabledCancelButton: {
+    opacity: 0.5,
   }
 });
 
