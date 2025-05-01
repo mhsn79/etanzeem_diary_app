@@ -19,7 +19,7 @@ export const ROUTES = {
   PROFILE_EDIT: `/${ROUTE_GROUPS.STACK}/ProfileEdit`,
 
   // Stack Routes
-  REPORTS: `/${ROUTE_GROUPS.STACK}/ReportsScreen`,
+  REPORTS_MANAGEMENT: `/${ROUTE_GROUPS.STACK}/ReportsManagementScreen`,
   ALL_REPORTS: `/${ROUTE_GROUPS.STACK}/AllReportsScreen`,
   CREATE_REPORT: `/${ROUTE_GROUPS.STACK}/CreateReportScreen`,
   SUBMITTED_REPORT: `/${ROUTE_GROUPS.STACK}/SubmittedReportScreen`,

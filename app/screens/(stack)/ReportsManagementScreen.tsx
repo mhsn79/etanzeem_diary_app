@@ -13,7 +13,7 @@ import ReportCard from './components/ReportCard';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '../../constants/navigation';
 
-const ReportsScreen = () => {
+const ReportsManagementScreen = () => {
   const insets = useSafeAreaInsets();
   const { currentLanguage } = useLanguage();
   const router = useRouter();
@@ -324,4 +324,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ReportsScreen;
+export default ReportsManagementScreen;

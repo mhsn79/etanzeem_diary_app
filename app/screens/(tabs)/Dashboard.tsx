@@ -192,7 +192,7 @@ const Dashboard = () => {
                                     padding: 0
                                 }]} />
                         </View>
-                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/ReportsScreen")}>
+                        <TouchableOpacity style={styles.reportButton} onPress={() => router.push("/screens/ReportsManagementScreen")}>
                             <ReportIcon1 style={{ width: 20, height: 20, marginStart: 10 }} />
                             <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
                         </TouchableOpacity>

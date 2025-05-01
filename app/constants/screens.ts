@@ -21,7 +21,7 @@ export const SCREENS = {
   PROFILE_EDIT: 'ProfileEdit',
 
   // Stack Screens
-  REPORTS: 'ReportsScreen',
+  REPORTS_MANAGEMENT: 'ReportsManagementScreen',
   ALL_REPORTS: 'AllReportsScreen',
   CREATE_REPORT: 'CreateReportScreen',
   SUBMITTED_REPORT: 'SubmittedReportScreen',
@@ -50,7 +50,7 @@ export const SCREEN_PATHS = {
   PROFILE_EDIT: `/${SCREEN_GROUPS.MAIN}/${SCREENS.PROFILE_EDIT}`,
 
   // Stack Paths
-  REPORTS: `/${SCREEN_GROUPS.STACK}/${SCREENS.REPORTS}`,
+  REPORTS_MANAGEMENT: `/${SCREEN_GROUPS.STACK}/${SCREENS.REPORTS_MANAGEMENT}`,
   ALL_REPORTS: `/${SCREEN_GROUPS.STACK}/${SCREENS.ALL_REPORTS}`,
   CREATE_REPORT: `/${SCREEN_GROUPS.STACK}/${SCREENS.CREATE_REPORT}`,
   SUBMITTED_REPORT: `/${SCREEN_GROUPS.STACK}/${SCREENS.SUBMITTED_REPORT}`,
@@ -71,7 +71,7 @@ export const SCREEN_TITLES = {
   [SCREENS.DASHBOARD]: 'ڈیش بورڈ',
   [SCREENS.PROFILE]: 'پروفائل',
   [SCREENS.PROFILE_EDIT]: 'پروفائل میں ترمیم کریں',
-  [SCREENS.REPORTS]: 'رپورٹس',
+  [SCREENS.REPORTS_MANAGEMENT]: 'رپورٹس',
   [SCREENS.ALL_REPORTS]: 'تمام رپورٹس',
   [SCREENS.CREATE_REPORT]: 'رپورٹ بنائیں',
   [SCREENS.SUBMITTED_REPORT]: 'جمع شدہ رپورٹس',

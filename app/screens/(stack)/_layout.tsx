@@ -30,7 +30,7 @@ export default function StackLayout() {
     >
       {/* Reports Related Screens */}
       <Stack.Screen 
-        name={SCREENS.REPORTS}
+        name={SCREENS.REPORTS_MANAGEMENT}
         options={{ 
           headerShown: false,
   
