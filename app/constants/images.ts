@@ -58,4 +58,5 @@ export const COMMON_IMAGES = {
   transfer: require('../../assets/images/transfer-icon.png'),
   pattern: require('../../assets/images/pattern.png'),
   profileBackground: require('../../assets/images/profile-background.png'),
+  noReport: require('../../assets/images/no-report.png'),
 };

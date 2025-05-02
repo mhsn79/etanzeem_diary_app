@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '../../i18n';
 import UrduText from '../../components/UrduText';
@@ -9,16 +9,67 @@ import Header from '../../components/Header';
 import ReportActionButton from './components/ReportActionButton';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
+import { COMMON_IMAGES } from '../../constants/images';
 import ReportCard from './components/ReportCard';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '../../constants/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  fetchAllReportData,
+  selectReportManagements,
+  selectReportTemplates,
+  selectReportSections,
+  selectReportQuestions,
+  selectTanzeemiLevels,
+  selectTanzeemiUnits,
+  selectReportsStatus,
+  selectReportsError,
+  selectReportSubmissions
+} from '@/app/features/reports/reportsSlice';
+import { AppDispatch } from '@/app/store';
 
 const ReportsManagementScreen = () => {
   const insets = useSafeAreaInsets();
   const { currentLanguage } = useLanguage();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const isRTL = currentLanguage === 'ur';
   const [selectedTab, setSelectedTab] = useState(0);
+
+  /* ------------ Redux state (immune to 'undefined') ------------- */
+  const tanzeemiLevels = useSelector(selectTanzeemiLevels) ?? [];
+  const tanzeemiUnits = useSelector(selectTanzeemiUnits) ?? [];
+  const reportManagements = useSelector(selectReportManagements) ?? [];
+  const reportTemplates = useSelector(selectReportTemplates) ?? [];
+  const reportSections = useSelector(selectReportSections) ?? [];
+  const reportQuestions = useSelector(selectReportQuestions) ?? [];
+  const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
+  const status = useSelector(selectReportsStatus) ?? 'idle';
+  const error = useSelector(selectReportsError) ?? null;
+
+  /* -------------------------------------------------------------- */
+  /*  Data bootstrapping                                            */
+  /* -------------------------------------------------------------- */
+  useEffect(() => {
+    // Fetch all report data when component mounts
+    console.log('ReportsManagementScreen: Dispatching fetchAllReportData');
+    dispatch(fetchAllReportData())
+      .unwrap()
+      .then((result) => {
+        console.log('ReportsManagementScreen: fetchAllReportData succeeded with data:', {
+          tanzeemiLevelsCount: result.tanzeemiLevels.length,
+          tanzeemiUnitsCount: result.tanzeemiUnits.length,
+          reportManagementsCount: result.reportManagements.length,
+          reportTemplatesCount: result.reportTemplates.length,
+          reportSectionsCount: result.reportSections.length,
+          reportQuestionsCount: result.reportQuestions.length
+        });
+      })
+      .catch((error) => {
+        console.error('ReportsManagementScreen: fetchAllReportData failed:', error);
+        Alert.alert('Error', 'Failed to load report data. Please try again.');
+      });
+  }, []);
 
   const tabs = [
     { label: 'سابقہ / جمع شدہ رپورٹس', value: 0 },
@@ -49,6 +100,31 @@ const ReportsManagementScreen = () => {
     router.push(ROUTES.CREATE_REPORT);
   };
 
+  // Render loading state
+  if (status === 'loading') {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
+      </View>
+    );
+  }
+
+  // Render error state
+  if (status === 'failed' && error) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => dispatch(fetchAllReportData())}
+        >
+          <UrduText style={styles.retryButtonText}>دوبارہ کوشش کریں</UrduText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -66,55 +142,96 @@ const ReportsManagementScreen = () => {
         <View style={styles.content}>
           <View>
             <UrduText style={styles.subTitle}>موجودہ رپورٹ</UrduText>
-            <View style={styles.reportSummaryContainer}>
+            <TouchableOpacity 
+              style={styles.reportSummaryContainer}
+              onPress={handleCreateReport}
+              activeOpacity={0.8}
+            >
               <View style={styles.reportSummaryItem}>
-                <UrduText style={styles.reportSummaryItemTitle}>ماہانہ کارکردگی رپورٹ ۔  ماہ مارچ 2025ء</UrduText>
-                <View style={styles.reportSummaryItemValueContainer}>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>وارڈ نمبر 3</UrduText>
+                {reportManagements.length > 0 ? (
+                  <>
+                    {/* Use the first report management entry as the current report */}
+                    {(() => {
+                      const currentReport = reportManagements[0];
+                      const template = reportTemplates.find(t => t.id === currentReport.report_template_id);
+                      const level = template && tanzeemiLevels.find(l => l.id === template.unit_level_id);
+                      
+                      // Calculate days remaining
+                      const endDate = new Date(currentReport.reporting_end_date);
+                      const today = new Date();
+                      const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      // Calculate completion percentage (mock data - would come from API in real app)
+                      const completionPercentage = 50;
+                      
+                      return (
+                        <>
+                          <UrduText style={styles.reportSummaryItemTitle}>
+                            {`ماہانہ کارکردگی رپورٹ ۔ ماہ ${currentReport.month}/20${currentReport.year}ء`}
+                          </UrduText>
+                          <View style={styles.reportSummaryItemValueContainer}>
+                            <View style={styles.reportSummaryItemValueContainerItem}>
+                              <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>{level ? level.Name : "نامعلوم"}</UrduText>
+                            </View>
+                            <View style={styles.reportSummaryItemValueContainerItem}>
+                              <UrduText style={styles.reportSummaryItemValue}>متوقع تکمیل</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>{currentReport.reporting_end_date}</UrduText>
+                            </View>
+                          </View>
+                          <View style={styles.reportSummaryItemValueContainer}>
+                            <View style={styles.reportSummaryItemValueContainerItem}>
+                              <UrduText style={styles.reportSummaryItemValue}>اسٹیٹس</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>{`% ${completionPercentage} مکمل`}</UrduText>
+                            </View>
+                            <View style={styles.reportSummaryItemValueContainerItem}>
+                              <UrduText 
+                                style={[
+                                  styles.reportSummaryItemValue, 
+                                  { color: daysRemaining < 5 ? '#E63946' : COLORS.success }
+                                ]}
+                                >
+                                {daysRemaining > 0 
+                                  ? `${daysRemaining} دن باقی ہیں` 
+                                : `${Math.abs(daysRemaining)} دن گزر چکے ہیں`}
+                              </UrduText>
+                            </View>
+                          </View>
+                          <View style={styles.progressContainer}>
+                            <View style={styles.progressBar}>
+                              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+                            </View>
+                          </View>
+                        </>
+                      );
+                    })()}
+                 </>
+                ) : (
+                  <View style={styles.noCurrentReportContainer}>
+                    <Image 
+                      source={COMMON_IMAGES.noReport}
+                      style={styles.noCurrentReportImage}
+                      resizeMode="contain"
+                    />
+                    <UrduText style={styles.noCurrentReportText}>
+                      اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔
+                    </UrduText>
+                
                   </View>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={styles.reportSummaryItemValue}>متوقع  تکمیل</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}> 15 مارچ 2024</UrduText>
+                )}
+                {/* Only show progress bar for fallback data if no reports exist */}
+                {reportManagements.length === 0 && !reportSubmissions.length && (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View style={[styles.progressFill, { width: '0%' }]} />
+                    </View>
                   </View>
-                </View>
-                <View style={styles.reportSummaryItemValueContainer}>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={styles.reportSummaryItemValue}>اسٹیٹس  </UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}> % 50 مکمل </UrduText>
-                  </View>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={[styles.reportSummaryItemValue, { color: '#E63946' }]}>3 دن باقی ہیں</UrduText>
-                  </View>
-                </View>
-
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: '70%' }]} />
-                  </View>
-                </View>
-                <View style={styles.buttonContainer}>
-                  <ReportActionButton
-                    text="ایڈٹ کریں"
-                    onPress={handleEdit}
-                    icon={<FontAwesome name="edit" size={20} color="black" />}
-                  />
-                  <ReportActionButton
-                    text="اوپن کریں"
-                    onPress={handleOpen}
-                    icon={<MaterialCommunityIcons name="arrow-top-left-thin-circle-outline" size={20} color="black" />}
-                  />
-                  <ReportActionButton
-                    text="جمع کروائیں"
-                    onPress={handleSubmit}
-                  />
-                </View>
+                )}
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -133,37 +250,81 @@ const ReportsManagementScreen = () => {
         </View>
 
         <View style={styles.reportContainer}>
-          <ReportCard
-            title="ماہانہ کارکردگی رپورٹ ۔  ماہ مارچ 2025ء"
-            sumbitDateText="جمع کروانے کی تاریخ – جنوری 2024"
-            location="یوسی 12 - گلزار ٹاؤن"
-            status="جمع شدہ"
-            statusColor={COLORS.success}
-            onEdit={handleEdit}
-          />
-          <ReportCard
-            title="ماہانہ کارکردگی رپورٹ ۔  ماہ مارچ 2025ء"
-            sumbitDateText="جمع کروانے کی تاریخ – جنوری 2024"
-            location="یوسی 12 - گلزار ٹاؤن"
-            status="جمع شدہ"
-            statusColor={COLORS.error}
-          />
-          <ReportCard
-            title="ماہانہ کارکردگی رپورٹ ۔  ماہ مارچ 2025ء"
-            sumbitDateText="جمع کروانے کی تاریخ – جنوری 2024"
-            location="یوسی 12 - گلزار ٹاؤن"
-            status="جمع شدہ"
-            statusColor={COLORS.success}
-            onEdit={handleEdit}
-          />
+          {reportSubmissions.length > 0 ? (
+            (() => {
+              // Filter submissions based on selected tab
+              const filteredSubmissions = reportSubmissions.filter(submission => {
+                if (selectedTab === 0) {
+                  return submission.status === 'published';
+                } else {
+                  return submission.status === 'draft' || submission.status === 'pending';
+                }
+              });
+              
+              // If there are no submissions for the selected tab, show the "no reports" message
+              if (filteredSubmissions.length === 0) {
+                return (
+                  <View style={styles.noReportsContainer}>
+                    <Image 
+                      source={COMMON_IMAGES.noReport} 
+                      style={styles.noReportImage}
+                      resizeMode="contain"
+                    />
+                    <UrduText style={styles.noReportText}>
+                      اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔
+                    </UrduText>
+                  </View>
+                );
+              }
+              
+              // Otherwise, show the filtered submissions
+              return filteredSubmissions.slice(0, 3).map((submission, index) => {
+                // Find the template for this submission
+                const template = reportTemplates.find(t => t.id === submission.template_id);
+                // Find the level for this template
+                const level = template && tanzeemiLevels.find(l => l.id === template.unit_level_id);
+                // Find the unit for this submission
+                const unit = tanzeemiUnits.find(u => u.id === submission.unit_id);
+                // Find the management report for this submission
+                const management = submission.mgmt_id ? reportManagements.find(m => m.id === submission.mgmt_id) : null;
+                
+                // Format date
+                const formattedDate = submission.date_created 
+                  ? new Date(submission.date_created).toLocaleDateString('ur-PK')
+                  : '';
+                
+                return (
+                  <ReportCard
+                    key={`submission-${submission.id}`}
+                    title={management 
+                      ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}/ء`
+                      : `رپورٹ ${submission.id}`
+                    }
+                    sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
+                    location={unit ? unit.Name : (level ? level.Name : "")}
+                    status={submission.status === 'published' ? "جمع شدہ" : "ڈرافٹ"}
+                    statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
+                    onEdit={handleEdit}
+                  />
+                );
+              });
+            })()
+          ) : (
+            // Show "no reports" message if no data is available at all
+            <View style={styles.noReportsContainer}>
+              <Image 
+                source={COMMON_IMAGES.noReport} 
+                style={styles.noReportImage}
+                resizeMode="contain"
+              />
+              <UrduText style={styles.noReportText}>
+                اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔
+              </UrduText>
+            </View>
+          )}
         </View>
       </ScrollView>
-      <TouchableOpacity 
-        style={styles.overlayButton}
-        onPress={handleCreateReport}
-      >
-        <Ionicons name="add" size={24} color={COLORS.background} />
-      </TouchableOpacity>
+    
     </KeyboardAvoidingView>
   );
 };
@@ -177,7 +338,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   content: {
-    flex: 1,
+    flex: 0.1,
     backgroundColor: COLORS.primary,
     borderBottomLeftRadius: BORDER_RADIUS.xl,
     borderBottomRightRadius: BORDER_RADIUS.xl,
@@ -310,17 +471,72 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.md,
   },
-  overlayButton: {
-    position: 'absolute',
-    bottom: SPACING.xl,
-    right: SPACING.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+
+  // Loading and error styles
+  loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.medium,
+    padding: SPACING.xl,
+  },
+  loadingText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.primary,
+    marginTop: SPACING.md,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.error,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.small,
+  },
+  retryButtonText: {
+    color: COLORS.background,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+  },
+  // No reports styles
+  noReportsContainer: {
+    height: 300, // Fixed height for the container
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+
+  },
+  noReportImage: {
+    width: 120,
+    height: 120,
+    marginBottom: SPACING.md,
+  },
+  noReportText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
+  // No current report styles
+  noCurrentReportContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.md,
+  },
+  noCurrentReportImage: {
+    width: 100,
+    height: 100,
+    marginBottom: SPACING.sm,
+  },
+  noCurrentReportText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
   },
 });
 
