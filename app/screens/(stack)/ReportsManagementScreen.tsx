@@ -77,7 +77,12 @@ const ReportsManagementScreen = () => {
   ];
 
   const handleBack = () => {
-    router.back();
+    // Check if we can go back, otherwise go to Dashboard
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push(ROUTES.DASHBOARD);
+    }
   };
 
   const handleViewAllReports = () => {
