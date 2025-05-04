@@ -125,6 +125,15 @@ export interface ReportSubmission {
   [key: string]: any;
 }
 
+export interface ReportAnswer {
+  id: number;
+  submission_id: number;
+  number_value?: number | null;
+  string_value?: string | null;
+  question_id: number;
+  [key: string]: any;
+}
+
 export interface ReportsState {
   tanzeemiLevels: TanzeemiLevel[];
   tanzeemiUnits: TanzeemiUnit[];
@@ -133,6 +142,7 @@ export interface ReportsState {
   reportSections: ReportSection[];
   reportQuestions: ReportQuestion[];
   reportSubmissions: ReportSubmission[];
+  reportAnswers: ReportAnswer[];
   currentReportData: ReportData;
   submissionStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
@@ -152,6 +162,7 @@ const initialState: ReportsState = {
   reportSections: [],
   reportQuestions: [],
   reportSubmissions: [],
+  reportAnswers: [],
   currentReportData: {},
   status: 'idle',
   submissionStatus: 'idle',
@@ -486,6 +497,48 @@ export const fetchReportSubmissions = createAsyncThunk<
   }
 });
 
+export const fetchReportAnswers = createAsyncThunk<
+  ReportAnswer[],
+  number | undefined,
+  { state: RootState; rejectValue: string }
+>('reports/fetchReportAnswers', async (submissionId, { rejectWithValue }) => {
+  try {
+    console.log('Fetching Report Answers...', submissionId ? `for submission ID: ${submissionId}` : 'all answers');
+    
+    // Construct filter parameter if submissionId is provided
+    const params: any = submissionId
+      ? { filter: JSON.stringify({ submission_id: { _eq: submissionId } }) }
+      : {};
+    
+    console.log('Making API request to fetch report answers with params:', params);
+    
+    const response = await apiRequest<ReportAnswer[] | { data: ReportAnswer[] }>(() => ({
+      path: '/items/report_answers',
+      method: 'GET',
+      params,
+    }));
+    
+    // Handle both response formats: direct array or {data: array}
+    let data: ReportAnswer[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Report Answers:', response);
+      return rejectWithValue('Invalid response format for Report Answers');
+    }
+    
+    console.log('Successfully fetched Report Answers:', data.length);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching Report Answers:', error);
+    return rejectWithValue(
+      error.message || 'Failed to fetch Report Answers',
+    );
+  }
+});
+
 export const fetchAllReportData = createAsyncThunk<
   {
     tanzeemiLevels: TanzeemiLevel[];
@@ -495,6 +548,7 @@ export const fetchAllReportData = createAsyncThunk<
     reportSections: ReportSection[];
     reportQuestions: ReportQuestion[];
     reportSubmissions: ReportSubmission[];
+    reportAnswers: ReportAnswer[];
   },
   void,
   { state: RootState; dispatch: any; rejectValue: string }
@@ -515,7 +569,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportTemplatesResult,
       reportSectionsResult,
       reportQuestionsResult,
-      reportSubmissionsResult
+      reportSubmissionsResult,
+      reportAnswersResult
     ] = await Promise.all([
       dispatch(fetchTanzeemiLevels()).unwrap().catch((error: any) => {
         console.error('Failed to fetch Tanzeemi Levels:', error);
@@ -544,6 +599,10 @@ export const fetchAllReportData = createAsyncThunk<
       dispatch(fetchReportSubmissions()).unwrap().catch((error: any) => {
         console.error('Failed to fetch Report Submissions:', error);
         return [] as ReportSubmission[];
+      }),
+      dispatch(fetchReportAnswers(undefined)).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Report Answers:', error);
+        return [] as ReportAnswer[];
       })
     ]);
     
@@ -554,7 +613,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportTemplatesCount: reportTemplatesResult.length,
       reportSectionsCount: reportSectionsResult.length,
       reportQuestionsCount: reportQuestionsResult.length,
-      reportSubmissionsCount: reportSubmissionsResult.length
+      reportSubmissionsCount: reportSubmissionsResult.length,
+      reportAnswersCount: reportAnswersResult.length
     });
     
     // Return all the fetched data to be used in the fulfilled case
@@ -565,7 +625,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportTemplates: reportTemplatesResult,
       reportSections: reportSectionsResult,
       reportQuestions: reportQuestionsResult,
-      reportSubmissions: reportSubmissionsResult
+      reportSubmissions: reportSubmissionsResult,
+      reportAnswers: reportAnswersResult
     };
   } catch (error: any) {
     console.error('Error in fetchAllReportData:', error);
@@ -693,6 +754,20 @@ const reportsSlice = createSlice({
         state.error = action.payload || 'Failed to fetch Report Submissions';
       })
       
+      // Handle fetchReportAnswers
+      .addCase(fetchReportAnswers.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchReportAnswers.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.reportAnswers = action.payload;
+        console.log('Updated reportAnswers in store:', state.reportAnswers.length);
+      })
+      .addCase(fetchReportAnswers.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload || 'Failed to fetch Report Answers';
+      })
+      
       // Handle fetchAllReportData
       .addCase(fetchAllReportData.pending, (state) => {
         state.status = 'loading';
@@ -729,6 +804,10 @@ const reportsSlice = createSlice({
           state.reportSubmissions = action.payload.reportSubmissions;
         }
         
+        if (action.payload.reportAnswers.length > 0) {
+          state.reportAnswers = action.payload.reportAnswers;
+        }
+        
         console.log('Updated all report data in store:', {
           tanzeemiLevels: state.tanzeemiLevels.length,
           tanzeemiUnits: state.tanzeemiUnits.length,
@@ -736,7 +815,8 @@ const reportsSlice = createSlice({
           reportTemplates: state.reportTemplates.length,
           reportSections: state.reportSections.length,
           reportQuestions: state.reportQuestions.length,
-          reportSubmissions: state.reportSubmissions.length
+          reportSubmissions: state.reportSubmissions.length,
+          reportAnswers: state.reportAnswers.length
         });
       })
       .addCase(fetchAllReportData.rejected, (state, action) => {
@@ -787,6 +867,9 @@ export const selectReportQuestions = (s: RootState) =>
 
 export const selectReportSubmissions = (s: RootState) =>
   s.reports?.reportSubmissions ?? [];
+
+export const selectReportAnswers = (s: RootState) =>
+  s.reports?.reportAnswers ?? [];
 
 export const selectCurrentReportData = (s: RootState) =>
   s.reports?.currentReportData ?? {};

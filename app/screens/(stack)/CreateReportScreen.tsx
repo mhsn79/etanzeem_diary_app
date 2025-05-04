@@ -26,6 +26,7 @@ import {
   fetchAllReportData,
   fetchReportSections,
   fetchReportQuestions,
+  fetchReportAnswers,
   selectCurrentReportData,
   selectReportQuestions,
   selectReportSections,
@@ -35,6 +36,7 @@ import {
   selectTanzeemiLevels,
   selectTanzeemiUnits,
   selectReportManagements,
+  selectReportAnswers,
   // submitReport,
   updateReportData,
 } from '@/app/features/reports/reportsSlice';
@@ -61,78 +63,6 @@ interface ReportSectionLocal {
   fields: ReportField[];
 }
 
-/* ------------------------------------------------------------------ */
-/*  Static fallback sections                                          */
-/* ------------------------------------------------------------------ */
-
-const staticReportSections: ReportSectionLocal[] = [
-  {
-    id: '1',
-    title: 'بنیادی معلومات',
-    fields: [
-      {
-        id: '1.1',
-        title: 'کل آبادی کی تعداد درج کریں',
-        field: 'totalPopulation',
-        placeholder: '40',
-        isRequired: true,
-        inputType: 'number',
-        helpText: '',
-      },
-      {
-        id: '1.2',
-        title: 'مرد آبادی کی تعداد درج کریں',
-        field: 'malePopulation',
-        placeholder: '40',
-        isRequired: false,
-        inputType: 'number',
-        helpText: '',
-      },
-      {
-        id: '1.3',
-        title: 'عورتوں کی آبادی کی تعداد درج کریں',
-        field: 'femalePopulation',
-        placeholder: '40',
-        isRequired: false,
-        inputType: 'number',
-        helpText: '',
-      },
-    ],
-  },
-  {
-    id: '2',
-    title: 'مزید معلومات',
-    fields: [
-      {
-        id: '2.1',
-        title: 'کل ممبران کی تعداد',
-        field: 'totalMembers',
-        placeholder: '40',
-        isRequired: true,
-        inputType: 'number',
-        helpText: '',
-      },
-      {
-        id: '2.2',
-        title: 'مرد ممبران کی تعداد',
-        field: 'maleMembers',
-        placeholder: '40',
-        isRequired: false,
-        inputType: 'number',
-        helpText: '',
-      },
-      {
-        id: '2.3',
-        title: 'خواتین ممبران کی تعداد',
-        field: 'femaleMembers',
-        placeholder: '40',
-        isRequired: false,
-        inputType: 'number',
-        helpText: '',
-      },
-    ],
-  },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
@@ -157,6 +87,7 @@ const CreateReportScreen = () => {
   const reportTemplates  = useSelector(selectReportTemplates) ?? [];
   const reportSections   = useSelector(selectReportSections) ?? [];
   const reportQuestions  = useSelector(selectReportQuestions) ?? [];
+  const reportAnswers  = useSelector(selectReportAnswers) ?? [];
   const reportData       = useSelector(selectCurrentReportData) ?? {};
   const status           = useSelector(selectReportsStatus) ?? 'idle';
   const error            = useSelector(selectReportsError) ?? null;
@@ -168,6 +99,7 @@ console.log('reportTemplates', reportTemplates);
 console.log('reportSections', reportSections);
 console.log('reportQuestions', reportQuestions);
 console.log('reportData', reportData);
+  console.log('reportAnswers', reportAnswers);
 
 
 
@@ -208,7 +140,7 @@ console.log('reportData', reportData);
     // If we don't have any sections from the API, use static data
     if (!reportSections?.length) {
       console.log('Using static report sections as fallback');
-      return staticReportSections;
+      return [];
     }
 
     // Map API sections to the format expected by the UI
@@ -302,12 +234,7 @@ console.log('reportData', reportData);
     
     // Fallback static options
     console.log('Using static year options as fallback');
-    return [
-      { id: '1', label: '2025', value: '2025' },
-      { id: '2', label: '2024', value: '2024' },
-      { id: '3', label: '2023', value: '2023' },
-      { id: '4', label: '2022', value: '2022' },
-    ];
+    return [];
   }, [reportManagements]);
 
   const tabs = [
