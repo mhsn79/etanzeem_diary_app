@@ -3,6 +3,7 @@ import { RootState } from '../../store';
 import directus from '../../services/directus';
 import { clearActivities } from '../activities/activitySlice';
 import { AppDispatch } from '../../store';
+import { fetchPersonByEmail } from '../persons/personSlice';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 
@@ -59,8 +60,8 @@ export interface AuthResponse {
 export const login = createAsyncThunk<
   AuthResponse,
   LoginCredentials,
-  { state: RootState; rejectValue: string }
->('auth/login', async (credentials, { rejectWithValue }) => {
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
     const authResponse = await directus.login(credentials.email, credentials.password, {
       mode: 'json',
@@ -76,8 +77,9 @@ export const login = createAsyncThunk<
         method: 'GET',
         headers: { 'Authorization': `Bearer ${authResponse.access_token}` },
       }));
+      console.log('userData===================', userData);
 
-      return {
+      const authResult = {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
@@ -85,6 +87,15 @@ export const login = createAsyncThunk<
         },
         user: userData as User,
       };
+
+      // After successful login, fetch the person data by email
+      // This is done asynchronously and doesn't block the login process
+      if (credentials.email) {
+        // Use the imported fetchPersonByEmail action
+        dispatch(fetchPersonByEmail(credentials.email));
+      }
+
+      return authResult;
     } catch (userDataError: any) {
       return {
         tokens: {
@@ -371,6 +382,31 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
 
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
     await dispatch(refresh());
+  }
+});
+
+/**
+ * Combined thunk that handles login and fetches person data
+ * This is useful for components that need to wait for both operations to complete
+ */
+export const loginAndFetchUserDetails = createAsyncThunk<
+  { auth: AuthResponse, userDetails: any },
+  LoginCredentials,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('auth/loginAndFetchUserDetails', async (credentials, { dispatch, rejectWithValue }) => {
+  try {
+    // First, perform the login
+    const authResult = await dispatch(login(credentials)).unwrap();
+    
+    // Then fetch the person data
+    const userDetails = await dispatch(fetchPersonByEmail(credentials.email)).unwrap();
+    
+    return { 
+      auth: authResult,
+      userDetails 
+    };
+  } catch (error: any) {
+    return rejectWithValue(error.message || 'Login and fetch user details failed');
   }
 });
 

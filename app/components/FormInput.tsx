@@ -8,12 +8,14 @@ export interface FormInputProps {
   inputTitle: string;
   value: string;
   onChange: (text: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   direction?: 'rtl' | 'ltr';
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   maxLength?: number;
   rightIcon?: React.ReactNode;
   editable?: boolean;
+  disabled?: boolean;
   error?: string;
   required?: boolean;
   multiline?: boolean;
@@ -25,12 +27,14 @@ const FormInput: React.FC<FormInputProps> = ({
   inputTitle,
   value,
   onChange,
+  onBlur,
   placeholder = '',
   direction = 'rtl',
   keyboardType = 'default',
   maxLength,
   rightIcon,
   editable = true,
+  disabled = false,
   error,
   required,
   multiline = false,
@@ -57,16 +61,18 @@ const FormInput: React.FC<FormInputProps> = ({
         <TextInput
           style={[
             styles.input,
-            { textAlign: direction === 'rtl' ? 'right' : 'left' }
+            { textAlign: direction === 'rtl' ? 'right' : 'left' },
+            disabled ? styles.disabledInput : null
           ]}
           value={value}
           onChangeText={onChange}
+          onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={COLORS.textSecondary}
           keyboardType={keyboardType}
           maxLength={maxLength}
           textAlignVertical="center"
-          editable={editable}
+          editable={editable && !disabled}
           multiline={multiline}
           numberOfLines={multiline ? 3 : 1}
         />
@@ -126,6 +132,10 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     paddingHorizontal: SPACING.md,
     color: COLORS.black,
+  },
+  disabledInput: {
+    opacity: 0.7,
+    color: COLORS.textSecondary,
   },
   iconContainer: {
     paddingHorizontal: SPACING.sm,

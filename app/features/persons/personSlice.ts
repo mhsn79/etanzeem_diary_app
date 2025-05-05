@@ -33,6 +33,9 @@ interface PersonsExtraState {
   selectedPersonId: number | null;
   selectedPersonStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   selectedPersonError: string | null;
+  userDetails: Person | null;
+  userDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  userDetailsError: string | null;
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -49,6 +52,9 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   selectedPersonId: null,
   selectedPersonStatus: 'idle',
   selectedPersonError: null,
+  userDetails: null,
+  userDetailsStatus: 'idle',
+  userDetailsError: null,
 });
 
 /**
@@ -199,6 +205,52 @@ export const fetchPersonById = createAsyncThunk<
   } catch (error: any) {
     console.error('Fetch person error:', error);
     return rejectWithValue(error.message || `Failed to fetch person with ID ${personId}`);
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch a single person by email
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+export const fetchPersonByEmail = createAsyncThunk<
+  Person | null,
+  string,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchByEmail', async (email, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Fetching person by email:', email);
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded());
+
+    const auth = selectAuthState(getState());
+    let token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const fetchPerson = async (accessToken: string) => {
+      // Use filter query to find person by email
+      const response = await apiRequest<PersonResponse>(
+        `/items/Person?filter[Email][_eq]=${encodeURIComponent(email)}&fields=*`,
+        'GET',
+        accessToken
+      );
+      
+      console.log('API Response for person by email:', response);
+      if (!response.data || response.data.length === 0) {
+        console.log(`No person found with email ${email}`);
+        return null;
+      }
+      
+      // Transform the API response to match our expected format
+      const transformedPerson = normalizePersonData(response.data[0]);
+      return transformedPerson;
+    };
+
+    return await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch person by email error:', error);
+    return rejectWithValue(error.message || `Failed to fetch person with email ${email}`);
   }
 });
 
@@ -531,6 +583,27 @@ const personsSlice = createSlice({
         state.updateError = action.payload ?? 'Failed to update person image';
       })
       
+      // Fetch person by email
+      .addCase(fetchPersonByEmail.pending, (state) => {
+        state.userDetailsStatus = 'loading';
+        state.userDetailsError = null;
+      })
+      .addCase(fetchPersonByEmail.fulfilled, (state, action: PayloadAction<Person | null>) => {
+        state.userDetailsStatus = 'succeeded';
+        if (action.payload) {
+          state.userDetails = action.payload;
+          // Also add to the entity adapter
+          personsAdapter.upsertOne(state, action.payload);
+        } else {
+          state.userDetails = null;
+        }
+      })
+      .addCase(fetchPersonByEmail.rejected, (state, action) => {
+        state.userDetailsStatus = 'failed';
+        state.userDetailsError = action.payload ?? 'Failed to fetch person by email';
+        state.userDetails = null;
+      })
+      
       // Delete person
       // .addCase(deletePerson.pending, state => {
       //   state.deleteStatus = 'loading';
@@ -589,5 +662,10 @@ export const selectSelectedPerson = (state: RootState) => {
 };
 export const selectSelectedPersonStatus = (state: RootState) => selectPersonsState(state).selectedPersonStatus;
 export const selectSelectedPersonError = (state: RootState) => selectPersonsState(state).selectedPersonError;
+
+// User details selectors
+export const selectUserDetails = (state: RootState) => selectPersonsState(state).userDetails;
+export const selectUserDetailsStatus = (state: RootState) => selectPersonsState(state).userDetailsStatus;
+export const selectUserDetailsError = (state: RootState) => selectPersonsState(state).userDetailsError;
 
 export default personsSlice.reducer;

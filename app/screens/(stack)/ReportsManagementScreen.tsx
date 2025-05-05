@@ -24,7 +24,8 @@ import {
   selectTanzeemiUnits,
   selectReportsStatus,
   selectReportsError,
-  selectReportSubmissions
+  selectReportSubmissions,
+  selectLatestReportMgmt
 } from '@/app/features/reports/reportsSlice';
 import { AppDispatch } from '@/app/store';
 
@@ -44,6 +45,7 @@ const ReportsManagementScreen = () => {
   const reportSections = useSelector(selectReportSections) ?? [];
   const reportQuestions = useSelector(selectReportQuestions) ?? [];
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
+  const latestReportMgmt = useSelector(selectLatestReportMgmt);
   const status = useSelector(selectReportsStatus) ?? 'idle';
   const error = useSelector(selectReportsError) ?? null;
 
@@ -102,7 +104,19 @@ const ReportsManagementScreen = () => {
   };
 
   const handleCreateReport = () => {
-    router.push(ROUTES.CREATE_REPORT);
+    // Pass the latest report management as a parameter if available
+    const mgmtParam = latestReportMgmt || (reportManagements.length > 0 ? reportManagements[0] : null);
+    
+    // Use the correct approach for passing parameters in expo-router
+    // Parameters should be passed as query parameters in the URL
+    if (mgmtParam) {
+      router.push({
+        pathname: ROUTES.CREATE_REPORT,
+        params: { mgmtId: mgmtParam.id.toString() }
+      });
+    } else {
+      router.push(ROUTES.CREATE_REPORT);
+    }
   };
 
   // Render loading state
@@ -153,11 +167,16 @@ const ReportsManagementScreen = () => {
               activeOpacity={0.8}
             >
               <View style={styles.reportSummaryItem}>
-                {reportManagements.length > 0 ? (
+                {latestReportMgmt&&latestReportMgmt.status!=='published' ? (
                   <>
-                    {/* Use the first report management entry as the current report */}
+                    {/* Use the latest report management entry as the current report */}
                     {(() => {
-                      const currentReport = reportManagements[0];
+
+                      console.log('ReportsManagementScreen: Rendering current report:', latestReportMgmt.status);
+                      
+                      const currentReport = latestReportMgmt;
+                      console.log('ReportsManagementScreen: Current report:', currentReport.status);
+                      
                       const template = reportTemplates.find(t => t.id === currentReport.report_template_id);
                       const level = template && tanzeemiLevels.find(l => l.id === template.unit_level_id);
                       
@@ -228,7 +247,7 @@ const ReportsManagementScreen = () => {
                   </View>
                 )}
                 {/* Only show progress bar for fallback data if no reports exist */}
-                {reportManagements.length === 0 && !reportSubmissions.length && (
+                {!latestReportMgmt && reportManagements.length === 0 && !reportSubmissions.length && (
                   <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
                       <View style={[styles.progressFill, { width: '0%' }]} />

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 import {
@@ -22,6 +22,7 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '@/app/constants/theme';
+import { getUrduMonth } from '@/app/constants/urduLocalization';
 import {
   fetchAllReportData,
   fetchReportSections,
@@ -37,7 +38,9 @@ import {
   selectTanzeemiUnits,
   selectReportManagements,
   selectReportAnswers,
+  selectLatestReportMgmt,
   // submitReport,
+  submitReportAnswer,
   updateReportData,
 } from '@/app/features/reports/reportsSlice';
 import { AppDispatch } from '@/app/store';
@@ -53,7 +56,6 @@ interface ReportField {
   placeholder: string;
   isRequired?: boolean;
   inputType?: string;
-  helpText?: string;
   options?: any[];
 }
 
@@ -79,6 +81,7 @@ const CreateReportScreen = () => {
   );
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedZone, setSelectedZone] = useState<string>('');
+  const [selectedManagement, setSelectedManagement] = useState<any>(null);
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
   const tanzeemiLevels   = useSelector(selectTanzeemiLevels) ?? [];
@@ -89,6 +92,7 @@ const CreateReportScreen = () => {
   const reportQuestions  = useSelector(selectReportQuestions) ?? [];
   const reportAnswers  = useSelector(selectReportAnswers) ?? [];
   const reportData       = useSelector(selectCurrentReportData) ?? {};
+  const latestReportMgmt = useSelector(selectLatestReportMgmt);
   const status           = useSelector(selectReportsStatus) ?? 'idle';
   const error            = useSelector(selectReportsError) ?? null;
 
@@ -98,7 +102,7 @@ console.log('reportManagements', reportManagements);
 console.log('reportTemplates', reportTemplates);
 console.log('reportSections', reportSections);
 console.log('reportQuestions', reportQuestions);
-console.log('reportData', reportData);
+console.log('reportData-------->', reportData);
   console.log('reportAnswers', reportAnswers);
 
 
@@ -107,26 +111,35 @@ console.log('reportData', reportData);
   /* -------------------------------------------------------------- */
   /*  Data bootstrapping                                            */
   /* -------------------------------------------------------------- */
+
+  // Initialize reportData with values from reportAnswers
   useEffect(() => {
-    // Fetch all report data when component mounts
-    console.log('CreateReportScreen: Dispatching fetchAllReportData');
-    dispatch(fetchAllReportData())
-      .unwrap()
-      .then((result) => {
-        console.log('CreateReportScreen: fetchAllReportData succeeded with data:', {
-          tanzeemiLevelsCount: result.tanzeemiLevels.length,
-          tanzeemiUnitsCount: result.tanzeemiUnits.length,
-          reportManagementsCount: result.reportManagements.length,
-          reportTemplatesCount: result.reportTemplates.length,
-          reportSectionsCount: result.reportSections.length,
-          reportQuestionsCount: result.reportQuestions.length
-        });
-      })
-      .catch((error) => {
-        console.error('CreateReportScreen: fetchAllReportData failed:', error);
-        Alert.alert('Error', 'Failed to load report data. Please try again.');
+    // Only run this effect when reportAnswers are available
+    if (reportAnswers && reportAnswers.length > 0) {
+      const initialData = { ...reportData };
+      
+      // Populate the reportData with values from reportAnswers
+      reportAnswers.forEach(answer => {
+        const questionId = answer.question_id;
+        const fieldName = `question_${questionId}`;
+        
+        // Use string_value if available, otherwise use number_value
+        const value = answer.string_value !== null && answer.string_value !== undefined
+          ? answer.string_value
+          : answer.number_value !== null && answer.number_value !== undefined
+            ? String(answer.number_value)
+            : '';
+            
+        initialData[fieldName] = value;
       });
-  }, []);
+      
+      // Update the Redux store with the initial data
+      console.log('Initializing reportData with values from reportAnswers:', initialData);
+      
+      // Dispatch the action to update the store with the initial data
+      dispatch(updateReportData(initialData));
+    }
+  }, [reportAnswers, dispatch]);
 
   /* -------------------------------------------------------------- */
   /*  Build dynamic report sections safely                          */
@@ -146,10 +159,16 @@ console.log('reportData', reportData);
     // Map API sections to the format expected by the UI
     const processed = reportSections.map((section) => {
       // Find questions for this section
+   
+
       const sectionQuestions = (reportQuestions ?? [])
         .filter((q) => q?.section_id === section.id);
-      
+        console.log('sectionQuestionssectionQuestionssectionQuestions>>>>>>>>>>>>',sectionQuestions);
+        
+        const sectionAnswer = (reportAnswers ?? [])
+        .filter((q) => section.question_id === q.id);
       console.log(`Processing section ${section.id} (${section.section_label}) with ${sectionQuestions.length} questions`);
+      console.log(`Section answer:===========safasdf=============================>>>>>>>`, sectionAnswer);
       
       return {
         id: section.id.toString(),
@@ -158,10 +177,12 @@ console.log('reportData', reportData);
           id: q.id.toString(),
           title: q.question_text || `Question ${q.id}`,
           field: `question_${q.id}`,
-          placeholder: q.category ?? '',
+          placeholder: (reportAnswers ?? [])
+            .filter((a) => a.question_id === q.id)[0]?.string_value ?? '',
+          value: (reportAnswers ?? [])
+            .filter((a) => a.question_id === q.id)[0]?.string_value ?? '',
           isRequired: q.highlight ?? false,
           inputType: q.input_type ?? 'text',
-          helpText: '',
           options: undefined,
         })),
       };
@@ -171,116 +192,24 @@ console.log('reportData', reportData);
     return processed;
   }, [reportSections, reportQuestions]);
 
-  /* -------------------------------------------------------------- */
-  /*  Dropdown options                                              */
-  /* -------------------------------------------------------------- */
-  const zoneOptions = useMemo(() => {
-    console.log('Building zone options with tanzeemiUnits:', tanzeemiUnits?.length ?? 0);
-    
-    if (tanzeemiUnits?.length) {
-      return tanzeemiUnits.map((unit) => ({
-        id: unit.id.toString(),
-        label: unit.Name || `Zone ${unit.id}`,
-        value: unit.id.toString(),
-      }));
-    }
-    
-    // Fallback static options
-    console.log('Using static zone options as fallback');
-    return [
-      { id: '1', label: 'زون 1', value: 'zone1' },
-      { id: '2', label: 'زون 2', value: 'zone2' },
-      { id: '3', label: 'زون 3', value: 'zone3' },
-      { id: '4', label: 'زون 4', value: 'zone4' },
-      { id: '5', label: 'زون 5', value: 'zone5' },
-    ];
-  }, [tanzeemiUnits]);
-
-  const templateOptions = useMemo(() => {
-    console.log('Building template options with reportTemplates:', reportTemplates?.length ?? 0);
-    
-    if (reportTemplates?.length) {
-      return reportTemplates.map((tpl) => {
-        const lvl = tanzeemiLevels?.find(
-          (l) => l.id === tpl.unit_level_id
-        );
-        
-        return {
-          id: tpl.id.toString(),
-          label: lvl ? `${lvl.Name} Report Template` : `Template ${tpl.id}`,
-          value: tpl.id.toString(),
-        };
-      });
-    }
-    
-    // Fallback static options
-    console.log('Using static template options as fallback');
-    return [{ id: '1', label: 'Default Template', value: '1' }];
-  }, [reportTemplates, tanzeemiLevels]);
-
-  const yearOptions = useMemo(() => {
-    console.log('Building year options with reportManagements:', reportManagements?.length ?? 0);
-    
-    if (reportManagements?.length) {
-      // Extract unique years from reportManagements
-      const uniqueYears = [...new Set(reportManagements.map(rm => rm.year))];
-      
-      return uniqueYears.map((year, index) => ({
-        id: index.toString(),
-        label: year.toString(),
-        value: year.toString(),
-      }));
-    }
-    
-    // Fallback static options
-    console.log('Using static year options as fallback');
-    return [];
-  }, [reportManagements]);
-
-  const tabs = [
-    { label: 'سوال وجواب وزرڈ', value: 0 },
-    { label: 'فارم(مکمل رپورٹ ایک ساتھ)', value: 1 },
-  ];
 
   /* -------------------------------------------------------------- */
   /*  Handlers                                                      */
   /* -------------------------------------------------------------- */
   const handleBack = () => navigation.goBack();
 
-  const handleInputChange = (field: string) => (value: string) =>
-    dispatch(updateReportData({ field, value }));
+  const handleInputChange = (field: string) => (value: string) => {
+    // TODO: Implement input change handler
+    console.log(`Field ${field} changed to: ${value}`);
+    // Return value or perform other actions as needed
+  }
+  
 
-  const handleZoneSelect = (opt: { value: string }) => {
-    setSelectedZone(opt.value);
-    dispatch(updateReportData({ field: 'zone_id', value: opt.value }));
-  };
 
-  const handleYearSelect = (opt: { value: string }) => {
-    setSelectedYear(opt.value);
-    dispatch(updateReportData({ field: 'year', value: opt.value }));
-  };
 
-  const handleTemplateSelect = async (opt: { value: string }) => {
-    const id = Number(opt.value);
-    console.log('Template selected:', id);
-    setSelectedTemplateId(id);
-    dispatch(updateReportData({ field: 'template_id', value: id }));
 
-    try {
-      console.log('Fetching sections for template ID:', id);
-      const sectionsResult = await dispatch(fetchReportSections(id)).unwrap();
-      console.log('Sections fetched successfully:', sectionsResult.length);
-      
-      console.log('Fetching all questions');
-      const questionsResult = await dispatch(fetchReportQuestions(undefined)).unwrap();
-      console.log('Questions fetched successfully:', questionsResult.length);
-      
-      console.log('Template data loaded successfully');
-    } catch (error) {
-      console.error('Failed to load template data:', error);
-      Alert.alert('Error', 'Failed to load template data. Please try again.');
-    }
-  };
+
+
 
   const renderSection = ({ item }: { item: ReportSectionLocal }) => (
     <View style={styles.section}>
@@ -293,7 +222,6 @@ console.log('reportData', reportData);
           onChange={handleInputChange(f.field)}
           keyboardType={f.inputType === 'number' ? 'numeric' : 'default'}
           placeholder={f.placeholder}
-          helpText={f.helpText}
           required={f.isRequired}
         />
       ))}
@@ -323,6 +251,93 @@ console.log('reportData', reportData);
       return;
     }
     setShowDialog(true);
+  };
+    
+  // Extract question ID from field name (e.g., "question_8" -> 8)
+  const getQuestionIdFromField = (field: string): number | null => {
+    if (field.startsWith('question_')) {
+      const idStr = field.replace('question_', '');
+      const id = parseInt(idStr, 10);
+      return isNaN(id) ? null : id;
+    }
+    return null;
+  };
+  
+  // Store pending submissions to prevent duplicate API calls
+  const pendingSubmissions = useRef<Record<string, boolean>>({});
+  
+  // Debounce function to prevent too many API calls
+  const debounce = (func: Function, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func(...args);
+      }, delay);
+    };
+  };
+  
+  // Find existing answer for a question
+  const findExistingAnswer = (questionId: number) => {
+    return reportAnswers.find(answer => answer.question_id === questionId);
+  };
+  
+  // Handle input blur to submit the answer to the API
+  const handleInputBlur = (field: string) => () => {
+    const value = reportData[field];
+    if (value === undefined || value === '') return; // Don't submit empty values
+    
+    const questionId = getQuestionIdFromField(field);
+    if (!questionId) return; // Not a question field
+    
+    // Check if we're already submitting this answer
+    const submissionKey = `${questionId}_${value}`;
+    if (pendingSubmissions.current[submissionKey]) {
+      console.log(`Submission for question ${questionId} already in progress, skipping`);
+      return;
+    }
+    
+    // Mark this submission as pending
+    pendingSubmissions.current[submissionKey] = true;
+    
+    // Check if we already have an answer for this question
+    const existingAnswer = findExistingAnswer(questionId);
+    
+    console.log(`Submitting answer for question ${questionId} with value: ${value}${existingAnswer ? ' (update)' : ' (new)'}`);
+    
+    // Determine if the value is numeric or string
+    const isNumeric = !isNaN(Number(value)) && value !== '';
+    const payload = {
+      submission_id: existingAnswer?.submission_id || null, // Use existing submission_id if available
+      question_id: questionId,
+      number_value: isNumeric ? Number(value) : null,
+      string_value: isNumeric ? null : String(value)
+    };
+    
+    // Use debounced version to prevent rapid API calls
+    const debouncedSubmit = debounce(() => {
+      // Dispatch the action to submit the answer
+      dispatch(submitReportAnswer(payload))
+        .unwrap()
+        .then((result) => {
+          console.log('Answer submitted successfully:', result);
+          // Remove from pending submissions
+          delete pendingSubmissions.current[submissionKey];
+          
+          // Show a small toast or indicator that the answer was saved
+          // This is optional but provides good UX feedback
+          // You could use a library like react-native-toast-message
+        })
+        .catch((error) => {
+          console.error('Failed to submit answer:', error);
+          // Remove from pending submissions
+          delete pendingSubmissions.current[submissionKey];
+          // Optionally show an error message to the user
+          // Alert.alert('Error', 'Failed to save your answer. Please try again.');
+        });
+    }, 500); // 500ms debounce
+    
+    debouncedSubmit();
   };
 
   const handleDialogConfirm = async () => {
@@ -399,24 +414,26 @@ console.log('reportData', reportData);
   /* -------------------------------------------------------------- */
   /*  Main render                                                   */
   /* -------------------------------------------------------------- */
+  console.log('latestReportMgmtlatestReportMgmtlatestReportMgmt',latestReportMgmt);
+  
+  
   return (
     <ScreenLayout title="رپورٹ بنائیں" onBack={handleBack}>
       <View style={styles.container}>
   
-        <CustomDropdown
-          options={zoneOptions}
-          onSelect={handleZoneSelect}
-          placeholder="زون نمبر منتخب کریں"
-          selectedValue={selectedZone}
-          dropdownContainerStyle={styles.dropdownContainer}
+      <FormInput
+          inputTitle="تنظیمی یونٹ"
+          value={tanzeemiUnits.find(item => item.id === (selectedManagement?.unit_level_id || latestReportMgmt?.unit_level_id))?.Name || ''}
+          editable={false}
+          onChange={() => {}}
         />
-
-         <CustomDropdown
-          options={yearOptions}
-          onSelect={handleYearSelect}
-          placeholder="مدت  : سال"
-          selectedValue={selectedYear}
-          dropdownContainerStyle={styles.dropdownContainer}
+        <FormInput
+          inputTitle="رپورٹنگ ماہ و "
+          value={latestReportMgmt 
+            ? `${getUrduMonth(latestReportMgmt.month)} ${getUrduMonth(latestReportMgmt.month) +' '+ latestReportMgmt.year}ء` 
+            : selectedYear || ''}
+          editable={false}
+          onChange={() => {}}
         />
 
     

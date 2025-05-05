@@ -144,6 +144,7 @@ export interface ReportsState {
   reportSubmissions: ReportSubmission[];
   reportAnswers: ReportAnswer[];
   currentReportData: ReportData;
+  latestReportMgmt: ReportManagement | null;
   submissionStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   submissionError: string | null;
@@ -164,6 +165,7 @@ const initialState: ReportsState = {
   reportSubmissions: [],
   reportAnswers: [],
   currentReportData: {},
+  latestReportMgmt: null,
   status: 'idle',
   submissionStatus: 'idle',
   error: null,
@@ -408,13 +410,65 @@ export const fetchReportQuestions = createAsyncThunk<
   }
 });
 
+/**
+ * Submit a single report answer to the API
+ * This thunk handles real-time submission of individual answers as users type
+ */
+export const submitReportAnswer = createAsyncThunk<
+  ReportAnswer,
+  {
+    submission_id: number | null;
+    question_id: number;
+    number_value: number | null;
+    string_value: string | null;
+  },
+  { state: RootState; rejectValue: string }
+>('reports/submitReportAnswer', async (answerData, { rejectWithValue }) => {
+  try {
+    console.log('Submitting answer with data:', answerData);
+    
+    // First, check if we have the required fields
+
+    
+    // Make the API call to submit the answer
+    const response = await apiRequest<ReportAnswer | { data: ReportAnswer }>(() => ({
+      path: '/items/report_answers',
+      method: 'POST',
+      body: JSON.stringify(answerData),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    
+    // Handle both response formats: direct object or {data: object}
+    let data: ReportAnswer;
+    if (response && 'data' in response && typeof response.data === 'object') {
+      data = response.data as ReportAnswer;
+    } else {
+      data = response as ReportAnswer;
+    }
+    
+    console.log('Successfully submitted answer:', data);
+    return data;
+  } catch (error: any) {
+    console.error('Error submitting answer:', error);
+    return rejectWithValue(
+      error.message || 'Failed to submit answer',
+    );
+  }
+});
+
+/**
+ * Submit the overall report
+ * Note: Individual answers are submitted in real-time, so this only finalizes the report
+ */
 export const submitReport = createAsyncThunk<
   ReportSubmission,
   {
     unit_id: number;
     template_id: number;
     mgmt_id: number;
-    // submission_data?: ReportData;
+    // submission_data?: ReportData; // No longer needed as answers are submitted in real-time
   },
   { state: RootState; rejectValue: string }
 >('reports/submitReport', async (reportData, { getState, rejectWithValue }) => {
@@ -431,6 +485,7 @@ export const submitReport = createAsyncThunk<
       unit_id: reportData.unit_id,
       template_id: reportData.template_id,
       mgmt_id: reportData.mgmt_id,
+      status: 'published', // Mark as published when submitting the final report
     };
     
     console.log('Submitting report with payload:', submissionPayload);
@@ -539,6 +594,45 @@ export const fetchReportAnswers = createAsyncThunk<
   }
 });
 
+export const fetchLatestReportMgmt = createAsyncThunk<
+  ReportManagement,
+  void,
+  { state: RootState; rejectValue: string }
+>('reports/fetchLatestReportMgmt', async (_, { rejectWithValue }) => {
+  try {
+    console.log('Fetching Latest Report Management...');
+    const response = await apiRequest<ReportManagement[] | { data: ReportManagement[] }>(() => ({
+      path: '/items/reports_mgmt',
+      method: 'GET',
+      params: { sort: '-date_created,-id', limit: 1 },
+    }));
+    
+    // Handle both response formats: direct array or {data: array}
+    let data: ReportManagement[];
+    if (Array.isArray(response)) {
+      data = response;
+    } else if (response && 'data' in response && Array.isArray(response.data)) {
+      data = response.data;
+    } else {
+      console.error('Invalid response format for Latest Report Management:', response);
+      return rejectWithValue('Invalid response format for Latest Report Management');
+    }
+    
+    if (!data.length) {
+      console.error('No report management records found');
+      return rejectWithValue('No report management records found');
+    }
+    
+    console.log('Successfully fetched Latest Report Management:', data[0]);
+    return data[0];
+  } catch (error: any) {
+    console.error('Error fetching Latest Report Management:', error);
+    return rejectWithValue(
+      error.message || 'Failed to fetch Latest Report Management',
+    );
+  }
+});
+
 export const fetchAllReportData = createAsyncThunk<
   {
     tanzeemiLevels: TanzeemiLevel[];
@@ -549,6 +643,7 @@ export const fetchAllReportData = createAsyncThunk<
     reportQuestions: ReportQuestion[];
     reportSubmissions: ReportSubmission[];
     reportAnswers: ReportAnswer[];
+    latestReportMgmt: ReportManagement | null;
   },
   void,
   { state: RootState; dispatch: any; rejectValue: string }
@@ -570,7 +665,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportSectionsResult,
       reportQuestionsResult,
       reportSubmissionsResult,
-      reportAnswersResult
+      reportAnswersResult,
+      latestReportMgmtResult
     ] = await Promise.all([
       dispatch(fetchTanzeemiLevels()).unwrap().catch((error: any) => {
         console.error('Failed to fetch Tanzeemi Levels:', error);
@@ -603,6 +699,10 @@ export const fetchAllReportData = createAsyncThunk<
       dispatch(fetchReportAnswers(undefined)).unwrap().catch((error: any) => {
         console.error('Failed to fetch Report Answers:', error);
         return [] as ReportAnswer[];
+      }),
+      dispatch(fetchLatestReportMgmt()).unwrap().catch((error: any) => {
+        console.error('Failed to fetch Latest Report Management:', error);
+        return null;
       })
     ]);
     
@@ -614,7 +714,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportSectionsCount: reportSectionsResult.length,
       reportQuestionsCount: reportQuestionsResult.length,
       reportSubmissionsCount: reportSubmissionsResult.length,
-      reportAnswersCount: reportAnswersResult.length
+      reportAnswersCount: reportAnswersResult.length,
+      latestReportMgmt: latestReportMgmtResult ? 'fetched' : 'not available'
     });
     
     // Return all the fetched data to be used in the fulfilled case
@@ -626,7 +727,8 @@ export const fetchAllReportData = createAsyncThunk<
       reportSections: reportSectionsResult,
       reportQuestions: reportQuestionsResult,
       reportSubmissions: reportSubmissionsResult,
-      reportAnswers: reportAnswersResult
+      reportAnswers: reportAnswersResult,
+      latestReportMgmt: latestReportMgmtResult
     };
   } catch (error: any) {
     console.error('Error in fetchAllReportData:', error);
@@ -642,15 +744,11 @@ const reportsSlice = createSlice({
   name: 'reports',
   initialState,
   reducers: {
-    updateReportData: (
-      state,
-      action: PayloadAction<{
-        field: string;
-        value: string | number | boolean | null;
-      }>,
-    ) => {
-      const { field, value } = action.payload;
-      state.currentReportData = { ...state.currentReportData, [field]: value };
+    updateReportData: (state, action: PayloadAction<ReportData>) => {
+      state.currentReportData = {
+        ...state.currentReportData,
+        ...action.payload
+      };
     },
     resetReportData: (state) => {
       state.currentReportData = {};
@@ -808,6 +906,11 @@ const reportsSlice = createSlice({
           state.reportAnswers = action.payload.reportAnswers;
         }
         
+        // Update latestReportMgmt if available
+        if (action.payload.latestReportMgmt) {
+          state.latestReportMgmt = action.payload.latestReportMgmt;
+        }
+        
         console.log('Updated all report data in store:', {
           tanzeemiLevels: state.tanzeemiLevels.length,
           tanzeemiUnits: state.tanzeemiUnits.length,
@@ -816,12 +919,55 @@ const reportsSlice = createSlice({
           reportSections: state.reportSections.length,
           reportQuestions: state.reportQuestions.length,
           reportSubmissions: state.reportSubmissions.length,
-          reportAnswers: state.reportAnswers.length
+          reportAnswers: state.reportAnswers.length,
+          latestReportMgmt: state.latestReportMgmt ? 'available' : 'not available'
         });
       })
       .addCase(fetchAllReportData.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch report data';
+      })
+      
+      // Handle submitReportAnswer
+      .addCase(submitReportAnswer.pending, (state) => {
+        // We don't set global loading state for individual answer submissions
+        // to avoid UI flicker - optimistic updates are handled in the component
+      })
+      .addCase(submitReportAnswer.fulfilled, (state, action) => {
+        // Update the reportAnswers array with the new answer
+        const existingAnswerIndex = state.reportAnswers.findIndex(
+          answer => answer.question_id === action.payload.question_id && 
+                   answer.submission_id === action.payload.submission_id
+        );
+        
+        if (existingAnswerIndex >= 0) {
+          // Update existing answer
+          state.reportAnswers[existingAnswerIndex] = action.payload;
+        } else {
+          // Add new answer
+          state.reportAnswers.push(action.payload);
+        }
+        
+        console.log('Updated reportAnswers in store after submission:', state.reportAnswers.length);
+      })
+      .addCase(submitReportAnswer.rejected, (state, action) => {
+        // We don't set global error state for individual answer submissions
+        // Error handling is done at the component level with optimistic updates
+        console.error('Failed to submit answer:', action.payload);
+      })
+      
+      // Handle fetchLatestReportMgmt
+      .addCase(fetchLatestReportMgmt.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchLatestReportMgmt.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.latestReportMgmt = action.payload;
+        console.log('Updated latestReportMgmt in store:', state.latestReportMgmt);
+      })
+      .addCase(fetchLatestReportMgmt.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload || 'Failed to fetch Latest Report Management';
       })
       
       // Handle submitReport
@@ -844,7 +990,12 @@ const reportsSlice = createSlice({
 export default reportsSlice.reducer;
 
 /* ------------------------------------------------------------------ */
-/* 5.  Safe selectors                                                 */
+/* 5.  Safe selectors                     // Update latestMgmt if available
+        if (action.payload.latestReportMgmt) {
+          state.latestMgmt = action.payload.latestReportMgmt;
+        }
+        
+                                    */
 /* ------------------------------------------------------------------ */
 
 export const selectTanzeemiLevels = (s: RootState) =>
@@ -885,6 +1036,9 @@ export const selectSubmissionStatus = (s: RootState) =>
 
 export const selectSubmissionError = (s: RootState) =>
   s.reports?.submissionError ?? null;
+
+export const selectLatestReportMgmt = (s: RootState) =>
+  s.reports?.latestReportMgmt ?? null;
 
 /** Helper selector */
 export const selectSectionsWithQuestions = (s: RootState) => {
