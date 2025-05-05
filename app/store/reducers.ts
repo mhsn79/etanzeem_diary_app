@@ -4,6 +4,7 @@ import activitiesReducer from '../features/activities/activitySlice';
 import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
 import personsReducer from '../features/persons/personSlice';
 import reportsReducer from '../features/reports/reportsSlice';
+import tazeemReducer from '../features/tazeem/tazeemSlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
@@ -12,6 +13,7 @@ const rootReducer = combineReducers({
   activityTypes: activityTypesReducer,
   persons: personsReducer,
   reports: reportsReducer,
+  tazeem: tazeemReducer,
 });
 
 export default rootReducer; 

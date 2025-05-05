@@ -1,6 +1,7 @@
 import { Person } from '../models/Person';
 import { Activity } from '@/src/types/Activity';
 import { ActivityType } from '../features/activityTypes/activityTypesSlice';
+import { TanzeemiUnit } from '../models/TanzeemiUnit';
 
 /**
  * Generic type for field mappings
@@ -197,4 +198,35 @@ export function normalizeActivityTypeData<T extends Record<string, any>>(data: T
  */
 export function normalizeActivityTypeDataArray<T extends Record<string, any>>(dataArray: T[]): (T & Partial<ActivityType>)[] {
   return normalizeDataArray<T, ActivityType>(dataArray, activityTypeFieldMappings);
+}
+
+// TanzeemiUnit-specific field mappings
+const tanzeemiUnitFieldMappings: FieldMappings = {
+  'Name': 'name',
+  'Description': 'description',
+  'Parent_id': 'parent_id',
+  'Level': 'level',
+  'Level_id': 'level_id',
+  'zaili_unit_hierarchy': 'zaili_unit_hierarchy',
+  'Status': 'status',
+  'date_created': 'created_at',
+  'date_updated': 'updated_at'
+};
+
+/**
+ * Normalizes TanzeemiUnit API response data
+ * @param data The API response data object
+ * @returns A normalized TanzeemiUnit object
+ */
+export function normalizeTanzeemiUnitData<T extends Record<string, any>>(data: T): T & Partial<TanzeemiUnit> {
+  return normalizeData<T, TanzeemiUnit>(data, tanzeemiUnitFieldMappings);
+}
+
+/**
+ * Normalizes an array of TanzeemiUnit API response data
+ * @param dataArray Array of API response data objects
+ * @returns Array of normalized TanzeemiUnit objects
+ */
+export function normalizeTanzeemiUnitDataArray<T extends Record<string, any>>(dataArray: T[]): (T & Partial<TanzeemiUnit>)[] {
+  return normalizeDataArray<T, TanzeemiUnit>(dataArray, tanzeemiUnitFieldMappings);
 }

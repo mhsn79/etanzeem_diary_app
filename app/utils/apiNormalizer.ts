@@ -9,6 +9,8 @@ export {
   normalizeActivityDataArray,
   normalizeActivityTypeData,
   normalizeActivityTypeDataArray,
+  normalizeTanzeemiUnitData,
+  normalizeTanzeemiUnitDataArray,
   normalizeData,
   normalizeDataArray
 } from './apiNormalizers';

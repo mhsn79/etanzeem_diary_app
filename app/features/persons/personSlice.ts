@@ -6,6 +6,7 @@ import {
   refresh,
   checkAndRefreshTokenIfNeeded,
 } from '../auth/authSlice';
+import { fetchUserTanzeemiUnit } from '../tazeem/tazeemSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
 import { uploadImage } from '@/app/utils/imageUpload';
@@ -247,7 +248,21 @@ export const fetchPersonByEmail = createAsyncThunk<
       return transformedPerson;
     };
 
-    return await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
+    const person = await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
+    
+    // If person data is fetched successfully and has a Tanzeemi_Unit, fetch the unit details
+    if (person && (person.Tanzeemi_Unit || person.unit)) {
+      const unitId = person.Tanzeemi_Unit || person.unit;
+
+      console.log('-------------------unitId:', unitId);
+      
+      if (typeof unitId === 'number') {
+        // Dispatch the action to fetch the tanzeemi unit
+        dispatch(fetchUserTanzeemiUnit(unitId));
+      }
+    }
+    
+    return person;
   } catch (error: any) {
     console.error('Fetch person by email error:', error);
     return rejectWithValue(error.message || `Failed to fetch person with email ${email}`);
