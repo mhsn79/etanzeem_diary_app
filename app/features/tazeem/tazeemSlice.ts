@@ -10,6 +10,28 @@ import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
 import { API_BASE_URL } from '@/app/constants/api';
 
+// Define the TanzeemLevel interface
+export interface TanzeemLevel {
+  id: number;
+  Name: string;
+  Nazim_Label: string;
+  status?: string;
+  sort?: number | null;
+  user_created?: string;
+  date_created?: string;
+  user_updated?: string | null;
+  date_updated?: string | null;
+  [key: string]: any;
+}
+
+export interface TanzeemLevelResponse {
+  data: TanzeemLevel;
+}
+
+export interface TanzeemLevelsResponse {
+  data: TanzeemLevel[];
+}
+
 /**
  * ────────────────────────────────────────────────────────────────────────────────
  * Entity adapter + initial state
@@ -33,6 +55,9 @@ interface TazeemExtraState {
   hierarchyError: string | null;
   unitsByLevel: Record<number, number[]>;
   userUnitHierarchyIds: number[]; // Store all hierarchy IDs for the user's unit
+  userTanzeemiLevelDetails: TanzeemLevel | null;
+  userTanzeemiLevelStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  userTanzeemiLevelError: string | null;
 }
 
 export type TazeemState = ReturnType<typeof tazeemAdapter.getInitialState<TazeemExtraState>>;
@@ -50,6 +75,9 @@ const initialState: TazeemState = tazeemAdapter.getInitialState<TazeemExtraState
   hierarchyError: null,
   unitsByLevel: {},
   userUnitHierarchyIds: [],
+  userTanzeemiLevelDetails: null,
+  userTanzeemiLevelStatus: 'idle',
+  userTanzeemiLevelError: null,
 });
 
 /**
@@ -366,6 +394,86 @@ const fetchAndProcessHierarchy = async (
   }
 };
 
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch a tanzeem level by ID
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+export const fetchTanzeemLevelById = createAsyncThunk<
+  TanzeemLevel,
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('tazeem/fetchLevelById', async (levelId, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Fetching tanzeem level by ID:', levelId);
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded());
+
+    const auth = selectAuthState(getState());
+    let token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const fetchLevel = async (accessToken: string) => {
+      const response = await apiRequest<TanzeemLevelResponse>(
+        `/items/Tanzeemi_Level/${levelId}?fields=*`,
+        'GET',
+        accessToken
+      );
+      
+      console.log('API Response for tanzeem level:', response);
+      if (!response.data) throw new Error(`Tanzeem level with ID ${levelId} not found`);
+      
+      return response.data;
+    };
+
+    return await executeWithTokenRefresh(fetchLevel, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch tanzeem level error:', error);
+    return rejectWithValue(error.message || `Failed to fetch tanzeem level with ID ${levelId}`);
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch all tanzeem levels
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+export const fetchAllTanzeemLevels = createAsyncThunk<
+  TanzeemLevel[],
+  void,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('tazeem/fetchAllLevels', async (_, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Fetching all tanzeem levels');
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded());
+
+    const auth = selectAuthState(getState());
+    let token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const fetchLevels = async (accessToken: string) => {
+      const response = await apiRequest<TanzeemLevelsResponse>(
+        '/items/Tanzeemi_Level?fields=*',
+        'GET',
+        accessToken
+      );
+      
+      console.log('API Response for all tanzeem levels:', response);
+      if (!response.data) throw new Error('Failed to fetch tanzeem levels');
+      
+      return response.data;
+    };
+
+    return await executeWithTokenRefresh(fetchLevels, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch all tanzeem levels error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch tanzeem levels');
+  }
+});
+
 export const fetchUserTanzeemiUnit = createAsyncThunk<
   { unit: TanzeemiUnit | null, hierarchyIds: number[], hierarchyUnits: TanzeemiUnit[] },
   number,
@@ -394,10 +502,19 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     const uniqueHierarchyIds = [...new Set([...allIds, unitId])];
     console.log(`Completed hierarchy processing for unit ${unitId}. Found ${uniqueHierarchyIds.length} unique hierarchy IDs:`, uniqueHierarchyIds);
     console.log(`Collected ${hierarchyUnits.length} units in the hierarchy tree`);
-console.log(hierarchyUnits);
+    console.log(hierarchyUnits);
     
     // Add all units to the store at once
     dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
+    
+    // If the unit has a level_id, fetch the level details
+    if (unit && (unit.Level_id || unit.level_id)) {
+      const levelId = unit.Level_id || unit.level_id;
+      if (typeof levelId === 'number') {
+        // Dispatch the action to fetch the tanzeem level
+        dispatch(fetchTanzeemLevelById(levelId));
+      }
+    }
     
     return { unit, hierarchyIds: uniqueHierarchyIds, hierarchyUnits };
   } catch (error: any) {
@@ -529,6 +646,21 @@ const tazeemSlice = createSlice({
         state.userUnitError = action.payload ?? 'Failed to fetch user tanzeemi unit';
         state.userUnitDetails = null;
         state.userUnitHierarchyIds = [];
+      })
+      
+      // Fetch tanzeem level by ID
+      .addCase(fetchTanzeemLevelById.pending, (state) => {
+        state.userTanzeemiLevelStatus = 'loading';
+        state.userTanzeemiLevelError = null;
+      })
+      .addCase(fetchTanzeemLevelById.fulfilled, (state, action: PayloadAction<TanzeemLevel>) => {
+        state.userTanzeemiLevelStatus = 'succeeded';
+        state.userTanzeemiLevelDetails = action.payload;
+      })
+      .addCase(fetchTanzeemLevelById.rejected, (state, action) => {
+        state.userTanzeemiLevelStatus = 'failed';
+        state.userTanzeemiLevelError = action.payload ?? 'Failed to fetch tanzeem level';
+        state.userTanzeemiLevelDetails = null;
       });
   },
 });
@@ -572,6 +704,11 @@ export const selectUserUnitDetails = (state: RootState) => selectTazeemState(sta
 export const selectUserUnitStatus = (state: RootState) => selectTazeemState(state).userUnitStatus;
 export const selectUserUnitError = (state: RootState) => selectTazeemState(state).userUnitError;
 export const selectUserUnitHierarchyIds = (state: RootState) => selectTazeemState(state).userUnitHierarchyIds;
+
+// User level selectors
+export const selectUserTanzeemiLevelDetails = (state: RootState) => selectTazeemState(state).userTanzeemiLevelDetails;
+export const selectUserTanzeemiLevelStatus = (state: RootState) => selectTazeemState(state).userTanzeemiLevelStatus;
+export const selectUserTanzeemiLevelError = (state: RootState) => selectTazeemState(state).userTanzeemiLevelError;
 
 // Helper selector to get all units in the user's hierarchy
 export const selectUserHierarchyUnits = (state: RootState) => {
