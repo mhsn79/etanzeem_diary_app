@@ -15,13 +15,15 @@ import {
   selectReportTemplates,
   selectReportSections,
   selectReportQuestions,
-  selectTanzeemiLevels,
-  selectTanzeemiUnits,
   selectReportsStatus,
   selectReportsError,
   selectReportSubmissions,
   selectLatestReportMgmt
 } from '@/app/features/reports/reportsSlice';
+import {
+  selectUserTanzeemiLevelDetails,
+  selectAllTanzeemiUnits,
+} from '@/app/features/tazeem/tazeemSlice';
 import { AppDispatch } from '@/app/store';
 import UrduText from '../../components/UrduText';
 
@@ -38,8 +40,8 @@ export default function Reports() {
   const [selectedTab, setSelectedTab] = useState(0);
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
-  const tanzeemiLevels = useSelector(selectTanzeemiLevels) ?? [];
-  const tanzeemiUnits = useSelector(selectTanzeemiUnits) ?? [];
+  const userTanzeemiLevel = useSelector(selectUserTanzeemiLevelDetails) ?? null;
+  const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
   const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates = useSelector(selectReportTemplates) ?? [];
   const reportSections = useSelector(selectReportSections) ?? [];
@@ -59,8 +61,6 @@ export default function Reports() {
       .unwrap()
       .then((result) => {
         console.log('Reports Tab: fetchAllReportData succeeded with data:', {
-          tanzeemiLevelsCount: result.tanzeemiLevels.length,
-          tanzeemiUnitsCount: result.tanzeemiUnits.length,
           reportManagementsCount: result.reportManagements.length,
           reportTemplatesCount: result.reportTemplates.length,
           reportSectionsCount: result.reportSections.length,
@@ -149,7 +149,6 @@ export default function Reports() {
                     {(() => {
                       const currentReport = latestReportMgmt;
                       const template = reportTemplates.find(t => t.id === currentReport.report_template_id);
-                      const level = template && tanzeemiLevels.find(l => l.id === template.unit_level_id);
                       
                       // Calculate days remaining
                       const endDate = new Date(currentReport.reporting_end_date);
@@ -168,7 +167,7 @@ export default function Reports() {
                             <View style={styles.reportSummaryItemValueContainerItem}>
                               <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
                               <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                              <UrduText style={styles.reportSummaryItemValue}>{level ? level.Name : "نامعلوم"}</UrduText>
+                              <UrduText style={styles.reportSummaryItemValue}>{userTanzeemiLevel ? userTanzeemiLevel.Name : "نامعلوم"}</UrduText>
                             </View>
                             <View style={styles.reportSummaryItemValueContainerItem}>
                               <UrduText style={styles.reportSummaryItemValue}>متوقع تکمیل</UrduText>
@@ -277,7 +276,6 @@ export default function Reports() {
                 // Find the template for this submission
                 const template = reportTemplates.find(t => t.id === submission.template_id);
                 // Find the level for this template
-                const level = template && tanzeemiLevels.find(l => l.id === template.unit_level_id);
                 // Find the unit for this submission
                 const unit = tanzeemiUnits.find(u => u.id === submission.unit_id);
                 // Find the management report for this submission
@@ -296,7 +294,7 @@ export default function Reports() {
                       : `رپورٹ ${submission.id}`
                     }
                     sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
-                    location={unit ? unit.Name : (level ? level.Name : "")}
+location=''
                     status={submission.status === 'published' ? "جمع شدہ" : "ڈرافٹ"}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
                     onEdit={handleEdit}

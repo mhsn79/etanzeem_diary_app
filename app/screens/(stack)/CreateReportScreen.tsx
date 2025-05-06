@@ -34,8 +34,6 @@ import {
   selectReportTemplates,
   selectReportsError,
   selectReportsStatus,
-  selectTanzeemiLevels,
-  selectTanzeemiUnits,
   selectReportManagements,
   selectReportAnswers,
   selectLatestReportMgmt,
@@ -43,6 +41,10 @@ import {
   submitReportAnswer,
   updateReportData,
 } from '@/app/features/reports/reportsSlice';
+import {
+  selectUserTanzeemiLevelDetails,
+  selectAllTanzeemiUnits,
+} from '@/app/features/tazeem/tazeemSlice';
 import { AppDispatch } from '@/app/store';
 
 /* ------------------------------------------------------------------ */
@@ -84,8 +86,8 @@ const CreateReportScreen = () => {
   const [selectedManagement, setSelectedManagement] = useState<any>(null);
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
-  const tanzeemiLevels   = useSelector(selectTanzeemiLevels) ?? [];
-  const tanzeemiUnits    = useSelector(selectTanzeemiUnits) ?? [];
+  const userTanzeemiLevel   = useSelector(selectUserTanzeemiLevelDetails) ?? null;
+  const tanzeemiUnits    = useSelector(selectAllTanzeemiUnits) ?? [];
   const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates  = useSelector(selectReportTemplates) ?? [];
   const reportSections   = useSelector(selectReportSections) ?? [];
@@ -96,7 +98,7 @@ const CreateReportScreen = () => {
   const status           = useSelector(selectReportsStatus) ?? 'idle';
   const error            = useSelector(selectReportsError) ?? null;
 
-console.log('tanzeemiLevels', tanzeemiLevels);
+console.log('userTanzeemiLevel', userTanzeemiLevel);
 console.log('tanzeemiUnits', tanzeemiUnits);
 console.log('reportManagements', reportManagements);
 console.log('reportTemplates', reportTemplates);
@@ -373,7 +375,7 @@ console.log('reportData-------->', reportData);
   /* -------------------------------------------------------------- */
   if (status === 'loading' && 
       !reportSections?.length && 
-      !tanzeemiLevels?.length && 
+      !userTanzeemiLevel?.length && 
       !reportTemplates?.length) {
     console.log('Rendering loading state');
     return (

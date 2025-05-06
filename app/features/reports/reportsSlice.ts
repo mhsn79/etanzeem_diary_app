@@ -135,8 +135,6 @@ export interface ReportAnswer {
 }
 
 export interface ReportsState {
-  tanzeemiLevels: TanzeemiLevel[];
-  tanzeemiUnits: TanzeemiUnit[];
   reportManagements: ReportManagement[];
   reportTemplates: ReportTemplate[];
   reportSections: ReportSection[];
@@ -156,8 +154,6 @@ export interface ReportsState {
 /* ------------------------------------------------------------------ */
 
 const initialState: ReportsState = {
-  tanzeemiLevels: [],
-  tanzeemiUnits: [],
   reportManagements: [],
   reportTemplates: [],
   reportSections: [],
@@ -176,74 +172,7 @@ const initialState: ReportsState = {
 /* 3.  Async thunks                                                   */
 /* ------------------------------------------------------------------ */
 
-/** NOTE: identical to your previous code – only shortened comments.  */
-export const fetchTanzeemiLevels = createAsyncThunk<
-  TanzeemiLevel[],
-  void,
-  { state: RootState; rejectValue: string }
->('reports/fetchTanzeemiLevels', async (_, { rejectWithValue }) => {
-  try {
-    console.log('Fetching Tanzeemi Levels...');
-    const response = await apiRequest<TanzeemiLevel[] | { data: TanzeemiLevel[] }>(() => ({
-      path: '/items/Tanzeemi_Level',
-      method: 'GET',
-      params: { sort: 'id' },
-    }));
-    
-    // Handle both response formats: direct array or {data: array}
-    let data: TanzeemiLevel[];
-    if (Array.isArray(response)) {
-      data = response;
-    } else if (response && 'data' in response && Array.isArray(response.data)) {
-      data = response.data;
-    } else {
-      console.error('Invalid response format for Tanzeemi Levels:', response);
-      return rejectWithValue('Invalid response format for Tanzeemi Levels');
-    }
-    
-    console.log('Successfully fetched Tanzeemi Levels:', data.length);
-    return data;
-  } catch (error: any) {
-    console.error('Error fetching Tanzeemi Levels:', error);
-    return rejectWithValue(
-      error.message || 'Failed to fetch Tanzeemi Levels',
-    );
-  }
-});
-
-export const fetchTanzeemiUnits = createAsyncThunk<
-  TanzeemiUnit[],
-  void,
-  { state: RootState; rejectValue: string }
->('reports/fetchTanzeemiUnits', async (_, { rejectWithValue }) => {
-  try {
-    console.log('Fetching Tanzeemi Units...');
-    const response = await apiRequest<TanzeemiUnit[] | { data: TanzeemiUnit[] }>(() => ({
-      path: '/items/Tanzeemi_Unit',
-      method: 'GET',
-      params: { sort: 'id' },
-    }));
-    
-    // Handle both response formats: direct array or {data: array}
-    let data: TanzeemiUnit[];
-    if (Array.isArray(response)) {
-      data = response;
-    } else if (response && 'data' in response && Array.isArray(response.data)) {
-      data = response.data;
-    } else {
-      console.error('Invalid response format for Tanzeemi Units:', response);
-      return rejectWithValue('Invalid response format for Tanzeemi Units');
-    }
-    
-    console.log('Successfully fetched Tanzeemi Units:', data.length);
-    return data;
-  } catch (error: any) {
-    console.error('Error fetching Tanzeemi Units:', error);
-    return rejectWithValue(
-      error.message || 'Failed to fetch Tanzeemi Units',
-    );
-  }
-});
+/** NOTE: Tanzeem-related thunks have been removed and moved to tazeemSlice */
 
 export const fetchReportManagements = createAsyncThunk<
   ReportManagement[],
@@ -635,8 +564,6 @@ export const fetchLatestReportMgmt = createAsyncThunk<
 
 export const fetchAllReportData = createAsyncThunk<
   {
-    tanzeemiLevels: TanzeemiLevel[];
-    tanzeemiUnits: TanzeemiUnit[];
     reportManagements: ReportManagement[];
     reportTemplates: ReportTemplate[];
     reportSections: ReportSection[];
@@ -658,8 +585,6 @@ export const fetchAllReportData = createAsyncThunk<
     
     // Execute all API calls in parallel and unwrap their results
     const [
-      tanzeemiLevelsResult,
-      tanzeemiUnitsResult,
       reportManagementsResult,
       reportTemplatesResult,
       reportSectionsResult,
@@ -668,14 +593,6 @@ export const fetchAllReportData = createAsyncThunk<
       reportAnswersResult,
       latestReportMgmtResult
     ] = await Promise.all([
-      dispatch(fetchTanzeemiLevels()).unwrap().catch((error: any) => {
-        console.error('Failed to fetch Tanzeemi Levels:', error);
-        return [] as TanzeemiLevel[];
-      }),
-      dispatch(fetchTanzeemiUnits()).unwrap().catch((error: any) => {
-        console.error('Failed to fetch Tanzeemi Units:', error);
-        return [] as TanzeemiUnit[];
-      }),
       dispatch(fetchReportManagements()).unwrap().catch((error: any) => {
         console.error('Failed to fetch Report Managements:', error);
         return [] as ReportManagement[];
@@ -707,8 +624,6 @@ export const fetchAllReportData = createAsyncThunk<
     ]);
     
     console.log('All data fetched successfully in fetchAllReportData:', {
-      tanzeemiLevelsCount: tanzeemiLevelsResult.length,
-      tanzeemiUnitsCount: tanzeemiUnitsResult.length,
       reportManagementsCount: reportManagementsResult.length,
       reportTemplatesCount: reportTemplatesResult.length,
       reportSectionsCount: reportSectionsResult.length,
@@ -720,8 +635,6 @@ export const fetchAllReportData = createAsyncThunk<
     
     // Return all the fetched data to be used in the fulfilled case
     return {
-      tanzeemiLevels: tanzeemiLevelsResult,
-      tanzeemiUnits: tanzeemiUnitsResult,
       reportManagements: reportManagementsResult,
       reportTemplates: reportTemplatesResult,
       reportSections: reportSectionsResult,
@@ -759,32 +672,7 @@ const reportsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Handle individual fetch operations
-      .addCase(fetchTanzeemiLevels.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(fetchTanzeemiLevels.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.tanzeemiLevels = action.payload;
-        console.log('Updated tanzeemiLevels in store:', state.tanzeemiLevels.length);
-      })
-      .addCase(fetchTanzeemiLevels.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch Tanzeemi Levels';
-      })
-      
-      .addCase(fetchTanzeemiUnits.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(fetchTanzeemiUnits.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.tanzeemiUnits = action.payload;
-        console.log('Updated tanzeemiUnits in store:', state.tanzeemiUnits.length);
-      })
-      .addCase(fetchTanzeemiUnits.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch Tanzeemi Units';
-      })
+      // Tanzeem-related reducer cases have been removed and moved to tazeemSlice
       
       .addCase(fetchReportManagements.pending, (state) => {
         state.status = 'loading';
@@ -874,14 +762,6 @@ const reportsSlice = createSlice({
         state.status = 'succeeded';
         
         // Update all state properties with the fetched data
-        if (action.payload.tanzeemiLevels.length > 0) {
-          state.tanzeemiLevels = action.payload.tanzeemiLevels;
-        }
-        
-        if (action.payload.tanzeemiUnits.length > 0) {
-          state.tanzeemiUnits = action.payload.tanzeemiUnits;
-        }
-        
         if (action.payload.reportManagements.length > 0) {
           state.reportManagements = action.payload.reportManagements;
         }
@@ -912,8 +792,6 @@ const reportsSlice = createSlice({
         }
         
         console.log('Updated all report data in store:', {
-          tanzeemiLevels: state.tanzeemiLevels.length,
-          tanzeemiUnits: state.tanzeemiUnits.length,
           reportManagements: state.reportManagements.length,
           reportTemplates: state.reportTemplates.length,
           reportSections: state.reportSections.length,
@@ -998,11 +876,7 @@ export default reportsSlice.reducer;
                                     */
 /* ------------------------------------------------------------------ */
 
-export const selectTanzeemiLevels = (s: RootState) =>
-  s.reports?.tanzeemiLevels ?? [];
-
-export const selectTanzeemiUnits = (s: RootState) =>
-  s.reports?.tanzeemiUnits ?? [];
+// Tanzeem-related selectors have been removed and moved to tazeemSlice
 
 export const selectReportManagements = (s: RootState) =>
   s.reports?.reportManagements ?? [];
