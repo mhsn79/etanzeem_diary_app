@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '../../context/LanguageContext';
-import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
 import { COMMON_IMAGES } from '../../constants/images';
@@ -13,8 +12,6 @@ import {
   fetchAllReportData,
   selectReportManagements,
   selectReportTemplates,
-  selectReportSections,
-  selectReportQuestions,
   selectReportsStatus,
   selectReportsError,
   selectReportSubmissions,
@@ -23,12 +20,12 @@ import {
 import {
   selectUserTanzeemiLevelDetails,
   selectAllTanzeemiUnits,
-} from '@/app/features/tazeem/tazeemSlice';
+  selectTanzeemiUnitIds
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 import UrduText from '../../components/UrduText';
 
 // Import components from stack screen
-import ReportActionButton from '../(stack)/components/ReportActionButton';
 import ReportCard from '../(stack)/components/ReportCard';
 
 export default function Reports() {
@@ -41,11 +38,10 @@ export default function Reports() {
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
   const userTanzeemiLevel = useSelector(selectUserTanzeemiLevelDetails) ?? null;
+  const tanzeemiUnitIds = useSelector(selectTanzeemiUnitIds) ?? null;
   const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
   const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates = useSelector(selectReportTemplates) ?? [];
-  const reportSections = useSelector(selectReportSections) ?? [];
-  const reportQuestions = useSelector(selectReportQuestions) ?? [];
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
   const latestReportMgmt = useSelector(selectLatestReportMgmt);
   const status = useSelector(selectReportsStatus) ?? 'idle';

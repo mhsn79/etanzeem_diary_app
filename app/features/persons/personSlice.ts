@@ -6,7 +6,7 @@ import {
   refresh,
   checkAndRefreshTokenIfNeeded,
 } from '../auth/authSlice';
-import { fetchUserTanzeemiUnit } from '../tazeem/tazeemSlice';
+import { fetchUserTanzeemiUnit } from '../tanzeem/tanzeemSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
 import { uploadImage } from '@/app/utils/imageUpload';

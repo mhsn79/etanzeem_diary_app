@@ -5,7 +5,6 @@ import {
   PayloadAction,
 } from '@reduxjs/toolkit';
 import { RootState } from '../../store';
-import directus from '../../services/directus';
 import apiRequest from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded } from '../auth/authSlice';
 
@@ -172,7 +171,7 @@ const initialState: ReportsState = {
 /* 3.  Async thunks                                                   */
 /* ------------------------------------------------------------------ */
 
-/** NOTE: Tanzeem-related thunks have been removed and moved to tazeemSlice */
+/** NOTE: Tanzeem-related thunks have been removed and moved to tanzeemSlice */
 
 export const fetchReportManagements = createAsyncThunk<
   ReportManagement[],
@@ -451,13 +450,32 @@ export const fetchReportSubmissions = createAsyncThunk<
   ReportSubmission[],
   void,
   { state: RootState; rejectValue: string }
->('reports/fetchReportSubmissions', async (_, { rejectWithValue }) => {
+>('reports/fetchReportSubmissions', async (_, { getState, rejectWithValue }) => {
   try {
     console.log('Fetching Report Submissions...');
+    
+    // Get tanzeemiUnitIds from the state
+    const state = getState();
+    const tanzeemiUnitIds = state.tanzeem?.ids;
+    console.log('Tanzeemi Unit IDs:', tanzeemiUnitIds);
+    
+    // Prepare filter parameters
+    let filterParams: any = { sort: 'id' };
+    if(tanzeemiUnitIds && tanzeemiUnitIds.length > 0) {
+       filterParams = {
+        filter: {                 
+          unit_id: { _in: tanzeemiUnitIds }
+        },
+        sort: 'id',
+      };
+    }
+
+   
+    
     const response = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
       path: '/items/reports_submissions',
       method: 'GET',
-      params: { sort: 'id' },
+      params: filterParams,
     }));
     
     // Handle both response formats: direct array or {data: array}
@@ -672,7 +690,7 @@ const reportsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Tanzeem-related reducer cases have been removed and moved to tazeemSlice
+      // Tanzeem-related reducer cases have been removed and moved to tanzeemSlice
       
       .addCase(fetchReportManagements.pending, (state) => {
         state.status = 'loading';
@@ -876,7 +894,7 @@ export default reportsSlice.reducer;
                                     */
 /* ------------------------------------------------------------------ */
 
-// Tanzeem-related selectors have been removed and moved to tazeemSlice
+// Tanzeem-related selectors have been removed and moved to tanzeemSlice
 
 export const selectReportManagements = (s: RootState) =>
   s.reports?.reportManagements ?? [];
@@ -892,6 +910,12 @@ export const selectReportQuestions = (s: RootState) =>
 
 export const selectReportSubmissions = (s: RootState) =>
   s.reports?.reportSubmissions ?? [];
+
+// Selector to get filtered report submissions
+// No longer needed to filter client-side as we're filtering at the API level
+export const selectFilteredReportSubmissions = (s: RootState) => {
+  return s.reports?.reportSubmissions ?? [];
+};
 
 export const selectReportAnswers = (s: RootState) =>
   s.reports?.reportAnswers ?? [];

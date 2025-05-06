@@ -4,7 +4,7 @@ This document explains how to use the new functionality that fetches and manages
 
 ## Overview
 
-The implementation adds a new `tazeemSlice` that fetches Tanzeemi Unit data from the API. It integrates with the `personSlice` to automatically fetch the user's Tanzeemi Unit after fetching their person data. It also provides functionality to fetch and organize units by level, build hierarchies, and find relationships between units.
+The implementation adds a new `tanzeemSlice` that fetches Tanzeemi Unit data from the API. It integrates with the `personSlice` to automatically fetch the user's Tanzeemi Unit after fetching their person data. It also provides functionality to fetch and organize units by level, build hierarchies, and find relationships between units.
 
 ## Tanzeemi Unit Model
 
@@ -28,13 +28,13 @@ interface TanzeemiUnit {
 
 1. When a user logs in, the `login` thunk in `authSlice` automatically dispatches the `fetchPersonByEmail` thunk from `personSlice`.
 2. The person data is fetched from the API and stored in the Redux store under `persons.userDetails`.
-3. If the person data includes a `Tanzeemi_Unit` or `unit` field, the `fetchUserTanzeemiUnit` thunk from `tazeemSlice` is automatically dispatched.
-4. The Tanzeemi Unit data is fetched from the API and stored in the Redux store under `tazeem.userUnitDetails`.
-5. You can access this data using the `selectUserUnitDetails` selector from `tazeemSlice`.
+3. If the person data includes a `Tanzeemi_Unit` or `unit` field, the `fetchUserTanzeemiUnit` thunk from `tanzeemSlice` is automatically dispatched.
+4. The Tanzeemi Unit data is fetched from the API and stored in the Redux store under `tanzeem.userUnitDetails`.
+5. You can access this data using the `selectUserUnitDetails` selector from `tanzeemSlice`.
 
 ## Additional Features
 
-The tazeemSlice also provides:
+The tanzeemSlice also provides:
 
 1. **Hierarchical Organization**: Units can be organized by level and parent-child relationships
 2. **Level-based Filtering**: Fetch units by their level_id
@@ -50,7 +50,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { useSelector } from 'react-redux';
 import { selectUserDetails } from '@/app/features/persons/personSlice';
-import { selectUserUnitDetails, selectUserUnitStatus } from '@/app/features/tazeem/tazeemSlice';
+import { selectUserUnitDetails, selectUserUnitStatus } from '@/app/features/tanzeem/tanzeemSlice';
 
 const ProfileScreen = () => {
   const userDetails = useSelector(selectUserDetails);
@@ -93,7 +93,7 @@ If you need to fetch Tanzeemi Unit data manually, you can use the `fetchTanzeemi
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchTanzeemiUnitById, selectTanzeemiUnitById } from '@/app/features/tazeem/tazeemSlice';
+import { fetchTanzeemiUnitById, selectTanzeemiUnitById } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 const UnitDetailsScreen = ({ unitId }) => {
@@ -134,13 +134,13 @@ To fetch units by level, you can use the `fetchTanzeemiUnitsByLevel` thunk:
 import React, { useEffect } from 'react';
 import { View, Text, FlatList } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchTanzeemiUnitsByLevel, selectUnitsByLevelId, selectTazeemStatus } from '@/app/features/tazeem/tazeemSlice';
+import { fetchTanzeemiUnitsByLevel, selectUnitsByLevelId, selectTanzeemStatus } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 const UnitsByLevelScreen = ({ levelId }) => {
   const dispatch = useDispatch<AppDispatch>();
   const units = useSelector(state => selectUnitsByLevelId(state, levelId));
-  const status = useSelector(selectTazeemStatus);
+  const status = useSelector(selectTanzeemStatus);
 
   useEffect(() => {
     dispatch(fetchTanzeemiUnitsByLevel(levelId));
@@ -184,7 +184,7 @@ import {
   selectChildUnits,
   selectTanzeemiUnitById,
   selectHierarchyStatus
-} from '@/app/features/tazeem/tazeemSlice';
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 const UnitHierarchyScreen = ({ initialUnitId }) => {
@@ -253,13 +253,13 @@ To fetch all Tanzeemi Units, you can use the `fetchTanzeemiUnits` thunk:
 import React, { useEffect } from 'react';
 import { View, Text, FlatList } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchTanzeemiUnits, selectAllTanzeemiUnits, selectTazeemStatus } from '@/app/features/tazeem/tazeemSlice';
+import { fetchTanzeemiUnits, selectAllTanzeemiUnits, selectTanzeemStatus } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 const AllUnitsScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
   const units = useSelector(selectAllTanzeemiUnits);
-  const status = useSelector(selectTazeemStatus);
+  const status = useSelector(selectTanzeemStatus);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -294,7 +294,7 @@ export default AllUnitsScreen;
 
 ## Available Selectors
 
-From `tazeemSlice`:
+From `tanzeemSlice`:
 
 ### Basic Selectors
 - `selectUserUnitDetails`: Gets the user's Tanzeemi Unit details
@@ -302,7 +302,7 @@ From `tazeemSlice`:
 - `selectUserUnitError`: Gets any error that occurred during fetching user unit
 - `selectAllTanzeemiUnits`: Gets all Tanzeemi Units
 - `selectTanzeemiUnitById`: Gets a specific Tanzeemi Unit by ID
-- `selectTazeemStatus`: Gets the loading status for all units
+- `selectTanzeemStatus`: Gets the loading status for all units
 
 ### Hierarchy Selectors
 - `selectHierarchyStatus`: Gets the loading status for the hierarchy
@@ -316,6 +316,6 @@ From `tazeemSlice`:
 
 - The user's Tanzeemi Unit is automatically fetched after login when the person data is fetched, so in most cases, you don't need to dispatch `fetchUserTanzeemiUnit` manually.
 - If the user doesn't have a corresponding Tanzeemi Unit record in the database, `userUnitDetails` will be `null`.
-- The Tanzeemi Unit data is also added to the tazeem entity adapter, so you can access it using `selectTanzeemiUnitById` if you know the ID.
+- The Tanzeemi Unit data is also added to the tanzeem entity adapter, so you can access it using `selectTanzeemiUnitById` if you know the ID.
 - The hierarchy functionality allows you to navigate up and down the unit structure, making it easy to build tree-like UI components.
 - The `zaili_unit_hierarchy` field can be used to display a formatted representation of the unit's position in the hierarchy.

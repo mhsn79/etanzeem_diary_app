@@ -25,9 +25,6 @@ import {
 import { getUrduMonth } from '@/app/constants/urduLocalization';
 import {
   fetchAllReportData,
-  fetchReportSections,
-  fetchReportQuestions,
-  fetchReportAnswers,
   selectCurrentReportData,
   selectReportQuestions,
   selectReportSections,
@@ -44,7 +41,7 @@ import {
 import {
   selectUserTanzeemiLevelDetails,
   selectAllTanzeemiUnits,
-} from '@/app/features/tazeem/tazeemSlice';
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 /* ------------------------------------------------------------------ */

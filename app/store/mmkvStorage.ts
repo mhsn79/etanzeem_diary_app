@@ -8,7 +8,7 @@ export const STORAGE_KEYS = {
   ACTIVITIES: 'activities',
   PERSONS: 'persons',
   REPORTS: 'reports',
-  TAZEEM: 'tazeem',
+  TANZEEM: 'tanzeem',
 } as const;
 
 type StorageKeys = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];

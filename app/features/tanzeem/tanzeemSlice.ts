@@ -37,12 +37,12 @@ export interface TanzeemLevelsResponse {
  * Entity adapter + initial state
  * ────────────────────────────────────────────────────────────────────────────────
  */
-const tazeemAdapter = createEntityAdapter<TanzeemiUnit>({
+const tanzeemAdapter = createEntityAdapter<TanzeemiUnit>({
   selectId: unit => unit.id,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 
-interface TazeemExtraState {
+interface TanzeemExtraState {
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
   selectedUnitId: number | null;
@@ -60,9 +60,9 @@ interface TazeemExtraState {
   userTanzeemiLevelError: string | null;
 }
 
-export type TazeemState = ReturnType<typeof tazeemAdapter.getInitialState<TazeemExtraState>>;
+export type TanzeemState = ReturnType<typeof tanzeemAdapter.getInitialState<TanzeemExtraState>>;
 
-const initialState: TazeemState = tazeemAdapter.getInitialState<TazeemExtraState>({
+const initialState: TanzeemState = tanzeemAdapter.getInitialState<TanzeemExtraState>({
   status: 'idle',
   error: null,
   selectedUnitId: null,
@@ -155,7 +155,7 @@ export const fetchTanzeemiUnits = createAsyncThunk<
   TanzeemiUnit[],
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchAll', async (_, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchAll', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching tanzeemi units...');
 
@@ -197,7 +197,7 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
   TanzeemiUnit,
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchById', async (unitId, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchById', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching tanzeemi unit by ID:', unitId);
     
@@ -239,7 +239,7 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
   { units: TanzeemiUnit[], levelId: number },
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchByLevel', async (levelId, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchByLevel', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching tanzeemi units by level ID:', levelId);
     
@@ -281,7 +281,7 @@ export const fetchUnitHierarchy = createAsyncThunk<
   Record<number, TanzeemiUnit[]>,
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchHierarchy', async (_, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchHierarchy', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching tanzeemi unit hierarchy');
     
@@ -403,7 +403,7 @@ export const fetchTanzeemLevelById = createAsyncThunk<
   TanzeemLevel,
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchLevelById', async (levelId, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchLevelById', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching tanzeem level by ID:', levelId);
     
@@ -443,7 +443,7 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
   TanzeemLevel[],
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchAllLevels', async (_, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchAllLevels', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching all tanzeem levels');
     
@@ -478,7 +478,7 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
   { unit: TanzeemiUnit | null, hierarchyIds: number[], hierarchyUnits: TanzeemiUnit[] },
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tazeem/fetchUserUnit', async (unitId, { getState, dispatch, rejectWithValue }) => {
+>('tanzeem/fetchUserUnit', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Fetching user tanzeemi unit by ID:', unitId);
     
@@ -528,12 +528,12 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
  * Slice
  * ────────────────────────────────────────────────────────────────────────────────
  */
-const tazeemSlice = createSlice({
-  name: 'tazeem',
+const tanzeemSlice = createSlice({
+  name: 'tanzeem',
   initialState,
   reducers: {
     clearTanzeemiUnits(state) {
-      tazeemAdapter.removeAll(state);
+      tanzeemAdapter.removeAll(state);
       state.status = 'idle';
       state.error = null;
     },
@@ -545,10 +545,10 @@ const tazeemSlice = createSlice({
       state.userUnitError = null;
     },
     addTanzeemiUnit(state, action: PayloadAction<TanzeemiUnit>) {
-      tazeemAdapter.upsertOne(state, action.payload);
+      tanzeemAdapter.upsertOne(state, action.payload);
     },
     addMultipleTanzeemiUnits(state, action: PayloadAction<TanzeemiUnit[]>) {
-      tazeemAdapter.upsertMany(state, action.payload);
+      tanzeemAdapter.upsertMany(state, action.payload);
     },
   },
   extraReducers: builder => {
@@ -561,7 +561,7 @@ const tazeemSlice = createSlice({
       .addCase(fetchTanzeemiUnits.fulfilled, (state, action: PayloadAction<TanzeemiUnit[]>) => {
         state.status = 'succeeded';
         console.log('Setting tanzeemi units:', action.payload);
-        tazeemAdapter.setAll(state, action.payload);
+        tanzeemAdapter.setAll(state, action.payload);
       })
       .addCase(fetchTanzeemiUnits.rejected, (state, action) => {
         state.status = 'failed';
@@ -576,7 +576,7 @@ const tazeemSlice = createSlice({
       .addCase(fetchTanzeemiUnitById.fulfilled, (state, action: PayloadAction<TanzeemiUnit>) => {
         state.selectedUnitStatus = 'succeeded';
         state.selectedUnitId = action.payload.id;
-        tazeemAdapter.upsertOne(state, action.payload);
+        tanzeemAdapter.upsertOne(state, action.payload);
       })
       .addCase(fetchTanzeemiUnitById.rejected, (state, action) => {
         state.selectedUnitStatus = 'failed';
@@ -593,7 +593,7 @@ const tazeemSlice = createSlice({
         console.log(`Setting tanzeemi units for level ${action.payload.levelId}:`, action.payload.units);
         
         // Add units to the entity adapter
-        tazeemAdapter.upsertMany(state, action.payload.units);
+        tanzeemAdapter.upsertMany(state, action.payload.units);
         
         // Update the unitsByLevel mapping
         const unitIds = action.payload.units.map(unit => unit.id);
@@ -671,15 +671,15 @@ export const {
   resetUserUnitStatus,
   addTanzeemiUnit,
   addMultipleTanzeemiUnits,
-} = tazeemSlice.actions;
+} = tanzeemSlice.actions;
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
  * Selectors (with safe fallback)
  * ────────────────────────────────────────────────────────────────────────────────
  */
-const selectTazeemState = (state: RootState): TazeemState =>
-  (state as any).tazeem ?? (initialState as TazeemState);
+const selectTanzeemState = (state: RootState): TanzeemState =>
+  (state as any).tanzeem ?? (initialState as TanzeemState);
 
 export const {
   selectAll: selectAllTanzeemiUnits,
@@ -687,28 +687,28 @@ export const {
   selectIds: selectTanzeemiUnitIds,
   selectEntities: selectTanzeemiUnitEntities,
   selectTotal: selectTotalTanzeemiUnits,
-} = tazeemAdapter.getSelectors(selectTazeemState);
+} = tanzeemAdapter.getSelectors(selectTanzeemState);
 
-export const selectTazeemStatus = (state: RootState) => selectTazeemState(state).status;
-export const selectTazeemError = (state: RootState) => selectTazeemState(state).error;
-export const selectSelectedUnitId = (state: RootState) => selectTazeemState(state).selectedUnitId;
+export const selectTanzeemStatus = (state: RootState) => selectTanzeemState(state).status;
+export const selectTanzeemError = (state: RootState) => selectTanzeemState(state).error;
+export const selectSelectedUnitId = (state: RootState) => selectTanzeemState(state).selectedUnitId;
 export const selectSelectedUnit = (state: RootState) => {
   const unitId = selectSelectedUnitId(state);
   return unitId ? selectTanzeemiUnitById(state, unitId) : undefined;
 };
-export const selectSelectedUnitStatus = (state: RootState) => selectTazeemState(state).selectedUnitStatus;
-export const selectSelectedUnitError = (state: RootState) => selectTazeemState(state).selectedUnitError;
+export const selectSelectedUnitStatus = (state: RootState) => selectTanzeemState(state).selectedUnitStatus;
+export const selectSelectedUnitError = (state: RootState) => selectTanzeemState(state).selectedUnitError;
 
 // User unit selectors
-export const selectUserUnitDetails = (state: RootState) => selectTazeemState(state).userUnitDetails;
-export const selectUserUnitStatus = (state: RootState) => selectTazeemState(state).userUnitStatus;
-export const selectUserUnitError = (state: RootState) => selectTazeemState(state).userUnitError;
-export const selectUserUnitHierarchyIds = (state: RootState) => selectTazeemState(state).userUnitHierarchyIds;
+export const selectUserUnitDetails = (state: RootState) => selectTanzeemState(state).userUnitDetails;
+export const selectUserUnitStatus = (state: RootState) => selectTanzeemState(state).userUnitStatus;
+export const selectUserUnitError = (state: RootState) => selectTanzeemState(state).userUnitError;
+export const selectUserUnitHierarchyIds = (state: RootState) => selectTanzeemState(state).userUnitHierarchyIds;
 
 // User level selectors
-export const selectUserTanzeemiLevelDetails = (state: RootState) => selectTazeemState(state).userTanzeemiLevelDetails;
-export const selectUserTanzeemiLevelStatus = (state: RootState) => selectTazeemState(state).userTanzeemiLevelStatus;
-export const selectUserTanzeemiLevelError = (state: RootState) => selectTazeemState(state).userTanzeemiLevelError;
+export const selectUserTanzeemiLevelDetails = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelDetails;
+export const selectUserTanzeemiLevelStatus = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelStatus;
+export const selectUserTanzeemiLevelError = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelError;
 
 // Helper selector to get all units in the user's hierarchy
 export const selectUserHierarchyUnits = (state: RootState) => {
@@ -728,13 +728,13 @@ export const selectAllHierarchyUnits = (state: RootState) => {
 };
 
 // Hierarchy selectors
-export const selectHierarchyStatus = (state: RootState) => selectTazeemState(state).hierarchyStatus;
-export const selectHierarchyError = (state: RootState) => selectTazeemState(state).hierarchyError;
-export const selectUnitsByLevel = (state: RootState) => selectTazeemState(state).unitsByLevel;
+export const selectHierarchyStatus = (state: RootState) => selectTanzeemState(state).hierarchyStatus;
+export const selectHierarchyError = (state: RootState) => selectTanzeemState(state).hierarchyError;
+export const selectUnitsByLevel = (state: RootState) => selectTanzeemState(state).unitsByLevel;
 
 // Helper selector to get units for a specific level
 export const selectUnitsByLevelId = (state: RootState, levelId: number) => {
-  const unitIds = selectTazeemState(state).unitsByLevel[levelId] || [];
+  const unitIds = selectTanzeemState(state).unitsByLevel[levelId] || [];
   return unitIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
 };
 
@@ -758,4 +758,4 @@ export const selectChildUnits = (state: RootState, unitId: number) => {
   });
 };
 
-export default tazeemSlice.reducer;
+export default tanzeemSlice.reducer;

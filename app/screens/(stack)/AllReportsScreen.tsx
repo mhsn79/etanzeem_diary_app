@@ -23,9 +23,10 @@ import {
   selectLatestReportMgmt
 } from '@/app/features/reports/reportsSlice';
 import {
-selectUserTanzeemiLevelDetails,
+  selectUserTanzeemiLevelDetails,
   selectAllTanzeemiUnits,
-} from '@/app/features/tazeem/tazeemSlice';
+  selectTanzeemiUnitIds
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
 
@@ -49,6 +50,7 @@ const AllReportsScreen = () => {
 
   /* ------------ Redux state (immune to 'undefined') ------------- */
   const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
+  const tanzeemiUnitIds = useSelector(selectTanzeemiUnitIds) ?? [];
   const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates = useSelector(selectReportTemplates) ?? [];
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];

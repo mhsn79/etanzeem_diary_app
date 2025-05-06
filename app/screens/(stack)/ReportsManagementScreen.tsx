@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import i18n from '../../i18n';
 import UrduText from '../../components/UrduText';
 import { useLanguage } from '../../context/LanguageContext';
-import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Header from '../../components/Header';
-import ReportActionButton from './components/ReportActionButton';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SIZES, SHADOWS } from '../../constants/theme';
 import { COMMON_IMAGES } from '../../constants/images';
@@ -18,8 +15,6 @@ import {
   fetchAllReportData,
   selectReportManagements,
   selectReportTemplates,
-  selectReportSections,
-  selectReportQuestions,
   selectReportsStatus,
   selectReportsError,
   selectReportSubmissions,
@@ -28,7 +23,7 @@ import {
 import {
   selectUserTanzeemiLevelDetails,
   selectAllTanzeemiUnits,
-} from '@/app/features/tazeem/tazeemSlice';
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 
 const ReportsManagementScreen = () => {
@@ -44,8 +39,6 @@ const ReportsManagementScreen = () => {
   const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
   const reportManagements = useSelector(selectReportManagements) ?? [];
   const reportTemplates = useSelector(selectReportTemplates) ?? [];
-  const reportSections = useSelector(selectReportSections) ?? [];
-  const reportQuestions = useSelector(selectReportQuestions) ?? [];
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
   const latestReportMgmt = useSelector(selectLatestReportMgmt);
   const status = useSelector(selectReportsStatus) ?? 'idle';
