@@ -32,6 +32,7 @@ interface TazeemExtraState {
   hierarchyStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   hierarchyError: string | null;
   unitsByLevel: Record<number, number[]>;
+  userUnitHierarchyIds: number[]; // Store all hierarchy IDs for the user's unit
 }
 
 export type TazeemState = ReturnType<typeof tazeemAdapter.getInitialState<TazeemExtraState>>;
@@ -48,6 +49,7 @@ const initialState: TazeemState = tazeemAdapter.getInitialState<TazeemExtraState
   hierarchyStatus: 'idle',
   hierarchyError: null,
   unitsByLevel: {},
+  userUnitHierarchyIds: [],
 });
 
 /**
@@ -283,8 +285,89 @@ export const fetchUnitHierarchy = createAsyncThunk<
  * Thunk to fetch user's tanzeemi unit
  * ────────────────────────────────────────────────────────────────────────────────
  */
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Helper function to fetch a Tanzeemi unit and process its zaili_unit_hierarchy
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+const fetchAndProcessHierarchy = async (
+  unitId: number,
+  token: string,
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  processedIds: Set<number> = new Set(),
+  allHierarchyIds: number[] = [],
+  allUnits: TanzeemiUnit[] = []
+): Promise<{ unit: TanzeemiUnit | null, allIds: number[], hierarchyUnits: TanzeemiUnit[] }> => {
+  // Avoid processing the same ID multiple times (prevents infinite loops)
+  if (processedIds.has(unitId)) {
+    return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
+  }
+  
+  processedIds.add(unitId);
+  
+  try {
+    const fetchUnit = async (accessToken: string) => {
+      const response = await apiRequest<SingleTanzeemiUnitResponse>(
+        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
+        'GET',
+        accessToken
+      );
+      
+      if (!response.data) {
+        console.log(`Tanzeemi unit with ID ${unitId} not found`);
+        return null;
+      }
+      
+      // Transform the API response to match our expected format
+      return normalizeTanzeemiUnitData(response.data);
+    };
+
+    const unit = await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    
+    if (!unit) {
+      return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
+    }
+    
+    // Add the current unit to our collection of all units
+    allUnits.push(unit);
+    
+    // Process zaili_unit_hierarchy if it exists and is an array
+    if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
+      console.log(`Processing zaili_unit_hierarchy for unit ${unitId}:`, unit.zaili_unit_hierarchy);
+      
+      // Add all hierarchy IDs to our tracking array
+      const hierarchyIds = unit.zaili_unit_hierarchy as number[];
+      allHierarchyIds.push(...hierarchyIds);
+      
+      // Recursively fetch each unit in the hierarchy
+      for (const childId of hierarchyIds) {
+        if (typeof childId === 'number' && !processedIds.has(childId)) {
+          const result = await fetchAndProcessHierarchy(
+            childId, 
+            token, 
+            dispatch, 
+            getState, 
+            processedIds,
+            allHierarchyIds,
+            allUnits
+          );
+          
+          // Merge any new IDs found in nested hierarchies
+          allHierarchyIds.push(...result.allIds.filter(id => !allHierarchyIds.includes(id)));
+        }
+      }
+    }
+    
+    return { unit, allIds: allHierarchyIds, hierarchyUnits: allUnits };
+  } catch (error) {
+    console.error(`Error fetching unit ${unitId} in hierarchy:`, error);
+    return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
+  }
+};
+
 export const fetchUserTanzeemiUnit = createAsyncThunk<
-  TanzeemiUnit | null,
+  { unit: TanzeemiUnit | null, hierarchyIds: number[], hierarchyUnits: TanzeemiUnit[] },
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tazeem/fetchUserUnit', async (unitId, { getState, dispatch, rejectWithValue }) => {
@@ -293,7 +376,7 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     
     if (!unitId) {
       console.log('No tanzeemi unit ID provided');
-      return null;
+      return { unit: null, hierarchyIds: [], hierarchyUnits: [] };
     }
     
     // Refresh token if needed
@@ -303,25 +386,20 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     let token = auth.tokens?.accessToken;
     if (!token) return rejectWithValue('No access token');
 
-    const fetchUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for user tanzeemi unit:', response);
-      if (!response.data) {
-        console.log(`Tanzeemi unit with ID ${unitId} not found`);
-        return null;
-      }
-      
-      // Transform the API response to match our expected format
-      const transformedUnit = normalizeTanzeemiUnitData(response.data);
-      return transformedUnit;
-    };
-
-    return await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    // Fetch the unit and process its hierarchy
+    const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, token, dispatch, getState);
+    console.log('unit------------------->>', unit);
+    
+    // Remove duplicates from the hierarchy IDs
+    const uniqueHierarchyIds = [...new Set([...allIds, unitId])];
+    console.log(`Completed hierarchy processing for unit ${unitId}. Found ${uniqueHierarchyIds.length} unique hierarchy IDs:`, uniqueHierarchyIds);
+    console.log(`Collected ${hierarchyUnits.length} units in the hierarchy tree`);
+console.log(hierarchyUnits);
+    
+    // Add all units to the store at once
+    dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
+    
+    return { unit, hierarchyIds: uniqueHierarchyIds, hierarchyUnits };
   } catch (error: any) {
     console.error('Fetch user tanzeemi unit error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi unit with ID ${unitId}`);
@@ -348,6 +426,12 @@ const tazeemSlice = createSlice({
     resetUserUnitStatus(state) {
       state.userUnitStatus = 'idle';
       state.userUnitError = null;
+    },
+    addTanzeemiUnit(state, action: PayloadAction<TanzeemiUnit>) {
+      tazeemAdapter.upsertOne(state, action.payload);
+    },
+    addMultipleTanzeemiUnits(state, action: PayloadAction<TanzeemiUnit[]>) {
+      tazeemAdapter.upsertMany(state, action.payload);
     },
   },
   extraReducers: builder => {
@@ -427,12 +511,15 @@ const tazeemSlice = createSlice({
         state.userUnitStatus = 'loading';
         state.userUnitError = null;
       })
-      .addCase(fetchUserTanzeemiUnit.fulfilled, (state, action: PayloadAction<TanzeemiUnit | null>) => {
+      .addCase(fetchUserTanzeemiUnit.fulfilled, (state, action: PayloadAction<{ unit: TanzeemiUnit | null, hierarchyIds: number[], hierarchyUnits: TanzeemiUnit[] }>) => {
         state.userUnitStatus = 'succeeded';
-        if (action.payload) {
-          state.userUnitDetails = action.payload;
-          // Also add to the entity adapter
-          tazeemAdapter.upsertOne(state, action.payload);
+        
+        // Store the hierarchy IDs
+        state.userUnitHierarchyIds = action.payload.hierarchyIds;
+        
+        if (action.payload.unit) {
+          state.userUnitDetails = action.payload.unit;
+          // Units are added to the store in the fetchUserTanzeemiUnit function
         } else {
           state.userUnitDetails = null;
         }
@@ -441,6 +528,7 @@ const tazeemSlice = createSlice({
         state.userUnitStatus = 'failed';
         state.userUnitError = action.payload ?? 'Failed to fetch user tanzeemi unit';
         state.userUnitDetails = null;
+        state.userUnitHierarchyIds = [];
       });
   },
 });
@@ -449,6 +537,8 @@ export const {
   clearTanzeemiUnits,
   setSelectedUnitId,
   resetUserUnitStatus,
+  addTanzeemiUnit,
+  addMultipleTanzeemiUnits,
 } = tazeemSlice.actions;
 
 /**
@@ -481,6 +571,24 @@ export const selectSelectedUnitError = (state: RootState) => selectTazeemState(s
 export const selectUserUnitDetails = (state: RootState) => selectTazeemState(state).userUnitDetails;
 export const selectUserUnitStatus = (state: RootState) => selectTazeemState(state).userUnitStatus;
 export const selectUserUnitError = (state: RootState) => selectTazeemState(state).userUnitError;
+export const selectUserUnitHierarchyIds = (state: RootState) => selectTazeemState(state).userUnitHierarchyIds;
+
+// Helper selector to get all units in the user's hierarchy
+export const selectUserHierarchyUnits = (state: RootState) => {
+  const hierarchyIds = selectUserUnitHierarchyIds(state);
+  return hierarchyIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
+};
+
+// Helper selector to get all units in the hierarchy as a flat array
+export const selectAllHierarchyUnits = (state: RootState) => {
+  const userUnit = selectUserUnitDetails(state);
+  const hierarchyUnits = selectUserHierarchyUnits(state);
+  
+  // Combine user unit with hierarchy units if it exists
+  return userUnit 
+    ? [userUnit, ...hierarchyUnits.filter(unit => unit.id !== userUnit.id)] 
+    : hierarchyUnits;
+};
 
 // Hierarchy selectors
 export const selectHierarchyStatus = (state: RootState) => selectTazeemState(state).hierarchyStatus;
