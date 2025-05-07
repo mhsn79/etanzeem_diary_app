@@ -51,3 +51,68 @@ export const getUrduWeekday = (dayNumber: number): string => {
   
   return URDU_WEEKDAYS[dayNumber];
 };
+
+/**
+ * "متوقع تکمیل" جیسا اردو فارمیٹڈ جملہ واپس کرتا ہے۔
+ *
+ * Example:
+ *   formatExpectedCompletion('2024-03-15');
+ *   // → "متوقع تکمیل: 15 مارچ 2024"
+ */
+export const formatExpectedCompletion = (
+  isoDate: string | Date,
+  {
+    extendedDays = 0,           // اگر آپ کو تاریخ میں دن بڑھانے ہوں
+    label = 'متوقع تکمیل',      // جملے کی شروعات (ضرورت ہو تو بدل لیں)
+    useUrduDigits = false        // true کریں تو اعداد ۰۱۲… کی صورت میں آئیں گے
+  }: {
+    extendedDays?: number;
+    label?: string;
+    useUrduDigits?: boolean;
+  } = {}
+): string => {
+  // 1) تاریخ کو Date آبجیکٹ میں بدلیئے
+  const date =
+    typeof isoDate === 'string' ? new Date(isoDate) : new Date(isoDate);
+
+  // 2) اضافی دن شامل کیجیے (اگر چاہیئے)
+  if (extendedDays) {
+    date.setDate(date.getDate() + extendedDays);
+  }
+
+  // 3) دن، مہینہ، سال حاصل کریں
+  const day = date.getDate();
+  const month = getUrduMonth(date.getMonth() + 1); // 1-based کیلئے +1
+  const year = date.getFullYear();
+
+  // 4) اردو ہندسوں کی ضرورت ہو تو بدلیں
+  const formattedDay = useUrduDigits ? toUrduDigits(day) : day.toString();
+  const formattedYear = useUrduDigits ? toUrduDigits(year) : year.toString();
+
+  // 5) آخری سٹرنگ تیار
+  return `${label}: ${formattedDay} ${month} ${formattedYear}`;
+};
+
+/* ------------------------------------------------------------------ */
+/* مددگار فنکشن: انگریزی ہندسوں کو اردو ہندسوں میں بدلنا               */
+/* ------------------------------------------------------------------ */
+
+const EN_TO_URDU_DIGITS_MAP: Record<string, string> = {
+  '0': '۰',
+  '1': '۱',
+  '2': '۲',
+  '3': '۳',
+  '4': '۴',
+  '5': '۵',
+  '6': '۶',
+  '7': '۷',
+  '8': '۸',
+  '9': '۹'
+};
+
+export const toUrduDigits = (value: number | string): string =>
+  value
+    .toString()
+    .split('')
+    .map((d) => EN_TO_URDU_DIGITS_MAP[d] ?? d)
+    .join('');

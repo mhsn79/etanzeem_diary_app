@@ -10,14 +10,17 @@ import { SimpleLineIcons } from '@expo/vector-icons';
 import UrduText from './UrduText';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useSelector } from 'react-redux';
+import { selectAllHierarchyUnits } from '../features/tanzeem/tanzeemSlice';
 
 interface FilterModalProps {
     visible: boolean;
     onClose: () => void;
-    onApplyFilter: (selectedTime: string, startDate: Date, endDate: Date) => void;
+    onApplyFilter: (selectedTime: string, startDate: Date, endDate: Date, selectedUnitId: number | null) => void;
+    onResetFilter: () => void;
 }
 
-const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilter }) => {
+const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilter, onResetFilter }) => {
     const [selectedTime, setSelectedTime] = useState<string>('');
     const [startDate, setStartDate] = useState<Date>(new Date());
     const [endDate, setEndDate] = useState<Date>(new Date());
@@ -25,21 +28,20 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilt
     const [currentDatePicker, setCurrentDatePicker] = useState<'start' | 'end' | null>(null);
     const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
     const [androidDateType, setAndroidDateType] = useState<'start' | 'end' | null>(null);
-
-    const areaOptions = [
-        { label: 'یوسی 05 – شاہ فیصل کالونی', value: 'morning' },
-        { label: 'یوسی 08 – ماڈل کالونی', value: 'afternoon' },
-        { label: 'یوسی 12 – گلزار ٹاؤن', value: 'evening' },
-    ];
+    const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
+    
+    const allHierarchyUnits = useSelector(selectAllHierarchyUnits);
 
     const handleReset = () => {
         setSelectedTime('');
         setStartDate(new Date());
         setEndDate(new Date());
+        setSelectedUnitId(null);
+        onResetFilter(); // Trigger reset in parent
     };
 
     const handleApply = () => {
-        onApplyFilter(selectedTime, startDate, endDate);
+        onApplyFilter(selectedTime, startDate, endDate, selectedUnitId);
         onClose();
     };
 
@@ -106,32 +108,34 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilt
                     <View style={styles.titleContainer}>
                         <UrduText style={styles.title}>فلٹر تلاش کریں</UrduText>
                     </View>
-
-                    <View style={styles.sectionContainer}>
-                        <UrduText style={styles.sectionTitle}>یوسی / علاقہ منتخب کریں</UrduText>
-                        <View style={styles.areaOptionsContainer}>
-                            {areaOptions.map((option) => (
-                                <TouchableOpacity
-                                    key={option.value}
-                                    style={[
-                                        styles.areaOption,
-                                        selectedTime === option.value && styles.selectedAreaOption,
-                                    ]}
-                                    onPress={() => setSelectedTime(option.value)}
-                                >
-                                    <UrduText
-                                        numberOfLines={1}
-                                        style={[
-                                            styles.areaOptionText,
-                                            selectedTime === option.value && styles.selectedAreaOptionText,
-                                        ]}
-                                    >
-                                        {option.label}
-                                    </UrduText>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+{allHierarchyUnits.length > 0 &&
+ <View style={styles.sectionContainer}>
+ <UrduText style={styles.sectionTitle}>یوسی / علاقہ منتخب کریں</UrduText>
+ <View style={styles.areaOptionsContainer}>
+     {allHierarchyUnits.map((unit) => (
+         <TouchableOpacity
+             key={unit.id}
+             style={[
+                 styles.areaOption,
+                 selectedUnitId === unit.id && styles.selectedAreaOption,
+             ]}
+             onPress={() => setSelectedUnitId(unit.id)}
+         >
+             <UrduText
+                 numberOfLines={1}
+                 style={[
+                     styles.areaOptionText,
+                     selectedUnitId === unit.id && styles.selectedAreaOptionText,
+                 ]}
+             >
+                 {unit.name}
+             </UrduText>
+         </TouchableOpacity>
+     ))}
+ </View>
+</View>
+ }
+                   
 
                     <View style={styles.sectionContainer}>
                         <UrduText style={styles.sectionTitle}>مہینہ اور سال منتخب کریں</UrduText>
@@ -371,4 +375,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default FilterModal; 
+export default FilterModal;

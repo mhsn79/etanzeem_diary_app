@@ -19,6 +19,7 @@ export interface TanzeemiUnit {
   Status?: string;
   date_created?: string;
   date_updated?: string;
+  unitDetails?: any;
   [key: string]: any; // Allow for any additional fields
 }
 
