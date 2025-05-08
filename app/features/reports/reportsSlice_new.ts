@@ -147,7 +147,6 @@ export const fetchReportsByUnitId = createAsyncThunk<
       method: 'GET',
       params: { filter: { unit_level_id: { _eq: unitId } } },
     }));
-console.log('templateResponse 99909090990090', templateResponse);
 
     const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
     if (!templates.length) {
@@ -232,7 +231,7 @@ export const selectReportIds = createSelector([selectAllReports], (reports) =>
   Object.keys(reports).map(Number)
 );
 
-export const selectReportsList = createSelector([selectAllReports], (reports) =>
+export const selectManagementReportsList = createSelector([selectAllReports], (reports) =>
   Object.values(reports)
 );
 
@@ -242,12 +241,12 @@ export const selectReportByTemplateId = createSelector(
 );
 
 export const selectReportsByUnitLevelId = createSelector(
-  [selectReportsList, (_state: RootState, unitLevelId: number) => unitLevelId],
+  [selectManagementReportsList, (_state: RootState, unitLevelId: number) => unitLevelId],
   (reportsList, unitLevelId) =>
     reportsList.filter((report) => report.template.unit_level_id === unitLevelId)
 );
 
-export const selectAllManagements = createSelector([selectReportsList], (reportsList) =>
+export const selectAllManagements = createSelector([selectManagementReportsList], (reportsList) =>
   reportsList.flatMap((report) => report.managements)
 );
 

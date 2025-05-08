@@ -26,7 +26,7 @@ The new Reports slice is designed to:
 ```typescript
 import { 
   fetchReportsByUnitId,
-  selectReportsList,
+  selectManagementReportsList,
   selectReportsLoading,
   selectReportsError,
   ReportData
@@ -50,7 +50,7 @@ useEffect(() => {
 
 ```typescript
 // Get all reports as an array
-const reportsList = useSelector(selectReportsList);
+const reportsList = useSelector(selectManagementReportsList);
 
 // Get loading status
 const loading = useSelector(selectReportsLoading);
@@ -93,7 +93,7 @@ const specificReport = useSelector(state => selectReportByTemplateId(state, temp
 
 - **Derived Selectors**
   - `selectReportIds`: Get an array of all template IDs
-  - `selectReportsList`: Get an array of all reports
+  - `selectManagementReportsList`: Get an array of all reports
   - `selectReportByTemplateId`: Get a specific report by template ID
   - `selectReportsByUnitLevelId`: Get reports for a specific unit level
   - `selectAllManagements`: Get all managements across all reports

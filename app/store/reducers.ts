@@ -6,6 +6,7 @@ import personsReducer from '../features/persons/personSlice';
 import reportsReducer from '../features/reports/reportsSlice';
 import reportsNewReducer from '../features/reports/reportsSlice_new';
 import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
+import qaReducer from '../features/qa/qaSlice';
 
 // Combine reducers
 const rootReducer = combineReducers({
@@ -16,6 +17,7 @@ const rootReducer = combineReducers({
   reports: reportsReducer,
   reportsNew: reportsNewReducer, // Add the new reports slice
   tanzeem: tanzeemReducer,
+  qa: qaReducer, // Add the QA slice
 });
 
 export default rootReducer; 

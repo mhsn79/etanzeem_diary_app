@@ -21,7 +21,7 @@ import { ROUTES } from '../../constants/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchReportsByUnitId,
-  selectReportsList,
+  selectManagementReportsList,
   selectReportSubmissions,
   selectReportsError,
   selectReportsLoading,
@@ -40,10 +40,10 @@ const ReportsManagementScreen: React.FC = () => {
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
-  const reportDetails = useSelector(selectReportsList) ?? [];
+  const reportMgmtDetails = useSelector(selectManagementReportsList) ?? [];
   const loading = useSelector(selectReportsLoading);
   const error = useSelector(selectReportsError);
-
+  
   // Memoized filtered submissions
   const filteredSubmissions = useMemo(() => {
     return reportSubmissions.filter((submission) =>
@@ -67,7 +67,7 @@ const ReportsManagementScreen: React.FC = () => {
   }, [router]);
 
   const handleCreateReport = useCallback(() => {
-    router.push(ROUTES.CREATE_REPORT);
+ router.push(ROUTES.CREATE_REPORT,{});
   }, [router]);
 
   useEffect(() => {
@@ -123,7 +123,7 @@ const ReportsManagementScreen: React.FC = () => {
     );
   }
 
-  const latestManagement = reportDetails[0]?.managements[0];
+  const latestManagement = reportMgmtDetails[0]?.managements[0];
   const completionPercentage = 50; // Mock data
   const daysRemaining = latestManagement
     ? Math.ceil(
@@ -149,10 +149,10 @@ const ReportsManagementScreen: React.FC = () => {
             onPress={handleCreateReport}
             activeOpacity={0.8}
           >
-            {latestManagement && reportDetails[0]?.template ? (
+            {latestManagement && reportMgmtDetails[0]?.template ? (
               <>
                 <UrduText style={styles.reportSummaryItemTitle}>
-                  {`${reportDetails[0].template.report_name}۔ ماہ ${getUrduMonth(
+                  {`${reportMgmtDetails[0].template.report_name}۔ ماہ ${getUrduMonth(
                     latestManagement.month
                   )} ${latestManagement.year}ء`}
                 </UrduText>
@@ -228,7 +228,7 @@ const ReportsManagementScreen: React.FC = () => {
               const formattedDate = submission.date_created
                 ? new Date(submission.date_created).toLocaleDateString('ur-PK')
                 : '';
-              const management = reportDetails
+              const management = reportMgmtDetails
                 .flatMap((r) => r.managements)
                 .find((m) => m.id === submission.mgmt_id);
 
@@ -249,7 +249,7 @@ const ReportsManagementScreen: React.FC = () => {
               );
             })
           ) : (
-            <View style={styles.noReportsContainer}>
+            <View style={[styles.noReportsContainer, { backgroundColor: COLORS.white }]}>
               <Image
                 source={COMMON_IMAGES.noReport}
                 style={styles.noReportImage}
@@ -383,10 +383,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   noReportsContainer: {
-    height: 300,
+
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.lightGray,
   },
   noReportImage: {
     width: 120,

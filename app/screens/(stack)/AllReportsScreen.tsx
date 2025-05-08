@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Text } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Header from '../../components/Header';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
 import ReportCard from './components/ReportCard';
@@ -14,7 +13,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchReportsByUnitId,
   fetchReportSubmissions,
-  selectReportsList,
+  selectManagementReportsList,
   selectReportSubmissions,
   selectReportsError,
   selectReportsLoading,
@@ -23,6 +22,7 @@ import { selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/ta
 import { AppDispatch } from '@/app/store';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
 import ScreenLayout from '@/app/components/ScreenLayout';
+import { COMMON_IMAGES } from '@/app/constants/images';
 
 const AllReportsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -41,7 +41,7 @@ const AllReportsScreen: React.FC = () => {
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
-  const reportDetails = useSelector(selectReportsList) ?? [];
+  const reportDetails = useSelector(selectManagementReportsList) ?? [];
   const loading = useSelector(selectReportsLoading);
   const error = useSelector(selectReportsError);
 
@@ -52,7 +52,6 @@ const AllReportsScreen: React.FC = () => {
   ];
 
   const filteredReports = useMemo(() => {
-    console.log('filterCriteria', filterCriteria);
   
     let reports = reportSubmissions.filter((submission) =>
       selectedTab === 0
@@ -87,10 +86,8 @@ const AllReportsScreen: React.FC = () => {
         return reportDate >= filterCriteria.startDate! && reportDate <= filterCriteria.endDate!;
       });
     }
-console.log('filterCriteria.selectedUnitIdfilterCriteria.selectedUnitId',filterCriteria.selectedUnitId,JSON.stringify(reports,null,2));
 
     if (filterCriteria.selectedUnitId !== null) {
-      console.log('after applying filters',reports);
       reports = reports.filter((report) => report?.unitDetails?.id === filterCriteria.selectedUnitId);
     }
 
@@ -185,8 +182,7 @@ console.log('filterCriteria.selectedUnitIdfilterCriteria.selectedUnitId',filterC
 
   if (error) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Header title="جمع شدہ رپورٹس" onBack={handleBack} />
+<ScreenLayout title="جمع شدہ رپورٹس" onBack={handleBack}>       
         <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
         <TouchableOpacity
           style={styles.retryButton}
@@ -194,7 +190,7 @@ console.log('filterCriteria.selectedUnitIdfilterCriteria.selectedUnitId',filterC
         >
           <UrduText style={styles.retryButtonText}>دوبارہ کوشش کریں</UrduText>
         </TouchableOpacity>
-      </View>
+      </ScreenLayout>
     );
   }
 
@@ -224,6 +220,11 @@ console.log('filterCriteria.selectedUnitIdfilterCriteria.selectedUnitId',filterC
 
       {filteredReports?.length === 0 ? (
         <View style={styles.noReportsContainer}>
+             <Image
+                          source={COMMON_IMAGES.noReport}
+                          style={styles.noReportImage}
+                          resizeMode="contain"
+                  />
           <UrduText style={styles.noReportsText}>کوئی رپورٹس نہیں ملیں۔</UrduText>
         </View>
       ) : (
@@ -324,11 +325,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.xl,
   },
+  noReportImage: {
+    width: 120,
+    height: 120,
+    marginBottom: SPACING.md,
+  },
   noReportsText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
     textAlign: 'center',
   },
+
 });
 
 export default AllReportsScreen;
