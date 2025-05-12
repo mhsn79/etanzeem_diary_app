@@ -171,6 +171,7 @@ export default function Arkan() {
                 placeholderTextColor={COLORS.textSecondary}
                 onChangeText={handleSearch}
                 value={searchQuery}
+                textAlign='right'
                 style={styles.searchInput}
               />
             </View>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import React from 'react';
-import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity } from "react-native";
+import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,7 +166,8 @@ const styles = StyleSheet.create({
     borderBottomEndRadius: 20,
   },
   header: {
-    flexDirection: 'row-reverse',
+    // Use I18nManager.isRTL to determine layout direction based on app language
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,

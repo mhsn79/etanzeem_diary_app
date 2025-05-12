@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   ImageSourcePropType,
   Alert,
+  Platform,
+  I18nManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6, Ionicons } from '@expo/vector-icons';
@@ -135,7 +137,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       <View
         style={[
           styles.headerContent,
-          { paddingTop: insets.top + 8 },
+          { paddingTop: insets.top  },
         ]}
       >
         {/* Left Icons (Settings + Edit) */}
@@ -222,7 +224,8 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   headerContent: {
-    flexDirection: 'row-reverse',
+    // Use I18nManager.isRTL to determine layout direction based on app language
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,

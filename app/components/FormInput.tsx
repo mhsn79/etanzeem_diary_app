@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, Text } from 'react-native';
+import { View, TextInput, StyleSheet, Text, I18nManager } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
 
@@ -47,8 +47,8 @@ const FormInput: React.FC<FormInputProps> = ({
       <View style={styles.titleContainer}>
         {mainTitle && <UrduText style={styles.mainTitle}>{mainTitle}</UrduText>}
         <View style={styles.titleRow}>
-          <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
           {required && <Text style={styles.requiredStar}>*</Text>}
+          <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
         </View>
       </View>
       <View style={[
@@ -92,27 +92,33 @@ const styles = StyleSheet.create({
   titleContainer: {
     marginBottom: SPACING.sm,
     lineHeight: 40,
+    width: '100%', // Ensure the container takes full width
+    alignItems: 'flex-end', // Align children to the end (right in LTR, left in RTL)
   },
   titleRow: {
-    flexDirection: 'row',
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end', // Align to the right for RTL support
+    width: '100%', // Ensure the row takes full width
   },
   mainTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: '600',
     color: COLORS.primary,
     marginBottom: SPACING.xs,
-    textAlign: 'left',
-    lineHeight: 40
+    textAlign: 'right', // Changed to right alignment
+    lineHeight: 40,
+    width: '100%', // Ensure the title takes full width
   },
   inputTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
-    textAlign: 'left',
+    textAlign: 'right', // Changed to right alignment
   },
   requiredStar: {
     color: COLORS.error || 'red',
-    marginLeft: 4,
+    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
+    marginLeft: 2, // Small margin on left for spacing
     fontSize: TYPOGRAPHY.fontSize.md,
   },
   inputContainer: {
@@ -148,14 +154,17 @@ const styles = StyleSheet.create({
     color: COLORS.error || 'red',
     fontSize: TYPOGRAPHY.fontSize.sm,
     marginTop: 4,
-    marginLeft: 4,
+    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
+    textAlign: 'right', // Ensure error text is right-aligned
+    width: '100%', // Ensure the error text takes full width
   },
   helpText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginTop: 4,
-    marginLeft: 4,
+    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
     textAlign: 'right',
+    width: '100%', // Ensure the help text takes full width
   },
 });
 
