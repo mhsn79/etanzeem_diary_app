@@ -148,5 +148,12 @@
     "update": "اپ ڈیٹ",
     "image_picker_error": "تصویر منتخب کرنے میں خرابی",
     "failed_to_update_profile_picture": "پروفائل تصویر کو اپ ڈیٹ کرنے میں ناکامی",
-    "profile_picture_updated": "پروفائل تصویر کامیابی سے اپ ڈیٹ ہو گئی"
+    "profile_picture_updated": "پروفائل تصویر کامیابی سے اپ ڈیٹ ہو گئی",
+    "total_members": "کل ارکان",
+    "add_new": "نیا شامل کریں",
+    "search_by_name_address_phone": "نام، پتہ یا فون نمبر سے تلاش کریں",
+    "api_error": "API خرابی: اجازت نہیں یا فیلڈ موجود نہیں",
+    "no_search_results_for": "کوئی تلاش کے نتائج نہیں ملے",
+    "no_persons_found_in_units": "آپ کے یونٹس میں کوئی افراد نہیں ملے",
+    "refresh": "ریفریش کریں"
 }

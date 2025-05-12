@@ -54,10 +54,14 @@ const apiRequest = async <T>(url: string, method: string, token: string, body?: 
     body: body ? JSON.stringify(body) : undefined,
   };
 
-  const response = await fetch(`${API_BASE_URL}${url}`, options);
+  // Ensure URL is properly formatted
+  const requestUrl = `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
+  console.log(`Making ${method} request to: ${requestUrl}`, Platform.OS);
+  
+  const response = await fetch(requestUrl, options);
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('API Error:', errorText);
+    console.error('API Error:', errorText, Platform.OS);
     throw new Error(errorText || `Request failed with status ${response.status}`);
   }
 
@@ -103,15 +107,23 @@ export const fetchPersonsByUnit = createAsyncThunk<
       return [];
     }
 
-    const params = new URLSearchParams({
-      'filter[Tanzeemi_Unit][_in]': tanzeemiUnitIds.join(','),
-      sort: 'id',
-      fields: '*',
-    });
+    // Create a more explicit URLSearchParams object to ensure consistent behavior across platforms
+    const params = new URLSearchParams();
+    params.append('filter[Tanzeemi_Unit][_in]', tanzeemiUnitIds.join(','));
+    params.append('sort', 'id');
+    params.append('fields', '*');
+    
+    console.log('Fetching persons by unit:', Platform.OS, 'Unit IDs:', tanzeemiUnitIds);
 
     const fetchPersons = async (accessToken: string) => {
+      // Construct the URL with proper encoding
+      const url = `/items/Person`;
+      const queryString = params.toString();
+      
+      console.log('API request URL:', `${url}?${queryString}`);
+      
       const response = await apiRequest<PersonResponse>(
-        `/items/Person?${params.toString()}`,
+        `${url}?${queryString}`,
         'GET',
         accessToken
       );
