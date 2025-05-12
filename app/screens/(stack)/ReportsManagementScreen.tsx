@@ -67,8 +67,19 @@ const ReportsManagementScreen: React.FC = () => {
   }, [router]);
 
   const handleCreateReport = useCallback(() => {
- router.push(ROUTES.CREATE_REPORT,{});
-  }, [router]);
+    // If we have report management details with a template, pass the template ID
+    if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
+      console.log('Navigating to create report with template ID:', reportMgmtDetails[0].template.id);
+      router.push({
+        pathname: ROUTES.CREATE_REPORT,
+        params: { templateId: reportMgmtDetails[0].template.id.toString() }
+      });
+    } else {
+      // If no template is available, just navigate without params
+      console.warn('No template available for report creation');
+      router.push(ROUTES.CREATE_REPORT);
+    }
+  }, [router, reportMgmtDetails]);
 
   useEffect(() => {
       // Fetch reports by unit ID when the component mounts

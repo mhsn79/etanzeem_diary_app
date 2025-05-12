@@ -117,7 +117,7 @@ export interface QAState {
   questions: NormalizedEntities<ReportQuestion>;
   answers: NormalizedEntities<ReportAnswer>;
   submissions: NormalizedEntities<ReportSubmission>;
-  currentSubmissionId: string | null;
+  currentSubmissionId: number | null;
   progress: { [sectionId: number]: SectionProgress };
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;

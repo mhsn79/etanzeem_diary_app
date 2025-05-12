@@ -19,6 +19,7 @@ export interface FormInputProps {
   error?: string;
   required?: boolean;
   multiline?: boolean;
+  numberOfLines?: number;
   helpText?: string;
 }
 
@@ -38,6 +39,7 @@ const FormInput: React.FC<FormInputProps> = ({
   error,
   required,
   multiline = false,
+  numberOfLines,
   helpText,
 }) => {
   return (
@@ -74,7 +76,7 @@ const FormInput: React.FC<FormInputProps> = ({
           textAlignVertical="center"
           editable={editable && !disabled}
           multiline={multiline}
-          numberOfLines={multiline ? 3 : 1}
+          numberOfLines={numberOfLines || (multiline ? 3 : 1)}
         />
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -85,7 +87,7 @@ const FormInput: React.FC<FormInputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   titleContainer: {
     marginBottom: SPACING.sm,

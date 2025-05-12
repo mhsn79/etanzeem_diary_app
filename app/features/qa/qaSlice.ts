@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
-import { v4 as uuidv4 } from 'uuid';
 import { RootState, AppDispatch } from '../../store';
 import apiRequest from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded } from '../auth/authSlice';
@@ -89,21 +88,30 @@ const calculateSectionProgress = (
   questions: NormalizedEntities<ReportQuestion>,
   answers: NormalizedEntities<ReportAnswer>
 ): SectionProgress => {
+  // Handle case where questions.byId might be undefined
+  if (!questions.byId) {
+    return { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
+  }
+  
   // Get all questions for this section
   const sectionQuestions = Object.values(questions.byId).filter(
-    q => q.section_id === sectionId
+    q => q && q.section_id === sectionId
   );
   
   // Count total questions
   const totalQuestions = sectionQuestions.length;
   
   // Count answered questions
-  const answeredQuestions = sectionQuestions.filter(question => 
-    Object.values(answers.byId).some(answer => 
+  const answeredQuestions = sectionQuestions.filter(question => {
+    // Handle case where answers.byId might be undefined
+    if (!answers.byId) return false;
+    
+    return Object.values(answers.byId).some(answer => 
+      answer && 
       answer.question_id === question.id && 
       (answer.string_value !== null || answer.number_value !== null)
-    )
-  ).length;
+    );
+  }).length;
   
   // Calculate percentage
   const percentage = totalQuestions > 0 
@@ -125,12 +133,17 @@ const updateAllSectionsProgress = (
 ): { [sectionId: number]: SectionProgress } => {
   const progress: { [sectionId: number]: SectionProgress } = {};
   
-  state.sections.allIds.forEach(sectionId => {
-    progress[sectionId] = calculateSectionProgress(
-      sectionId,
-      state.questions,
-      state.answers
-    );
+  // Handle case where sections.allIds might be undefined
+  const sectionIds = Array.isArray(state.sections.allIds) ? state.sections.allIds : [];
+  
+  sectionIds.forEach(sectionId => {
+    if (sectionId !== undefined) {
+      progress[sectionId] = calculateSectionProgress(
+        sectionId,
+        state.questions,
+        state.answers
+      );
+    }
   });
   
   return progress;
@@ -157,7 +170,7 @@ export const fetchReportSections = createAsyncThunk<
     }
     
     // Construct filter parameter
-    const filter = JSON.stringify({ template_id: { _eq: params.template_id } });
+    const filter ={ template_id: { _eq: params.template_id } };
     
     // Make API request
     const response = await apiRequest<ReportSection[] | { data: ReportSection[] }>(() => ({
@@ -165,6 +178,7 @@ export const fetchReportSections = createAsyncThunk<
       method: 'GET',
       params: { filter, sort: 'sort' }
     }));
+    console.log('API response of section:', response);
     
     // Handle both response formats: direct array or {data: array}
     let data: ReportSection[];
@@ -201,7 +215,7 @@ export const fetchReportQuestions = createAsyncThunk<
     // Construct filter parameter if section_id is provided
     const params_obj: any = {};
     if (params.section_id) {
-      params_obj.filter = JSON.stringify({ section_id: { _eq: params.section_id } });
+      params_obj.filter = { section_id: { _eq: params.section_id } };
     }
     
     // Add sorting
@@ -213,6 +227,7 @@ export const fetchReportQuestions = createAsyncThunk<
       method: 'GET',
       params: params_obj
     }));
+    console.log('API response of question:', response);
     
     // Handle both response formats: direct array or {data: array}
     let data: ReportQuestion[];
@@ -251,19 +266,21 @@ export const fetchReportAnswers = createAsyncThunk<
       return rejectWithValue('Invalid submission ID provided');
     }
     
-    // Construct filter parameter
-    let filter: any = { submission_id: { _eq: params.submission_id } };
+    // Construct filter parameter with proper type
+    const filter: { submission_id: { _eq: number }; question_id?: { _eq: number } } = { 
+      submission_id: { _eq: params.submission_id } 
+    };
     
     // Add question_id filter if provided
     if (params.question_id) {
       filter.question_id = { _eq: params.question_id };
     }
     
-    // Make API request
+    // Make API request with proper filter
     const response = await apiRequest<ReportAnswer[] | { data: ReportAnswer[] }>(() => ({
       path: '/items/report_answers',
       method: 'GET',
-      params: { filter: JSON.stringify(filter) }
+      params: { filter }
     }));
     
     // Handle both response formats: direct array or {data: array}
@@ -290,9 +307,72 @@ export const fetchReportAnswers = createAsyncThunk<
 /**
  * Fetch all report data sequentially (sections -> questions -> answers)
  */
+/**
+ * Create a new report submission when first visiting the Create Report Screen
+ */
+export const createInitialSubmission = createAsyncThunk<
+  ReportSubmission,
+  { template_id: number; unit_id: number; mgmt_id: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('qa/createInitialSubmission', async (params, { dispatch, rejectWithValue }) => {
+  try {
+    console.log('99999-------------------------------------------------------------------', 
+      params.template_id, params.unit_id, params.mgmt_id);
+    
+    // Validate required fields
+    if (!params.unit_id || !params.template_id || !params.mgmt_id) {
+      return rejectWithValue('Missing required fields for initial report submission');
+    }
+    
+
+  
+    
+    // Create submission payload with explicit ID and draft status
+    const submissionData = {
+    
+      template_id: params.template_id,
+      unit_id: params.unit_id,
+      mgmt_id: params.mgmt_id,
+      status: 'draft' 
+    };
+    console.log('submissionData:_____________________________>>>>>>>>', submissionData);
+    
+    // Make API request to create the submission
+    const response = await apiRequest<ReportSubmission | { data: ReportSubmission }>(() => ({
+      path: '/items/report_submissions',
+      method: 'POST',
+      body: JSON.stringify(submissionData),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    console.log();
+    
+    // Handle both response formats: direct object or {data: object}
+    let data: ReportSubmission;
+    if (response && 'data' in response && typeof response.data === 'object') {
+      data = response.data as ReportSubmission;
+    } else {
+      data = response as ReportSubmission;
+    }
+    
+    console.log('Successfully created initial report submission:', data);
+    
+    // Set the current submission ID
+    dispatch(setCurrentSubmissionId(data.id || null));
+    
+    return data;
+  } catch (error: any) {
+    console.error('Error creating initial report submission:', JSON.stringify(error, null, 2));
+    return rejectWithValue(
+      error.message || 'Failed to create initial report submission'
+    );
+  }
+});
+
 export const fetchReportData = createAsyncThunk<
   void,
-  { template_id: number; submission_id?: number },
+  { template_id: number; submission_id?: number; unit_id?: number; mgmt_id?: number },
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/fetchReportData', async (params, { dispatch, getState, rejectWithValue }) => {
   try {
@@ -307,16 +387,80 @@ export const fetchReportData = createAsyncThunk<
     
     // Step 2: Fetch questions for each section
     for (const section of sectionsResult) {
-      await dispatch(fetchReportQuestions({ section_id: section.id })).unwrap();
+      try {
+        await dispatch(fetchReportQuestions({ section_id: section.id })).unwrap();
+      } catch (error: any) {
+        console.error(`Error fetching questions for section ${section.id}:`, error);
+        // Continue with other sections instead of failing the whole process
+      }
     }
     
-    // Step 3: If submission_id is provided, fetch answers
-    if (params.submission_id) {
-      await dispatch(fetchReportAnswers({ submission_id: params.submission_id })).unwrap();
-    } else {
-      // If no submission_id, generate a new one
-      const submissionId = uuidv4();
-      dispatch(setCurrentSubmissionId(submissionId));
+    // Step 3: Handle submission ID
+    let currentSubmissionId = params.submission_id;
+    
+    // Check if we already have a submission ID in state
+    if (!currentSubmissionId) {
+      const state = getState();
+      // Convert null to undefined to satisfy TypeScript
+      currentSubmissionId = state.qa.currentSubmissionId || undefined;
+    }
+    
+    // If we have a submission ID (either from params or state), fetch answers
+    if (currentSubmissionId !== undefined) {
+      console.log('Using existing submission ID:', currentSubmissionId);
+      try {
+        // No need for explicit cast since we've already ensured it's a number
+        await dispatch(fetchReportAnswers({ submission_id: currentSubmissionId })).unwrap();
+      } catch (error: any) {
+        console.error('Error fetching answers for submission:', error);
+        // Continue anyway, as we might be creating a new submission
+      }
+    } 
+    // If no submission ID but we have unit_id and mgmt_id, create a new submission
+    else if (params.unit_id && params.mgmt_id) {
+      console.log('Creating new submission with template_id:', params.template_id, 'unit_id:', params.unit_id, 'mgmt_id:', params.mgmt_id);
+      try {
+        const submission = await dispatch(createInitialSubmission({
+          template_id: params.template_id,
+          unit_id: params.unit_id,
+          mgmt_id: params.mgmt_id
+        })).unwrap();
+        
+        // Set the current submission ID
+        if (submission.id) {
+          console.log('Created new submission with ID:', submission.id);
+          dispatch(setCurrentSubmissionId(submission.id));
+          
+          // Try to fetch any existing answers for this submission
+          try {
+            await dispatch(fetchReportAnswers({ submission_id: submission.id })).unwrap();
+          } catch (error) {
+            console.error('No existing answers found for new submission:', error);
+            // This is expected for a new submission, so we can continue
+          }
+        } else {
+          console.error('Created submission has no ID');
+          dispatch(setCurrentSubmissionId(null));
+        }
+      } catch (error: any) {
+        console.error('Failed to create initial submission:', error);
+        // Fallback to generating a temporary ID
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 10000);
+        const submissionId = parseInt(`${timestamp}${random}`.slice(0, 9));
+        console.log('Generated fallback submission ID:', submissionId);
+        
+        dispatch(setCurrentSubmissionId(submissionId));
+      }
+    } 
+    // If we have no submission ID and no unit/mgmt info, log a warning
+    // We'll create a submission when the first answer is saved
+    else {
+      console.log('Initializing form submission ID null');
+      console.log('No submission ID or unit/mgmt info provided. A submission will be created when the first answer is saved.');
+      
+      // Clear any existing submission ID
+      dispatch(setCurrentSubmissionId(null));
     }
     
     console.log('Successfully fetched all report data');
@@ -334,14 +478,14 @@ export const fetchReportData = createAsyncThunk<
 export const saveAnswer = createAsyncThunk<
   ReportAnswer,
   SaveAnswerParams,
-  { state: RootState; rejectValue: string }
->('qa/saveAnswer', async (answerData, { getState, rejectWithValue }) => {
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('qa/saveAnswer', async (answerData, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Saving answer:', answerData);
     
-    // Validate required fields
-    if (!answerData.submission_id || !answerData.question_id) {
-      return rejectWithValue('Missing required fields for answer submission');
+    // Validate question_id is provided
+    if (!answerData.question_id) {
+      return rejectWithValue('Missing question_id for answer submission');
     }
     
     // Check if at least one value is provided
@@ -349,11 +493,68 @@ export const saveAnswer = createAsyncThunk<
       return rejectWithValue('Either string_value or number_value must be provided');
     }
     
+    // Get the current state to check for existing submission ID
+    const state = getState();
+    let submissionId = answerData.submission_id || state.qa.currentSubmissionId;
+    
+    // If no submission_id exists, create a new submission
+    if (!submissionId) {
+      console.log('Initializing form submission ID null');
+      try {
+        // Get template_id, unit_id, and mgmt_id from state if available
+        // These should be available from previous API calls or user input
+        const templateId = state.qa.sections.allIds.length > 0 
+          ? state.qa.sections.byId[state.qa.sections.allIds[0]].template_id 
+          : null;
+          
+        // If we don't have template_id, we can't create a submission
+        if (!templateId) {
+          return rejectWithValue('Cannot create submission: missing template_id');
+        }
+        
+        // For unit_id and mgmt_id, we'll need to get them from somewhere
+        // This could be from user input, app state, or another source
+        // For now, we'll use placeholder values that should be replaced with actual values
+        const unitId = 5; // Replace with actual unit_id from your app state
+        const mgmtId = 4; // Replace with actual mgmt_id from your app state
+        
+        console.log('Creating new submission with template_id:', templateId, 'unit_id:', unitId, 'mgmt_id:', mgmtId);
+        
+        const submission = await dispatch(createInitialSubmission({
+          template_id: templateId,
+          unit_id: unitId,
+          mgmt_id: mgmtId
+        })).unwrap();
+        
+        // Use the new submission ID
+        submissionId = submission.id || null;
+        console.log('Created new submission with ID:', submissionId);
+      } catch (error: any) {
+        console.error('Failed to create initial submission:', error);
+        // Generate a temporary ID as fallback
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 10000);
+        submissionId = parseInt(`${timestamp}${random}`.slice(0, 9));
+        console.log('Generated fallback submission ID:', submissionId);
+        
+        // Set this as the current submission ID
+        dispatch(setCurrentSubmissionId(submissionId));
+      }
+    }
+    
+    // Now we have a valid submission ID, update the answer data
+    const updatedAnswerData = {
+      ...answerData,
+      submission_id: submissionId
+    };
+    
+    console.log('Saving answer with submission ID:', submissionId);
+    
     // Make API request
     const response = await apiRequest<ReportAnswer | { data: ReportAnswer }>(() => ({
       path: '/items/report_answers',
       method: 'POST',
-      body: JSON.stringify(answerData),
+      body: JSON.stringify(updatedAnswerData),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -368,6 +569,18 @@ export const saveAnswer = createAsyncThunk<
     }
     
     console.log('Successfully saved answer:', data);
+    
+    // If this is the first answer for a new submission, fetch all existing answers
+    // This ensures we have all answers for this submission
+    if (state.qa.answers.allIds.length === 0 && submissionId !== null) {
+      try {
+        await dispatch(fetchReportAnswers({ submission_id: submissionId })).unwrap();
+      } catch (error) {
+        console.error('Failed to fetch existing answers:', error);
+        // Continue anyway, as we've already saved the current answer
+      }
+    }
+    
     return data;
   } catch (error: any) {
     console.error('Error saving answer:', error);
@@ -382,7 +595,7 @@ export const saveAnswer = createAsyncThunk<
  */
 export const submitReport = createAsyncThunk<
   ReportSubmission,
-  CreateSubmissionParams,
+  CreateSubmissionParams & { id?: number },
   { state: RootState; rejectValue: string }
 >('qa/submitReport', async (submissionData, { getState, rejectWithValue }) => {
   try {
@@ -393,17 +606,34 @@ export const submitReport = createAsyncThunk<
       return rejectWithValue('Missing required fields for report submission');
     }
     
-    // Set status to published if not provided
-    const payload: CreateSubmissionParams = {
+    // Get the current state to check for existing submission ID
+    const state = getState();
+    const currentSubmissionId = state.qa.currentSubmissionId;
+    
+    // Determine if we're updating an existing submission or creating a new one
+    const isUpdate = submissionData.id !== undefined || currentSubmissionId !== null;
+    
+    // Prepare the payload
+    const payload = {
       ...submissionData,
-      status: submissionData.status || 'published'
+      id: submissionData.id || currentSubmissionId, // Use provided ID or current submission ID
+      status: 'published' // Always set status to published when submitting
     };
+    
+    // Determine the API endpoint and method
+    const path = isUpdate 
+      ? `/items/report_submissions/${payload.id}` 
+      : '/items/report_submissions';
+    
+    const method = isUpdate ? 'PATCH' : 'POST';
+    
+    console.log(`${isUpdate ? 'Updating' : 'Creating'} report submission with ID: ${payload.id}`);
     
     // Make API request
     const response = await apiRequest<ReportSubmission | { data: ReportSubmission }>(() => ({
-      path: '/items/report_submissions',
-      method: 'POST',
-      body: JSON.stringify(payload),
+      path,
+      method,
+      body: JSON.stringify(isUpdate ? { status: 'published' } : payload),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -436,7 +666,7 @@ const qaSlice = createSlice({
   initialState,
   reducers: {
     // Set current submission ID
-    setCurrentSubmissionId: (state, action: PayloadAction<string>) => {
+    setCurrentSubmissionId: (state, action: PayloadAction<number | null>) => {
       state.currentSubmissionId = action.payload;
     },
     
@@ -491,21 +721,37 @@ const qaSlice = createSlice({
       .addCase(fetchReportQuestions.fulfilled, (state, action) => {
         state.status = 'succeeded';
         
-        // Merge new questions with existing ones
-        const newQuestions = normalizeEntities<ReportQuestion>(action.payload);
-        
-        // Update byId with new questions
-        state.questions.byId = {
-          ...state.questions.byId,
-          ...newQuestions.byId
-        };
-        
-        // Update allIds with unique IDs
-        const uniqueIds = new Set([...state.questions.allIds, ...newQuestions.allIds]);
-        state.questions.allIds = Array.from(uniqueIds);
-        
-        // Update progress
-        state.progress = updateAllSectionsProgress(state);
+        try {
+          // Merge new questions with existing ones
+          const newQuestions = normalizeEntities<ReportQuestion>(action.payload);
+          
+          // Create a new questions state object to avoid Immer issues
+          const existingByIdEntries = state.questions.byId ? Object.entries(state.questions.byId) : [];
+          const newByIdEntries = newQuestions.byId ? Object.entries(newQuestions.byId) : [];
+          
+          // Combine existing and new byId entries
+          const combinedByIdEntries = [...existingByIdEntries, ...newByIdEntries];
+          const combinedByIdObject = combinedByIdEntries.reduce((acc, [key, value]) => {
+            acc[key as unknown as number] = value;
+            return acc;
+          }, {} as { [id: number]: ReportQuestion });
+          
+          // Create a new allIds array with unique IDs
+          const existingIds = Array.isArray(state.questions.allIds) ? state.questions.allIds : [];
+          const newIds = Array.isArray(newQuestions.allIds) ? newQuestions.allIds : [];
+          const uniqueIds = Array.from(new Set([...existingIds, ...newIds]));
+          
+          // Update the state with the new objects
+          state.questions = {
+            byId: combinedByIdObject,
+            allIds: uniqueIds
+          };
+          
+          // Update progress
+          state.progress = updateAllSectionsProgress(state);
+        } catch (error) {
+          console.error('Error in fetchReportQuestions.fulfilled reducer:', error);
+        }
       })
       .addCase(fetchReportQuestions.rejected, (state, action) => {
         state.status = 'failed';
@@ -519,15 +765,24 @@ const qaSlice = createSlice({
       .addCase(fetchReportAnswers.fulfilled, (state, action) => {
         state.status = 'succeeded';
         
-        // Filter out answers without IDs before normalizing
-        const validAnswers = action.payload.filter(answer => answer.id !== undefined);
-        
-        // Explicitly type the normalized entities to ensure type safety
-        const normalizedAnswers = normalizeEntities<ReportAnswer>(validAnswers);
-        state.answers = normalizedAnswers;
-        
-        // Update progress
-        state.progress = updateAllSectionsProgress(state);
+        try {
+          // Filter out answers without IDs before normalizing
+          const validAnswers = action.payload.filter(answer => answer.id !== undefined);
+          
+          // Explicitly type the normalized entities to ensure type safety
+          const normalizedAnswers = normalizeEntities<ReportAnswer>(validAnswers);
+          
+          // Create a new answers state object to avoid Immer issues
+          state.answers = {
+            byId: normalizedAnswers.byId || {},
+            allIds: normalizedAnswers.allIds || []
+          };
+          
+          // Update progress
+          state.progress = updateAllSectionsProgress(state);
+        } catch (error) {
+          console.error('Error in fetchReportAnswers.fulfilled reducer:', error);
+        }
       })
       .addCase(fetchReportAnswers.rejected, (state, action) => {
         state.status = 'failed';
@@ -541,25 +796,68 @@ const qaSlice = createSlice({
       .addCase(saveAnswer.fulfilled, (state, action) => {
         state.saveStatus = 'succeeded';
         
-        // Add or update the answer in state
-        const answer = action.payload;
-        
-        // Only process answers with valid IDs
-        if (answer.id !== undefined) {
-          state.answers.byId[answer.id] = answer;
+        try {
+          // Add or update the answer in state
+          const answer = action.payload;
           
-          // Add to allIds if not already present
-          if (!state.answers.allIds.includes(answer.id)) {
-            state.answers.allIds.push(answer.id);
+          // Only process answers with valid IDs
+          if (answer.id !== undefined) {
+            // Create a new byId object
+            const newByIdObject = { 
+              ...state.answers.byId,
+              [answer.id]: answer
+            };
+            
+            // Add to allIds if not already present
+            const existingIds = Array.isArray(state.answers.allIds) ? state.answers.allIds : [];
+            let newAllIds = existingIds;
+            
+            if (!existingIds.includes(answer.id)) {
+              newAllIds = [...existingIds, answer.id];
+            }
+            
+            // Update the state with the new objects
+            state.answers = {
+              byId: newByIdObject,
+              allIds: newAllIds
+            };
           }
+          
+          // Update progress
+          state.progress = updateAllSectionsProgress(state);
+        } catch (error) {
+          console.error('Error in saveAnswer.fulfilled reducer:', error);
         }
-        
-        // Update progress
-        state.progress = updateAllSectionsProgress(state);
       })
       .addCase(saveAnswer.rejected, (state, action) => {
         state.saveStatus = 'failed';
         state.saveError = action.payload || 'Failed to save answer';
+      })
+      
+      // Handle createInitialSubmission
+      .addCase(createInitialSubmission.pending, (state) => {
+        state.submitStatus = 'loading';
+      })
+      .addCase(createInitialSubmission.fulfilled, (state, action) => {
+        state.submitStatus = 'succeeded';
+        
+        // Add the submission to state
+        const submission = action.payload;
+        if (submission.id) {
+          state.submissions.byId[submission.id] = submission;
+          
+          // Add to allIds if not already present
+          if (!state.submissions.allIds.includes(submission.id)) {
+            state.submissions.allIds.push(submission.id);
+          }
+          
+          // Set current submission ID
+          state.currentSubmissionId = submission.id;
+        }
+      })
+      .addCase(createInitialSubmission.rejected, (state, action) => {
+        state.submitStatus = 'failed';
+        state.submitError = action.payload || 'Failed to create initial submission';
       })
       
       // Handle submitReport
@@ -614,29 +912,35 @@ export const selectSubmitError = (state: RootState) => state.qa.submitError;
 export const selectSectionsByTemplateId = createSelector(
   [selectSections, (_, templateId: number) => templateId],
   (sections, templateId) => {
+    if (!sections.allIds || !sections.byId) return [];
     return sections.allIds
       .map(id => sections.byId[id])
-      .filter(section => section.template_id === templateId);
-  }
-);
+      .filter(section => section && section.template_id === templateId);
+   }
+ );
+ 
 
 export const selectQuestionsBySectionId = createSelector(
   [selectQuestions, (_, sectionId: number) => sectionId],
   (questions, sectionId) => {
+    if (!questions.allIds || !questions.byId) return [];
     return questions.allIds
       .map(id => questions.byId[id])
-      .filter(question => question.section_id === sectionId);
+      .filter(question => question && question.section_id === sectionId);
   }
 );
 
 export const selectAnswersByQuestionId = createSelector(
   [selectAnswers, (_, questionId: number) => questionId],
   (answers, questionId) => {
+    if (!answers.allIds || !answers.byId) return [];
+  
     return answers.allIds
       .map(id => answers.byId[id])
-      .filter(answer => answer.question_id === questionId);
+    .filter(answer => answer && answer.question_id === questionId);
   }
 );
+
 
 export const selectProgressBySection = createSelector(
   [selectProgress, (_, sectionId: number) => sectionId],

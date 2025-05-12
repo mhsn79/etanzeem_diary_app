@@ -58,7 +58,7 @@ const ROW_HEIGHT = 48;
 const WINDOW = Dimensions.get('window');
 
 const CustomDropdown: React.FC<CustomDropdownProps> = ({
-  options,
+  options = [],
   onSelect,
   placeholder = 'Select an option',
   dropdownContainerStyle,
@@ -71,14 +71,14 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
-    options.find(opt => opt.value === selectedValue) || null
+    options?.find(opt => opt.value === selectedValue) || null
   );
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const triggerRef = useRef<View | null>(null);
 
   // Update selected option when selectedValue changes
   useEffect(() => {
-    setSelectedOption(options.find(opt => opt.value === selectedValue) || null);
+    setSelectedOption(options?.find(opt => opt.value === selectedValue) || null);
   }, [selectedValue, options]);
 
   const open = () => {
@@ -101,13 +101,13 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   // --------------------------- PLACEMENT -----------------------------------
   const placement = useMemo(() => {
     const spaceBelow = WINDOW.height - (layout.y + layout.height);
-    const neededHeight = Math.min(maxHeight, options.length * ROW_HEIGHT);
+    const neededHeight = Math.min(maxHeight, (options?.length || 0) * ROW_HEIGHT);
     const showAbove = spaceBelow < neededHeight && layout.y > neededHeight;
     return {
       top: showAbove ? layout.y - neededHeight : layout.y + layout.height,
       maxHeight: neededHeight,
     };
-  }, [layout, options.length, maxHeight]);
+  }, [layout, options?.length, maxHeight]);
 
   // ---------------------------- RENDER -------------------------------------
   return (
@@ -155,7 +155,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
           ]}
         >
           <FlatList
-            data={options}
+            data={options || []}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity

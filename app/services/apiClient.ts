@@ -13,7 +13,7 @@ interface RequestOptions {
   path: string;
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   params?: Record<string, any>;
-  body?: string;
+  body?: any;
   headers?: Record<string, string>;
 }
 
@@ -36,7 +36,7 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
   const state = store.getState();
   const auth = selectAuthState(state);
   const token = auth.tokens?.accessToken;
-  
+
   // If no tokens, we can't make authenticated requests
   if (!token) {
     throw new Error('No authentication tokens available');
