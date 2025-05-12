@@ -6,6 +6,7 @@ import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, Singl
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
 import { uploadImage } from '@/app/utils/imageUpload';
 import { API_BASE_URL } from '@/app/constants/api';
+import { Platform } from 'react-native';
 
 // Entity adapter for persons
 const personsAdapter = createEntityAdapter<Person>({
@@ -148,13 +149,26 @@ export const fetchPersonByEmail = createAsyncThunk<
     if (!token) return rejectWithValue('No access token');
 
     const fetchPerson = async (accessToken: string) => {
+      // Normalize the email to lowercase to ensure consistent handling across platforms
+      const normalizedEmail = email.trim().toLowerCase();
+      
+      console.log('Fetching person by email:', Platform.OS, normalizedEmail);
+      
+      // Construct the URL with proper encoding and use a more robust approach
+      const url = `/items/Person`;
+      const params = new URLSearchParams();
+      params.append('filter[Email][_eq]', normalizedEmail);
+      params.append('fields', '*');
+      
       const response = await apiRequest<PersonResponse>(
-        `/items/Person?filter[Email][_eq]=${encodeURIComponent(email)}&fields=*`,
+        `${url}?${params.toString()}`,
         'GET',
         accessToken
       );
+      console.log('Fetching person response by email:', Platform.OS, response);
+
       if (!response.data || response.data.length === 0) {
-        console.log(`No person found with email ${email}`);
+        console.log(`No person found with email ${normalizedEmail}`);
         return null;
       }
       return normalizePersonData(response.data[0]);
