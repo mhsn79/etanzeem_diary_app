@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import { selectAuthState, isTokenExpiredOrExpiring, refresh, checkAndRefreshTokenIfNeeded } from '../auth/authSlice';
+import { selectAuthState, isTokenExpiredOrExpiring, refresh, checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import { fetchUserTanzeemiUnit } from '../tanzeem/tanzeemSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
@@ -68,7 +68,7 @@ const apiRequest = async <T>(url: string, method: string, token: string, body?: 
   return response.json() as Promise<T>;
 };
 
-// Helper function for token refresh
+// Helper function for token refresh with improved error handling
 const executeWithTokenRefresh = async <T>(
   apiCall: (token: string) => Promise<T>,
   token: string,
@@ -76,14 +76,44 @@ const executeWithTokenRefresh = async <T>(
   getState: () => RootState
 ): Promise<T> => {
   try {
-    return await apiCall(token);
-  } catch (err: any) {
+    // First, check if token is about to expire and refresh if needed
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    
+    // Get the latest token after potential refresh
     const auth = selectAuthState(getState());
-    if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
-      const { tokens } = await dispatch(refresh()).unwrap();
-      if (!tokens?.accessToken) throw new Error('Token refresh failed');
-      return await apiCall(tokens.accessToken);
+    const currentToken = auth.tokens?.accessToken || token;
+    
+    // Try the API call with the current token
+    return await apiCall(currentToken);
+  } catch (err: any) {
+    // If the error is due to token expiration
+    const auth = selectAuthState(getState());
+    const isTokenError = 
+      err?.response?.status === 401 || 
+      (err?.errors && err?.errors[0]?.message === 'Token expired.') ||
+      err?.message?.includes('401') ||
+      err?.message?.includes('Token expired');
+    
+    if (isTokenError && auth.tokens?.refreshToken) {
+      console.log('Token expired during API call in personSlice. Attempting to refresh...');
+      
+      try {
+        // Try to refresh the token
+        const { tokens } = await dispatch(refresh()).unwrap();
+        if (!tokens?.accessToken) throw new Error('Token refresh failed');
+        
+        console.log('Token refreshed successfully in personSlice. Retrying API call...');
+        // Retry the API call with the new token
+        return await apiCall(tokens.accessToken);
+      } catch (refreshError: any) {
+        console.error('Failed to refresh token in personSlice:', refreshError);
+        // If refresh fails, log the user out
+        dispatch(logout());
+        throw new Error('Authentication expired. Please log in again.');
+      }
     }
+    
+    // If it's not a token issue or refresh failed, rethrow the original error
     throw new Error(String(err?.message ?? err));
   }
 };

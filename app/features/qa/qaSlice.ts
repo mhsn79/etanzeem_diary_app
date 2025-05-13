@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
 import apiRequest from '../../services/apiClient';
-import { checkAndRefreshTokenIfNeeded } from '../auth/authSlice';
+import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import {
   QAState,
   ReportSection,
@@ -164,7 +164,13 @@ export const initializeReportData = createAsyncThunk<
     }
     
     // First, check and refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
+    try {
+      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    } catch (refreshError) {
+      console.error('Token refresh failed in initializeReportData:', refreshError);
+      dispatch(logout());
+      return rejectWithValue('Authentication expired. Please log in again.');
+    }
     
     // Step 1: Check for existing draft submission
     const filter = {
@@ -308,6 +314,15 @@ export const initializeReportData = createAsyncThunk<
     };
   } catch (error: any) {
     console.error('Error in initializeReportData:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('Authentication expired') || 
+        error.message?.includes('Token expired') ||
+        error.message?.includes('401')) {
+      // Dispatch logout action if it's an auth error
+      dispatch(logout());
+    }
+    
     return rejectWithValue(
       error.message || 'Failed to initialize report data'
     );
@@ -321,7 +336,7 @@ export const saveAnswer = createAsyncThunk<
   ReportAnswer,
   SaveAnswerParams,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('qa/saveAnswer', async (answerData, { getState, rejectWithValue }) => {
+>('qa/saveAnswer', async (answerData, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Saving answer:', answerData);
     
@@ -333,6 +348,15 @@ export const saveAnswer = createAsyncThunk<
     // Check if at least one value is provided
     if (answerData.string_value === undefined && answerData.number_value === undefined) {
       return rejectWithValue('Either string_value or number_value must be provided');
+    }
+    
+    // First, check and refresh token if needed
+    try {
+      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    } catch (refreshError) {
+      console.error('Token refresh failed in saveAnswer:', refreshError);
+      dispatch(logout());
+      return rejectWithValue('Authentication expired. Please log in again.');
     }
     
     // Get the current state to check for existing submission ID
@@ -408,6 +432,15 @@ export const saveAnswer = createAsyncThunk<
     return data;
   } catch (error: any) {
     console.error('Error saving answer:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('Authentication expired') || 
+        error.message?.includes('Token expired') ||
+        error.message?.includes('401')) {
+      // Dispatch logout action if it's an auth error
+      dispatch(logout());
+    }
+    
     return rejectWithValue(
       error.message || 'Failed to save answer'
     );
@@ -420,10 +453,19 @@ export const saveAnswer = createAsyncThunk<
 export const submitReport = createAsyncThunk<
   ReportSubmission,
   SubmitReportParams,
-  { state: RootState; rejectValue: string }
->('qa/submitReport', async (params, { getState, rejectWithValue }) => {
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('qa/submitReport', async (params, { getState, dispatch, rejectWithValue }) => {
   try {
     console.log('Submitting report:', params);
+    
+    // First, check and refresh token if needed
+    try {
+      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    } catch (refreshError) {
+      console.error('Token refresh failed in submitReport:', refreshError);
+      dispatch(logout());
+      return rejectWithValue('Authentication expired. Please log in again.');
+    }
     
     // Get the current state to check for existing submission ID
     const state = getState();
@@ -457,6 +499,15 @@ export const submitReport = createAsyncThunk<
     return data;
   } catch (error: any) {
     console.error('Error submitting report:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('Authentication expired') || 
+        error.message?.includes('Token expired') ||
+        error.message?.includes('401')) {
+      // Dispatch logout action if it's an auth error
+      dispatch(logout());
+    }
+    
     return rejectWithValue(
       error.message || 'Failed to submit report'
     );

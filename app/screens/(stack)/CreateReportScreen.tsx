@@ -26,6 +26,7 @@ import {
 } from '@/app/features/qa/qaSlice';
 import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectManagementReportsList } from '@/app/features/reports/reportsSlice_new';
+import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
 import ScreenLayout from '@/app/components/ScreenLayout';
 
@@ -34,6 +35,9 @@ const CreateReportScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
   const params = useLocalSearchParams();
   const templateId = params.templateId ? Number(params.templateId) : null;
+  
+  // Use our token refresh hook
+  const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
   
   // Dialog states
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -64,6 +68,12 @@ const CreateReportScreen = () => {
       : '';
   }, [latestReportMgmt]);
 
+  // Ensure we have a fresh token before initializing report data
+  useEffect(() => {
+    // Refresh token if needed when the screen loads
+    refreshTokenIfNeeded();
+  }, []);
+
   // Initialize report data
   useEffect(() => {
     if (templateId && userUnitDetails?.id && latestReportMgmt[0]?.managements[0]?.id) {
@@ -73,8 +83,12 @@ const CreateReportScreen = () => {
         mgmt_id: latestReportMgmt[0]?.managements[0]?.id
       };
       
-      dispatch(initializeReportData(initParams))
-        .unwrap()
+      // First ensure we have a fresh token
+      ensureFreshTokenBeforeOperation()
+        .then(() => {
+          // Then initialize the report data
+          return dispatch(initializeReportData(initParams)).unwrap();
+        })
         .then(() => {
           console.table('رپورٹ ڈیٹا لوڈ ہو گیا ہے');
         })
@@ -92,18 +106,22 @@ const CreateReportScreen = () => {
       return;
     }
     
-    dispatch(saveAnswer({
-      submission_id: currentSubmissionId,
-      question_id: questionId,
-      string_value: typeof value === 'string' ? value : null,
-      number_value: typeof value === 'number' ? value : null
-    }))
-      .unwrap()
+    // First ensure we have a fresh token
+    ensureFreshTokenBeforeOperation()
+      .then(() => {
+        // Then save the answer
+        return dispatch(saveAnswer({
+          submission_id: currentSubmissionId,
+          question_id: questionId,
+          string_value: typeof value === 'string' ? value : null,
+          number_value: typeof value === 'number' ? value : null
+        })).unwrap();
+      })
       .catch((error) => {
         console.error('Error saving answer:', error);
         console.error('جواب محفوظ کرنے میں خرابی');
       });
-  }, [currentSubmissionId, dispatch]);
+  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation]);
 
   // Handle report submission
   const handleSubmit = useCallback(() => {
@@ -126,9 +144,16 @@ const CreateReportScreen = () => {
       }),
     ]).start();
     
-    // Show confirmation dialog
-    setShowSubmitDialog(true);
-  }, [currentSubmissionId, scaleAnim]);
+    // Refresh token if needed before showing the dialog
+    refreshTokenIfNeeded()
+      .then(() => {
+        // Show confirmation dialog
+        setShowSubmitDialog(true);
+      })
+      .catch((error) => {
+        console.error('Error refreshing token before submission:', error);
+      });
+  }, [currentSubmissionId, scaleAnim, refreshTokenIfNeeded]);
   
   // Handle confirm submission
   const handleConfirmSubmit = useCallback(() => {
@@ -136,8 +161,12 @@ const CreateReportScreen = () => {
     
     setShowSubmitDialog(false);
     
-    dispatch(submitReport({ submission_id: currentSubmissionId }))
-      .unwrap()
+    // First ensure we have a fresh token
+    ensureFreshTokenBeforeOperation()
+      .then(() => {
+        // Then submit the report
+        return dispatch(submitReport({ submission_id: currentSubmissionId })).unwrap();
+      })
       .then(() => {
         console.log('رپورٹ کامیابی سے جمع کروا دی گئی ہے');
         // Show success dialog and navigate back after it's closed or auto-closed
@@ -147,7 +176,7 @@ const CreateReportScreen = () => {
         console.error('Error submitting report:', error);
         console.error('رپورٹ جمع کروانے میں خرابی');
       });
-  }, [currentSubmissionId, dispatch]);
+  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation]);
 
   // Show loading state
   if (status === 'loading') {
@@ -297,10 +326,12 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    padding: SPACING.md,
+
+
   },
   headerInfoContainer: {
-    marginBottom: SPACING.md,
+    paddingVertical: SPACING.md,
+    marginHorizontal: SPACING.md,
   },
   buttonContainer: {
     position: 'absolute',

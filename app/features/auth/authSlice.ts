@@ -381,7 +381,16 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
   }
 
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
-    await dispatch(refresh());
+    try {
+      console.log('Token is expired or about to expire, refreshing in checkAndRefreshTokenIfNeeded');
+      await dispatch(refresh()).unwrap();
+      console.log('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
+    } catch (error) {
+      console.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
+      // If refresh fails, we should log the user out
+      dispatch(logout());
+      throw new Error('Authentication expired. Please log in again.');
+    }
   }
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TabGroup } from '../../components/Tab';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
@@ -21,6 +22,7 @@ import {
 import { selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
+import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import ScreenLayout from '@/app/components/ScreenLayout';
 import { COMMON_IMAGES } from '@/app/constants/images';
 
@@ -37,6 +39,9 @@ const AllReportsScreen: React.FC = () => {
     endDate: null as Date | null,
     selectedUnitId: null as number | null,
   });
+  
+  // Use our token refresh hook
+  const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
 
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const tanzeemiUnits = useSelector(selectAllTanzeemiUnits) ?? [];
@@ -124,13 +129,61 @@ const AllReportsScreen: React.FC = () => {
     });
     setIsFilterModalVisible(false);
   }, []);
+  
+  // Function to fetch reports data with token refresh
+  const fetchReportsData = useCallback(async () => {
+    try {
+      if (!userUnitDetails?.id) {
+        console.error('User unit details not available');
+        return;
+      }
+      
+      // First ensure we have a fresh token
+      await ensureFreshTokenBeforeOperation();
+      
+      console.log('Fetching reports data in AllReportsScreen...');
+      await dispatch(fetchReportsByUnitId(userUnitDetails.id));
+      await dispatch(fetchReportSubmissions());
+      console.log('Reports data fetched successfully in AllReportsScreen');
+    } catch (error) {
+      console.error('Error fetching reports in AllReportsScreen:', error);
+    }
+  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation]);
 
+  // Ensure we have a fresh token when the component mounts
+  useEffect(() => {
+    refreshTokenIfNeeded();
+  }, []);
+
+  // Fetch reports on initial mount
   useEffect(() => {
     if (userUnitDetails?.id) {
-      dispatch(fetchReportsByUnitId(userUnitDetails.id));
-      dispatch(fetchReportSubmissions());
+      fetchReportsData();
     }
-  }, [dispatch, userUnitDetails?.id]);
+  }, [userUnitDetails?.id, fetchReportsData]);
+  
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('AllReportsScreen is focused, refreshing data...');
+      
+      // Refresh token and then fetch data
+      refreshTokenIfNeeded()
+        .then(() => {
+          if (userUnitDetails?.id) {
+            return fetchReportsData();
+          }
+        })
+        .catch(error => {
+          console.error('Error refreshing token on focus in AllReportsScreen:', error);
+        });
+      
+      return () => {
+        // Cleanup function when screen loses focus (optional)
+        console.log('AllReportsScreen lost focus');
+      };
+    }, [userUnitDetails?.id, fetchReportsData, refreshTokenIfNeeded])
+  );
 
   const renderReportCard = useCallback(
     ({ item }: { item: any }) => {
@@ -186,7 +239,18 @@ const AllReportsScreen: React.FC = () => {
         <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => userUnitDetails?.id && dispatch(fetchReportsByUnitId(userUnitDetails.id))}
+          onPress={() => {
+            // Ensure we have a fresh token before retrying
+            refreshTokenIfNeeded()
+              .then(() => {
+                if (userUnitDetails?.id) {
+                  return fetchReportsData();
+                }
+              })
+              .catch(error => {
+                console.error('Error refreshing token before retry:', error);
+              });
+          }}
         >
           <UrduText style={styles.retryButtonText}>دوبارہ کوشش کریں</UrduText>
         </TouchableOpacity>
