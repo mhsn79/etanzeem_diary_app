@@ -78,31 +78,21 @@ export interface SectionProgress {
 }
 
 // Parameters for API requests
-export interface FetchSectionsParams {
+export interface FetchReportDataParams {
   template_id: number;
-}
-
-export interface FetchQuestionsParams {
-  section_id?: number;
-}
-
-export interface FetchAnswersParams {
-  submission_id: number;
-  question_id?: number;
+  unit_id: number;
+  mgmt_id: number;
 }
 
 export interface SaveAnswerParams {
-  submission_id: number;
+  submission_id?: number;
   question_id: number;
   number_value?: number | null;
   string_value?: string | null;
 }
 
-export interface CreateSubmissionParams {
-  unit_id: number;
-  template_id: number;
-  mgmt_id: number;
-  status?: string;
+export interface SubmitReportParams {
+  submission_id?: number;
 }
 
 // Normalized entities for state management

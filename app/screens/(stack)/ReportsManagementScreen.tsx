@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import UrduText from '../../components/UrduText';
 import Header from '../../components/Header';
 import { TabGroup } from '../../components/Tab';
@@ -36,6 +38,18 @@ const ReportsManagementScreen: React.FC = () => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const [selectedTab, setSelectedTab] = useState(0);
+  
+  // Track the latest submission ID to highlight it
+  const [latestSubmissionId, setLatestSubmissionId] = useState<number | null>(null);
+  
+  // Animation value for highlighting new submissions
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+  
+  // Ref to track which submissions we've already highlighted
+  const highlightedSubmissionsRef = useRef<Set<number>>(new Set());
+  
+  // Ref to track if we need to reset the highlighted submissions
+  const shouldResetHighlightedRef = useRef(false);
 
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
@@ -46,11 +60,19 @@ const ReportsManagementScreen: React.FC = () => {
   
   // Memoized filtered submissions
   const filteredSubmissions = useMemo(() => {
-    return reportSubmissions.filter((submission) =>
+    // First filter by status based on selected tab
+    const filtered = reportSubmissions.filter((submission) =>
       selectedTab === 0
         ? submission.status === 'published'
         : submission.status === 'draft' || submission.status === 'pending'
     );
+    
+    // Then sort by date_created in descending order (newest first)
+    return filtered.sort((a, b) => {
+      const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
+      const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
+      return dateB - dateA; // Descending order (newest first)
+    });
   }, [reportSubmissions, selectedTab]);
 
   // Handlers
@@ -67,6 +89,18 @@ const ReportsManagementScreen: React.FC = () => {
   }, [router]);
 
   const handleCreateReport = useCallback(() => {
+    // Check if there's already a published report for this management period
+    const latestManagement = reportMgmtDetails[0]?.managements[0];
+    const hasPublishedReport = latestManagement && reportSubmissions.some(
+      submission => submission.mgmt_id === latestManagement.id && submission.status === 'published'
+    );
+    
+    if (hasPublishedReport) {
+      // If report is already submitted, show a message or navigate to view submitted reports
+      router.push(ROUTES.ALL_REPORTS);
+      return;
+    }
+    
     // If we have report management details with a template, pass the template ID
     if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
       console.log('Navigating to create report with template ID:', reportMgmtDetails[0].template.id);
@@ -79,35 +113,114 @@ const ReportsManagementScreen: React.FC = () => {
       console.warn('No template available for report creation');
       router.push(ROUTES.CREATE_REPORT);
     }
-  }, [router, reportMgmtDetails]);
+  }, [router, reportMgmtDetails, reportSubmissions]);
 
+  // Function to fetch reports data
+  const fetchReportsData = useCallback(async () => {
+    try {
+      if (!userUnitDetails) {
+        console.error('User unit details not available');
+        return;
+      }
+      
+      console.log('Fetching reports data...');
+      await dispatch(fetchReportsByUnitId(userUnitDetails?.id));
+      await dispatch(fetchReportSubmissions());
+      console.log('Reports data fetched successfully');
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    }
+  }, [userUnitDetails, dispatch]);
+
+  // Fetch reports on initial mount and clean up on unmount
   useEffect(() => {
-      // Fetch reports by unit ID when the component mounts
-      const fetchReports = async () => {
-        try {
-          if (!userUnitDetails) {
-            console.error('User unit details not available');
-            return;
-          }
-        
-          await dispatch(fetchReportsByUnitId(userUnitDetails?.id));
-          await dispatch(fetchReportSubmissions())
-        } catch (error) {
-          console.error('Error fetching reports:', error);
-        }
-      };
+    if (userUnitDetails) {
+      fetchReportsData();
+    }
+    
+    // Clean up function to reset state when component unmounts
+    return () => {
+      highlightedSubmissionsRef.current.clear();
+      setLatestSubmissionId(null);
+    };
+  }, [userUnitDetails]);
   
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('ReportsManagementScreen is focused, refreshing data...');
+      
+      // When screen comes into focus, mark that we should reset highlighted submissions
+      // This will allow us to highlight new submissions when coming back from CreateReportScreen
+      shouldResetHighlightedRef.current = true;
+      
       if (userUnitDetails) {
-        fetchReports();
+        fetchReportsData();
+      }
+      
+      return () => {
+        // Cleanup function when screen loses focus (optional)
+        console.log('ReportsManagementScreen lost focus');
+      };
+    }, [userUnitDetails, fetchReportsData])
+  );
+  
+  // Effect to highlight the latest submission when reportSubmissions changes
+  useEffect(() => {
+    // Only run this effect if we have submissions
+    if (reportSubmissions.length > 0) {
+      // If we should reset highlighted submissions (e.g., when coming back from CreateReportScreen)
+      if (shouldResetHighlightedRef.current) {
+        highlightedSubmissionsRef.current.clear();
+        shouldResetHighlightedRef.current = false;
+      }
+      
+      // Sort submissions by date (newest first)
+      const sortedSubmissions = [...reportSubmissions].sort((a, b) => {
+        const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
+        const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      // Get the latest submission ID
+      const latest = sortedSubmissions[0];
+      if (latest && latest.id && !highlightedSubmissionsRef.current.has(latest.id)) {
+        // Mark this submission as highlighted
+        highlightedSubmissionsRef.current.add(latest.id);
+        
+        // Set the latest submission ID for highlighting
+        setLatestSubmissionId(latest.id);
+        
+        // Start highlight animation
+        highlightAnim.setValue(0);
+        Animated.sequence([
+          Animated.timing(highlightAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(highlightAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(highlightAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(highlightAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // Clear the latest submission ID after animation completes
+          setTimeout(() => setLatestSubmissionId(null), 2000);
+        });
       }
     }
-  , [userUnitDetails, dispatch]);
-  // Fetch reports on mount
-  useEffect(() => {
-    if (userUnitDetails?.unitLevelId) {
-      dispatch(fetchReportsByUnitId(userUnitDetails.unitLevelId));
-    }
-  }, [dispatch, userUnitDetails?.unitLevelId]);
+  }, [reportSubmissions, highlightAnim]);
 
   // Render loading state
   if (loading) {
@@ -160,7 +273,12 @@ const ReportsManagementScreen: React.FC = () => {
             onPress={handleCreateReport}
             activeOpacity={0.8}
           >
-            {latestManagement && reportMgmtDetails[0]?.template ? (
+            {latestManagement && reportMgmtDetails[0]?.template && 
+              // Check if there's no published report for this management period
+              !reportSubmissions.some(submission => 
+                submission.mgmt_id === latestManagement.id && 
+                submission.status === 'published'
+              ) ? (
               <>
                 <UrduText style={styles.reportSummaryItemTitle}>
                   {`${reportMgmtDetails[0].template.report_name}۔ ماہ ${getUrduMonth(
@@ -242,21 +360,45 @@ const ReportsManagementScreen: React.FC = () => {
               const management = reportMgmtDetails
                 .flatMap((r) => r.managements)
                 .find((m) => m.id === submission.mgmt_id);
+              
+              // Check if this is the latest submission to highlight
+              const isLatestSubmission = submission.id === latestSubmissionId;
+              
+              // Create animated style for highlighting
+              const animatedStyle = isLatestSubmission ? {
+                transform: [
+                  {
+                    scale: highlightAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.03],
+                    }),
+                  },
+                ],
+            
+              } : {};
 
               return (
-                <ReportCard
-                  key={`submission-${submission.id}`}
-                  title={
-                    management
-                      ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}ء`
-                      : `رپورٹ ${submission.id}`
-                  }
-                  sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
-                  location={submission.unitDetails?.Name ?? 'نامعلوم'}
-                  status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
-                  statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
-                  onEdit={handleEdit}
-                />
+                <Animated.View 
+                  key={`submission-container-${submission.id}`}
+                  style={[
+                    isLatestSubmission && styles.highlightedCard,
+                    animatedStyle
+                  ]}
+                >
+                  <ReportCard
+                    key={`submission-${submission.id}`}
+                    title={
+                      management
+                        ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}ء`
+                        : `رپورٹ ${submission.id}`
+                    }
+                    sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
+                    location={submission.unitDetails?.Name ?? 'نامعلوم'}
+                    status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
+                    statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
+                    onEdit={handleEdit}
+                  />
+                </Animated.View>
               );
             })
           ) : (
@@ -409,6 +551,11 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  highlightedCard: {
+    marginBottom: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
   },
 });
 

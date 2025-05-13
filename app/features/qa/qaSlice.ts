@@ -11,11 +11,9 @@ import {
   ReportSubmission,
   SectionProgress,
   NormalizedEntities,
-  FetchSectionsParams,
-  FetchQuestionsParams,
-  FetchAnswersParams,
+  FetchReportDataParams,
   SaveAnswerParams,
-  CreateSubmissionParams
+  SubmitReportParams
 } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -63,14 +61,12 @@ const initialState: QAState = {
 
 /**
  * Normalize an array of entities into a normalized state structure
- * Handles both required and optional id properties
  */
 const normalizeEntities = <T extends { id: number } | { id?: number }>(entities: T[]): NormalizedEntities<T> => {
   const byId: { [id: number]: T } = {};
   const allIds: number[] = [];
 
   entities.forEach(entity => {
-    // Skip entities without an id
     if ('id' in entity && entity.id !== undefined) {
       byId[entity.id] = entity;
       allIds.push(entity.id);
@@ -88,7 +84,6 @@ const calculateSectionProgress = (
   questions: NormalizedEntities<ReportQuestion>,
   answers: NormalizedEntities<ReportAnswer>
 ): SectionProgress => {
-  // Handle case where questions.byId might be undefined
   if (!questions.byId) {
     return { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
   }
@@ -103,7 +98,6 @@ const calculateSectionProgress = (
   
   // Count answered questions
   const answeredQuestions = sectionQuestions.filter(question => {
-    // Handle case where answers.byId might be undefined
     if (!answers.byId) return false;
     
     return Object.values(answers.byId).some(answer => 
@@ -133,7 +127,6 @@ const updateAllSectionsProgress = (
 ): { [sectionId: number]: SectionProgress } => {
   const progress: { [sectionId: number]: SectionProgress } = {};
   
-  // Handle case where sections.allIds might be undefined
   const sectionIds = Array.isArray(state.sections.allIds) ? state.sections.allIds : [];
   
   sectionIds.forEach(sectionId => {
@@ -154,320 +147,169 @@ const updateAllSectionsProgress = (
 /* ------------------------------------------------------------------ */
 
 /**
- * Fetch report sections by template ID
+ * Consolidated thunk to fetch or create a report submission and load all related data
+ * This replaces the separate fetchReportData and createInitialSubmission thunks
  */
-export const fetchReportSections = createAsyncThunk<
-  ReportSection[],
-  FetchSectionsParams,
-  { state: RootState; rejectValue: string }
->('qa/fetchReportSections', async (params, { rejectWithValue }) => {
-  try {
-    console.log('Fetching report sections for template ID:', params.template_id);
-    
-    // Validate template_id
-    if (!params.template_id || isNaN(params.template_id)) {
-      return rejectWithValue('Invalid template ID provided');
-    }
-    
-    // Construct filter parameter
-    const filter ={ template_id: { _eq: params.template_id } };
-    
-    // Make API request
-    const response = await apiRequest<ReportSection[] | { data: ReportSection[] }>(() => ({
-      path: '/items/report_sections',
-      method: 'GET',
-      params: { filter, sort: 'sort' }
-    }));
-    console.log('API response of section:', response);
-    
-    // Handle both response formats: direct array or {data: array}
-    let data: ReportSection[];
-    if (Array.isArray(response)) {
-      data = response;
-    } else if (response && 'data' in response && Array.isArray(response.data)) {
-      data = response.data;
-    } else {
-      console.error('Invalid response format for Report Sections:', response);
-      return rejectWithValue('Invalid response format for Report Sections');
-    }
-    
-    console.log('Successfully fetched Report Sections:', data.length);
-    return data;
-  } catch (error: any) {
-    console.error('Error fetching Report Sections:', error);
-    return rejectWithValue(
-      error.message || 'Failed to fetch Report Sections'
-    );
-  }
-});
-
-/**
- * Fetch report questions by section ID
- */
-export const fetchReportQuestions = createAsyncThunk<
-  ReportQuestion[],
-  FetchQuestionsParams,
-  { state: RootState; rejectValue: string }
->('qa/fetchReportQuestions', async (params, { rejectWithValue }) => {
-  try {
-    console.log('Fetching report questions', params.section_id ? `for section ID: ${params.section_id}` : 'all questions');
-    
-    // Construct filter parameter if section_id is provided
-    const params_obj: any = {};
-    if (params.section_id) {
-      params_obj.filter = { section_id: { _eq: params.section_id } };
-    }
-    
-    // Add sorting
-    params_obj.sort = 'sort';
-    
-    // Make API request
-    const response = await apiRequest<ReportQuestion[] | { data: ReportQuestion[] }>(() => ({
-      path: '/items/report_questions',
-      method: 'GET',
-      params: params_obj
-    }));
-    console.log('API response of question:', response);
-    
-    // Handle both response formats: direct array or {data: array}
-    let data: ReportQuestion[];
-    if (Array.isArray(response)) {
-      data = response;
-    } else if (response && 'data' in response && Array.isArray(response.data)) {
-      data = response.data;
-    } else {
-      console.error('Invalid response format for Report Questions:', response);
-      return rejectWithValue('Invalid response format for Report Questions');
-    }
-    
-    console.log('Successfully fetched Report Questions:', data.length);
-    return data;
-  } catch (error: any) {
-    console.error('Error fetching Report Questions:', error);
-    return rejectWithValue(
-      error.message || 'Failed to fetch Report Questions'
-    );
-  }
-});
-
-/**
- * Fetch report answers by submission ID and optionally question ID
- */
-export const fetchReportAnswers = createAsyncThunk<
-  ReportAnswer[],
-  FetchAnswersParams,
-  { state: RootState; rejectValue: string }
->('qa/fetchReportAnswers', async (params, { rejectWithValue }) => {
-  try {
-    console.log('Fetching report answers for submission ID:', params.submission_id);
-    
-    // Validate submission_id
-    if (!params.submission_id) {
-      return rejectWithValue('Invalid submission ID provided');
-    }
-    
-    // Construct filter parameter with proper type
-    const filter: { submission_id: { _eq: number }; question_id?: { _eq: number } } = { 
-      submission_id: { _eq: params.submission_id } 
-    };
-    
-    // Add question_id filter if provided
-    if (params.question_id) {
-      filter.question_id = { _eq: params.question_id };
-    }
-    
-    // Make API request with proper filter
-    const response = await apiRequest<ReportAnswer[] | { data: ReportAnswer[] }>(() => ({
-      path: '/items/report_answers',
-      method: 'GET',
-      params: { filter }
-    }));
-    
-    // Handle both response formats: direct array or {data: array}
-    let data: ReportAnswer[];
-    if (Array.isArray(response)) {
-      data = response;
-    } else if (response && 'data' in response && Array.isArray(response.data)) {
-      data = response.data;
-    } else {
-      console.error('Invalid response format for Report Answers:', response);
-      return rejectWithValue('Invalid response format for Report Answers');
-    }
-    
-    console.log('Successfully fetched Report Answers:', data.length);
-    return data;
-  } catch (error: any) {
-    console.error('Error fetching Report Answers:', error);
-    return rejectWithValue(
-      error.message || 'Failed to fetch Report Answers'
-    );
-  }
-});
-
-/**
- * Fetch all report data sequentially (sections -> questions -> answers)
- */
-/**
- * Create a new report submission when first visiting the Create Report Screen
- */
-export const createInitialSubmission = createAsyncThunk<
-  ReportSubmission,
-  { template_id: number; unit_id: number; mgmt_id: number },
+export const initializeReportData = createAsyncThunk<
+  { submission: ReportSubmission; sections: ReportSection[]; questions: ReportQuestion[]; answers: ReportAnswer[] },
+  FetchReportDataParams,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('qa/createInitialSubmission', async (params, { dispatch, rejectWithValue }) => {
+>('qa/initializeReportData', async (params, { dispatch, rejectWithValue }) => {
   try {
-    console.log('99999-------------------------------------------------------------------', 
-      params.template_id, params.unit_id, params.mgmt_id);
+    console.log('Initializing report data with params:', params);
     
     // Validate required fields
-    if (!params.unit_id || !params.template_id || !params.mgmt_id) {
-      return rejectWithValue('Missing required fields for initial report submission');
+    if (!params.template_id || !params.unit_id || !params.mgmt_id) {
+      return rejectWithValue('Missing required fields for report initialization');
     }
-    
-
-  
-    
-    // Create submission payload with explicit ID and draft status
-    const submissionData = {
-    
-      template_id: params.template_id,
-      unit_id: params.unit_id,
-      mgmt_id: params.mgmt_id,
-      status: 'draft' 
-    };
-    console.log('submissionData:_____________________________>>>>>>>>', submissionData);
-    
-    // Make API request to create the submission
-    const response = await apiRequest<ReportSubmission | { data: ReportSubmission }>(() => ({
-      path: '/items/report_submissions',
-      method: 'POST',
-      body: JSON.stringify(submissionData),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }));
-    console.log();
-    
-    // Handle both response formats: direct object or {data: object}
-    let data: ReportSubmission;
-    if (response && 'data' in response && typeof response.data === 'object') {
-      data = response.data as ReportSubmission;
-    } else {
-      data = response as ReportSubmission;
-    }
-    
-    console.log('Successfully created initial report submission:', data);
-    
-    // Set the current submission ID
-    dispatch(setCurrentSubmissionId(data.id || null));
-    
-    return data;
-  } catch (error: any) {
-    console.error('Error creating initial report submission:', JSON.stringify(error, null, 2));
-    return rejectWithValue(
-      error.message || 'Failed to create initial report submission'
-    );
-  }
-});
-
-export const fetchReportData = createAsyncThunk<
-  void,
-  { template_id: number; submission_id?: number; unit_id?: number; mgmt_id?: number },
-  { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('qa/fetchReportData', async (params, { dispatch, getState, rejectWithValue }) => {
-  try {
-    console.log('Fetching complete report data for template ID:', params.template_id);
     
     // First, check and refresh token if needed
     await dispatch(checkAndRefreshTokenIfNeeded());
     
-    // Step 1: Fetch sections
-    const sectionsResult = await dispatch(fetchReportSections({ template_id: params.template_id })).unwrap();
-    console.log('Sections fetched:', sectionsResult.length);
+    // Step 1: Check for existing draft submission
+    const filter = {
+      _and: [
+        { template_id: { _eq: params.template_id } },
+        { unit_id: { _eq: params.unit_id } },
+        { mgmt_id: { _eq: params.mgmt_id } },
+        { status: { _eq: 'draft' } }
+      ]
+    };
     
-    // Step 2: Fetch questions for each section
-    for (const section of sectionsResult) {
-      try {
-        await dispatch(fetchReportQuestions({ section_id: section.id })).unwrap();
-      } catch (error: any) {
-        console.error(`Error fetching questions for section ${section.id}:`, error);
-        // Continue with other sections instead of failing the whole process
-      }
-    }
+    console.log('Checking for existing draft submission');
+    const existingSubmissionsResponse = await apiRequest<ReportSubmission[]>(() => ({
+      path: '/items/reports_submissions',
+      method: 'GET',
+      params: { filter },
+    }));
+    console.log('Existing submissions response:', existingSubmissionsResponse);
     
-    // Step 3: Handle submission ID
-    let currentSubmissionId = params.submission_id;
+    // Initialize submission variable
+    let submission: ReportSubmission;
     
-    // Check if we already have a submission ID in state
-    if (!currentSubmissionId) {
-      const state = getState();
-      // Convert null to undefined to satisfy TypeScript
-      currentSubmissionId = state.qa.currentSubmissionId || undefined;
-    }
-    
-    // If we have a submission ID (either from params or state), fetch answers
-    if (currentSubmissionId !== undefined) {
-      console.log('Using existing submission ID:', currentSubmissionId);
-      try {
-        // No need for explicit cast since we've already ensured it's a number
-        await dispatch(fetchReportAnswers({ submission_id: currentSubmissionId })).unwrap();
-      } catch (error: any) {
-        console.error('Error fetching answers for submission:', error);
-        // Continue anyway, as we might be creating a new submission
-      }
-    } 
-    // If no submission ID but we have unit_id and mgmt_id, create a new submission
-    else if (params.unit_id && params.mgmt_id) {
-      console.log('Creating new submission with template_id:', params.template_id, 'unit_id:', params.unit_id, 'mgmt_id:', params.mgmt_id);
-      try {
-        const submission = await dispatch(createInitialSubmission({
-          template_id: params.template_id,
-          unit_id: params.unit_id,
-          mgmt_id: params.mgmt_id
-        })).unwrap();
-        
-        // Set the current submission ID
-        if (submission.id) {
-          console.log('Created new submission with ID:', submission.id);
-          dispatch(setCurrentSubmissionId(submission.id));
-          
-          // Try to fetch any existing answers for this submission
-          try {
-            await dispatch(fetchReportAnswers({ submission_id: submission.id })).unwrap();
-          } catch (error) {
-            console.error('No existing answers found for new submission:', error);
-            // This is expected for a new submission, so we can continue
-          }
-        } else {
-          console.error('Created submission has no ID');
-          dispatch(setCurrentSubmissionId(null));
-        }
-      } catch (error: any) {
-        console.error('Failed to create initial submission:', error);
-        // Fallback to generating a temporary ID
-        const timestamp = Date.now();
-        const random = Math.floor(Math.random() * 10000);
-        const submissionId = parseInt(`${timestamp}${random}`.slice(0, 9));
-        console.log('Generated fallback submission ID:', submissionId);
-        
-        dispatch(setCurrentSubmissionId(submissionId));
-      }
-    } 
-    // If we have no submission ID and no unit/mgmt info, log a warning
-    // We'll create a submission when the first answer is saved
-    else {
-      console.log('Initializing form submission ID null');
-      console.log('No submission ID or unit/mgmt info provided. A submission will be created when the first answer is saved.');
+    // Step 2: Use existing submission or create a new one
+    if (existingSubmissionsResponse?.length > 0) {
+      submission = existingSubmissionsResponse[0];
+      console.log('Found existing draft submission:', submission);
+    } else {
+      console.log('No existing draft submission found. Creating new one.');
+      const submissionData = {
+        template_id: params.template_id,
+        unit_id: params.unit_id,
+        mgmt_id: params.mgmt_id,
+        status: 'draft',
+      };
       
-      // Clear any existing submission ID
-      dispatch(setCurrentSubmissionId(null));
+      submission = await apiRequest<ReportSubmission>(() => ({
+        path: '/items/reports_submissions',
+        method: 'POST',
+        body: JSON.stringify(submissionData),
+        headers: { 'Content-Type': 'application/json' },
+      }));
+      
+      if (!submission.id) {
+        console.error('New submission created but missing ID:', submission);
+        return rejectWithValue('Created submission is missing an ID');
+      }
+      
+      console.log('Created new draft submission:', submission);
     }
     
-    console.log('Successfully fetched all report data');
+    // Step 3: Fetch sections for the template
+    console.log('Fetching sections for template ID:', params.template_id);
+    const sectionsFilter = { template_id: { _eq: params.template_id } };
+    const sectionsResponse = await apiRequest<ReportSection[] | { data: ReportSection[] }>(() => ({
+      path: '/items/report_sections',
+      method: 'GET',
+      params: { filter: sectionsFilter, sort: 'sort' }
+    }));
+    console.log('Successfully fetched Report Sections:',sectionsResponse);
+    
+    // Handle both response formats: direct array or {data: array}
+    let sections: ReportSection[];
+    if (Array.isArray(sectionsResponse)) {
+      sections = sectionsResponse;
+    } else if (sectionsResponse && 'data' in sectionsResponse && Array.isArray(sectionsResponse.data)) {
+      sections = sectionsResponse.data;
+    } else {
+      console.error('Invalid response format for Report Sections:', sectionsResponse);
+      return rejectWithValue('Invalid response format for Report Sections');
+    }
+    
+    console.log('Successfully fetched Report Sections:', sections.length);
+    
+    // Step 4: Fetch all questions for the template in a single batch
+    console.log('Fetching all questions for template sections');
+    const sectionIds = sections.map(section => section.id);
+    
+    if (sectionIds.length === 0) {
+      return rejectWithValue('No sections found for this template');
+    }
+    
+    const questionsFilter = { section_id: { _in: sectionIds } };
+    const questionsResponse = await apiRequest<ReportQuestion[] | { data: ReportQuestion[] }>(() => ({
+      path: '/items/report_questions',
+      method: 'GET',
+      params: { filter: questionsFilter, sort: 'sort' }
+    }));
+    console.log('quest ionsResponse --------------------->>>>',questionsResponse);
+    
+    // Handle both response formats: direct array or {data: array}
+    let questions: ReportQuestion[];
+    if (Array.isArray(questionsResponse)) {
+      questions = questionsResponse;
+    } else if (questionsResponse && 'data' in questionsResponse && Array.isArray(questionsResponse.data)) {
+      questions = questionsResponse.data;
+    } else {
+      console.error('Invalid response format for Report Questions:', questionsResponse);
+      return rejectWithValue('Invalid response format for Report Questions');
+    }
+    
+    console.log('Successfully fetched Report Questions:', questions.length);
+    
+    // Step 5: Fetch answers for the submission if it exists
+    let answers: ReportAnswer[] = [];
+    if (submission.id) {
+      console.log('Fetching answers for submission ID:', submission.id);
+      const answersFilter = { submission_id: { _eq: submission.id } };
+      
+      try {
+        const answersResponse = await apiRequest<ReportAnswer[] | { data: ReportAnswer[] }>(() => ({
+          path: '/items/report_answers',
+          method: 'GET',
+          params: { filter: answersFilter }
+        }));
+        console.log('Fetched answers for submission:', answersResponse);
+        
+        // Handle both response formats: direct array or {data: array}
+        if (Array.isArray(answersResponse)) {
+          answers = answersResponse;
+        } else if (answersResponse && 'data' in answersResponse && Array.isArray(answersResponse.data)) {
+          answers = answersResponse.data;
+        } else {
+          console.error('Invalid response format for Report Answers:', answersResponse);
+          // Don't reject, just log error and continue with empty answers
+          answers = [];
+        }
+        
+        console.log('Successfully fetched Report Answers:', answers.length);
+      } catch (error) {
+        console.error('Error fetching answers:', error);
+        // Don't reject, just log error and continue with empty answers
+        answers = [];
+      }
+    }
+    
+    return {
+      submission,
+      sections,
+      questions,
+      answers
+    };
   } catch (error: any) {
-    console.error('Error in fetchReportData:', error);
+    console.error('Error in initializeReportData:', error);
     return rejectWithValue(
-      error.message || 'Failed to fetch complete report data'
+      error.message || 'Failed to initialize report data'
     );
   }
 });
@@ -479,7 +321,7 @@ export const saveAnswer = createAsyncThunk<
   ReportAnswer,
   SaveAnswerParams,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('qa/saveAnswer', async (answerData, { getState, dispatch, rejectWithValue }) => {
+>('qa/saveAnswer', async (answerData, { getState, rejectWithValue }) => {
   try {
     console.log('Saving answer:', answerData);
     
@@ -495,54 +337,13 @@ export const saveAnswer = createAsyncThunk<
     
     // Get the current state to check for existing submission ID
     const state = getState();
-    let submissionId = answerData.submission_id || state.qa.currentSubmissionId;
+    const submissionId = answerData.submission_id || state.qa.currentSubmissionId;
     
-    // If no submission_id exists, create a new submission
     if (!submissionId) {
-      console.log('Initializing form submission ID null');
-      try {
-        // Get template_id, unit_id, and mgmt_id from state if available
-        // These should be available from previous API calls or user input
-        const templateId = state.qa.sections.allIds.length > 0 
-          ? state.qa.sections.byId[state.qa.sections.allIds[0]].template_id 
-          : null;
-          
-        // If we don't have template_id, we can't create a submission
-        if (!templateId) {
-          return rejectWithValue('Cannot create submission: missing template_id');
-        }
-        
-        // For unit_id and mgmt_id, we'll need to get them from somewhere
-        // This could be from user input, app state, or another source
-        // For now, we'll use placeholder values that should be replaced with actual values
-        const unitId = 5; // Replace with actual unit_id from your app state
-        const mgmtId = 4; // Replace with actual mgmt_id from your app state
-        
-        console.log('Creating new submission with template_id:', templateId, 'unit_id:', unitId, 'mgmt_id:', mgmtId);
-        
-        const submission = await dispatch(createInitialSubmission({
-          template_id: templateId,
-          unit_id: unitId,
-          mgmt_id: mgmtId
-        })).unwrap();
-        
-        // Use the new submission ID
-        submissionId = submission.id || null;
-        console.log('Created new submission with ID:', submissionId);
-      } catch (error: any) {
-        console.error('Failed to create initial submission:', error);
-        // Generate a temporary ID as fallback
-        const timestamp = Date.now();
-        const random = Math.floor(Math.random() * 10000);
-        submissionId = parseInt(`${timestamp}${random}`.slice(0, 9));
-        console.log('Generated fallback submission ID:', submissionId);
-        
-        // Set this as the current submission ID
-        dispatch(setCurrentSubmissionId(submissionId));
-      }
+      return rejectWithValue('No submission ID available. Please initialize the report first.');
     }
     
-    // Now we have a valid submission ID, update the answer data
+    // Update the answer data with the submission ID
     const updatedAnswerData = {
       ...answerData,
       submission_id: submissionId
@@ -550,11 +351,46 @@ export const saveAnswer = createAsyncThunk<
     
     console.log('Saving answer with submission ID:', submissionId);
     
+    // Check if an answer for this question already exists
+    const filter = {
+      _and: [
+        { submission_id: { _eq: submissionId } },
+        { question_id: { _eq: answerData.question_id } }
+      ]
+    };
+    
+    const existingAnswers = await apiRequest<ReportAnswer[]>(() => ({
+      path: '/items/report_answers',
+      method: 'GET',
+      params: { filter }
+    }));
+    
+    let existingAnswer: ReportAnswer | null = null;
+    if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
+      existingAnswer = existingAnswers[0];
+      console.log('Found existing answer:', existingAnswer);
+    }
+    
+    // Determine if we need to create or update
+    let method: 'POST' | 'PATCH' = 'POST';
+    let path = '/items/report_answers';
+    
+    // If we found an existing answer, update it instead of creating a new one
+    if (existingAnswer && existingAnswer.id) {
+      method = 'PATCH';
+      path = `/items/report_answers/${existingAnswer.id}`;
+      console.log(`Updating existing answer with ID: ${existingAnswer.id}`);
+    } else {
+      console.log('Creating new answer');
+    }
+    
     // Make API request
     const response = await apiRequest<ReportAnswer | { data: ReportAnswer }>(() => ({
-      path: '/items/report_answers',
-      method: 'POST',
-      body: JSON.stringify(updatedAnswerData),
+      path,
+      method,
+      body: JSON.stringify(method === 'PATCH' 
+        ? { string_value: updatedAnswerData.string_value, number_value: updatedAnswerData.number_value }
+        : updatedAnswerData),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -569,18 +405,6 @@ export const saveAnswer = createAsyncThunk<
     }
     
     console.log('Successfully saved answer:', data);
-    
-    // If this is the first answer for a new submission, fetch all existing answers
-    // This ensures we have all answers for this submission
-    if (state.qa.answers.allIds.length === 0 && submissionId !== null) {
-      try {
-        await dispatch(fetchReportAnswers({ submission_id: submissionId })).unwrap();
-      } catch (error) {
-        console.error('Failed to fetch existing answers:', error);
-        // Continue anyway, as we've already saved the current answer
-      }
-    }
-    
     return data;
   } catch (error: any) {
     console.error('Error saving answer:', error);
@@ -591,49 +415,31 @@ export const saveAnswer = createAsyncThunk<
 });
 
 /**
- * Submit a report (create a report submission)
+ * Submit a report (finalize a report submission)
  */
 export const submitReport = createAsyncThunk<
   ReportSubmission,
-  CreateSubmissionParams & { id?: number },
+  SubmitReportParams,
   { state: RootState; rejectValue: string }
->('qa/submitReport', async (submissionData, { getState, rejectWithValue }) => {
+>('qa/submitReport', async (params, { getState, rejectWithValue }) => {
   try {
-    console.log('Submitting report:', submissionData);
-    
-    // Validate required fields
-    if (!submissionData.unit_id || !submissionData.template_id || !submissionData.mgmt_id) {
-      return rejectWithValue('Missing required fields for report submission');
-    }
+    console.log('Submitting report:', params);
     
     // Get the current state to check for existing submission ID
     const state = getState();
-    const currentSubmissionId = state.qa.currentSubmissionId;
+    const submissionId = params.submission_id || state.qa.currentSubmissionId;
     
-    // Determine if we're updating an existing submission or creating a new one
-    const isUpdate = submissionData.id !== undefined || currentSubmissionId !== null;
+    if (!submissionId) {
+      return rejectWithValue('No submission ID available. Please initialize the report first.');
+    }
     
-    // Prepare the payload
-    const payload = {
-      ...submissionData,
-      id: submissionData.id || currentSubmissionId, // Use provided ID or current submission ID
-      status: 'published' // Always set status to published when submitting
-    };
+    // Update the submission status to 'published'
+    console.log(`Finalizing report submission with ID: ${submissionId}`);
     
-    // Determine the API endpoint and method
-    const path = isUpdate 
-      ? `/items/report_submissions/${payload.id}` 
-      : '/items/report_submissions';
-    
-    const method = isUpdate ? 'PATCH' : 'POST';
-    
-    console.log(`${isUpdate ? 'Updating' : 'Creating'} report submission with ID: ${payload.id}`);
-    
-    // Make API request
     const response = await apiRequest<ReportSubmission | { data: ReportSubmission }>(() => ({
-      path,
-      method,
-      body: JSON.stringify(isUpdate ? { status: 'published' } : payload),
+      path: `/items/reports_submissions/${submissionId}`,
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -692,101 +498,39 @@ const qaSlice = createSlice({
     }
   },
   extraReducers: (builder) => {
-    // Handle fetchReportSections
+    // Handle initializeReportData
     builder
-      .addCase(fetchReportSections.pending, (state) => {
+      .addCase(initializeReportData.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(fetchReportSections.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.sections = normalizeEntities<ReportSection>(action.payload);
-        // Initialize progress for each section
-        action.payload.forEach(section => {
-          state.progress[section.id] = {
-            totalQuestions: 0,
-            answeredQuestions: 0,
-            percentage: 0
-          };
-        });
-      })
-      .addCase(fetchReportSections.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch sections';
-      })
-      
-      // Handle fetchReportQuestions
-      .addCase(fetchReportQuestions.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(fetchReportQuestions.fulfilled, (state, action) => {
+      .addCase(initializeReportData.fulfilled, (state, action) => {
         state.status = 'succeeded';
         
-        try {
-          // Merge new questions with existing ones
-          const newQuestions = normalizeEntities<ReportQuestion>(action.payload);
-          
-          // Create a new questions state object to avoid Immer issues
-          const existingByIdEntries = state.questions.byId ? Object.entries(state.questions.byId) : [];
-          const newByIdEntries = newQuestions.byId ? Object.entries(newQuestions.byId) : [];
-          
-          // Combine existing and new byId entries
-          const combinedByIdEntries = [...existingByIdEntries, ...newByIdEntries];
-          const combinedByIdObject = combinedByIdEntries.reduce((acc, [key, value]) => {
-            acc[key as unknown as number] = value;
-            return acc;
-          }, {} as { [id: number]: ReportQuestion });
-          
-          // Create a new allIds array with unique IDs
-          const existingIds = Array.isArray(state.questions.allIds) ? state.questions.allIds : [];
-          const newIds = Array.isArray(newQuestions.allIds) ? newQuestions.allIds : [];
-          const uniqueIds = Array.from(new Set([...existingIds, ...newIds]));
-          
-          // Update the state with the new objects
-          state.questions = {
-            byId: combinedByIdObject,
-            allIds: uniqueIds
-          };
-          
-          // Update progress
-          state.progress = updateAllSectionsProgress(state);
-        } catch (error) {
-          console.error('Error in fetchReportQuestions.fulfilled reducer:', error);
+        // Store the submission
+        const submission = action.payload.submission;
+        if (submission.id) {
+          state.submissions.byId[submission.id] = submission;
+          if (!state.submissions.allIds.includes(submission.id)) {
+            state.submissions.allIds.push(submission.id);
+          }
+          state.currentSubmissionId = submission.id;
         }
-      })
-      .addCase(fetchReportQuestions.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch questions';
-      })
-      
-      // Handle fetchReportAnswers
-      .addCase(fetchReportAnswers.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(fetchReportAnswers.fulfilled, (state, action) => {
-        state.status = 'succeeded';
         
-        try {
-          // Filter out answers without IDs before normalizing
-          const validAnswers = action.payload.filter(answer => answer.id !== undefined);
-          
-          // Explicitly type the normalized entities to ensure type safety
-          const normalizedAnswers = normalizeEntities<ReportAnswer>(validAnswers);
-          
-          // Create a new answers state object to avoid Immer issues
-          state.answers = {
-            byId: normalizedAnswers.byId || {},
-            allIds: normalizedAnswers.allIds || []
-          };
-          
-          // Update progress
-          state.progress = updateAllSectionsProgress(state);
-        } catch (error) {
-          console.error('Error in fetchReportAnswers.fulfilled reducer:', error);
-        }
+        // Store the sections
+        state.sections = normalizeEntities<ReportSection>(action.payload.sections);
+        
+        // Store the questions
+        state.questions = normalizeEntities<ReportQuestion>(action.payload.questions);
+        
+        // Store the answers
+        state.answers = normalizeEntities<ReportAnswer>(action.payload.answers);
+        
+        // Update progress
+        state.progress = updateAllSectionsProgress(state);
       })
-      .addCase(fetchReportAnswers.rejected, (state, action) => {
+      .addCase(initializeReportData.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch answers';
+        state.error = action.payload || 'Failed to initialize report data';
       })
       
       // Handle saveAnswer
@@ -834,11 +578,11 @@ const qaSlice = createSlice({
         state.saveError = action.payload || 'Failed to save answer';
       })
       
-      // Handle createInitialSubmission
-      .addCase(createInitialSubmission.pending, (state) => {
+      // Handle submitReport
+      .addCase(submitReport.pending, (state) => {
         state.submitStatus = 'loading';
       })
-      .addCase(createInitialSubmission.fulfilled, (state, action) => {
+      .addCase(submitReport.fulfilled, (state, action) => {
         state.submitStatus = 'succeeded';
         
         // Add the submission to state
@@ -850,30 +594,6 @@ const qaSlice = createSlice({
           if (!state.submissions.allIds.includes(submission.id)) {
             state.submissions.allIds.push(submission.id);
           }
-          
-          // Set current submission ID
-          state.currentSubmissionId = submission.id;
-        }
-      })
-      .addCase(createInitialSubmission.rejected, (state, action) => {
-        state.submitStatus = 'failed';
-        state.submitError = action.payload || 'Failed to create initial submission';
-      })
-      
-      // Handle submitReport
-      .addCase(submitReport.pending, (state) => {
-        state.submitStatus = 'loading';
-      })
-      .addCase(submitReport.fulfilled, (state, action) => {
-        state.submitStatus = 'succeeded';
-        
-        // Add the submission to state
-        const submission = action.payload;
-        state.submissions.byId[submission.id!] = submission;
-        
-        // Add to allIds if not already present
-        if (!state.submissions.allIds.includes(submission.id!)) {
-          state.submissions.allIds.push(submission.id!);
         }
         
         // Clear current submission ID as it's now finalized
@@ -916,9 +636,8 @@ export const selectSectionsByTemplateId = createSelector(
     return sections.allIds
       .map(id => sections.byId[id])
       .filter(section => section && section.template_id === templateId);
-   }
- );
- 
+  }
+);
 
 export const selectQuestionsBySectionId = createSelector(
   [selectQuestions, (_, sectionId: number) => sectionId],
@@ -934,13 +653,11 @@ export const selectAnswersByQuestionId = createSelector(
   [selectAnswers, (_, questionId: number) => questionId],
   (answers, questionId) => {
     if (!answers.allIds || !answers.byId) return [];
-  
     return answers.allIds
       .map(id => answers.byId[id])
-    .filter(answer => answer && answer.question_id === questionId);
+      .filter(answer => answer && answer.question_id === questionId);
   }
 );
-
 
 export const selectProgressBySection = createSelector(
   [selectProgress, (_, sectionId: number) => sectionId],
@@ -961,6 +678,34 @@ export const selectOverallProgress = createSelector(
     );
     
     return Math.round(totalPercentage / sectionIds.length);
+  }
+);
+
+// Create a selector to transform sections into the expected format for SectionList
+export const selectSectionsWithProgress = createSelector(
+  [selectSections, selectProgress],
+  (sections, progress) => {
+    if (!sections.allIds || !sections.byId) return [];
+    
+    return sections.allIds.map(id => {
+      const section = sections.byId[id];
+      const sectionProgress = progress[id] || { percentage: 0 };
+      
+      return {
+        ...section,
+        progress: sectionProgress.percentage
+      };
+    });
+  }
+);
+
+// Create a selector to transform normalized questions into an array for SectionList
+export const selectQuestionsArray = createSelector(
+  [selectQuestions],
+  (questions) => {
+    if (!questions.allIds || !questions.byId) return [];
+    
+    return questions.allIds.map(id => questions.byId[id]);
   }
 );
 

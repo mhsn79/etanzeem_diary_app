@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, Text, I18nManager } from 'react-native';
+import { View, TextInput, StyleSheet, Text, I18nManager, ActivityIndicator } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import UrduText from './UrduText';
 
@@ -16,11 +16,12 @@ export interface FormInputProps {
   rightIcon?: React.ReactNode;
   editable?: boolean;
   disabled?: boolean;
-  error?: string;
+  error?: string | null;
   required?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
   helpText?: string;
+  loading?: boolean;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -41,6 +42,7 @@ const FormInput: React.FC<FormInputProps> = ({
   multiline = false,
   numberOfLines,
   helpText,
+  loading = false,
 }) => {
   return (
     <View style={styles.container}>
@@ -74,10 +76,15 @@ const FormInput: React.FC<FormInputProps> = ({
           keyboardType={keyboardType}
           maxLength={maxLength}
           textAlignVertical="center"
-          editable={editable && !disabled}
+          editable={editable && !disabled && !loading}
           multiline={multiline}
           numberOfLines={numberOfLines || (multiline ? 3 : 1)}
         />
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        )}
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
       {helpText && <UrduText style={styles.helpText}>{helpText}</UrduText>}
@@ -88,6 +95,12 @@ const FormInput: React.FC<FormInputProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    right: SPACING.md,
+    height: '100%',
+    justifyContent: 'center',
   },
   titleContainer: {
     marginBottom: SPACING.sm,
