@@ -11,10 +11,6 @@ export {
   updateProgress,
   
   // Thunks
-  fetchReportData,
-  fetchReportSections,
-  fetchReportQuestions,
-  fetchReportAnswers,
   saveAnswer,
   submitReport,
   

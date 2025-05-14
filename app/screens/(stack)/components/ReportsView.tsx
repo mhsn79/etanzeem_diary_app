@@ -73,6 +73,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   
   // Ref to track if we need to reset the highlighted submissions
   const shouldResetHighlightedRef = useRef(false);
+  
+  // Ref to track if we've already initialized QA data in this session
+  const qaInitializedRef = useRef<boolean>(false);
+  
+  // Ref to track the last template ID we initialized QA data for
+  const lastTemplateIdRef = useRef<number | null>(null);
+  
+  // Ref to track the last management ID we initialized QA data for
+  const lastMgmtIdRef = useRef<number | null>(null);
 
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
@@ -158,8 +167,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       });
   }, [router, reportMgmtDetails, reportSubmissions, ensureFreshTokenBeforeOperation]);
 
-  // Function to fetch reports data with token refresh
-  const fetchReportsData = useCallback(async () => {
+  // Combined function to fetch all necessary data with token refresh
+  const fetchAllData = useCallback(async (forceQARefresh = false) => {
     try {
       if (!userUnitDetails) {
         console.error('User unit details not available');
@@ -169,47 +178,82 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // First ensure we have a fresh token
       await ensureFreshTokenBeforeOperation();
       
+      // Step 1: Fetch reports data
       console.log('Fetching reports data...');
-      await dispatch(fetchReportsByUnitId(userUnitDetails?.id));
+      await dispatch(fetchReportsByUnitId(userUnitDetails.id));
       await dispatch(fetchReportSubmissions());
+      console.log('Reports data fetched successfully');
       
-      // Initialize QA data if we have report management details
-      if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
-        const latestManagement = reportMgmtDetails[0]?.managements[0];
+      // Step 2: Check if we need to initialize QA data
+      // Use the current reportMgmtDetails from props
+      const latestReportMgmt = reportMgmtDetails?.[0] || null;
+      
+      if (!latestReportMgmt || !latestReportMgmt.template?.id || !latestReportMgmt.managements?.[0]) {
+        console.log('No report management details available for QA initialization');
+        return;
+      }
+      
+      const templateId = latestReportMgmt.template.id;
+      const latestManagement = latestReportMgmt.managements[0];
+      
+      // Only initialize QA data if:
+      // 1. We're forcing a refresh, OR
+      // 2. We haven't initialized it yet, OR
+      // 3. The template or management ID has changed
+      if (
+        forceQARefresh || 
+        !qaInitializedRef.current || 
+        lastTemplateIdRef.current !== templateId ||
+        lastMgmtIdRef.current !== latestManagement.id
+      ) {
+        console.log('Initializing QA data for template:', templateId);
         
-        if (latestManagement && userUnitDetails.id) {
-          console.log('Initializing QA data for template:', reportMgmtDetails[0].template.id);
+        try {
           await dispatch(initializeReportData({
-            template_id: reportMgmtDetails[0].template.id,
+            template_id: templateId,
             unit_id: userUnitDetails.id,
             mgmt_id: latestManagement.id
           }));
+          
+          // Update our refs to track that we've initialized QA data
+          qaInitializedRef.current = true;
+          lastTemplateIdRef.current = templateId;
+          lastMgmtIdRef.current = latestManagement.id;
+          
+          console.log('QA data initialized successfully');
+        } catch (qaError) {
+          console.error('Error initializing QA data:', qaError);
+          // Don't rethrow - we want to continue even if QA initialization fails
         }
+      } else {
+        console.log('Skipping QA data initialization - already initialized for this template/management');
       }
-      
-      console.log('Reports data fetched successfully');
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('Error fetching data:', error);
     }
-  }, [userUnitDetails, reportMgmtDetails, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation]);
 
   // Ensure we have a fresh token when the component mounts
   useEffect(() => {
     refreshTokenIfNeeded();
   }, []);
 
-  // Fetch reports on initial mount and clean up on unmount
+  // Fetch all data on initial mount and clean up on unmount
   useEffect(() => {
     if (userUnitDetails) {
-      fetchReportsData();
+      // On initial mount, force QA refresh
+      fetchAllData(true);
     }
     
     // Clean up function to reset state when component unmounts
     return () => {
       highlightedSubmissionsRef.current.clear();
       setLatestSubmissionId(null);
+      qaInitializedRef.current = false;
+      lastTemplateIdRef.current = null;
+      lastMgmtIdRef.current = null;
     };
-  }, [userUnitDetails, fetchReportsData]);
+  }, [userUnitDetails, fetchAllData]);
   
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -220,15 +264,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // This will allow us to highlight new submissions when coming back from CreateReportScreen
       shouldResetHighlightedRef.current = true;
       
-      // Refresh token and then fetch data
+      // When coming back from creating/editing a report, force QA refresh
+      const shouldForceQARefresh = true;
+      
+      // Refresh token and then fetch all data
       refreshTokenIfNeeded()
         .then(() => {
           if (userUnitDetails) {
-            return fetchReportsData();
+            return fetchAllData(shouldForceQARefresh);
           }
         })
         .catch(error => {
-            dispatch(logout())
+          dispatch(logout());
           console.error('Error refreshing token on focus:', error);
         });
       
@@ -236,7 +283,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         // Cleanup function when screen loses focus (optional)
         console.log('ReportsView lost focus');
       };
-    }, [userUnitDetails, fetchReportsData, refreshTokenIfNeeded])
+    }, [userUnitDetails, fetchAllData, refreshTokenIfNeeded])
   );
   
   // Effect to highlight the latest submission when reportSubmissions changes
@@ -315,11 +362,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => {
+            // Reset QA initialization flags to force a fresh fetch
+            qaInitializedRef.current = false;
+            lastTemplateIdRef.current = null;
+            lastMgmtIdRef.current = null;
+            
             // Ensure we have a fresh token before retrying
             refreshTokenIfNeeded()
               .then(() => {
-                if (userUnitDetails?.id) {
-                  return fetchReportsData();
+                if (userUnitDetails) {
+                  // Force QA refresh on retry
+                  return fetchAllData(true);
                 }
               })
               .catch(error => {
