@@ -36,6 +36,11 @@ import { COMMON_IMAGES } from '@/app/constants/images';
 import { TabGroup } from '@/app/components/Tab';
 import ReportCard from './ReportCard';
 import { logout } from '@/app/features/auth/authSlice';
+import { 
+  initializeReportData, 
+  selectOverallProgress, 
+  selectQAState 
+} from '@/app/features/qa/qaSlice';
 
 interface ReportsViewProps {
   showHeader?: boolean;
@@ -75,6 +80,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   const reportMgmtDetails = useSelector(selectManagementReportsList) ?? [];
   const loading = useSelector(selectReportsLoading);
   const error = useSelector(selectReportsError);
+  
+  // QA module state
+  const qaState = useSelector(selectQAState);
+  const overallProgress = useSelector(selectOverallProgress);
   
   // Memoized filtered submissions
   const filteredSubmissions = useMemo(() => {
@@ -163,11 +172,26 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       console.log('Fetching reports data...');
       await dispatch(fetchReportsByUnitId(userUnitDetails?.id));
       await dispatch(fetchReportSubmissions());
+      
+      // Initialize QA data if we have report management details
+      if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
+        const latestManagement = reportMgmtDetails[0]?.managements[0];
+        
+        if (latestManagement && userUnitDetails.id) {
+          console.log('Initializing QA data for template:', reportMgmtDetails[0].template.id);
+          await dispatch(initializeReportData({
+            template_id: reportMgmtDetails[0].template.id,
+            unit_id: userUnitDetails.id,
+            mgmt_id: latestManagement.id
+          }));
+        }
+      }
+      
       console.log('Reports data fetched successfully');
     } catch (error) {
       console.error('Error fetching reports:', error);
     }
-  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [userUnitDetails, reportMgmtDetails, dispatch, ensureFreshTokenBeforeOperation]);
 
   // Ensure we have a fresh token when the component mounts
   useEffect(() => {
@@ -273,7 +297,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   }, [reportSubmissions, highlightAnim]);
 
   // Render loading state
-  if (loading) {
+  if (loading || qaState.status === 'loading') {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -283,10 +307,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   }
 
   // Render error state
-  if (error) {
+  if (error || qaState.error) {
+    const errorMessage = error || qaState.error;
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
+        <UrduText style={styles.errorText}>خرابی: {errorMessage}</UrduText>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => {
@@ -309,7 +334,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   }
 
   const latestManagement = reportMgmtDetails[0]?.managements[0];
-  const completionPercentage = 50; // Mock data
+  // Use the actual overall progress from QA module instead of mock data
+  const completionPercentage = overallProgress || 0;
   const daysRemaining = latestManagement
     ? Math.ceil(
         (new Date(latestManagement.reporting_end_date).getTime() - new Date().getTime()) /

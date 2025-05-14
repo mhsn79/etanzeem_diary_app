@@ -38,6 +38,15 @@ interface QAState {
 - `saveAnswer`: Saves an answer with submission ID and updates progress
 - `submitReport`: Creates a report submission with mandatory fields
 
+## Utility Functions
+
+- `normalizeEntities`: Normalizes an array of entities into a state structure with byId and allIds
+- `calculateSectionProgress`: Calculates progress for a specific section
+- `calculateAverageSectionProgress`: Calculates the average progress across all sections
+- `calculateOverallProgress`: Calculates overall progress based on sections, questions, and answers
+- `findAnswerForQuestion`: Finds an answer for a specific question
+- `isQuestionAnswered`: Checks if a question has been answered
+
 ## Selectors
 
 - Basic selectors for all state properties
@@ -46,7 +55,7 @@ interface QAState {
   - `selectQuestionsBySectionId`: Get questions by section ID
   - `selectAnswersByQuestionId`: Get answers by question ID
   - `selectProgressBySection`: Get progress for a specific section
-  - `selectOverallProgress`: Get overall progress percentage
+  - `selectOverallProgress`: Get overall progress percentage (average of all section percentages)
 
 ## Usage Example
 
@@ -73,6 +82,17 @@ const sections = useSelector(selectSections);
 const questions = useSelector(state => selectQuestionsBySectionId(state, sectionId));
 const progress = useSelector(state => selectProgressBySection(state, sectionId));
 const overallProgress = useSelector(selectOverallProgress);
+
+// Using the utility functions directly
+import { calculateAverageSectionProgress } from 'app/features/qa';
+
+// Calculate average progress from a progress object
+const progressData = { 
+  1: { totalQuestions: 10, answeredQuestions: 5, percentage: 50 },
+  2: { totalQuestions: 8, answeredQuestions: 4, percentage: 50 },
+  3: { totalQuestions: 5, answeredQuestions: 3, percentage: 60 }
+};
+const averageProgress = calculateAverageSectionProgress(progressData); // Returns 53
 ```
 
 ## Integration with Redux Store

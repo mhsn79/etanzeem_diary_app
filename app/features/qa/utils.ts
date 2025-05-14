@@ -3,7 +3,8 @@ import {
   ReportQuestion, 
   ReportAnswer, 
   ReportSubmission,
-  NormalizedEntities
+  NormalizedEntities,
+  SectionProgress
 } from './types';
 
 /**
@@ -53,6 +54,30 @@ export const calculateSectionProgress = (
     answeredQuestions,
     percentage
   };
+};
+
+/**
+ * Calculate the average progress across all sections
+ * 
+ * @param progress - Object mapping section IDs to SectionProgress objects
+ * @returns The average percentage across all sections, rounded to the nearest whole number
+ */
+export const calculateAverageSectionProgress = (
+  progress: { [sectionId: number]: SectionProgress }
+): number => {
+  const sectionIds = Object.keys(progress).map(Number);
+  
+  // Handle edge case: no sections
+  if (sectionIds.length === 0) return 0;
+  
+  // Calculate the sum of all section percentages
+  const totalPercentage = sectionIds.reduce(
+    (sum, sectionId) => sum + progress[sectionId].percentage,
+    0
+  );
+  
+  // Return the average, rounded to the nearest whole number
+  return Math.round(totalPercentage / sectionIds.length);
 };
 
 /**

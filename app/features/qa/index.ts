@@ -40,4 +40,11 @@ export {
 } from './qaSlice';
 
 // Export utilities
-export * from './utils';
+export {
+  normalizeEntities,
+  calculateSectionProgress,
+  calculateAverageSectionProgress,
+  calculateOverallProgress,
+  findAnswerForQuestion,
+  isQuestionAnswered
+} from './utils';

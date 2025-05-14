@@ -3,6 +3,7 @@ import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@r
 import { RootState, AppDispatch } from '../../store';
 import apiRequest from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
+import { calculateAverageSectionProgress } from './utils';
 import {
   QAState,
   ReportSection,
@@ -717,19 +718,13 @@ export const selectProgressBySection = createSelector(
   }
 );
 
+/**
+ * Selector to get the overall progress percentage across all sections
+ * Uses the calculateAverageSectionProgress utility function for calculation
+ */
 export const selectOverallProgress = createSelector(
   [selectProgress],
-  (progress) => {
-    const sectionIds = Object.keys(progress).map(Number);
-    if (sectionIds.length === 0) return 0;
-    
-    const totalPercentage = sectionIds.reduce(
-      (sum, sectionId) => sum + progress[sectionId].percentage,
-      0
-    );
-    
-    return Math.round(totalPercentage / sectionIds.length);
-  }
+  (progress) => calculateAverageSectionProgress(progress)
 );
 
 // Create a selector to transform sections into the expected format for SectionList
