@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, StatusBar } from 'react-native';
 import i18n from '../i18n';
 import CustomDropdown from '../components/CustomDropdown';
@@ -90,6 +90,20 @@ export default function UnitSelection() {
       });
   }, [dispatch,userDetails]);
   
+  // Helper function to check for self-referencing units (parent_id === id)
+  // Using useCallback to prevent recreation on each render
+  const removeSelfReferencingUnits = useCallback((units: any[]) => {
+    return units.filter(unit => unit.id !== unit.parent_id);
+  }, []);
+  
+  // Helper function to get the label of a selected option
+  // Using useCallback to prevent recreation on each render
+  const getSelectedLabel = useCallback((options: Option[], selectedValue: string | null): string => {
+    if (!selectedValue) return '';
+    const selectedOption = options.find(opt => opt.value === selectedValue);
+    return selectedOption?.label || '';
+  }, []);
+
   // Process hierarchy data when it changes
   useEffect(() => {
     console.log('Dashboard: Hierarchy status:', hierarchyStatus);
@@ -107,84 +121,129 @@ export default function UnitSelection() {
       if (districts.length === 0 && completeHierarchyUnits[0].parent_id) {
         // Create a mock district option for the parent
         const districtOpts = [{
-          id: completeHierarchyUnits[0].parent_id.toString(),
-          label: 'اسلام آباد', // Default name based on logs
+          id: `district-${completeHierarchyUnits[0].parent_id}`, // Ensure unique ID
+          label: 'Unknown', // Default name based on logs
           value: completeHierarchyUnits[0].parent_id.toString()
         }];
         setDistrictOptions(districtOpts);
+        
+        // Auto-select the only district option
+        setSelectedDistrict(districtOpts[0].value);
       } else {
         // Map districts to dropdown options
         const districtOpts = districts.map(unit => ({
-          id: unit.id.toString(),
+          id: `district-${unit.id}`, // Ensure unique ID with prefix
           label: unit.Name || unit.name || 'Unknown District',
           value: unit.id.toString()
         }));
         setDistrictOptions(districtOpts);
+        
+        // Auto-select if there's only one district option and none is selected yet
+        if (districtOpts.length === 1 && !selectedDistrict) {
+          console.log('Auto-selecting the only district:', districtOpts[0].label);
+          setSelectedDistrict(districtOpts[0].value);
+        }
       }
       
-      // Find zones (level 2)
-      const zones = completeHierarchyUnits.filter(unit => unit.level === 2);
+      // Find zones (level 2) and remove any self-referencing units
+      const zones = removeSelfReferencingUnits(
+        completeHierarchyUnits.filter(unit => unit.level === 2)
+      );
       console.log('Zones found:', zones.length);
       
       // Map zones to dropdown options
       const zoneOpts = zones.map(unit => ({
-        id: unit.id.toString(),
+        id: `zone-${unit.id}`, // Ensure unique ID with prefix
         label: unit.Name || unit.name || 'Unknown Zone',
         value: unit.id.toString()
       }));
       setZoneOptions(zoneOpts);
       
-      // Find circles/UCs (level 3 and 4)
-      const circles = completeHierarchyUnits.filter(unit => unit.level === 3);
-      const ucs = completeHierarchyUnits.filter(unit => unit.level === 4);
+      // Auto-select if there's only one zone and none is selected yet
+      if (zoneOpts.length === 1 && !selectedZone) {
+        console.log('Auto-selecting the only zone:', zoneOpts[0].label);
+        setSelectedZone(zoneOpts[0].value);
+      }
+      
+      // Find circles/UCs (level 3 and 4) and remove any self-referencing units
+      const circles = removeSelfReferencingUnits(
+        completeHierarchyUnits.filter(unit => unit.level === 3)
+      );
+      const ucs = removeSelfReferencingUnits(
+        completeHierarchyUnits.filter(unit => unit.level === 4)
+      );
       
       console.log('Circles found:', circles.length);
       console.log('UCs found:', ucs.length);
       
       // Combine circles and UCs for the third dropdown
       const ucOpts = [...circles, ...ucs].map(unit => ({
-        id: unit.id.toString(),
+        id: `uc-${unit.id}`, // Ensure unique ID with prefix
         label: unit.Name || unit.name || 'Unknown UC',
         value: unit.id.toString()
       }));
       setUCOptions(ucOpts);
+      
+      // Auto-select if there's only one UC, a zone is selected, and no UC is selected yet
+      if (selectedZone && ucOpts.length === 1 && !selectedUC) {
+        console.log('Auto-selecting the only UC:', ucOpts[0].label);
+        setSelectedUC(ucOpts[0].value);
+      }
     }
-  }, [hierarchyStatus, completeHierarchyUnits]);
+  }, [hierarchyStatus, completeHierarchyUnits, selectedZone]);
   
   // Update filtered options when selections change
   useEffect(() => {
     if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
       // If district is selected, filter zones by parent_id
       if (selectedDistrict) {
-        const filteredZones = completeHierarchyUnits.filter(unit => 
-          unit.level === 2 && unit.parent_id?.toString() === selectedDistrict
+        // Filter zones and remove any self-referencing units
+        const filteredZones = removeSelfReferencingUnits(
+          completeHierarchyUnits.filter(unit => 
+            unit.level === 2 && unit.parent_id?.toString() === selectedDistrict
+          )
         );
         
         const zoneOpts = filteredZones.map(unit => ({
-          id: unit.id.toString(),
+          id: `zone-${unit.id}`, // Ensure unique ID with prefix
           label: unit.Name || unit.name || 'Unknown Zone',
           value: unit.id.toString()
         }));
         
         setZoneOptions(zoneOpts);
+        
+        // Auto-select if there's only one zone and none is selected yet
+        if (zoneOpts.length === 1 && !selectedZone) {
+          console.log('Auto-selecting the only zone (filtered):', zoneOpts[0].label);
+          setSelectedZone(zoneOpts[0].value);
+        }
       }
       
       // If zone is selected, filter UCs by parent_id
       if (selectedZone) {
-        const filteredUCs = completeHierarchyUnits.filter(unit => 
-          (unit.level === 3 || unit.level === 4) && unit.parent_id?.toString() === selectedZone
+        // Filter UCs and remove any self-referencing units
+        const filteredUCs = removeSelfReferencingUnits(
+          completeHierarchyUnits.filter(unit => 
+            (unit.level === 3 || unit.level === 4) && unit.parent_id?.toString() === selectedZone
+          )
         );
         
         const ucOpts = filteredUCs.map(unit => ({
-          id: unit.id.toString(),
+          id: `uc-${unit.id}`, // Ensure unique ID with prefix
           label: unit.Name || unit.name || 'Unknown UC',
           value: unit.id.toString()
         }));
         
         setUCOptions(ucOpts);
+        
+        // Auto-select if there's only one UC and none is selected yet
+        if (ucOpts.length === 1 && !selectedUC) {
+          console.log('Auto-selecting the only UC (filtered):', ucOpts[0].label);
+          setSelectedUC(ucOpts[0].value);
+        }
       }
     }
-  }, [selectedDistrict, selectedZone, hierarchyStatus, completeHierarchyUnits]);
+  }, [selectedDistrict, selectedZone, selectedUC, hierarchyStatus, completeHierarchyUnits]);
  
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -197,9 +256,10 @@ export default function UnitSelection() {
             viewStyle={[styles.dropdown]}
             dropdownContainerStyle={styles.dropdownContainer}
             textStyle={[styles.dropdownText]}
-            placeholder='ضلع:'
+            placeholder={selectedDistrict ? getSelectedLabel(districtOptions, selectedDistrict) : 'ضلع منتخب کریں'}
             selectedValue={selectedDistrict || undefined}
             loading={hierarchyStatus === 'loading'}
+            disabled={districtOptions.length <= 1} // Disable if there's only one option
           />
           <CustomDropdown
             options={zoneOptions}
@@ -207,9 +267,10 @@ export default function UnitSelection() {
             viewStyle={[styles.dropdown]}
             textStyle={[styles.dropdownText]}
             dropdownContainerStyle={styles.dropdownContainer}
-            placeholder='زون نمبر:'
+            placeholder={selectedZone ? getSelectedLabel(zoneOptions, selectedZone) : 'زون منتخب کریں'}
             selectedValue={selectedZone || undefined}
-            loading={hierarchyStatus === 'loading'}
+            loading={hierarchyStatus === 'loading' || !selectedDistrict}
+            disabled={zoneOptions.length <= 1 || !selectedDistrict} // Disable if there's only one option or no district selected
           />
           <CustomDropdown
             options={ucOptions}
@@ -217,9 +278,10 @@ export default function UnitSelection() {
             viewStyle={[styles.dropdown]}
             textStyle={[styles.dropdownText]}
             dropdownContainerStyle={styles.dropdownContainer}
-            placeholder=' یوسی:'
+            placeholder={selectedUC ? getSelectedLabel(ucOptions, selectedUC) : ' یوسی منتخب کریں'}
             selectedValue={selectedUC || undefined}
-            loading={hierarchyStatus === 'loading'}
+            loading={hierarchyStatus === 'loading' }
+            disabled={ucOptions.length <= 1 || !selectedZone} // Disable if there's only one option or no zone selected
           />
         </View>
         <View style={styles.bottomContainer}>

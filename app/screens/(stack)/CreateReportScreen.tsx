@@ -29,6 +29,7 @@ import { selectManagementReportsList } from '@/app/features/reports/reportsSlice
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
 import ScreenLayout from '@/app/components/ScreenLayout';
+import { getUrduMonth } from '@/app/constants/urduLocalization';
 
 const CreateReportScreen = () => {
   const navigation = useNavigation();
@@ -64,7 +65,7 @@ const CreateReportScreen = () => {
   const unitName = useMemo(() => userUnitDetails?.Name || '', [userUnitDetails?.Name]);
   const reportingPeriod = useMemo(() => {
     return latestReportMgmt[0]?.managements[0]
-      ? `${latestReportMgmt[0]?.managements[0]?.month} ${latestReportMgmt[0]?.managements[0].year}`
+      ? `${getUrduMonth(latestReportMgmt[0]?.managements[0]?.month)} ${latestReportMgmt[0]?.managements[0].year}`
       : '';
   }, [latestReportMgmt]);
 

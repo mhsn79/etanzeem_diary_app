@@ -36,6 +36,8 @@ interface CustomDropdownProps {
   maxHeight?: number;
   /** Whether the dropdown is in loading state */
   loading?: boolean;
+  /** Whether the dropdown is disabled */
+  disabled?: boolean;
 }
 
 /**
@@ -68,6 +70,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   dropdownTitle,
   maxHeight = 200,
   loading = false,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
@@ -117,10 +120,14 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
       {/* TRIGGER */}
       <TouchableOpacity
         ref={triggerRef}
-        style={[styles.trigger, dropdownContainerStyle]}
+        style={[
+          styles.trigger, 
+          dropdownContainerStyle,
+          disabled && styles.disabledTrigger
+        ]}
         onPress={open}
         activeOpacity={0.8}
-        disabled={loading}
+        disabled={loading || disabled}
       >
         <UrduText style={[styles.selectedText, textStyle]}> {selectedOption ? selectedOption.label : placeholder} </UrduText>
         {loading ? (
@@ -197,6 +204,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.md,
+  },
+  disabledTrigger: {
+    opacity: 0.7,
+    backgroundColor: COLORS.disabled,
   },
   selectedText: {
     fontSize: TYPOGRAPHY.fontSize.md,
