@@ -4,7 +4,7 @@ import i18n from '@/app/i18n';
 import CustomDropdown from "@/app/components/CustomDropdown";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import Spacer from '@/app/components/Spacer';
 import SmallTarazu from "@/assets/images/small-tarazu.svg";
 import LocationIcon from "@/assets/images/location-icon-yellow.svg";
@@ -139,7 +139,6 @@ const Dashboard = () => {
   const colorScheme = useColorScheme();
   const styles = getStyles(colorScheme);
   const isRtl = i18n.locale === 'ur';
-  const dispatch = useDispatch();
   
   // Redux state selectors
   const userUnit = useSelector(selectUserUnitDetails);

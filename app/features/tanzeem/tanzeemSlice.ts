@@ -511,6 +511,7 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     // Fetch the unit and process its hierarchy
     const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, token, dispatch, getState);
     console.log('unit------------------->>', unit);
+    console.log('==================this hierarchyUnits which are under mine==============>>>',hierarchyUnits);
     
     // Remove duplicates from the hierarchy IDs
     const uniqueHierarchyIds = [...new Set([...allIds, unitId])];

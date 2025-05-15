@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   PERSONS: 'persons',
   REPORTS: 'reports',
   TANZEEM: 'tanzeem',
+  TANZEEM_HIERARCHY: 'tanzeemHierarchy',
   QA: 'qa',
 } as const;
 

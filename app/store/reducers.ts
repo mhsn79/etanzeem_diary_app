@@ -5,6 +5,7 @@ import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
 import personsReducer from '../features/persons/personSlice';
 import reportsNewReducer from '../features/reports/reportsSlice_new';
 import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
+import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
 
 // Combine reducers
@@ -15,6 +16,7 @@ const rootReducer = combineReducers({
   persons: personsReducer,
   reportsNew: reportsNewReducer, // Add the new reports slice
   tanzeem: tanzeemReducer,
+  tanzeemHierarchy: tanzeemHierarchyReducer, // Add the tanzeem hierarchy slice
   qa: qaReducer, // Add the QA slice
 });
 
