@@ -17,7 +17,7 @@ import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/const
 import { AntDesign } from '@expo/vector-icons';
 import Dialog from '@/app/components/Dialog';
 import { 
-    selectAllHierarchyUnits,
+  selectAllHierarchyUnits,
   selectUserUnitDetails, 
   selectUserUnitStatus, 
   selectUserUnitError,
@@ -153,7 +153,6 @@ const Dashboard = () => {
   const [direction, setDirection] = useState(isRtl ? 'rtl' : 'ltr');
   const [showDialog, setShowDialog] = useState(false);
 
- console.log('Dashboard component loaded hierarchyUnits',hierarchyUnits);
  
   // Log when user unit data changes
   useEffect(() => {

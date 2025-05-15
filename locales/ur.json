@@ -1,5 +1,6 @@
 {
     "activities": "سرگرمیاں",
+    "all": "تمام",
     "add_new_rukun": "نیا رکن درج کریں",
     "add_rukun": "رکن شامل کریں",
     "address": "پتہ",
@@ -155,5 +156,8 @@
     "api_error": "API خرابی: اجازت نہیں یا فیلڈ موجود نہیں",
     "no_search_results_for": "کوئی تلاش کے نتائج نہیں ملے",
     "no_persons_found_in_units": "آپ کے یونٹس میں کوئی افراد نہیں ملے",
+    "no_arkan_found": "کوئی ارکان نہیں ملے",
+    "no_participants_found": "کوئی شرکاء نہیں ملے",
+    "participants": "شرکاء",
     "refresh": "ریفریش کریں"
 }

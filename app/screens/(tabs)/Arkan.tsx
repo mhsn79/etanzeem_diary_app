@@ -15,6 +15,7 @@ import CustomTextInput from '@/app/components/CustomTextInput';
 import UrduText from '@/app/components/UrduText';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from 'expo-router';
+import { TabGroup } from '@/app/components/Tab';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,6 +33,25 @@ export default function Arkan() {
   const [filteredData, setFilteredData] = useState<Person[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTab, setSelectedTab] = useState(0); // 0 for all, 1 for rukun, 2 for other
+  
+  // Count persons by contact type
+  const rukunCount = useMemo(() => 
+    persons.filter(person => person.contact_type === 'rukun').length, 
+    [persons]
+  );
+  
+  const otherCount = useMemo(() => 
+    persons.filter(person => person.contact_type === 'other').length, 
+    [persons]
+  );
+  
+  // Define tabs with badges
+  const tabs = useMemo(() => [
+    { label: i18n.t('all'), value: 0, badge: persons.length.toString() },
+    { label: i18n.t('arkan'), value: 1, badge: rukunCount.toString() }, // اراکین
+    { label: i18n.t('participants'), value: 2, badge: otherCount.toString() }, // شرکاء
+  ], [persons.length, rukunCount, otherCount, i18n]);
 
   // Fetch persons on component mount
   useEffect(() => {
@@ -40,18 +60,34 @@ export default function Arkan() {
     }
   }, [dispatch, status]);
 
-  // Filter persons based on search query
+  // Filter persons based on search query and selected tab
   const filteredPersons = useMemo(() => {
-    if (!searchQuery.trim()) return persons;
+    // First, filter by tab selection
+    let tabFilteredPersons = persons;
+    
+    if (selectedTab === 1) {
+      // Filter for "rukun" contact type
+      tabFilteredPersons = persons.filter(person => 
+        person.contact_type === 'rukun'
+      );
+    } else if (selectedTab === 2) {
+      // Filter for "other" contact type
+      tabFilteredPersons = persons.filter(person => 
+        person.contact_type === 'other'
+      );
+    }
+    
+    // Then apply search query filter if needed
+    if (!searchQuery.trim()) return tabFilteredPersons;
 
     const query = searchQuery.toLowerCase().trim();
-    return persons.filter(person => {
+    return tabFilteredPersons.filter(person => {
       const nameMatch = person.name?.toLowerCase().includes(query);
       const addressMatch = person.address?.toLowerCase().includes(query) || person.Address?.toLowerCase().includes(query);
       const phoneMatch = person.phone?.includes(query) || person.Phone_Number?.includes(query);
       return nameMatch || addressMatch || phoneMatch;
     });
-  }, [persons, searchQuery]);
+  }, [persons, searchQuery, selectedTab]);
 
   // Update filtered data
   useEffect(() => {
@@ -150,8 +186,14 @@ export default function Arkan() {
                   source={require('@/assets/images/multiple-users.png')}
                   style={styles.headerIcon}
                 />
-                <Text style={styles.headerCount}>{persons.length}</Text>
-                <UrduText style={styles.headerTitle}>{i18n.t('total_members')}</UrduText>
+                <Text style={styles.headerCount}>{filteredData.length}</Text>
+                <UrduText style={styles.headerTitle}>
+                  {selectedTab === 0 
+                    ? i18n.t('total_members') 
+                    : selectedTab === 1 
+                      ? i18n.t('arkan') 
+                      : i18n.t('participants')}
+                </UrduText>
               </View>
               <CustomButton
                 text={i18n.t('add_new')}
@@ -175,6 +217,9 @@ export default function Arkan() {
                 style={styles.searchInput}
               />
             </View>
+            <View style={styles.tabSection}>
+              <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
+            </View>
           </>
         }
         ListEmptyComponent={
@@ -182,7 +227,11 @@ export default function Arkan() {
             <Text style={styles.emptyText}>
               {searchQuery.trim()
                 ? `${i18n.t('no_search_results_for')} "${searchQuery}"`
-                : i18n.t('no_persons_found_in_units')}
+                : selectedTab === 0
+                  ? i18n.t('no_persons_found_in_units')
+                  : selectedTab === 1
+                    ? i18n.t('no_arkan_found')
+                    : i18n.t('no_participants_found')}
             </Text>
             {!searchQuery.trim() && (
               <CustomButton
@@ -268,6 +317,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: COLORS.textPrimary,
+  },
+  tabSection: {
+    marginBottom: 15,
   },
   loadingText: {
     marginTop: 10,

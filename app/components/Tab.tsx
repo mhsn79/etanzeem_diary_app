@@ -97,8 +97,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: 5,
+    right: 7,
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.sm,
     paddingHorizontal: 4,

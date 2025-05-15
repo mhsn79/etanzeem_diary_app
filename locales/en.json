@@ -1,5 +1,7 @@
 {
     "activities": "Activities",
+    "add_new": "Add New",
+    "all": "All",
     "add_new_rukun": "Add new Rukun",
     "add_rukun": "Add Rukun",
     "address": "Address",
@@ -144,5 +146,12 @@
     "success": "Success",
     "take_photo": "Take Photo",
     "try_again": "Try Again",
-    "uploading_image": "Uploading image..."
+    "uploading_image": "Uploading image...",
+    "no_search_results_for": "No search results for",
+    "no_arkan_found": "No Arkan found",
+    "no_participants_found": "No participants found",
+    "no_persons_found_in_units": "No persons found in units",
+    "participants": "Participants",
+    "total_members": "Total Members",
+    "refresh": "Refresh"
 }
