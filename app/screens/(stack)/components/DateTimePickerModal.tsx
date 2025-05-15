@@ -94,6 +94,7 @@ interface DateTimePickerModalProps {
   onClose: () => void;
   onSelect: (date: Date) => void;
   selectedDate: Date | null;
+  mode?: 'report' | 'schedule'; // Add mode parameter
 }
 
 const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
@@ -101,17 +102,59 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
   onClose,
   onSelect,
   selectedDate,
+  mode = 'schedule', // Default to schedule mode
 }) => {
   // Tabs
   const [activeTab, setActiveTab] = useState(0);
+  
+  // Helper function to check if two dates are the same day
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getDate() === d2.getDate() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getFullYear() === d2.getFullYear();
 
-  // Calendar state
-  const [date, setDate] = useState<Date>(selectedDate || new Date());
+  // Calendar state - initialize with a valid date based on mode
+  const getInitialDate = () => {
+    const today = new Date();
+    
+    if (selectedDate) {
+      // If a date is already selected, use it
+      return selectedDate;
+    } else if (mode === 'report') {
+      // For report mode, use today
+      return today;
+    } else {
+      // For schedule mode, use tomorrow
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow;
+    }
+  };
+  
+  const [date, setDate] = useState<Date>(getInitialDate());
   const [currentMonth, setCurrentMonth] = useState(date.getMonth());
   const [currentYear, setCurrentYear] = useState(date.getFullYear());
 
   // ======= Hour State ======= //
-  const [hour, setHour] = useState(date.getHours());
+  // Initialize with a valid hour based on mode
+  const getInitialHour = useCallback(() => {
+    const now = new Date();
+    const dateHour = date.getHours();
+    
+    if (isSameDay(date, now)) {
+      if (mode === 'report' && dateHour > now.getHours()) {
+        // For report mode, if the hour is in the future, use current hour
+        return now.getHours();
+      } else if (mode === 'schedule' && dateHour < now.getHours()) {
+        // For schedule mode, if the hour is in the past, use next hour
+        return now.getHours() + 1;
+      }
+    }
+    
+    return dateHour;
+  }, [date, mode]);
+  
+  const [hour, setHour] = useState(getInitialHour());
   const [manualTime, setManualTime] = useState('');
   const [timeError, setTimeError] = useState('');
 
@@ -139,9 +182,12 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
   // Monday-based day array
     // Set default time when component mounts or selectedDate changes
     useEffect(() => {
-        const defaultTime = `${String(hour).padStart(2, '0')}:00`;
+        // Use getInitialHour to ensure the time is valid based on the mode
+        const validHour = getInitialHour();
+        setHour(validHour);
+        const defaultTime = `${String(validHour).padStart(2, '0')}:00`;
         setManualTime(defaultTime);
-      }, [hour, selectedDate]);
+      }, [selectedDate, mode, getInitialHour, date]);
     
   const daysArray = generateCalendarDays(currentYear, currentMonth);
 
@@ -172,15 +218,30 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
   };
 
   const handleDayPress = (d: Date) => {
-    setDate(d);
-    setCurrentMonth(d.getMonth());
-    setCurrentYear(d.getFullYear());
+    // Only allow valid dates based on the mode
+    if (isValidDate(d)) {
+      setDate(d);
+      setCurrentMonth(d.getMonth());
+      setCurrentYear(d.getFullYear());
+    }
   };
 
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getDate() === d2.getDate() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getFullYear() === d2.getFullYear();
+  // Function to check if a date is valid based on the mode
+  const isValidDate = (d: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dateToCheck = new Date(d);
+    dateToCheck.setHours(0, 0, 0, 0);
+    
+    if (mode === 'report') {
+      // For report mode, only allow past dates (today and before)
+      return dateToCheck <= today;
+    } else {
+      // For schedule mode, only allow future dates (today and after)
+      return dateToCheck >= today;
+    }
+  };
 
   // For the time ring
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -203,7 +264,28 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
   }
 
   const handleSelectHour = (val: number) => {
-    setHour(val);
+    // Check if the selected hour is valid based on the mode
+    const now = new Date();
+    const selectedDate = new Date(currentYear, currentMonth, date.getDate(), val, 0, 0, 0);
+    
+    if (mode === 'report') {
+      // For report mode, if the date is today, only allow hours up to the current hour
+      if (isSameDay(selectedDate, now) && val > now.getHours()) {
+        // If invalid, set to current hour
+        setHour(now.getHours());
+      } else {
+        setHour(val);
+      }
+    } else { // schedule mode
+      // For schedule mode, if the date is today, only allow hours after the current hour
+      if (isSameDay(selectedDate, now) && val < now.getHours()) {
+        // If invalid, set to next hour
+        setHour(now.getHours() + 1);
+      } else {
+        setHour(val);
+      }
+    }
+    
     animateSelection();
   };
   const handleManualTimeChange = (text: string) => {
@@ -216,12 +298,32 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
       // Validate hour when 2 digits are entered
       if (numbersOnly.length === 2) {
         const hourValue = parseInt(numbersOnly, 10);
+        
         if (hourValue >= 0 && hourValue <= 23) {
+          // Check if the hour is valid based on the mode
+          const now = new Date();
+          const selectedDate = new Date(currentYear, currentMonth, date.getDate(), hourValue, 0, 0, 0);
+          
+          if (mode === 'report') {
+            // For report mode, if the date is today, only allow hours up to the current hour
+            if (isSameDay(selectedDate, now) && hourValue > now.getHours()) {
+              setTimeError('برائے مہربانی موجودہ وقت یا ماضی کا وقت درج کریں');
+              return;
+            }
+          } else { // schedule mode
+            // For schedule mode, if the date is today, only allow hours after the current hour
+            if (isSameDay(selectedDate, now) && hourValue < now.getHours()) {
+              setTimeError('برائے مہربانی مستقبل کا وقت درج کریں');
+              return;
+            }
+          }
+          
           setHour(hourValue);
           animateSelection();
           setManualTime(`${numbersOnly}:00`);
+          setTimeError('');
         } else {
-          setTimeError('Please enter a valid hour (00-23)');
+          setTimeError('برائے مہربانی درست گھنٹہ درج کریں (00-23)');
         }
       }
     }
@@ -237,6 +339,34 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
       0,
       0
     );
+    
+    // Validate the final date and time based on mode
+    const now = new Date();
+    
+    if (mode === 'report') {
+      // For report mode, ensure the date and time is not in the future
+      if (finalDate > now) {
+        // If time is in the future but date is valid (today), adjust time to current time
+        if (isValidDate(finalDate)) {
+          finalDate.setHours(now.getHours(), now.getMinutes(), 0, 0);
+        } else {
+          // Otherwise, don't allow selection
+          return;
+        }
+      }
+    } else { // schedule mode
+      // For schedule mode, ensure the date and time is not in the past
+      if (finalDate < now) {
+        // If time is in the past but date is valid (today), adjust time to next hour
+        if (isValidDate(finalDate)) {
+          finalDate.setHours(now.getHours() + 1, 0, 0, 0);
+        } else {
+          // Otherwise, don't allow selection
+          return;
+        }
+      }
+    }
+    
     onSelect(finalDate);
     onClose();
   };
@@ -288,6 +418,15 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
               </TouchableOpacity>
             ))}
           </View>
+          
+          {/* Mode indicator */}
+          <View style={styles.modeIndicator}>
+            <Text style={styles.modeText}>
+              {mode === 'report' 
+                ? 'آپ صرف آج یا ماضی کی تاریخیں منتخب کر سکتے ہیں' 
+                : 'آپ صرف آج یا مستقبل کی تاریخیں منتخب کر سکتے ہیں'}
+            </Text>
+          </View>
 
           {/* CALENDAR TAB */}
           {activeTab === 0 && (
@@ -327,19 +466,23 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
                   {week.map((d, colIndex) => {
                     const inMonth = d.getMonth() === currentMonth;
                     const selected = isSameDay(d, date);
+                    const valid = isValidDate(d);
                     return (
                       <TouchableOpacity
                         key={colIndex}
                         style={[
                           styles.dayContainer,
                           !inMonth && { opacity: 0.4 },
+                          !valid && { opacity: 0.3 },
                           selected && { backgroundColor: COLORS.primary },
                         ]}
                         onPress={() => handleDayPress(d)}
+                        disabled={!valid}
                       >
                         <Text
                           style={[
                             styles.dayText,
+                            !valid && { color: COLORS.error },
                             selected && { color: COLORS.white },
                           ]}
                         >
@@ -389,16 +532,37 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
                   {/* Outer ring */}
                   {outerHours.map(({ hour: hVal, x, y }) => {
                     const isSelected = hVal === hour;
+                    
+                    // Check if this hour is valid based on the mode
+                    const now = new Date();
+                    const selectedDate = new Date(currentYear, currentMonth, date.getDate(), hVal, 0, 0, 0);
+                    let isValid = true;
+                    
+                    if (isSameDay(selectedDate, now)) {
+                      if (mode === 'report' && hVal > now.getHours()) {
+                        isValid = false; // Future hours are invalid in report mode
+                      } else if (mode === 'schedule' && hVal < now.getHours()) {
+                        isValid = false; // Past hours are invalid in schedule mode
+                      }
+                    }
+                    
                     return (
                       <React.Fragment key={`outer-${hVal}`}>
                         <SvgText
                           x={x}
                           y={y + 5}
-                          fill={isSelected ? COLORS.white : COLORS.black}
+                          fill={
+                            isSelected 
+                              ? COLORS.white 
+                              : isValid 
+                                ? COLORS.black 
+                                : COLORS.lightGray
+                          }
                           fontSize={TYPOGRAPHY.fontSize.md}
                           fontWeight="bold"
                           textAnchor="middle"
-                          onPress={() => handleSelectHour(hVal)}
+                          opacity={isValid ? 1 : 0.5}
+                          onPress={() => isValid && handleSelectHour(hVal)}
                         >
                           {hVal}
                         </SvgText>
@@ -410,16 +574,37 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
                   {innerHours.map(({ hour: hVal, x, y }) => {
                     const isSelected = hVal === hour;
                     const label = hVal === 0 ? '00' : String(hVal);
+                    
+                    // Check if this hour is valid based on the mode
+                    const now = new Date();
+                    const selectedDate = new Date(currentYear, currentMonth, date.getDate(), hVal, 0, 0, 0);
+                    let isValid = true;
+                    
+                    if (isSameDay(selectedDate, now)) {
+                      if (mode === 'report' && hVal > now.getHours()) {
+                        isValid = false; // Future hours are invalid in report mode
+                      } else if (mode === 'schedule' && hVal < now.getHours()) {
+                        isValid = false; // Past hours are invalid in schedule mode
+                      }
+                    }
+                    
                     return (
                       <React.Fragment key={`inner-${hVal}`}>
                         <SvgText
                           x={x}
                           y={y + 5}
-                          fill={isSelected ? COLORS.white : COLORS.black}
+                          fill={
+                            isSelected 
+                              ? COLORS.white 
+                              : isValid 
+                                ? COLORS.black 
+                                : COLORS.lightGray
+                          }
                           fontSize={TYPOGRAPHY.fontSize.md}
                           fontWeight="bold"
                           textAnchor="middle"
-                          onPress={() => handleSelectHour(hVal)}
+                          opacity={isValid ? 1 : 0.5}
+                          onPress={() => isValid && handleSelectHour(hVal)}
                         >
                           {label}
                         </SvgText>
@@ -496,6 +681,19 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modeIndicator: {
+    backgroundColor: COLORS.lightPrimary,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.md,
+    alignItems: 'center',
+  },
+  modeText: {
+    color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
+    fontSize: TYPOGRAPHY.fontSize.md,
+    textAlign: 'center',
   },
   tabItemActive: {
     backgroundColor: COLORS.primary,

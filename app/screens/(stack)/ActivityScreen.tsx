@@ -28,7 +28,13 @@ const ActivityScreen = () => {
     const params = useLocalSearchParams();
     const dispatch = useAppDispatch();
     const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-    const [selectedActivityDate, setSelectedActivityDate] = useState<Date | null>(null);
+    // Initialize with current date for report mode, or tomorrow for schedule mode
+    const mode = params.mode || 'schedule';
+    const initialDate = mode === 'report' 
+        ? new Date() // Today for report mode
+        : new Date(new Date().setDate(new Date().getDate() + 1)); // Tomorrow for schedule mode
+    
+    const [selectedActivityDate, setSelectedActivityDate] = useState<Date | null>(initialDate);
     const [activityDetails, setActivityDetails] = useState({
         activityType: '',
         location: '',
@@ -165,7 +171,6 @@ console.log(activityTypes);
     };
 
     // Determine the screen title based on the mode parameter
-    const mode = params.mode || 'schedule';
     const screenTitle = mode === 'report' ? 'سرگرمی رپورٹ فارم' : 'سرگرمی شیڈول کریں';
 
     return (
@@ -235,6 +240,7 @@ console.log(activityTypes);
                 onClose={() => setDatePickerVisible(false)}
                 onSelect={selectActivityDate}
                 selectedDate={selectedActivityDate}
+                mode={mode as 'report' | 'schedule'} // Pass the mode
             />
 
             {/* Confirmation Dialog */}
