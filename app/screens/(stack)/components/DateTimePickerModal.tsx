@@ -482,7 +482,7 @@ const DateTimePickerModal: React.FC<DateTimePickerModalProps> = ({
                         <Text
                           style={[
                             styles.dayText,
-                            !valid && { color: COLORS.error },
+                            !valid && { color: COLORS.primary },
                             selected && { color: COLORS.white },
                           ]}
                         >
