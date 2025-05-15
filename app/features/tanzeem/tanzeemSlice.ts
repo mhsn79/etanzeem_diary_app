@@ -6,6 +6,7 @@ import {
   refresh,
   checkAndRefreshTokenIfNeeded,
 } from '../auth/authSlice';
+import { fetchNazimDetails } from '../persons/personSlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
 import { API_BASE_URL } from '@/app/constants/api';
@@ -220,6 +221,13 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
       
       // Transform the API response to match our expected format
       const transformedUnit = normalizeTanzeemiUnitData(response.data);
+      
+      // If the unit has a Nazim_id, fetch the Nazim details
+      if (transformedUnit.Nazim_id) {
+        console.log(`Unit has Nazim_id: ${transformedUnit.Nazim_id}, fetching Nazim details...`);
+        dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
+      }
+      
       return transformedUnit;
     };
 
@@ -359,6 +367,12 @@ const fetchAndProcessHierarchy = async (
     
     // Add the current unit to our collection of all units
     allUnits.push(unit);
+    
+    // If the unit has a Nazim_id, fetch the Nazim details
+    if (unit.Nazim_id) {
+      console.log(`Unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
+      dispatch(fetchNazimDetails(unit.Nazim_id));
+    }
     
     // Process zaili_unit_hierarchy if it exists and is an array
     if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
@@ -514,6 +528,12 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
         // Dispatch the action to fetch the tanzeem level
         dispatch(fetchTanzeemLevelById(levelId));
       }
+    }
+    
+    // If the unit has a Nazim_id, fetch the Nazim details
+    if (unit && unit.Nazim_id) {
+      console.log(`User unit has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
+      dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
     return { unit, hierarchyIds: uniqueHierarchyIds, hierarchyUnits };

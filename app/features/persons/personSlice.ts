@@ -7,6 +7,7 @@ import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNo
 import { uploadImage } from '@/app/utils/imageUpload';
 import { API_BASE_URL } from '@/app/constants/api';
 import { Platform } from 'react-native';
+import { TanzeemiUnit } from '@/app/models/TanzeemiUnit';
 
 // Entity adapter for persons
 const personsAdapter = createEntityAdapter<Person>({
@@ -25,6 +26,9 @@ interface PersonsExtraState {
   userDetails: Person | null;
   userDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   userDetailsError: string | null;
+  nazimDetails: Person | null;
+  nazimDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  nazimDetailsError: string | null;
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -39,6 +43,9 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   userDetails: null,
   userDetailsStatus: 'idle',
   userDetailsError: null,
+  nazimDetails: null,
+  nazimDetailsStatus: 'idle',
+  nazimDetailsError: null,
 });
 
 // Helper function for API requests
@@ -354,6 +361,60 @@ export const updatePersonImage = createAsyncThunk<
   }
 });
 
+/**
+ * Fetch Nazim details based on Nazim_id from a TanzeemiUnit
+ * This function fetches the person details for a Nazim from the Person table
+ * by matching the Nazim_id with the person.id
+ */
+export const fetchNazimDetails = createAsyncThunk<
+  Person,
+  TanzeemiUnit | number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchNazimDetails', async (unitOrNazimId, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log('Fetching Nazim details...');
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    
+    const auth = selectAuthState(getState());
+    const token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+    
+    // Extract Nazim_id from the unit object or use the provided ID directly
+    let nazimId: number;
+    if (typeof unitOrNazimId === 'number') {
+      nazimId = unitOrNazimId;
+    } else {
+      nazimId = unitOrNazimId.Nazim_id || 0;
+      if (!nazimId) {
+        return rejectWithValue('No Nazim_id found in the provided unit');
+      }
+    }
+    
+    console.log(`Fetching Nazim details for Nazim_id: ${nazimId}`);
+    
+    const fetchNazim = async (accessToken: string) => {
+      const response = await apiRequest<SinglePersonResponse>(
+        `/items/Person/${nazimId}?fields=*`,
+        'GET',
+        accessToken
+      );
+      
+      console.log('API Response for Nazim details:', response);
+      if (!response.data) throw new Error(`Person with ID ${nazimId} not found`);
+      
+      // Transform the API response to match our expected format
+      return normalizePersonData(response.data);
+    };
+    
+    return await executeWithTokenRefresh(fetchNazim, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch Nazim details error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch Nazim details');
+  }
+});
+
 // Persons slice
 const personsSlice = createSlice({
   name: 'persons',
@@ -366,6 +427,9 @@ const personsSlice = createSlice({
       state.userDetails = null;
       state.userDetailsStatus = 'idle';
       state.userDetailsError = null;
+      state.nazimDetails = null;
+      state.nazimDetailsStatus = 'idle';
+      state.nazimDetailsError = null;
     },
     resetCreateStatus(state) {
       state.createStatus = 'idle';
@@ -446,6 +510,20 @@ const personsSlice = createSlice({
       .addCase(updatePersonImage.rejected, (state, action) => {
         state.updateStatus = 'failed';
         state.updateError = action.payload ?? 'Failed to update person image';
+      })
+      // Fetch Nazim details
+      .addCase(fetchNazimDetails.pending, (state) => {
+        state.nazimDetailsStatus = 'loading';
+        state.nazimDetailsError = null;
+      })
+      .addCase(fetchNazimDetails.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.nazimDetailsStatus = 'succeeded';
+        state.nazimDetails = action.payload;
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(fetchNazimDetails.rejected, (state, action) => {
+        state.nazimDetailsStatus = 'failed';
+        state.nazimDetailsError = action.payload ?? 'Failed to fetch Nazim details';
       });
   },
 });
@@ -471,5 +549,10 @@ export const selectUpdatePersonError = (state: RootState) => selectPersonsState(
 export const selectUserDetails = (state: RootState) => selectPersonsState(state).userDetails;
 export const selectUserDetailsStatus = (state: RootState) => selectPersonsState(state).userDetailsStatus;
 export const selectUserDetailsError = (state: RootState) => selectPersonsState(state).userDetailsError;
+
+// Nazim details selectors
+export const selectNazimDetails = (state: RootState) => selectPersonsState(state).nazimDetails;
+export const selectNazimDetailsStatus = (state: RootState) => selectPersonsState(state).nazimDetailsStatus;
+export const selectNazimDetailsError = (state: RootState) => selectPersonsState(state).nazimDetailsError;
 
 export default personsSlice.reducer;
