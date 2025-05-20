@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme, Pressable, ActivityIndicator } from 'react-native';
 import i18n from '@/app/i18n';
 import CustomDropdown from "@/app/components/CustomDropdown";
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
 import Spacer from '@/app/components/Spacer';
@@ -273,8 +273,13 @@ const Dashboard = () => {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <StatusBar hidden />
+    <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primary}
+        translucent={Platform.OS === 'android'}
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       
       <View style={[styles.mainContainer, { direction: isRtl ? 'rtl' : 'ltr' }]}>
         {/* Header section */}
@@ -426,6 +431,7 @@ const Dashboard = () => {
         cancelTextStyle={styles.cancelTextStyle}
       />
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -434,6 +440,10 @@ const getStyles = (colorScheme: string | null | undefined) => {
   const isDark = colorScheme === 'dark';
   
   return StyleSheet.create({
+    safeAreaContainer: {
+      flex: 1,
+      backgroundColor: isDark ? "#23242D" : "#EBEBEB",
+    },
     container: {
       flex: 1,
     },

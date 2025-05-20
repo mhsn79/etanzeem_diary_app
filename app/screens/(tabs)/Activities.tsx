@@ -1,14 +1,24 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity, FlatList, ActivityIndicator, Text, RefreshControl } from 'react-native';
+import React, { useLayoutEffect, useMemo, useState, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Text,
+  RefreshControl,
+  StatusBar,
+  Platform,
+  ViewStyle,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityCard from '../../components/ActivityCard';
-import ScreenLayout from '../../components/ScreenLayout';
 import { TabGroup } from '@/app/components/Tab';
 import Dialog from '@/app/components/Dialog';
-import { BORDER_RADIUS, COLORS, SHADOWS, SPACING } from '@/app/constants/theme';
-
+import Header from '../../components/Header';
+import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import { useAppDispatch } from '@/src/hooks/useAppDispatch';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
 import {
@@ -17,6 +27,36 @@ import {
   selectActivitiesStatus,
   selectActivitiesError,
 } from '@/app/features/activities/activitySlice';
+import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
+
+// Reusable component to wrap content with consistent status bar and background
+interface ScreenWrapperProps {
+  children: React.ReactNode;
+  headerTitle: string;
+  onBack: () => void;
+}
+
+const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ children, headerTitle, onBack }) => {
+
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primary}
+        translucent={true}
+      />
+      {/* Create a transparent view for the header area */}
+      <View style={styles.headerArea}>
+        <Header 
+          title={headerTitle} 
+          onBack={onBack}
+        />
+      </View>
+      <View style={styles.contentWrapper}>{children}</View>
+    </SafeAreaView>
+  );
+};
 
 export default function Activities() {
   const router = useRouter();
@@ -24,20 +64,11 @@ export default function Activities() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showDialog, setShowDialog] = useState(false);
-  /**
-   * ────────────────────────────────────────────────────────────────────────────────
-   * Redux state (always an array thanks to the slice fix)
-   * ────────────────────────────────────────────────────────────────────────────────
-   */
+
   const activities = useAppSelector(selectAllActivities);
   const status = useAppSelector(selectActivitiesStatus);
   const error = useAppSelector(selectActivitiesError);
 
-  /**
-   * ────────────────────────────────────────────────────────────────────────────────
-   * Pull-to-refresh handler
-   * ────────────────────────────────────────────────────────────────────────────────
-   */
   const onRefresh = useCallback(() => {
     console.log('Pull-to-refresh triggered');
     setRefreshing(true);
@@ -47,22 +78,12 @@ export default function Activities() {
     });
   }, [dispatch]);
 
-  /**
-   * ────────────────────────────────────────────────────────────────────────────────
-   * Side effects
-   * ────────────────────────────────────────────────────────────────────────────────
-   */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (status === 'idle') {
       dispatch(fetchActivities());
     }
   }, [dispatch, status]);
 
-  /**
-   * ────────────────────────────────────────────────────────────────────────────────
-   * UI helpers
-   * ────────────────────────────────────────────────────────────────────────────────
-   */
   const tabs = useMemo(
     () => [
       { label: 'شیڈول', value: 0 },
@@ -71,7 +92,7 @@ export default function Activities() {
     []
   );
 
-  const formatActivityData = (activity: any) => ({
+  const formatActivityData = (activity:any) => ({
     id: activity.id.toString(),
     title: activity.activity_details || activity.title || 'غير متعين',
     location: activity.location || activity.location_coordinates || 'غير متعين',
@@ -102,50 +123,47 @@ export default function Activities() {
     );
   }, [activities, selectedTab]);
 
-  // Dialog handlers
-  const handleAdd = () => setShowDialog(true);
-  const handleReportActivity = () => {
+  const handleAdd = useCallback(() => setShowDialog(true), []);
+  const handleReportActivity = useCallback(() => {
     setShowDialog(false);
     router.push({
       pathname: '/screens/ActivityScreen',
       params: { mode: 'report' },
     });
-  };
-  const handleScheduleActivity = () => {
+  }, [router]);
+  const handleScheduleActivity = useCallback(() => {
     setShowDialog(false);
     router.push({
       pathname: '/screens/ActivityScreen',
       params: { mode: 'schedule' },
     });
-  };
+  }, [router]);
 
+  // Loading state
   if (status === 'loading' && !refreshing) {
     return (
-      <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
-      </ScreenLayout>
+      </ScreenWrapper>
     );
   }
 
+  // Error state
   if (status === 'failed') {
     return (
-      <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
         <View style={styles.center}>
           <Text style={styles.errorText}>{error || 'سرگرمیاں لوڈ کرنے میں ناکامی'}</Text>
         </View>
-      </ScreenLayout>
+      </ScreenWrapper>
     );
   }
 
-  /**
-   * ────────────────────────────────────────────────────────────────────────────────
-   * Main render
-   * ────────────────────────────────────────────────────────────────────────────────
-   */
+  // Main content
   return (
-    <ScreenLayout title="سرگرمیاں" onBack={() => router.back()}>
+    <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
       <View style={styles.container}>
         <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
         <FlatList
@@ -187,12 +205,10 @@ export default function Activities() {
         />
       </View>
 
-      {/* Floating Add Button */}
       <TouchableOpacity style={styles.fab} onPress={handleAdd}>
         <Ionicons name="add" size={24} color={COLORS.white} />
       </TouchableOpacity>
 
-      {/* Action Dialog */}
       <Dialog
         visible={showDialog}
         onConfirm={handleReportActivity}
@@ -211,19 +227,32 @@ export default function Activities() {
         confirmTextStyle={styles.confirmTextStyle}
         cancelTextStyle={styles.cancelTextStyle}
       />
-    </ScreenLayout>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.primary, // Status
+      },
+  headerArea: {
+    backgroundColor: COLORS.white,
+
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.white, // White content area
+  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white, // Ensure container is white
     paddingTop: SPACING.lg,
     marginHorizontal: SPACING.md,
+    zIndex: 0,
   },
   listContent: {
-    paddingBottom: 80,
+    paddingBottom: hp('12%'),
   },
   center: {
     flex: 1,
@@ -244,7 +273,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: SPACING.xl,
+    bottom: SPACING.xl + hp('10%'),
     right: SPACING.xl,
     width: 56,
     height: 56,
@@ -253,28 +282,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.medium,
+    zIndex: 1000,
   },
   confirmButtonStyle: {
     backgroundColor: COLORS.primary,
     width: '100%',
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
-},
-cancelButtonStyle: {
+  },
+  cancelButtonStyle: {
     width: '100%',
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.sm,
     borderWidth: 1,
     borderStyle: 'dashed',
-},
-confirmTextStyle: {
+  },
+  confirmTextStyle: {
     color: COLORS.white,
-},
-cancelTextStyle: {
+  },
+  cancelTextStyle: {
     color: COLORS.black,
-},
-titleStyle: {
+  },
+  titleStyle: {
     textAlign: 'left',
-},
+  },
 });

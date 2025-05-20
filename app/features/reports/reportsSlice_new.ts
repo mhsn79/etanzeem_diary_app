@@ -138,7 +138,7 @@ export const fetchReportSubmissions = createAsyncThunk<
     
     // Check if it's an authentication error
     if (error.message?.includes('Authentication expired') || 
-        error.message?.includes('Token expired') ||
+        error.message?.includes('No authentication') ||
         error.message?.includes('401')) {
       // Dispatch logout action if it's an auth error
       dispatch(logout());

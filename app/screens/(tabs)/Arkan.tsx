@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 
 import i18n from '../../i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
@@ -127,42 +127,62 @@ export default function Arkan() {
   // Render loading state
   if (status === 'loading' && !refreshing) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>{i18n.t('loading')}</Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.primary}
+          translucent={Platform.OS === 'android'}
+        />
+        <View style={[styles.keyboardAvoidingContainer, styles.centerContent]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{i18n.t('loading')}</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   // Render error state
   if (status === 'failed' && error) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>
-          {error.includes('{') ? i18n.t('api_error') : error}
-        </Text>
-        <CustomButton
-          text={i18n.t('try_again')}
-          onPress={() => dispatch(fetchPersonsByUnit())}
-          style={styles.retryButton}
-          viewStyle={styles.retryButtonView}
-          textStyle={styles.retryButtonText}
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.primary}
+          translucent={Platform.OS === 'android'}
         />
-      </View>
+        <View style={[styles.keyboardAvoidingContainer, styles.centerContent]}>
+          <Text style={styles.errorText}>
+            {error.includes('{') ? i18n.t('api_error') : error}
+          </Text>
+          <CustomButton
+            text={i18n.t('try_again')}
+            onPress={() => dispatch(fetchPersonsByUnit())}
+            style={styles.retryButton}
+            viewStyle={styles.retryButtonView}
+            textStyle={styles.retryButtonText}
+          />
+        </View>
+      </SafeAreaView>
     );
   }
 
   const safeTop = insets.top > 0 ? insets.top : 10;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={COLORS.primary}
+        translucent={Platform.OS === 'android'}
+      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingContainer}
+      >
       <FlatList
         contentContainerStyle={{
           flexGrow: 1,
-          paddingTop: safeTop,
+          paddingTop: 10,
           paddingHorizontal: 20,
           paddingBottom: 20,
           direction: i18n.locale === 'ur' ? 'rtl' : 'ltr',
@@ -246,11 +266,16 @@ export default function Arkan() {
         }
       />
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+  },
+  keyboardAvoidingContainer: {
     flex: 1,
     backgroundColor: '#fff',
   },

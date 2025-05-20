@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../store';
-import { selectAuthState, isTokenExpiredOrExpiring, checkAndRefreshTokenIfNeeded } from '../features/auth/authSlice';
+import { selectAuthState, isTokenExpiredOrExpiring, checkAndRefreshTokenIfNeeded, logout } from '../features/auth/authSlice';
 import { ensureFreshToken } from '../services/apiClient';
 import { Platform } from 'react-native';
 
@@ -27,6 +27,7 @@ export const useTokenRefresh = () => {
       return false;
     } catch (error) {
       console.error('Failed to refresh token in useTokenRefresh hook:', error);
+      dispatch(logout())
       return false;
     }
   }, [auth.tokens, dispatch]);
