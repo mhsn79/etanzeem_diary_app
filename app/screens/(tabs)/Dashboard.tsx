@@ -622,31 +622,9 @@ const UnitSelectionModal = ({ visible, onClose, styles, isRtl }: UnitSelectionMo
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalScrollView}>
-              {/* Parent Units Section */}
+            <ScrollView style={styles.modalScrollView}>              
+      
               <View style={styles.sectionContainer}>
-                <UrduText style={styles.sectionTitle}>{i18n.t('parent_units')}</UrduText>
-                
-                {hierarchyStatus === 'loading' ? (
-                  <ActivityIndicator size="large" color={COLORS.primary} />
-                ) : parentUnits.length > 0 ? (
-                  parentUnits.map((unit, index) => (
-                    <View key={`parent-${unit.id}`} style={styles.parentUnitItem}>
-                      <UrduText style={styles.parentUnitText}>
-                        {unit.Name || unit.name} ({i18n.t('level')} {unit.level})
-                      </UrduText>
-                    </View>
-                  ))
-                ) : (
-                  <UrduText style={styles.noDataText}>{i18n.t('no_parent_units')}</UrduText>
-                )}
-              </View>
-              
-              <Spacer height={20} />
-              
-              {/* Subordinate Units Section */}
-              <View style={styles.sectionContainer}>
-                <UrduText style={styles.sectionTitle}>{i18n.t('subordinate_units')}</UrduText>
                 
                 {hierarchyStatus === 'loading' ? (
                   <ActivityIndicator size="large" color={COLORS.primary} />
@@ -698,33 +676,7 @@ const UnitSelectionModal = ({ visible, onClose, styles, isRtl }: UnitSelectionMo
                 )}
               </View>
               
-              <Spacer height={20} />
-              
-              {/* Selected Unit Details Section */}
-              {selectedUC && (
-                <View style={styles.sectionContainer}>
-                  <UrduText style={styles.sectionTitle}>{i18n.t('unit_details')}</UrduText>
-                  
-                  <View style={styles.unitDetailsContainer}>
-                    <View style={styles.unitDetailRow}>
-                      <UrduText style={styles.unitDetailLabel}>{i18n.t('members')}</UrduText>
-                      <UrduText style={styles.unitDetailValue}>50</UrduText>
-                    </View>
-                    <View style={styles.unitDetailRow}>
-                      <UrduText style={styles.unitDetailLabel}>{i18n.t('voters')}</UrduText>
-                      <UrduText style={styles.unitDetailValue}>5000</UrduText>
-                    </View>
-                    <View style={styles.unitDetailRow}>
-                      <UrduText style={styles.unitDetailLabel}>{i18n.t('wards')}</UrduText>
-                      <UrduText style={styles.unitDetailValue}>4</UrduText>
-                    </View>
-                    <View style={styles.unitDetailRow}>
-                      <UrduText style={styles.unitDetailLabel}>{i18n.t('block_codes')}</UrduText>
-                      <UrduText style={styles.unitDetailValue}>10</UrduText>
-                    </View>
-                  </View>
-                </View>
-              )}
+        
             </ScrollView>
             
             {/* Close Button */}
