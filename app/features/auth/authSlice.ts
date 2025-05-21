@@ -6,6 +6,8 @@ import { AppDispatch } from '../../store';
 import { fetchPersonByEmail } from '../persons/personSlice';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import { persistor } from '../../store';
+import { RESET_STATE } from '../../store/reducers';
 
 // Utility function to check if a token is expired or about to expire
 export const isTokenExpiredOrExpiring = (expiresAt: number | undefined): boolean => {
@@ -299,11 +301,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout: (state) => {
+      // Clear auth state
       state.tokens = null;
       state.user = null;
       state.status = 'idle';
       state.error = null;
+      
+      // Logout from Directus
       directus.logout();
+      
+      // The global state reset will be handled by the thunk
     },
     clearError: (state) => {
       state.error = null;
@@ -359,7 +366,47 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout: logoutAction, clearError } = authSlice.actions;
+
+/**
+ * Complete logout thunk that:
+ * 1. Clears the auth state
+ * 2. Resets all Redux slices to their initial state
+ * 3. Purges the persisted Redux data
+ */
+export const logout = createAsyncThunk(
+  'auth/logoutComplete',
+  async (_, { dispatch }) => {
+    try {
+      // First dispatch the auth logout action to clear auth state and log out from Directus
+      dispatch(logoutAction());
+      
+      // Then dispatch the reset action to reset all slices to their initial state
+      dispatch({ type: RESET_STATE });
+      
+      try {
+        // Finally, purge the persisted Redux data
+        await persistor.purge();
+      } catch (purgeError) {
+        // If purge fails, log the error but continue with logout
+        console.warn('Error purging persisted data:', purgeError);
+      }
+      
+      console.log('Logout complete: Auth state cleared, Redux state reset, and persisted data purged');
+      
+      return true;
+    } catch (error) {
+      console.error('Error during logout process:', error);
+      // Even if there's an error, we should still try to reset the state
+      try {
+        dispatch({ type: RESET_STATE });
+      } catch (resetError) {
+        console.error('Failed to reset state during error recovery:', resetError);
+      }
+      return true; // Return true anyway to allow navigation to continue
+    }
+  }
+);
 
 export const selectAuthState = (state: RootState) => state.auth;
 export const selectIsAuthenticated = (state: RootState) => !!state.auth.tokens;
@@ -387,8 +434,8 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
       console.log('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
     } catch (error) {
       console.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
-      // If refresh fails, we should log the user out
-      dispatch(logout());
+      // If refresh fails, we should log the user out completely
+      await dispatch(logout()).unwrap();
       throw new Error('Authentication expired. Please log in again.');
     }
   }

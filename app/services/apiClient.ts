@@ -79,8 +79,8 @@ const refreshTokenAndGetNew = async (): Promise<string> => {
   } catch (error: any) {
     console.error('Token refresh failed:', error, Platform.OS);
     
-    // If refresh fails, we should log the user out
-    store.dispatch(logout());
+    // If refresh fails, we should log the user out completely
+    await store.dispatch(logout()).unwrap();
     
     const refreshError = new Error(error?.message || 'Authentication expired. Please log in again.');
     processQueue(refreshError);

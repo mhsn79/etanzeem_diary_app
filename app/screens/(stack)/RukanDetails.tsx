@@ -48,8 +48,14 @@ export default function RukanDetails() {
   const navigation = useNavigation();
 
   const handleLogout = () => {
-    dispatch(logout());
-    router.replace('/screens/LoginScreen');
+    dispatch(logout())
+      .then(() => {
+        router.replace('/screens/LoginScreen');
+      })
+      .catch((err) => {
+        console.error('Error during logout:', err);
+        router.replace('/screens/LoginScreen');
+      });
   };
   
   useFocusEffect(() => {

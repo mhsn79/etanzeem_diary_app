@@ -1,4 +1,4 @@
-import { combineReducers } from '@reduxjs/toolkit';
+import { combineReducers, AnyAction } from '@reduxjs/toolkit';
 import authReducer from '../features/auth/authSlice'; // Import the auth slice
 import activitiesReducer from '../features/activities/activitySlice';
 import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
@@ -8,8 +8,11 @@ import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
 import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
 
+// Define a reset action type
+export const RESET_STATE = 'RESET_STATE';
+
 // Combine reducers
-const rootReducer = combineReducers({
+const appReducer = combineReducers({
   auth: authReducer, // Include the auth slice
   activities: activitiesReducer,
   activityTypes: activityTypesReducer,
@@ -20,4 +23,14 @@ const rootReducer = combineReducers({
   qa: qaReducer, // Add the QA slice
 });
 
-export default rootReducer; 
+// Root reducer with state reset capability
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: AnyAction) => {
+  // When the RESET_STATE action is dispatched, reset all reducers to their initial state
+  if (action.type === RESET_STATE) {
+    return appReducer(undefined, action);
+  }
+  
+  return appReducer(state, action);
+};
+
+export default rootReducer;

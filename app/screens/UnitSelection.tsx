@@ -84,8 +84,14 @@ export default function UnitSelection() {
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes('Authentication expired')) {
           console.log('Authentication expired, redirecting to login...');
-          dispatch(logout());
-          router.replace('/screens/LoginScreen');
+          dispatch(logout())
+            .then(() => {
+              router.replace('/screens/LoginScreen');
+            })
+            .catch((err) => {
+              console.error('Error during logout:', err);
+              router.replace('/screens/LoginScreen');
+            });
         }
       });
   }, [dispatch,userDetails]);
