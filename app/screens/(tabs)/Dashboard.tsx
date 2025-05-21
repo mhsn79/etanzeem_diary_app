@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme, Pressable, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, StatusBar, useColorScheme, Pressable, ActivityIndicator, Modal, Dimensions } from 'react-native';
 import i18n from '@/app/i18n';
 import CustomDropdown from "@/app/components/CustomDropdown";
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Spacer from '@/app/components/Spacer';
 import SmallTarazu from "@/assets/images/small-tarazu.svg";
 import LocationIcon from "@/assets/images/location-icon-yellow.svg";
@@ -25,6 +25,22 @@ import {
   selectUserTanzeemiLevelStatus
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectNazimDetails } from '@/app/features/persons/personSlice';
+import { 
+  selectAllHierarchyUnits as selectAllCompleteHierarchyUnits,
+  selectSubordinateUnits,
+  selectParentUnits,
+  selectUserUnit,
+  selectHierarchyStatus,
+  fetchCompleteTanzeemiHierarchy
+} from '@/app/features/tanzeem/tanzeemHierarchySlice';
+import { AppDispatch } from '@/app/store';
+import { logout } from '@/app/features/auth/authSlice';
+import { selectUserDetails } from '@/app/features/persons/personSlice';
+
+// Helper function to convert hierarchyStatus to boolean for loading prop
+const isLoading = (status: 'idle' | 'loading' | 'succeeded' | 'failed'): boolean => {
+  return status === 'loading';
+};
 
 // Reusable components
 const HeaderInfoItem = ({ 
@@ -134,11 +150,600 @@ const DashboardBox = ({ title, stats, onPress, isRtl, styles }: DashboardBoxProp
   );
 };
 
+// Unit Selection Modal Component
+interface UnitSelectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  styles: any;
+  isRtl: boolean;
+}
+
+interface Option {
+  id: string;
+  label: string;
+  value: string;
+}
+
+const UnitSelectionModal = ({ visible, onClose, styles, isRtl }: UnitSelectionModalProps) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [selectedUC, setSelectedUC] = useState<string | null>(null);
+  
+  // Options for dropdowns
+  const [districtOptions, setDistrictOptions] = useState<Option[]>([]);
+  const [zoneOptions, setZoneOptions] = useState<Option[]>([]);
+  const [ucOptions, setUCOptions] = useState<Option[]>([]);
+  
+  // Redux selectors
+  const completeHierarchyUnits = useSelector(selectAllCompleteHierarchyUnits);
+  const subordinateUnits = useSelector(selectSubordinateUnits);
+  const parentUnits = useSelector(selectParentUnits);
+  const userHierarchyUnit = useSelector(selectUserUnit);
+  const hierarchyStatus = useSelector(selectHierarchyStatus);
+  const userDetails = useSelector(selectUserDetails);
+  
+  // Handle selection for each dropdown - improved implementation
+  const handleDistrictSelection = (option: Option) => {
+    try {
+      console.log('Selected district:', option.value, option.label);
+      
+      // Only update if the selection has changed
+      if (selectedDistrict !== option.value) {
+        setSelectedDistrict(option.value);
+        
+        // Reset lower level selections
+        setSelectedZone(null);
+        setSelectedUC(null);
+        
+        // Find the selected district unit for reference
+        const selectedUnit = completeHierarchyUnits.find(unit => unit.id.toString() === option.value);
+        if (selectedUnit) {
+          console.log('Selected district unit details:', {
+            name: selectedUnit.Name || selectedUnit.name,
+            level: selectedUnit.level,
+            parent_id: selectedUnit.parent_id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleDistrictSelection:', error);
+    }
+  };
+  
+  const handleZoneSelection = (option: Option) => {
+    try {
+      console.log('Selected zone:', option.value, option.label);
+      
+      // Only update if the selection has changed
+      if (selectedZone !== option.value) {
+        setSelectedZone(option.value);
+        
+        // Reset lower level selection
+        setSelectedUC(null);
+        
+        // Find the selected zone unit for reference
+        const selectedUnit = completeHierarchyUnits.find(unit => unit.id.toString() === option.value);
+        if (selectedUnit) {
+          console.log('Selected zone unit details:', {
+            name: selectedUnit.Name || selectedUnit.name,
+            level: selectedUnit.level,
+            parent_id: selectedUnit.parent_id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleZoneSelection:', error);
+    }
+  };
+  
+  const handleUCSelection = (option: Option) => {
+    try {
+      console.log('Selected UC:', option.value, option.label);
+      
+      // Only update if the selection has changed
+      if (selectedUC !== option.value) {
+        setSelectedUC(option.value);
+        
+        // Find the selected UC unit for reference
+        const selectedUnit = completeHierarchyUnits.find(unit => unit.id.toString() === option.value);
+        if (selectedUnit) {
+          console.log('Selected UC unit details:', {
+            name: selectedUnit.Name || selectedUnit.name,
+            level: selectedUnit.level,
+            parent_id: selectedUnit.parent_id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleUCSelection:', error);
+    }
+  };
+  
+  // Helper function to check for self-referencing units (parent_id === id)
+  const removeSelfReferencingUnits = useCallback((units: any[]) => {
+    return units.filter(unit => unit.id !== unit.parent_id);
+  }, []);
+  
+  // Helper function to get the label of a selected option
+  const getSelectedLabel = useCallback((options: Option[], selectedValue: string | null): string => {
+    if (!selectedValue) return '';
+    const selectedOption = options.find(opt => opt.value === selectedValue);
+    return selectedOption?.label || '';
+  }, []);
+
+  // Fetch complete hierarchy when modal opens
+  useEffect(() => {
+    if (visible) {
+      const userEmail = userDetails?.email || '';
+      console.log('Fetching complete hierarchy for user:', userEmail);
+      
+      // Dispatch the action to fetch the complete hierarchy
+      dispatch(fetchCompleteTanzeemiHierarchy(userEmail))
+        .unwrap()
+        .then((result: { hierarchyUnits: any[]; hierarchyIds: number[]; userUnitId: number }) => {
+          console.log('Complete hierarchy fetch succeeded:', result);
+        })
+        .catch((error: unknown) => {
+          console.error('Complete hierarchy fetch failed:', error);
+          
+          // Check if the error is an authentication error
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (errorMessage.includes('Authentication expired')) {
+            console.log('Authentication expired, redirecting to login...');
+            dispatch(logout())
+              .then(() => {
+                router.replace('/screens/LoginScreen');
+              })
+              .catch((err) => {
+                console.error('Error during logout:', err);
+                router.replace('/screens/LoginScreen');
+              });
+          }
+        });
+    }
+  }, [visible, dispatch, userDetails]);
+  
+  // Process hierarchy data when it changes - improved implementation
+  useEffect(() => {
+    if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
+      console.log('Complete hierarchy units:', completeHierarchyUnits);
+      
+      try {
+        // Find the district (level 1)
+        const districts = completeHierarchyUnits.filter(unit => unit.level === 1);
+        console.log('Districts found:', districts.length);
+        
+        // If no districts found, try to find the highest level units
+        if (districts.length === 0) {
+          // Get all unique levels
+          const levels = [...new Set(completeHierarchyUnits.map(unit => unit.level))].sort();
+          
+          if (levels.length > 0) {
+            // Use the highest level as districts
+            const highestLevel = levels[0];
+            const highestLevelUnits = completeHierarchyUnits.filter(unit => unit.level === highestLevel);
+            
+            if (highestLevelUnits.length > 0) {
+              console.log(`No districts found, using level ${highestLevel} units as districts:`, highestLevelUnits.length);
+              
+              const districtOpts = highestLevelUnits.map(unit => ({
+                id: `district-${unit.id}`,
+                label: unit.Name || unit.name || `Level ${highestLevel} Unit`,
+                value: unit.id.toString()
+              }));
+              
+              setDistrictOptions(districtOpts);
+              
+              // Auto-select if there's only one option and none is selected yet
+              if (districtOpts.length === 1 && !selectedDistrict) {
+                console.log('Auto-selecting the only district:', districtOpts[0].label);
+                setSelectedDistrict(districtOpts[0].value);
+              }
+            } else {
+              // Fallback to parent_id if no units at any level
+              if (completeHierarchyUnits[0]?.parent_id) {
+                const districtOpts = [{
+                  id: `district-${completeHierarchyUnits[0].parent_id}`,
+                  label: 'Parent Unit',
+                  value: completeHierarchyUnits[0].parent_id.toString()
+                }];
+                setDistrictOptions(districtOpts);
+                setSelectedDistrict(districtOpts[0].value);
+              } else {
+                // Last resort - create a dummy option
+                console.warn('No suitable district units found');
+                setDistrictOptions([]);
+              }
+            }
+          }
+        } else {
+          // Normal case - we have district level units
+          const districtOpts = districts.map(unit => ({
+            id: `district-${unit.id}`,
+            label: unit.Name || unit.name || 'Unknown District',
+            value: unit.id.toString()
+          }));
+          
+          setDistrictOptions(districtOpts);
+          
+          // Auto-select if there's only one district option and none is selected yet
+          if (districtOpts.length === 1 && !selectedDistrict) {
+            console.log('Auto-selecting the only district:', districtOpts[0].label);
+            setSelectedDistrict(districtOpts[0].value);
+          }
+        }
+        
+        // Find zones (level 2) and remove any self-referencing units
+        const zones = removeSelfReferencingUnits(
+          completeHierarchyUnits.filter(unit => unit.level === 2)
+        );
+        console.log('Zones found:', zones.length);
+        
+        // Map zones to dropdown options
+        const zoneOpts = zones.map(unit => ({
+          id: `zone-${unit.id}`,
+          label: unit.Name || unit.name || 'Unknown Zone',
+          value: unit.id.toString()
+        }));
+        
+        setZoneOptions(zoneOpts);
+        
+        // Auto-select if there's only one zone and none is selected yet
+        if (zoneOpts.length === 1 && !selectedZone) {
+          console.log('Auto-selecting the only zone:', zoneOpts[0].label);
+          setSelectedZone(zoneOpts[0].value);
+        }
+        
+        // Find circles/UCs (level 3 and 4) and remove any self-referencing units
+        const circles = removeSelfReferencingUnits(
+          completeHierarchyUnits.filter(unit => unit.level === 3)
+        );
+        const ucs = removeSelfReferencingUnits(
+          completeHierarchyUnits.filter(unit => unit.level === 4)
+        );
+        
+        console.log('Circles found:', circles.length);
+        console.log('UCs found:', ucs.length);
+        
+        // Combine circles and UCs for the third dropdown
+        const ucOpts = [...circles, ...ucs].map(unit => ({
+          id: `uc-${unit.id}`,
+          label: unit.Name || unit.name || 'Unknown UC',
+          value: unit.id.toString()
+        }));
+        
+        setUCOptions(ucOpts);
+        
+        // Auto-select if there's only one UC, a zone is selected, and no UC is selected yet
+        if (selectedZone && ucOpts.length === 1 && !selectedUC) {
+          console.log('Auto-selecting the only UC:', ucOpts[0].label);
+          setSelectedUC(ucOpts[0].value);
+        }
+      } catch (error) {
+        console.error('Error processing hierarchy data:', error);
+      }
+    }
+  }, [hierarchyStatus, completeHierarchyUnits, selectedZone, selectedDistrict, selectedUC, removeSelfReferencingUnits]);
+  
+  // Update filtered options when selections change - improved implementation
+  useEffect(() => {
+    if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
+      try {
+        // If district is selected, filter zones by parent_id
+        if (selectedDistrict) {
+          console.log('Filtering zones for district ID:', selectedDistrict);
+          
+          // Filter zones and remove any self-referencing units
+          const filteredZones = removeSelfReferencingUnits(
+            completeHierarchyUnits.filter(unit => {
+              // Check if parent_id matches selected district
+              const parentId = unit.parent_id?.toString();
+              const isLevel2 = unit.level === 2;
+              const isParentMatch = parentId === selectedDistrict;
+              
+              if (isLevel2 && isParentMatch) {
+                return true;
+              }
+              
+              // If no direct matches, check if this unit is in the hierarchy of the selected district
+              if (isLevel2 && unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
+                return unit.zaili_unit_hierarchy.some(id => id.toString() === selectedDistrict);
+              }
+              
+              return false;
+            })
+          );
+          
+          console.log('Filtered zones:', filteredZones.length);
+          
+          if (filteredZones.length > 0) {
+            const zoneOpts = filteredZones.map(unit => ({
+              id: `zone-${unit.id}`,
+              label: unit.Name || unit.name || 'Unknown Zone',
+              value: unit.id.toString()
+            }));
+            
+            setZoneOptions(zoneOpts);
+            
+            // Auto-select if there's only one zone and none is selected yet
+            if (zoneOpts.length === 1 && !selectedZone) {
+              console.log('Auto-selecting the only zone (filtered):', zoneOpts[0].label);
+              setSelectedZone(zoneOpts[0].value);
+            } else if (zoneOpts.length === 0) {
+              // Reset zone selection if no zones found
+              setSelectedZone(null);
+            } else if (selectedZone && !zoneOpts.some(opt => opt.value === selectedZone)) {
+              // If current selection is not in the new options, reset it
+              setSelectedZone(null);
+            }
+          } else {
+            // If no zones found, try to find any level 2 units
+            const allLevel2Units = removeSelfReferencingUnits(
+              completeHierarchyUnits.filter(unit => unit.level === 2)
+            );
+            
+            if (allLevel2Units.length > 0) {
+              const zoneOpts = allLevel2Units.map(unit => ({
+                id: `zone-${unit.id}`,
+                label: unit.Name || unit.name || 'Unknown Zone',
+                value: unit.id.toString()
+              }));
+              
+              setZoneOptions(zoneOpts);
+              
+              // Don't auto-select in this case as the relationship is uncertain
+              if (selectedZone && !zoneOpts.some(opt => opt.value === selectedZone)) {
+                setSelectedZone(null);
+              }
+            } else {
+              // No zones at all
+              setZoneOptions([]);
+              setSelectedZone(null);
+            }
+          }
+        } else {
+          // No district selected, reset zone options to all level 2 units
+          const allZones = removeSelfReferencingUnits(
+            completeHierarchyUnits.filter(unit => unit.level === 2)
+          );
+          
+          const zoneOpts = allZones.map(unit => ({
+            id: `zone-${unit.id}`,
+            label: unit.Name || unit.name || 'Unknown Zone',
+            value: unit.id.toString()
+          }));
+          
+          setZoneOptions(zoneOpts);
+          setSelectedZone(null);
+        }
+        
+        // If zone is selected, filter UCs by parent_id
+        if (selectedZone) {
+          console.log('Filtering UCs for zone ID:', selectedZone);
+          
+          // Filter UCs and remove any self-referencing units
+          const filteredUCs = removeSelfReferencingUnits(
+            completeHierarchyUnits.filter(unit => {
+              // Check if parent_id matches selected zone
+              const parentId = unit.parent_id?.toString();
+              const isLevel3or4 = unit.level === 3 || unit.level === 4;
+              const isParentMatch = parentId === selectedZone;
+              
+              if (isLevel3or4 && isParentMatch) {
+                return true;
+              }
+              
+              // If no direct matches, check if this unit is in the hierarchy of the selected zone
+              if (isLevel3or4 && unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
+                return unit.zaili_unit_hierarchy.some(id => id.toString() === selectedZone);
+              }
+              
+              return false;
+            })
+          );
+          
+          console.log('Filtered UCs:', filteredUCs.length);
+          
+          if (filteredUCs.length > 0) {
+            const ucOpts = filteredUCs.map(unit => ({
+              id: `uc-${unit.id}`,
+              label: unit.Name || unit.name || 'Unknown UC',
+              value: unit.id.toString()
+            }));
+            
+            setUCOptions(ucOpts);
+            
+            // Auto-select if there's only one UC and none is selected yet
+            if (ucOpts.length === 1 && !selectedUC) {
+              console.log('Auto-selecting the only UC (filtered):', ucOpts[0].label);
+              setSelectedUC(ucOpts[0].value);
+            } else if (ucOpts.length === 0) {
+              // Reset UC selection if no UCs found
+              setSelectedUC(null);
+            } else if (selectedUC && !ucOpts.some(opt => opt.value === selectedUC)) {
+              // If current selection is not in the new options, reset it
+              setSelectedUC(null);
+            }
+          } else {
+            // If no UCs found, try to find any level 3 or 4 units
+            const allUCUnits = removeSelfReferencingUnits(
+              completeHierarchyUnits.filter(unit => unit.level === 3 || unit.level === 4)
+            );
+            
+            if (allUCUnits.length > 0) {
+              const ucOpts = allUCUnits.map(unit => ({
+                id: `uc-${unit.id}`,
+                label: unit.Name || unit.name || 'Unknown UC',
+                value: unit.id.toString()
+              }));
+              
+              setUCOptions(ucOpts);
+              
+              // Don't auto-select in this case as the relationship is uncertain
+              if (selectedUC && !ucOpts.some(opt => opt.value === selectedUC)) {
+                setSelectedUC(null);
+              }
+            } else {
+              // No UCs at all
+              setUCOptions([]);
+              setSelectedUC(null);
+            }
+          }
+        } else {
+          // No zone selected, reset UC options
+          setUCOptions([]);
+          setSelectedUC(null);
+        }
+      } catch (error) {
+        console.error('Error updating filtered options:', error);
+      }
+    }
+  }, [selectedDistrict, selectedZone, hierarchyStatus, completeHierarchyUnits, removeSelfReferencingUnits]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={styles.modalContainer}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <UrduText style={styles.modalTitle}>{i18n.t('unit_selection')}</UrduText>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <AntDesign name="close" size={24} color={COLORS.black} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScrollView}>
+              {/* Parent Units Section */}
+              <View style={styles.sectionContainer}>
+                <UrduText style={styles.sectionTitle}>{i18n.t('parent_units')}</UrduText>
+                
+                {hierarchyStatus === 'loading' ? (
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                ) : parentUnits.length > 0 ? (
+                  parentUnits.map((unit, index) => (
+                    <View key={`parent-${unit.id}`} style={styles.parentUnitItem}>
+                      <UrduText style={styles.parentUnitText}>
+                        {unit.Name || unit.name} ({i18n.t('level')} {unit.level})
+                      </UrduText>
+                    </View>
+                  ))
+                ) : (
+                  <UrduText style={styles.noDataText}>{i18n.t('no_parent_units')}</UrduText>
+                )}
+              </View>
+              
+              <Spacer height={20} />
+              
+              {/* Subordinate Units Section */}
+              <View style={styles.sectionContainer}>
+                <UrduText style={styles.sectionTitle}>{i18n.t('subordinate_units')}</UrduText>
+                
+                {hierarchyStatus === 'loading' ? (
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                ) : (
+                  <>
+                    {/* District Dropdown */}
+                    <CustomDropdown
+                      options={districtOptions}
+                      onSelect={handleDistrictSelection}
+                      viewStyle={styles.modalDropdown}
+                      dropdownContainerStyle={styles.modalDropdownContainer}
+                      textStyle={styles.modalDropdownText}
+                      placeholder={selectedDistrict ? getSelectedLabel(districtOptions, selectedDistrict) : i18n.t('select_district')}
+                      selectedValue={selectedDistrict || undefined}
+                      loading={isLoading(hierarchyStatus)}
+                      disabled={districtOptions.length <= 1} // Disable if there's only one option
+                    />
+                    
+                    <Spacer height={10} />
+                    
+                    {/* Zone Dropdown */}
+                    <CustomDropdown
+                      options={zoneOptions}
+                      onSelect={handleZoneSelection}
+                      viewStyle={styles.modalDropdown}
+                      textStyle={styles.modalDropdownText}
+                      dropdownContainerStyle={styles.modalDropdownContainer}
+                      placeholder={selectedZone ? getSelectedLabel(zoneOptions, selectedZone) : i18n.t('select_zone')}
+                      selectedValue={selectedZone || undefined}
+                      loading={isLoading(hierarchyStatus) || !selectedDistrict}
+                      disabled={zoneOptions.length <= 1 || !selectedDistrict} // Disable if there's only one option or no district selected
+                    />
+                    
+                    <Spacer height={10} />
+                    
+                    {/* UC Dropdown */}
+                    <CustomDropdown
+                      options={ucOptions}
+                      onSelect={handleUCSelection}
+                      viewStyle={styles.modalDropdown}
+                      textStyle={styles.modalDropdownText}
+                      dropdownContainerStyle={styles.modalDropdownContainer}
+                      placeholder={selectedUC ? getSelectedLabel(ucOptions, selectedUC) : i18n.t('select_uc')}
+                      selectedValue={selectedUC || undefined}
+                      loading={isLoading(hierarchyStatus)}
+                      disabled={ucOptions.length <= 1 || !selectedZone} // Disable if there's only one option or no zone selected
+                    />
+                  </>
+                )}
+              </View>
+              
+              <Spacer height={20} />
+              
+              {/* Selected Unit Details Section */}
+              {selectedUC && (
+                <View style={styles.sectionContainer}>
+                  <UrduText style={styles.sectionTitle}>{i18n.t('unit_details')}</UrduText>
+                  
+                  <View style={styles.unitDetailsContainer}>
+                    <View style={styles.unitDetailRow}>
+                      <UrduText style={styles.unitDetailLabel}>{i18n.t('members')}</UrduText>
+                      <UrduText style={styles.unitDetailValue}>50</UrduText>
+                    </View>
+                    <View style={styles.unitDetailRow}>
+                      <UrduText style={styles.unitDetailLabel}>{i18n.t('voters')}</UrduText>
+                      <UrduText style={styles.unitDetailValue}>5000</UrduText>
+                    </View>
+                    <View style={styles.unitDetailRow}>
+                      <UrduText style={styles.unitDetailLabel}>{i18n.t('wards')}</UrduText>
+                      <UrduText style={styles.unitDetailValue}>4</UrduText>
+                    </View>
+                    <View style={styles.unitDetailRow}>
+                      <UrduText style={styles.unitDetailLabel}>{i18n.t('block_codes')}</UrduText>
+                      <UrduText style={styles.unitDetailValue}>10</UrduText>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+            
+            {/* Close Button */}
+            <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
+              <UrduText style={styles.modalCloseButtonText}>{i18n.t('close')}</UrduText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
 const Dashboard = () => {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const styles = getStyles(colorScheme);
   const isRtl = i18n.locale === 'ur';
+  const dispatch = useDispatch<AppDispatch>();
   
   // Redux state selectors
   const userUnit = useSelector(selectUserUnitDetails);
@@ -147,11 +752,23 @@ const Dashboard = () => {
   const userTanzeemLevel = useSelector(selectUserTanzeemiLevelDetails);
   const userTanzeemLevelStatus = useSelector(selectUserTanzeemiLevelStatus);
   const hierarchyUnits = useSelector(selectAllHierarchyUnits);
-  const nazimDetaiils=useSelector(selectNazimDetails);
+  const nazimDetaiils = useSelector(selectNazimDetails);
   const [currentLanguage, setCurrentLanguage] = useState(i18n.locale);
   const [direction, setDirection] = useState(isRtl ? 'rtl' : 'ltr');
   const [showDialog, setShowDialog] = useState(false);
-
+  
+  // Unit selection modal state
+  const [showUnitSelectionModal, setShowUnitSelectionModal] = useState(false);
+  
+  // Open unit selection modal
+  const handleOpenUnitSelectionModal = () => {
+    setShowUnitSelectionModal(true);
+  };
+  
+  // Close unit selection modal
+  const handleCloseUnitSelectionModal = () => {
+    setShowUnitSelectionModal(false);
+  };
  
   // Log when user unit data changes
   useEffect(() => {
@@ -210,7 +827,7 @@ const Dashboard = () => {
     },
     {
       title: i18n.t('sub_units'),
-      onPress: () => router.push("/screens/UnitSelection"),
+      onPress: handleOpenUnitSelectionModal, // Open modal instead of navigating
       stats: [
         { label: i18n.t('wards'), value: '5' },
         { label: '-', value: '-' },
@@ -228,7 +845,7 @@ const Dashboard = () => {
     },
     {
       title: i18n.t('upper_management'),
-      onPress: () => router.push("/screens/UnitSelection"),
+      onPress: handleOpenUnitSelectionModal, // Open modal instead of navigating
       stats: [
         { label: i18n.t('activities'), value: '1' },
         { label: i18n.t('participation'), value: '1' },
@@ -296,7 +913,7 @@ const Dashboard = () => {
                 icon={LeftUpArrowWhite} 
                 iconProps={{ style: styles.headerIcon }} 
                 textStyle={styles.headerTitle}
-                onPress={() => router.push("/screens/UnitSelection")}
+                onPress={handleOpenUnitSelectionModal} // Open modal instead of navigating
                 styles={styles}
               />
               <HeaderInfoItem 
@@ -429,6 +1046,14 @@ const Dashboard = () => {
         cancelButtonStyle={styles.cancelButtonStyle}
         confirmTextStyle={styles.confirmTextStyle}
         cancelTextStyle={styles.cancelTextStyle}
+      />
+      
+      {/* Unit Selection Modal */}
+      <UnitSelectionModal 
+        visible={showUnitSelectionModal} 
+        onClose={handleCloseUnitSelectionModal} 
+        styles={styles} 
+        isRtl={isRtl} 
       />
     </KeyboardAvoidingView>
     </SafeAreaView>
@@ -648,6 +1273,123 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     cancelTextStyle: {
       color: COLORS.black,
+    },
+    // Modal styles
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+    },
+    modalContent: {
+      backgroundColor: isDark ? '#23242D' : COLORS.white,
+      borderRadius: BORDER_RADIUS.lg,
+      padding: SPACING.lg,
+      width: '90%',
+      maxHeight: '80%',
+      ...SHADOWS.medium,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#373842' : '#EBEBEB',
+      paddingBottom: SPACING.sm,
+    },
+    modalTitle: {
+      color: isDark ? COLORS.white : COLORS.primary,
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    closeButton: {
+      padding: SPACING.xs,
+    },
+    modalScrollView: {
+      maxHeight: '70%',
+    },
+    sectionContainer: {
+      marginBottom: SPACING.md,
+    },
+    sectionTitle: {
+      color: isDark ? COLORS.white : COLORS.primary,
+      fontSize: 20,
+      marginBottom: SPACING.sm,
+    },
+    parentUnitItem: {
+      backgroundColor: isDark ? '#373842' : '#F5F5F5',
+      padding: SPACING.sm,
+      borderRadius: BORDER_RADIUS.sm,
+      marginBottom: SPACING.xs,
+    },
+    parentUnitText: {
+      color: isDark ? COLORS.white : COLORS.black,
+      fontSize: 16,
+    },
+    noDataText: {
+      color: isDark ? '#575862' : '#666',
+      fontSize: 16,
+      fontStyle: 'italic',
+      textAlign: 'center',
+      padding: SPACING.md,
+    },
+    modalDropdown: {
+      backgroundColor: isDark ? '#373842' : COLORS.white,
+      borderWidth: 1,
+      borderColor: isDark ? '#575862' : '#EBEBEB',
+      borderRadius: BORDER_RADIUS.sm,
+      height: 50,
+    },
+    modalDropdownContainer: {
+      width: '100%',
+      borderRadius: BORDER_RADIUS.sm,
+      backgroundColor: isDark ? '#373842' : COLORS.white,
+    },
+    modalDropdownText: {
+      color: isDark ? COLORS.white : COLORS.black,
+      fontSize: 16,
+      fontFamily: "JameelNooriNastaleeq",
+    },
+    unitDetailsContainer: {
+      backgroundColor: isDark ? '#373842' : '#F5F5F5',
+      padding: SPACING.md,
+      borderRadius: BORDER_RADIUS.sm,
+    },
+    unitDetailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: SPACING.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#23242D' : '#EBEBEB',
+    },
+    unitDetailLabel: {
+      color: isDark ? COLORS.white : COLORS.black,
+      fontSize: 16,
+    },
+    unitDetailValue: {
+      color: isDark ? COLORS.primary : COLORS.primary,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    modalCloseButton: {
+      backgroundColor: COLORS.primary,
+      padding: SPACING.sm,
+      borderRadius: BORDER_RADIUS.sm,
+      alignItems: 'center',
+      marginTop: SPACING.md,
+    },
+    modalCloseButtonText: {
+      color: COLORS.white,
+      fontSize: 16,
+      fontWeight: 'bold',
     },
   });
 };

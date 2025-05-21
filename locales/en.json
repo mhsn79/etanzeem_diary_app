@@ -153,5 +153,16 @@
     "no_persons_found_in_units": "No persons found in units",
     "participants": "Participants",
     "total_members": "Total Members",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "select_district": "Select District",
+    "select_zone": "Select Zone",
+    "select_uc": "Select UC",
+    "parent_units": "Parent Units",
+    "subordinate_units": "Subordinate Units",
+    "unit_details": "Unit Details",
+    "members": "Members",
+    "voters": "Voters",
+    "block_codes": "Block Codes",
+    "close": "Close",
+    "level": "Level"
 }

@@ -159,5 +159,16 @@
     "no_arkan_found": "کوئی ارکان نہیں ملے",
     "no_participants_found": "کوئی شرکاء نہیں ملے",
     "participants": "شرکاء",
-    "refresh": "ریفریش کریں"
+    "refresh": "ریفریش کریں",
+    "select_district": "ضلع منتخب کریں",
+    "select_zone": "زون منتخب کریں",
+    "select_uc": "یوسی منتخب کریں",
+    "parent_units": "اعلی اکائیاں",
+    "subordinate_units": "ماتحت اکائیاں",
+    "unit_details": "اکائی کی تفصیلات",
+    "members": "ممبران",
+    "voters": "ووٹرز",
+    "block_codes": "بلاک کوڈز",
+    "close": "بند کریں",
+    "level": "سطح"
 }
