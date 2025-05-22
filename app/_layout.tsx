@@ -126,7 +126,7 @@ export default function RootLayout() {
         screenOptions={{
           header: (props) => <CustomHeader {...props} />,
           headerStyle: {
-            backgroundColor: '#1E90FF',
+            backgroundColor: COLORS.primary,
           },
           headerTintColor: '#fff',
           headerTitleStyle: {
@@ -156,12 +156,12 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   headerContainer: {
-    backgroundColor: '#1E90FF'
+    backgroundColor:COLORS.primary,
   },
   headerContainerSubscreen: {
-    backgroundColor: '#1E90FF',
+    backgroundColor: COLORS.primary,
     borderBottomWidth: 25,
-    borderColor: '#1E90FF',
+    borderColor: COLORS.primary,
     borderBottomStartRadius: 20,
     borderBottomEndRadius: 20,
   },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    height: 56
+    height: 53
   },
   leftSection: {
     width: 40,
