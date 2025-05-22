@@ -5,8 +5,11 @@ import {
   isTokenExpiredOrExpiring,
   refresh,
   checkAndRefreshTokenIfNeeded,
+  logout,
 } from '../auth/authSlice';
 import { Activity } from '@/src/types/Activity';
+import { API_BASE_URL } from '@/app/constants/api';
+import { Platform } from 'react-native';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -37,6 +40,89 @@ const initialState: ActivitiesState = activitiesAdapter.getInitialState<Activiti
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
+ * Helper function for API requests
+ * ────────────────────────────────────────────────────────────────────────────────*/
+const apiRequest = async <T>(url: string, method: string, token: string, body?: any): Promise<T> => {
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  const options: RequestInit = {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  };
+
+  // Ensure URL is properly formatted
+  const requestUrl = `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
+  console.log(`Making ${method} request to: ${requestUrl}`, Platform.OS);
+  
+  const response = await fetch(requestUrl, options);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('API Error:', errorText, Platform.OS);
+    throw new Error(errorText || `Request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+};
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Helper function for token refresh with improved error handling
+ * ────────────────────────────────────────────────────────────────────────────────*/
+const executeWithTokenRefresh = async <T>(
+  apiCall: (token: string) => Promise<T>,
+  token: string,
+  dispatch: AppDispatch,
+  getState: () => RootState
+): Promise<T> => {
+  try {
+    // First, check if token is about to expire and refresh if needed
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    
+    // Get the latest token after potential refresh
+    const auth = selectAuthState(getState());
+    const currentToken = auth.tokens?.accessToken || token;
+    
+    // Try the API call with the current token
+    return await apiCall(currentToken);
+  } catch (err: any) {
+    // If the error is due to token expiration
+    const auth = selectAuthState(getState());
+    const isTokenError = 
+      err?.response?.status === 401 || 
+      (err?.errors && err?.errors[0]?.message === 'Token expired.') ||
+      err?.message?.includes('401') ||
+      err?.message?.includes('Token expired');
+    
+    if (isTokenError && auth.tokens?.refreshToken) {
+      console.log('Token expired during API call in activitySlice. Attempting to refresh...');
+      
+      try {
+        // Try to refresh the token
+        const { tokens } = await dispatch(refresh()).unwrap();
+        if (!tokens?.accessToken) throw new Error('Token refresh failed');
+        
+        console.log('Token refreshed successfully in activitySlice. Retrying API call...');
+        // Retry the API call with the new token
+        return await apiCall(tokens.accessToken);
+      } catch (refreshError: any) {
+        console.error('Failed to refresh token in activitySlice:', refreshError);
+        // If refresh fails, log the user out
+        dispatch(logout());
+        throw new Error('Authentication expired. Please log in again.');
+      }
+    }
+    
+    // If it's not a token issue or refresh failed, rethrow the original error
+    throw new Error(String(err?.message ?? err));
+  }
+};
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
  * Interface for creating a new activity
  * ────────────────────────────────────────────────────────────────────────────────*/
 export interface CreateActivityPayload {
@@ -56,44 +142,27 @@ export const createActivity = createAsyncThunk<
   CreateActivityPayload,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('activities/create', async (payload, { getState, dispatch, rejectWithValue }) => {
-  // Refresh token if needed (does not throw on failure)
-  await dispatch(checkAndRefreshTokenIfNeeded());
-
-  const auth = selectAuthState(getState());
-  let token = auth.tokens?.accessToken;
-  if (!token) return rejectWithValue('No access token');
-
-  const tryCreate = async (bearer: string) => {
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
-    const res = await fetch(`${baseUrl}/items/Activities`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${bearer}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(errorText || `Failed to create activity with status ${res.status}`);
-    }
-    
-    const json = await res.json();
-    return json.data as Activity;
-  };
-
   try {
-    return await tryCreate(token);
-  } catch (err: any) {
-    const msg = String(err?.message ?? err);
-    if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
-      // try refresh once
-      const { tokens } = await dispatch(refresh()).unwrap();
-      if (!tokens?.accessToken) return rejectWithValue('Refresh failed');
-      return await tryCreate(tokens.accessToken);
-    }
-    return rejectWithValue(msg);
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    const auth = selectAuthState(getState());
+    const token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const createActivityRequest = async (accessToken: string) => {
+      const response = await apiRequest<{ data: Activity }>(
+        '/items/Activities',
+        'POST',
+        accessToken,
+        payload
+      );
+      if (!response.data) throw new Error('Failed to create activity');
+      return response.data;
+    };
+
+    return await executeWithTokenRefresh(createActivityRequest, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Create activity error:', error);
+    return rejectWithValue(error.message || 'Failed to create activity');
   }
 });
 
@@ -106,34 +175,29 @@ export const fetchActivities = createAsyncThunk<
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('activities/fetch', async (_, { getState, dispatch, rejectWithValue }) => {
-  // Refresh token if needed (does not throw on failure)
-  await dispatch(checkAndRefreshTokenIfNeeded());
-
-  const auth = selectAuthState(getState());
-  let token = auth.tokens?.accessToken;
-  if (!token) return rejectWithValue('No access token');
-
-  const tryFetch = async (bearer: string) => {
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
-    const res = await fetch(`${baseUrl}/items/Activities?sort=-activity_date_and_time&fields=*`, {
-      headers: { Authorization: `Bearer ${bearer}` },
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const json = await res.json();
-    return (json.data ?? []) as Activity[];
-  };
-
   try {
-    return await tryFetch(token);
-  } catch (err: any) {
-    const msg = String(err?.message ?? err);
-    if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
-      // try refresh once
-      const { tokens } = await dispatch(refresh()).unwrap();
-      if (!tokens?.accessToken) return rejectWithValue('Refresh failed');
-      return await tryFetch(tokens.accessToken);
-    }
-    return rejectWithValue(msg);
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    const auth = selectAuthState(getState());
+    const token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const fetchActivitiesRequest = async (accessToken: string) => {
+      console.log('Fetching activities:', Platform.OS);
+      
+      const response = await apiRequest<{ data: Activity[] }>(
+        '/items/Activities?sort=-activity_date_and_time&fields=*',
+        'GET',
+        accessToken
+      );
+      
+      if (!response.data) throw new Error('Failed to fetch activities');
+      return response.data;
+    };
+
+    return await executeWithTokenRefresh(fetchActivitiesRequest, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch activities error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch activities');
   }
 });
 

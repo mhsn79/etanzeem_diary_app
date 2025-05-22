@@ -53,6 +53,7 @@
     "react-native-gesture-handler": "~2.20.2",
     "react-native-mmkv": "^2.1.0",
     "react-native-modal": "^14.0.0-rc.1",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-popup-menu": "^0.16.1",
     "react-native-reanimated": "~3.16.1",
     "react-native-responsive-fontsize": "^0.5.1",

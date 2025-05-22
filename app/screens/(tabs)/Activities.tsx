@@ -78,11 +78,10 @@ export default function Activities() {
     });
   }, [dispatch]);
 
-  useLayoutEffect(() => {
-    if (status === 'idle') {
+  useLayoutEffect(() => {    
       dispatch(fetchActivities());
-    }
-  }, [dispatch, status]);
+
+  }, [dispatch]);
 
   const tabs = useMemo(
     () => [
