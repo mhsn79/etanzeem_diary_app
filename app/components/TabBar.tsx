@@ -13,12 +13,10 @@ import ReportIcon2White from '../../assets/images/report-icon-2-white.svg';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
-const { width } = Dimensions.get('window');
-
 const VALID_LABELS = ['ڈیش بورڈ', 'ارکان', 'سرگرمیاں', 'کارکردگی'] as const;
 type ValidLabel = typeof VALID_LABELS[number];
 
-function getIcon(label: string | ValidLabel, focused: boolean) {
+function getIcon(label: ValidLabel, focused: boolean) {
   const iconSize = wp(6);
   const iconStyle = { width: iconSize, height: iconSize };
 
@@ -29,19 +27,17 @@ function getIcon(label: string | ValidLabel, focused: boolean) {
     'کارکردگی': focused ? ReportIcon2White : ReportIcon2Black,
   };
 
-  if (!VALID_LABELS.includes(label as any)) {
+  if (!VALID_LABELS.includes(label)) {
     console.warn(`Invalid tab label: ${label}. Expected one of: ${VALID_LABELS.join(', ')}`);
-    return null; // Prevent rendering icon for invalid labels
+    return null;
   }
 
-  // Now TypeScript knows that label is a valid key for icons
-  const IconComponent = icons[label as ValidLabel];
+  const IconComponent = icons[label];
   return <IconComponent style={iconStyle} />;
 }
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  // Limit to first 4 routes
   const displayedRoutes = state.routes.slice(0, 4);
 
   return (
@@ -60,18 +56,15 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
         const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name;
-        
-        // Skip rendering if label is invalid
+
         if (!VALID_LABELS.includes(label as any)) {
           console.warn(`Skipping route with invalid label: ${label}`);
           return null;
         }
-        
-        // Type assertion to help TypeScript understand the label is valid
-        const validLabel = label as ValidLabel;
 
+        const validLabel = label as ValidLabel;
         const icon = getIcon(validLabel, isFocused);
-        if (!icon) return null; // Skip if no valid icon
+        if (!icon) return null;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -118,7 +111,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: BORDER_RADIUS.lg,
     borderTopRightRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.sm,
     paddingTop: SPACING.xs,
     ...SHADOWS.medium,
     position: 'absolute',
@@ -139,18 +132,21 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     minHeight: hp(6),
     width: '100%',
+    overflow: 'hidden', // Ensure clipping for borderRadius
   },
   tabBarButtonFocused: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
-    ...SHADOWS.small,
-    width: wp('30%'),
-
+    borderRadius: BORDER_RADIUS.lg, // Explicitly set for clarity
+    width: wp(30), // Consistent with first code
+    overflow: 'hidden', // Critical for Android borderRadius
   },
   tabBarButtonShadow: {
     ...SHADOWS.small,
-    ...(Platform.OS === 'android' && { elevation: 3 }),
+    ...(Platform.OS === 'android' && { elevation: 2 }), // Lowered elevation to reduce interference
   },
   iconContainer: {
     alignItems: 'center',
