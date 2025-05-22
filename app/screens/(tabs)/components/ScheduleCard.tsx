@@ -33,7 +33,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
   return StyleSheet.create({
     scheduleContainer: {
       position: 'absolute',
-      marginTop: 160,
+      marginTop: 140,
     },
     scheduleCard: {
       backgroundColor: isDark ? '#008cff' : '#FFFFFF',
@@ -49,7 +49,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       padding: 10,
     },
     scheduleText: {
-      color: COLORS.tertiary,
+      color: COLORS.warning,
     },
   });
 };

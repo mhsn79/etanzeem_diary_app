@@ -11,13 +11,13 @@ interface HeaderInfoItemProps {
   iconProps?: IconProps;
   textStyle?: any;
   colorScheme?: string | null | undefined;
+  isLeftUpArrowWhite?: boolean;
 }
 
-const HeaderInfoItem = memo(({ text, icon: Icon, onPress, iconProps = {}, textStyle = {}, colorScheme }: HeaderInfoItemProps) => {
+const HeaderInfoItem = memo(({ text, icon: Icon, onPress, iconProps = {}, textStyle = {}, colorScheme,isLeftUpArrowWhite=false }: HeaderInfoItemProps) => {
   const styles = getStyles(colorScheme);
   const isClickable = !!onPress;
   const Container = isClickable ? TouchableOpacity : View;
-  const isLeftUpArrowWhite = Icon && (Icon.displayName === 'LeftUpArrowWhite' || Icon.name === 'LeftUpArrowWhite');
 
   return (
     <Container onPress={onPress}>

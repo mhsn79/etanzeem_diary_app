@@ -235,6 +235,7 @@ const Dashboard = () => {
                   textStyle={styles.headerTitle}
                   onPress={() => setShowUnitSelectionModal(true)}
                   colorScheme={colorScheme}
+                  isLeftUpArrowWhite
                 />
                 <HeaderInfoItem
                   text={
@@ -337,11 +338,12 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     headerContainer: {
       paddingTop: 0,
-      height: 200,
+      height: SPACING.lg*6.5,
+      
       alignItems: 'center',
       borderBottomStartRadius: 20,
       borderBottomEndRadius: 20,
-      backgroundColor: isDark ? '#23242D' : '#008cff',
+      backgroundColor: isDark ? '#23242D' : COLORS.primary,
     },
     headerContent: {
       padding: 5,
@@ -384,8 +386,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       resizeMode: 'contain',
     },
     dashboardContent: {
-      margin: 15,
-      marginTop: 40,
+      marginHorizontal:SPACING.sm,
       borderRadius: 10,
       backgroundColor: isDark ? '#373842' : 'transparent',
       padding: 10,
@@ -395,13 +396,16 @@ const getStyles = (colorScheme: string | null | undefined) => {
       justifyContent: 'space-between',
       alignItems: 'center',
       width: '100%',
+      marginTop:SPACING.lg,
+      marginBottom:SPACING.md,
     },
     dropdownContainer: {
       width: 150,
+      alignItems:'center',
+      justifyContent:'center'
     },
     dropdown: {
-      backgroundColor: 'transparent',
-      height: 48,
+      height: 36,
     },
     dropdownText: {
       color: isDark ? '#FFB30F' : '#0BA241',
