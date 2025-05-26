@@ -284,15 +284,17 @@ const Dashboard = () => {
                 <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={styles.boxesContainer}>
-              {Array.from({ length: Math.ceil(dashboardBoxes.length / 2) }, (_, rowIndex) => (
-                <View key={rowIndex} style={styles.boxRow}>
-                  {dashboardBoxes.slice(rowIndex * 2, rowIndex * 2 + 2).map((box, index) => (
-                    <DashboardBox key={index} {...box} />
-                  ))}
-                </View>
-              ))}
-            </ScrollView>
+            <View style={{  }}>
+              <ScrollView contentContainerStyle={styles.boxesContainer}>
+                {Array.from({ length: Math.ceil(dashboardBoxes.length / 2) }, (_, rowIndex) => (
+                  <View key={rowIndex} style={styles.boxRow}>
+                    {dashboardBoxes.slice(rowIndex * 2, rowIndex * 2 + 2).map((box, index) => (
+                      <DashboardBox key={index} {...box} />
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
           </View>
         </View>
         <Pressable style={[styles.overlayButton, { bottom: insets.bottom + SPACING.lg*3, right: SPACING.xxl }]} onPress={handleAddNew}>
@@ -338,15 +340,14 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     headerContainer: {
       paddingTop: 0,
-      height: SPACING.lg*6.5,
-      
+      height: SPACING.lg*7,
       alignItems: 'center',
       borderBottomStartRadius: 20,
       borderBottomEndRadius: 20,
       backgroundColor: isDark ? '#23242D' : COLORS.primary,
     },
     headerContent: {
-      padding: 5,
+      paddingHorizontal: 10,
       marginTop: 10,
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -386,7 +387,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       resizeMode: 'contain',
     },
     dashboardContent: {
-      marginHorizontal:SPACING.sm,
+      marginHorizontal: SPACING.sm,
       borderRadius: 10,
       backgroundColor: isDark ? '#373842' : 'transparent',
       padding: 10,
@@ -396,8 +397,8 @@ const getStyles = (colorScheme: string | null | undefined) => {
       justifyContent: 'space-between',
       alignItems: 'center',
       width: '100%',
-      marginTop:SPACING.lg,
-      marginBottom:SPACING.md,
+      marginTop: SPACING.lg,
+      marginBottom: SPACING.md,
     },
     dropdownContainer: {
       width: 150,
