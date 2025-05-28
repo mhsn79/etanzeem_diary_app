@@ -1,22 +1,18 @@
 // app/screens/ProfileView.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
-  StyleProp,
-  ViewStyle,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
-import * as ImagePicker from 'expo-image-picker';
 
 import i18n from '../i18n';
 import { profileData } from '@/app/data/profile';
-import { logout, selectUser, updateUserAvatar, selectAuthStatus } from '@/app/features/auth/authSlice';
+import { logout, selectUser, selectAuthStatus } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store';
 
 // Define an extended profile data interface to include additional fields
@@ -45,7 +41,7 @@ import FormInput from '@/app/components/FormInput';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS } from '../constants/theme';
 
 /* ──────────────────────
    Helper for read-only text fields
@@ -71,19 +67,10 @@ export default function ProfileView() {
   const navigation = useNavigation();
   const userData = useSelector(selectUser);
   const authStatus = useSelector(selectAuthStatus);
-  
-  // State for tracking image upload
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Combine user data from API with static profile data
   // Use API data if available, otherwise fall back to static data
   const displayData = useMemo<ExtendedProfileData>(() => {
-    // Log avatar URL for debugging
-    if (userData?.avatar) {
-      console.log('Avatar URL:', `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055'}/assets/${userData.avatar}`);
-    }
-    
     if (!userData) return profileData as ExtendedProfileData;
 
     // Format the name based on first_name and last_name
@@ -109,87 +96,10 @@ export default function ProfileView() {
       name: formattedName,
       email: userData.email || profileData.email,
       status: userData.status || profileData.status,
-      // We can add more fields from the API response as needed
       role: userData.role || 'N/A',
       lastAccess,
-      // Keep the rest of the profile data for fields not provided by the API
     } as ExtendedProfileData;
   }, [userData]);
-
-  // Handle image picker and upload
-  const handleImageUpload = async () => {
-    try {
-      // Request permission to access the camera roll
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          i18n.t('error'),
-          i18n.t('camera_permission_denied') || 'Permission to access camera roll was denied'
-        );
-        return;
-      }
-      
-      // Launch the image picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        console.log('Image picker was cancelled');
-        return;
-      }
-      
-      const selectedImage = result.assets[0];
-      
-      // Confirm with the user
-      Alert.alert(
-        i18n.t('confirm') || 'Confirm',
-        i18n.t('update_profile_picture_confirm') || 'Do you want to update your profile picture?',
-        [
-          {
-            text: i18n.t('cancel') || 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: i18n.t('update') || 'Update',
-            onPress: async () => {
-              setIsUploading(true);
-              try {
-                await dispatch(updateUserAvatar({
-                  imageUri: selectedImage.uri,
-                  onProgress: (progress) => {
-                    setUploadProgress(progress);
-                  }
-                })).unwrap();
-                
-                Alert.alert(
-                  i18n.t('success') || 'Success',
-                  i18n.t('profile_picture_updated') || 'Profile picture updated successfully'
-                );
-              } catch (error: any) {
-                Alert.alert(
-                  i18n.t('error') || 'Error',
-                  error.message || i18n.t('failed_to_update_profile_picture') || 'Failed to update profile picture'
-                );
-              } finally {
-                setIsUploading(false);
-              }
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(
-        i18n.t('error') || 'Error',
-        i18n.t('image_picker_error') || 'An error occurred while picking an image'
-      );
-    }
-  };
 
   const handleLogout = () => {
     dispatch(logout())
@@ -212,31 +122,9 @@ export default function ProfileView() {
       <ProfileHeader
         title={i18n.t('profile')}
         backgroundSource={COMMON_IMAGES.profileBackground}
-        avatarSource={
-          userData?.avatar 
-            ? { 
-                uri: `${process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055'}/assets/${userData.avatar}?cache=${Date.now()}`,
-                cache: 'web',
-                headers: {
-                  Accept: 'image/jpeg, image/png, image/jpg',
-                  'Cache-Control': 'no-cache',
-                  Pragma: 'no-cache',
-                  Expires: '0',
-                }
-              }
-            : require('@/assets/images/avatar.png')
-        }
-        showCamera={true}
-        onCameraPress={handleImageUpload}
-        isUploading={isUploading}
+        avatarSource={require('@/assets/images/avatar.png')}
+        showCamera={false}
       />
-      
-      {/* Loading indicator for avatar upload */}
-      {isUploading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      )}
 
       {/*──────────── Content ────────────*/}
       <ScrollView
@@ -269,9 +157,7 @@ export default function ProfileView() {
           ]}
         />
 
-
-
-<View style={styles.logoutContainer}>
+        <View style={styles.logoutContainer}>
           <CustomButton
             text={i18n.t('logout')}
             onPress={handleLogout}
@@ -316,25 +202,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-
   /* buttons */
   logoutContainer: {
     marginVertical: 32,
   },
   logoutBtn: {
     backgroundColor: COLORS.error,
-  },
-  
-  /* loading overlay */
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
   },
 });

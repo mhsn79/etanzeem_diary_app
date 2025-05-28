@@ -8,6 +8,7 @@ import {
   FlatList,
   Dimensions,
   ActivityIndicator,
+  ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
@@ -23,39 +24,18 @@ interface CustomDropdownProps {
   options: Option[];
   onSelect: (option: Option) => void;
   placeholder?: string;
-  /** Extra styles for the touchable */
   viewStyle?: object;
-  /** Extra styles for the selected‑text */
   textStyle?: object;
-  /** Currently‑selected value (controlled) */
   selectedValue?: string;
-  /** Extra styles for the dropdown touchable container */
   dropdownContainerStyle?: object;
   dropdownTitle?: string;
-  /** Max height (px) of the list before it starts scrolling */
   maxHeight?: number;
-  /** Whether the dropdown is in loading state */
   loading?: boolean;
-  /** Whether the dropdown is disabled */
   disabled?: boolean;
+  listWrapperStyle?: ViewStyle;
+  isRtl?: boolean; // New prop to handle RTL layout
 }
 
-/**
- * CustomDropdown — *modal* implementation.
- * --------------------------------------------------------------
- * Fixes two issues present in the in‑place <ScrollView> variant:
- *   • Last dropdown’s list could not scroll because it was clipped by the
- *     parent <ScrollView>.
- *   • Second‑last dropdown’s list was hidden under the last dropdown —
- *     z‑index chaos inside nested views.
- *
- * We now render the list in a **transparent Modal** at the root of the app.
- * This guarantees:
- *   • Full‑screen overlay — z‑order always sits above everything.
- *   • Independent scrolling using FlatList.
- *   • Smart placement *above* or *below* the trigger, depending on available
- *     space, so nothing gets cut off.
- */
 const ROW_HEIGHT = 48;
 const WINDOW = Dimensions.get('window');
 
@@ -71,6 +51,8 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   maxHeight = 200,
   loading = false,
   disabled = false,
+  listWrapperStyle,
+  isRtl = true, // Default to false for LTR
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<Option | null>(
@@ -79,13 +61,12 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const triggerRef = useRef<View | null>(null);
 
-  // Update selected option when selectedValue changes
   useEffect(() => {
     setSelectedOption(options?.find(opt => opt.value === selectedValue) || null);
   }, [selectedValue, options]);
 
   const open = () => {
-    if (loading) return; // Don't open if loading
+    if (loading) return;
     
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setLayout({ x, y, width, height });
@@ -101,7 +82,6 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     close();
   };
 
-  // --------------------------- PLACEMENT -----------------------------------
   const placement = useMemo(() => {
     const spaceBelow = WINDOW.height - (layout.y + layout.height);
     const neededHeight = Math.min(maxHeight, (options?.length || 0) * ROW_HEIGHT);
@@ -112,16 +92,25 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     };
   }, [layout, options?.length, maxHeight]);
 
-  // ---------------------------- RENDER -------------------------------------
+  // Adjust positioning for RTL
+  const listPosition = useMemo(() => {
+    if (isRtl) {
+      // In RTL, align the list with the right edge of the trigger
+      const right = WINDOW.width - (layout.x + layout.width);
+      return { right, width: layout.width };
+    }
+    // In LTR, align with the left edge
+    return { left: layout.x, width: layout.width };
+  }, [isRtl, layout.x, layout.width]);
+
   return (
     <View style={[styles.container, viewStyle]}>
       {dropdownTitle && <UrduText style={styles.dropdownTitle}>{dropdownTitle}</UrduText>}
 
-      {/* TRIGGER */}
       <TouchableOpacity
         ref={triggerRef}
         style={[
-          styles.trigger, 
+          styles.trigger,
           dropdownContainerStyle,
           disabled && styles.disabledTrigger
         ]}
@@ -129,7 +118,9 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         activeOpacity={0.8}
         disabled={loading || disabled}
       >
-        <UrduText style={[styles.selectedText, textStyle]}> {selectedOption ? selectedOption.label : placeholder} </UrduText>
+        <UrduText style={[styles.selectedText, textStyle]}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </UrduText>
         {loading ? (
           <ActivityIndicator size="small" color={COLORS.primary} />
         ) : (
@@ -137,28 +128,25 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         )}
       </TouchableOpacity>
 
-      {/* LIST (Modal) */}
       <Modal
         visible={isOpen}
         transparent
         animationType="fade"
         onRequestClose={close}
       >
-        {/* Overlay to capture taps outside */}
         <TouchableWithoutFeedback onPress={close}>
           <View style={styles.overlay} />
         </TouchableWithoutFeedback>
 
-        {/* Positioned list */}
         <View
           style={[
             styles.listWrapper,
             {
               top: placement.top,
-              left: layout.x,
-              width: layout.width,
+              ...listPosition,
               maxHeight: placement.maxHeight,
             },
+            listWrapperStyle,
           ]}
         >
           <FlatList
@@ -184,7 +172,6 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   );
 };
 
-// ------------------------- STYLES ------------------------------------------
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -243,7 +230,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     textAlign: 'left',
-
   },
   selectedOptionText: {
     color: COLORS.primary,

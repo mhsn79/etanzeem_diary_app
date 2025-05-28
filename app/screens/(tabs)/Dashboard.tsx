@@ -10,7 +10,6 @@ import {
   StatusBar,
   useColorScheme,
   Pressable,
-
 } from 'react-native';
 import i18n from '@/app/i18n';
 import CustomDropdown from '@/app/components/CustomDropdown';
@@ -46,8 +45,6 @@ interface Option {
   value: string;
 }
 
-
-
 interface ScheduleItem {
   eventName: string;
   startTime: string;
@@ -62,10 +59,6 @@ interface Stat {
   value: string;
 }
 
-
-
-
-
 interface DashboardBoxProps {
   title: string;
   stats: Stat[];
@@ -78,8 +71,6 @@ interface DashboardBoxProps {
 const isLoading = (status: 'idle' | 'loading' | 'succeeded' | 'failed'): boolean => {
   return status === 'loading';
 };
-
-
 
 // Main Dashboard Component
 const Dashboard = () => {
@@ -277,6 +268,9 @@ const Dashboard = () => {
                   onSelect={console.log}
                   placeholder={i18n.t('select_duration')}
                   textStyle={styles.dropdownText}
+                  dropdownContainerStyle={styles.dropdownContainerStyle}
+                  listWrapperStyle={styles.dropdownListWrapper}
+                  isRtl={isRtl}
                 />
               </View>
               <TouchableOpacity style={styles.reportButton} onPress={() => router.push('/screens/ReportsManagementScreen')}>
@@ -284,7 +278,13 @@ const Dashboard = () => {
                 <UrduText style={styles.reportButtonText}>{i18n.t('generate_report')}</UrduText>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={styles.boxesContainer}>
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollViewContent}
+              nestedScrollEnabled={true}
+              bounces={Platform.OS === 'ios'}
+              showsVerticalScrollIndicator={true}
+            >
               {Array.from({ length: Math.ceil(dashboardBoxes.length / 2) }, (_, rowIndex) => (
                 <View key={rowIndex} style={styles.boxRow}>
                   {dashboardBoxes.slice(rowIndex * 2, rowIndex * 2 + 2).map((box, index) => (
@@ -322,7 +322,7 @@ const Dashboard = () => {
   );
 };
 
-// Styles (unchanged)
+// Styles
 const getStyles = (colorScheme: string | null | undefined) => {
   const isDark = colorScheme === 'dark';
   return StyleSheet.create({
@@ -334,12 +334,12 @@ const getStyles = (colorScheme: string | null | undefined) => {
       flex: 1,
     },
     mainContainer: {
+      flex: 1,
       backgroundColor: isDark ? '#23242D' : '#EBEBEB',
     },
     headerContainer: {
       paddingTop: 0,
       height: SPACING.lg*6.5,
-      
       alignItems: 'center',
       borderBottomStartRadius: 20,
       borderBottomEndRadius: 20,
@@ -373,12 +373,12 @@ const getStyles = (colorScheme: string | null | undefined) => {
     locationIcon: {
       width: 13,
       height: 16,
-      marginHorizontal: 10,
+      marginHorizontal: 6,
     },
     userIcon: {
       width: 14,
       height: 15,
-      marginHorizontal: 10,
+      marginHorizontal: 6,
     },
     logo: {
       width: 85,
@@ -386,9 +386,10 @@ const getStyles = (colorScheme: string | null | undefined) => {
       resizeMode: 'contain',
     },
     dashboardContent: {
-      marginHorizontal:SPACING.sm,
+      flex: 1,
+      marginHorizontal: SPACING.sm,
       borderRadius: 10,
-      backgroundColor: isDark ? '#373842' : 'transparent',
+      backgroundColor: isDark ? '#333842' : 'transparent',
       padding: 10,
     },
     reportSection: {
@@ -396,26 +397,42 @@ const getStyles = (colorScheme: string | null | undefined) => {
       justifyContent: 'space-between',
       alignItems: 'center',
       width: '100%',
-      marginTop:SPACING.lg,
-      marginBottom:SPACING.md,
+      marginTop: SPACING.lg,
+      marginBottom: SPACING.md,
     },
     dropdownContainer: {
       width: 150,
-      alignItems:'center',
-      justifyContent:'center'
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dropdownStyle: {
+      height: 36,
     },
     dropdown: {
       height: 36,
     },
     dropdownText: {
-      color: isDark ? '#FFB30F' : '#0BA241',
+      color: isDark ? '#FFB30F' : '#333333',
       lineHeight: 28,
-      includeFontPadding: false,
-      textAlignVertical: 'center',
       padding: 0,
     },
+    dropdownContainerStyle: {
+      width: '100%',
+      height: 55,
+      borderRadius: 10,
+      marginBottom: SPACING.md,
+      backgroundColor: COLORS.lightGray,
+    },
+    dropdownListWrapper: {
+      backgroundColor: COLORS.white,
+      borderRadius: BORDER_RADIUS.lg,
+      left:20,
+      borderWidth: 1,
+      borderColor: COLORS.lightGray,
+      ...SHADOWS.small,
+    },
     reportButton: {
-      backgroundColor: '#1E90FF',
+      backgroundColor: COLORS.primary,
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
@@ -426,7 +443,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
     reportIcon: {
       width: 20,
       height: 20,
-      marginStart: 10,
+      marginRight: 10,
     },
     reportButtonText: {
       color: '#fff',
@@ -435,9 +452,13 @@ const getStyles = (colorScheme: string | null | undefined) => {
       includeFontPadding: false,
       textAlignVertical: 'center',
     },
-    boxesContainer: {
+    scrollView: {
+      flex: 1,
+    },
+    scrollViewContent: {
       flexGrow: 1,
-      paddingTop: 0,
+      minHeight: '100%',
+      paddingBottom: SPACING.xl,
     },
     boxRow: {
       flexDirection: 'row',
@@ -450,7 +471,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       borderRadius: 10,
       padding: 15,
     },
-      overlayButton: {
+    overlayButton: {
       position: 'absolute',
       width: 56,
       height: 56,
@@ -460,14 +481,14 @@ const getStyles = (colorScheme: string | null | undefined) => {
       alignItems: 'center',
       ...SHADOWS.medium,
     },
-      titleStyle: {
+    titleStyle: {
       textAlign: 'left',
       color: isDark ? undefined : COLORS.black,
       fontSize: isDark ? undefined : TYPOGRAPHY.fontSize.lg,
       lineHeight: isDark ? undefined : TYPOGRAPHY.lineHeight.xl,
       fontFamily: isDark ? undefined : TYPOGRAPHY.fontFamily.bold,
     },
-        confirmButtonStyle: {
+    confirmButtonStyle: {
       backgroundColor: COLORS.primary,
       width: '100%',
       paddingVertical: SPACING.md,
@@ -478,7 +499,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       paddingVertical: SPACING.md,
       borderRadius: BORDER_RADIUS.md,
       borderWidth: 1,
-      borderStyle: 'dashed',
+      borderStyle: 'solid',
     },
     confirmTextStyle: {
       color: COLORS.white,
@@ -486,7 +507,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
     cancelTextStyle: {
       color: COLORS.black,
     },
-    });
+  });
 };
 
 export default Dashboard;
