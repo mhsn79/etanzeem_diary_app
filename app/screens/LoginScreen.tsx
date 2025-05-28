@@ -56,7 +56,7 @@ export default function LoginScreen() {
   const authError = useAppSelector(selectAuthError);
 
   /* Form state */
-  const [email, setEmail] = useState('sohail-abubaker@pixelpk.com');
+  const [email, setEmail] = useState('test.zone1.nazim@ji.com');
   const [password, setPassword] = useState('12345678');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);

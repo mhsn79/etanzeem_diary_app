@@ -13,7 +13,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Reports"
         options={{
-          tabBarLabel: "کارکردگی"
+          tabBarLabel: "رپورٹس"
         }}
       />
       <Tabs.Screen

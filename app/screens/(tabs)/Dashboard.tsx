@@ -346,7 +346,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       backgroundColor: isDark ? '#23242D' : COLORS.primary,
     },
     headerContent: {
-      padding: 5,
+      paddingHorizontal: 10,
       marginTop: 10,
       flexDirection: 'row',
       justifyContent: 'space-between',

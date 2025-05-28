@@ -13,7 +13,7 @@ import ReportIcon2White from '../../assets/images/report-icon-2-white.svg';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
-const VALID_LABELS = ['ڈیش بورڈ', 'ارکان', 'سرگرمیاں', 'کارکردگی'] as const;
+const VALID_LABELS = ['ڈیش بورڈ', 'ارکان', 'سرگرمیاں', 'رپورٹس'] as const;
 type ValidLabel = typeof VALID_LABELS[number];
 
 function getIcon(label: ValidLabel, focused: boolean) {
@@ -24,7 +24,7 @@ function getIcon(label: ValidLabel, focused: boolean) {
     'ڈیش بورڈ': focused ? HomeIconWhite : HomeIconBlack,
     'ارکان': focused ? ArkanIconWhite : ArkanIconBlack,
     'سرگرمیاں': focused ? ActivitiesIconWhite : ActivitiesIconBlack,
-    'کارکردگی': focused ? ReportIcon2White : ReportIcon2Black,
+    'رپورٹس': focused ? ReportIcon2White : ReportIcon2Black,
   };
 
   if (!VALID_LABELS.includes(label)) {

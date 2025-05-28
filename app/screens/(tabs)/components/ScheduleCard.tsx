@@ -33,7 +33,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
   return StyleSheet.create({
     scheduleContainer: {
       position: 'absolute',
-      marginTop: 140,
+      marginTop: SPACING.lg*6,
     },
     scheduleCard: {
       backgroundColor: isDark ? '#008cff' : '#FFFFFF',
@@ -46,7 +46,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 10,
+      paddingHorizontal: 10,
     },
     scheduleText: {
       color: COLORS.warning,
