@@ -164,5 +164,8 @@
     "voters": "Voters",
     "block_codes": "Block Codes",
     "close": "Close",
-    "level": "Level"
+    "level": "Level",
+    "access_denied": "Access Denied",
+    "access_denied_message": "You don't have any access to the app. Please contact administrator.",
+    "ok": "OK"
 }

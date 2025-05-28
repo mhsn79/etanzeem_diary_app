@@ -20,7 +20,9 @@ import Toast from '../components/Toast';
 import { useAppDispatch } from '../../src/hooks/useAppDispatch';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
 import {
-  login,
+  clearError,
+  loginAndFetchUserDetails,
+  selectAuthError,
   selectAuthStatus,
   selectIsAuthenticated,
 } from '../features/auth/authSlice';
@@ -51,17 +53,32 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectAuthStatus);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const authError = useAppSelector(selectAuthError);
 
   /* Form state */
   const [email, setEmail] = useState('sohail-abubaker@pixelpk.com');
   const [password, setPassword] = useState('12345678');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
 
   /* Redirect when auth succeeds */
   useEffect(() => {
     if (isAuthenticated) router.replace('/screens/Dashboard');
   }, [isAuthenticated]);
+
+  /* Check for access denied error */
+  useEffect(() => {
+    if (authError && authError.includes("don't have any access to the app")) {
+      setShowAccessDeniedModal(true);
+    }
+  }, [authError]);
+
+  /* Handle modal close */
+  const handleCloseModal = () => {
+    setShowAccessDeniedModal(false);
+    dispatch(clearError());
+  };
 
   /* Submit */
   const handleLogin = () => {
@@ -73,7 +90,7 @@ export default function LoginScreen() {
 
     if (eErr || pErr) return;
 
-    dispatch(login({ email, password }));
+    dispatch(loginAndFetchUserDetails({ email, password }));
   };
 
   /* Dynamic title top value based on notch presence */
@@ -158,7 +175,11 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-      <Toast />
+      
+      {/* Regular toast for other errors */}
+      {authError && !authError.includes("don't have any access to the app") && <Toast />}
+      
+
     </KeyboardAvoidingView>
   );
 }

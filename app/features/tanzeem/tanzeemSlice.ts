@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
 import {
   selectAuthState,
@@ -713,10 +713,12 @@ export const {
 export const selectTanzeemStatus = (state: RootState) => selectTanzeemState(state).status;
 export const selectTanzeemError = (state: RootState) => selectTanzeemState(state).error;
 export const selectSelectedUnitId = (state: RootState) => selectTanzeemState(state).selectedUnitId;
-export const selectSelectedUnit = (state: RootState) => {
-  const unitId = selectSelectedUnitId(state);
-  return unitId ? selectTanzeemiUnitById(state, unitId) : undefined;
-};
+export const selectSelectedUnit = createSelector(
+  [selectSelectedUnitId, state => state],
+  (unitId, state) => {
+    return unitId ? selectTanzeemiUnitById(state, unitId) : undefined;
+  }
+);
 export const selectSelectedUnitStatus = (state: RootState) => selectTanzeemState(state).selectedUnitStatus;
 export const selectSelectedUnitError = (state: RootState) => selectTanzeemState(state).selectedUnitError;
 
@@ -732,21 +734,25 @@ export const selectUserTanzeemiLevelStatus = (state: RootState) => selectTanzeem
 export const selectUserTanzeemiLevelError = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelError;
 
 // Helper selector to get all units in the user's hierarchy
-export const selectUserHierarchyUnits = (state: RootState) => {
-  const hierarchyIds = selectUserUnitHierarchyIds(state);
-  return hierarchyIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
-};
+// Memoized selector for user hierarchy units
+export const selectUserHierarchyUnits = createSelector(
+  [selectUserUnitHierarchyIds, state => state],
+  (hierarchyIds, state) => {
+    return hierarchyIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
+  }
+);
 
 // Helper selector to get all units in the hierarchy as a flat array
-export const selectAllHierarchyUnits = (state: RootState) => {
-  const userUnit = selectUserUnitDetails(state);
-  const hierarchyUnits = selectUserHierarchyUnits(state);
-  
-  // Combine user unit with hierarchy units if it exists
-  return userUnit 
-    ? [userUnit, ...hierarchyUnits.filter(unit => unit.id !== userUnit.id)] 
-    : hierarchyUnits;
-};
+// Memoized selector to prevent unnecessary rerenders
+export const selectAllHierarchyUnits = createSelector(
+  [selectUserUnitDetails, selectUserHierarchyUnits],
+  (userUnit, hierarchyUnits) => {
+    // Combine user unit with hierarchy units if it exists
+    return userUnit 
+      ? [userUnit, ...hierarchyUnits.filter(unit => unit.id !== userUnit.id)] 
+      : hierarchyUnits;
+  }
+);
 
 // Hierarchy selectors
 export const selectHierarchyStatus = (state: RootState) => selectTanzeemState(state).hierarchyStatus;
@@ -754,29 +760,45 @@ export const selectHierarchyError = (state: RootState) => selectTanzeemState(sta
 export const selectUnitsByLevel = (state: RootState) => selectTanzeemState(state).unitsByLevel;
 
 // Helper selector to get units for a specific level
-export const selectUnitsByLevelId = (state: RootState, levelId: number) => {
-  const unitIds = selectTanzeemState(state).unitsByLevel[levelId] || [];
-  return unitIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
+// Using createSelector with a factory pattern for parameterized selectors
+export const selectUnitsByLevelId = (levelId: number) => {
+  return createSelector(
+    [selectUnitsByLevel, state => state],
+    (unitsByLevel, state) => {
+      const unitIds = unitsByLevel[levelId] || [];
+      return unitIds.map(id => selectTanzeemiUnitById(state, id)).filter(Boolean) as TanzeemiUnit[];
+    }
+  );
 };
 
 // Helper selector to get parent unit of a specific unit
-export const selectParentUnit = (state: RootState, unitId: number) => {
-  const unit = selectTanzeemiUnitById(state, unitId);
-  if (!unit) return undefined;
-  
-  const parentId = unit.parent_id || unit.Parent_id;
-  if (parentId === undefined || parentId === null) return undefined;
-  
-  return selectTanzeemiUnitById(state, parentId);
+// Using factory pattern for parameterized selector
+export const selectParentUnit = (unitId: number) => {
+  return createSelector(
+    [state => selectTanzeemiUnitById(state, unitId), state => state],
+    (unit, state) => {
+      if (!unit) return undefined;
+      
+      const parentId = unit.parent_id || unit.Parent_id;
+      if (parentId === undefined || parentId === null) return undefined;
+      
+      return selectTanzeemiUnitById(state, parentId);
+    }
+  );
 };
 
 // Helper selector to get child units of a specific unit
-export const selectChildUnits = (state: RootState, unitId: number) => {
-  const allUnits = selectAllTanzeemiUnits(state);
-  return allUnits.filter(unit => {
-    const parentId = unit.parent_id || unit.Parent_id;
-    return parentId === unitId;
-  });
+// Using factory pattern for parameterized selector
+export const selectChildUnits = (unitId: number) => {
+  return createSelector(
+    [selectAllTanzeemiUnits],
+    (allUnits) => {
+      return allUnits.filter(unit => {
+        const parentId = unit.parent_id || unit.Parent_id;
+        return parentId === unitId;
+      });
+    }
+  );
 };
 
 export default tanzeemSlice.reducer;

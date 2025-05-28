@@ -65,6 +65,7 @@ export const login = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
+    // Authenticate with Directus
     const authResponse = await directus.login(credentials.email, credentials.password, {
       mode: 'json',
     });
@@ -74,13 +75,14 @@ export const login = createAsyncThunk<
     }
 
     try {
+      // Get user data
       const userData = await directus.request(() => ({
         path: '/users/me',
         method: 'GET',
         headers: { 'Authorization': `Bearer ${authResponse.access_token}` },
       }));
-      console.log('userData===================', userData);
 
+      // Create auth result object
       const authResult = {
         tokens: {
           accessToken: authResponse.access_token,
@@ -90,15 +92,46 @@ export const login = createAsyncThunk<
         user: userData as User,
       };
 
-      // After successful login, fetch the person data by email
-      // This is done asynchronously and doesn't block the login process
+      // Check if the person exists in the database before allowing login
       if (credentials.email) {
-        // Use the imported fetchPersonByEmail action
-        dispatch(fetchPersonByEmail(credentials.email));
+        // Use the baseUrl from environment or fallback
+        const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+        
+        // Normalize the email to lowercase for consistent handling
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+        
+        // Check if person exists
+        const url = `/items/Person`;
+        const params = new URLSearchParams();
+        params.append('filter[Email][_eq]', normalizedEmail);
+        params.append('fields', 'id,Email');
+        
+        const personResponse = await fetch(`${baseUrl}${url}?${params.toString()}`, {
+          method: 'GET',
+          headers: { 
+            'Authorization': `Bearer ${authResponse.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!personResponse.ok) {
+          throw new Error(`Failed to check person data: ${personResponse.status}`);
+        }
+        
+        const personData = await personResponse.json();
+        
+        // If no person record found, reject the login
+        if (!personData.data || personData.data.length === 0) {
+          // Logout from Directus to clean up the session
+          directus.logout();
+          // Clear error message with a more professional message
+          return rejectWithValue("Access denied. You don't have permission to use this application. Please contact your administrator.");
+        }
       }
 
       return authResult;
     } catch (userDataError: any) {
+      // If we can't get user data but have tokens, return minimal user info
       return {
         tokens: {
           accessToken: authResponse.access_token,
@@ -451,10 +484,10 @@ export const loginAndFetchUserDetails = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/loginAndFetchUserDetails', async (credentials, { dispatch, rejectWithValue }) => {
   try {
-    // First, perform the login
+    // First, perform the login which already checks if person exists
     const authResult = await dispatch(login(credentials)).unwrap();
     
-    // Then fetch the person data
+    // Then fetch the complete person data
     const userDetails = await dispatch(fetchPersonByEmail(credentials.email)).unwrap();
     
     return { 

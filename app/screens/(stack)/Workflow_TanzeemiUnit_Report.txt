@@ -1,0 +1,12 @@
+LETR TRAP Workflow
+-----------------
+L: Login to system
+E: Email → Person Table
+T: TanzeemiUnit ID
+R: Retrieve & match in TanzeemiUnit
+T: Template via Unit ID
+R: Retrieve Template ID
+A: Access Report Mgmt
+P: Pull final report
+-----------------
+Save in: Workflow_TanzeemiUnit_Report.txt
