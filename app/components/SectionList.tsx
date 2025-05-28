@@ -61,10 +61,12 @@ const Question = memo(({
   question, 
   value, 
   submissionId,
+  disabled,
 }: { 
   question: ReportQuestion; 
   value: any; 
   submissionId: number | null;
+  disabled?: boolean;
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   
@@ -275,7 +277,7 @@ const Question = memo(({
         placeholder={getPlaceholder()}
         keyboardType={getKeyboardType()}
         loading={isSaving}
-        editable={!isSaving}
+        editable={!disabled}
         multiline={shouldBeMultiline()}
         numberOfLines={shouldBeMultiline() ? 3 : 1}
         error={error}
@@ -296,12 +298,14 @@ const AccordionSection = memo(({
   section, 
   questions, 
   answers,
-  submissionId
+  submissionId,
+  disabled
 }: {
   section: ReportSection & { progress: number };
   questions: ReportQuestion[];
   answers: ReportAnswer[];
   submissionId: number | null;
+  disabled?: boolean;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -329,6 +333,7 @@ const AccordionSection = memo(({
           question={question}
           value={answerValue}
           submissionId={submissionId}
+          disabled={disabled}
         />
       );
     });
@@ -377,11 +382,18 @@ interface SectionListProps {
   sections: Array<ReportSection & { progress: number }>;
   questions: ReportQuestion[];
   answers: ReportAnswer[];
-  onAnswerChange?: (questionId: number, value: any) => void; // Make optional since we're using direct dispatch
+  onAnswerChange?: (questionId: number, value: any) => void;
+  disabled?: boolean;
 }
 
 // Main SectionList component
-const SectionList = memo(({ sections, questions, answers, onAnswerChange }: SectionListProps) => {
+const SectionList: React.FC<SectionListProps> = ({
+  sections,
+  questions,
+  answers,
+  onAnswerChange,
+  disabled = false,
+}) => {
   // Get the current submission ID from Redux
   const submissionId = useSelector(selectCurrentSubmissionId);
 
@@ -398,6 +410,7 @@ const SectionList = memo(({ sections, questions, answers, onAnswerChange }: Sect
           questions={sectionQuestions}
           answers={answers}
           submissionId={submissionId}
+          disabled={disabled}
         />
       );
     });
@@ -408,7 +421,7 @@ const SectionList = memo(({ sections, questions, answers, onAnswerChange }: Sect
       {sectionComponents}
     </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   container: {

@@ -1,12 +1,20 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
-
 import i18n from '../../i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
 import { COLORS } from '@/app/constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchPersonsByUnit, selectAllPersons, selectPersonsStatus, selectPersonsError } from '@/app/features/persons/personSlice';
+import { 
+  fetchPersonsByUnit, 
+  selectAllPersons, 
+  selectPersonsStatus, 
+  selectPersonsError,
+  fetchContactTypes,
+  selectContactTypes,
+  selectContactTypesStatus,
+  selectContactTypesError
+} from '@/app/features/persons/personSlice';
 import { Person } from '@/app/models/Person';
 import { AppDispatch } from '@/app/store';
 import RukunCard from '@/app/components/RukunCard';
@@ -28,53 +36,51 @@ export default function Arkan() {
   const persons = useSelector(selectAllPersons);
   const status = useSelector(selectPersonsStatus);
   const error = useSelector(selectPersonsError);
+  const contactTypes = useSelector(selectContactTypes);
+  const contactTypesStatus = useSelector(selectContactTypesStatus);
+  const contactTypesError = useSelector(selectContactTypesError);
 
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTab, setSelectedTab] = useState(0); // 0 for all, 1 for rukun, 2 for other
-  
-  // Count persons by contact type
-  const rukunCount = useMemo(() => 
-    persons.filter(person => person.contact_type === 'rukun').length, 
-    [persons]
-  );
-  
-  const otherCount = useMemo(() => 
-    persons.filter(person => person.contact_type === 'other').length, 
-    [persons]
-  );
-  
-  // Define tabs with badges
-  const tabs = useMemo(() => [
-    { label: i18n.t('all'), value: 0, badge: persons.length.toString() },
-    { label: i18n.t('arkan'), value: 1, badge: rukunCount.toString() }, // اراکین
-    { label: i18n.t('participants'), value: 2, badge: otherCount.toString() }, // شرکاء
-  ], [persons.length, rukunCount, otherCount, i18n]);
+  const [selectedTab, setSelectedTab] = useState(0);
 
-  // Fetch persons on component mount
+  // Define tabs with badges
+  const tabs = useMemo(() => {
+    const allCount = persons.length;
+    const typeCounts = (contactTypes || []).reduce((acc, type) => {
+      acc[type.id] = persons.filter(person => person.contact_type === type.id).length;
+      return acc;
+    }, {} as Record<number, number>);
+
+    return [
+      { label: i18n.t('all'), value: 0, badge: allCount.toString() },
+      ...(contactTypes || []).map(type => ({
+        label: i18n.t(type.type) || type.type,
+        value: type.id,
+        badge: typeCounts[type.id]?.toString() || '0'
+      }))
+    ];
+  }, [persons, contactTypes, i18n]);
+
+  // Fetch persons and contact types on component mount
   useEffect(() => {
     if (status === 'idle') {
       dispatch(fetchPersonsByUnit());
     }
-  }, [dispatch, status]);
+    if (contactTypesStatus === 'idle') {
+      dispatch(fetchContactTypes());
+    }
+  }, [dispatch, status, contactTypesStatus]);
 
   // Filter persons based on search query and selected tab
   const filteredPersons = useMemo(() => {
     // First, filter by tab selection
     let tabFilteredPersons = persons;
     
-    if (selectedTab === 1) {
-      // Filter for "rukun" contact type
-      tabFilteredPersons = persons.filter(person => 
-        person.contact_type === 'rukun'
-      );
-    } else if (selectedTab === 2) {
-      // Filter for "other" contact type
-      tabFilteredPersons = persons.filter(person => 
-        person.contact_type === 'other'
-      );
+    if (selectedTab !== 0) {
+      tabFilteredPersons = persons.filter(person => person.contact_type === selectedTab);
     }
     
     // Then apply search query filter if needed
@@ -82,9 +88,9 @@ export default function Arkan() {
 
     const query = searchQuery.toLowerCase().trim();
     return tabFilteredPersons.filter(person => {
-      const nameMatch = person.name?.toLowerCase().includes(query);
-      const addressMatch = person.address?.toLowerCase().includes(query) || person.Address?.toLowerCase().includes(query);
-      const phoneMatch = person.phone?.includes(query) || person.Phone_Number?.includes(query);
+      const nameMatch = person.Name?.toLowerCase().includes(query);
+      const addressMatch = person.Address?.toLowerCase().includes(query);
+      const phoneMatch = person.Phone_Number?.includes(query);
       return nameMatch || addressMatch || phoneMatch;
     });
   }, [persons, searchQuery, selectedTab]);
@@ -103,9 +109,12 @@ export default function Arkan() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await dispatch(fetchPersonsByUnit()).unwrap();
+      await Promise.all([
+        dispatch(fetchPersonsByUnit()).unwrap(),
+        dispatch(fetchContactTypes()).unwrap()
+      ]);
     } catch (error) {
-      console.error('Error refreshing persons:', error);
+      console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }
@@ -125,7 +134,7 @@ export default function Arkan() {
   }, [navigation]);
 
   // Render loading state
-  if (status === 'loading' && !refreshing) {
+  if ((status === 'loading' || contactTypesStatus === 'loading') && !refreshing) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <StatusBar
@@ -142,7 +151,7 @@ export default function Arkan() {
   }
 
   // Render error state
-  if (status === 'failed' && error) {
+  if ((status === 'failed' && error) || (contactTypesStatus === 'failed' && contactTypesError)) {
     return (
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
         <StatusBar
@@ -152,11 +161,14 @@ export default function Arkan() {
         />
         <View style={[styles.keyboardAvoidingContainer, styles.centerContent]}>
           <Text style={styles.errorText}>
-            {error.includes('{') ? i18n.t('api_error') : error}
+            {error?.includes('{') ? i18n.t('api_error') : error || contactTypesError}
           </Text>
           <CustomButton
             text={i18n.t('try_again')}
-            onPress={() => dispatch(fetchPersonsByUnit())}
+            onPress={() => {
+              dispatch(fetchPersonsByUnit());
+              dispatch(fetchContactTypes());
+            }}
             style={styles.retryButton}
             viewStyle={styles.retryButtonView}
             textStyle={styles.retryButtonText}
@@ -165,8 +177,6 @@ export default function Arkan() {
       </SafeAreaView>
     );
   }
-
-  const safeTop = insets.top > 0 ? insets.top : 10;
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
@@ -179,93 +189,91 @@ export default function Arkan() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingContainer}
       >
-      <FlatList
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: 10,
-          paddingHorizontal: 20,
-          paddingBottom: 20,
-          direction: i18n.locale === 'ur' ? 'rtl' : 'ltr',
-        }}
-        data={filteredData}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => <RukunCard item={item} />}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-          />
-        }
-        ListHeaderComponent={
-          <>
-            <View style={styles.headerContainer}>
-              <View style={styles.headerTextContainer}>
-                <Image
-                  source={require('@/assets/images/multiple-users.png')}
-                  style={styles.headerIcon}
+        <FlatList
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: 10,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            direction: i18n.locale === 'ur' ? 'rtl' : 'ltr',
+          }}
+          data={filteredData}
+          keyExtractor={item => item.id.toString()}
+          renderItem={({ item }) => <RukunCard item={item} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
+          ListHeaderComponent={
+            <>
+              <View style={styles.headerContainer}>
+                <View style={styles.headerTextContainer}>
+                  <Image
+                    source={require('@/assets/images/multiple-users.png')}
+                    style={styles.headerIcon}
+                  />
+                  <Text style={styles.headerCount}>{filteredData.length}</Text>
+                  <UrduText style={styles.headerTitle}>
+                    {selectedTab === 0 
+                      ? i18n.t('total_members') 
+                      : i18n.t((contactTypes || []).find(type => type.id === selectedTab)?.type || '')}
+                  </UrduText>
+                </View>
+                <CustomButton
+                  text={i18n.t('add_new')}
+                  onPress={handleAddNewRukun}
+                  style={styles.addButton}
+                  viewStyle={styles.addButtonView}
+                  textStyle={styles.addButtonText}
                 />
-                <Text style={styles.headerCount}>{filteredData.length}</Text>
-                <UrduText style={styles.headerTitle}>
-                  {selectedTab === 0 
-                    ? i18n.t('total_members') 
-                    : selectedTab === 1 
-                      ? i18n.t('arkan') 
-                      : i18n.t('participants')}
-                </UrduText>
               </View>
-              <CustomButton
-                text={i18n.t('add_new')}
-                onPress={handleAddNewRukun}
-                style={styles.addButton}
-                viewStyle={styles.addButtonView}
-                textStyle={styles.addButtonText}
-              />
+              <View style={styles.searchContainer}>
+                <Image
+                  source={require('@/assets/images/magnifier.png')}
+                  style={styles.searchIcon}
+                />
+                <CustomTextInput
+                  placeholder={i18n.t('search_by_name_address_phone')}
+                  placeholderTextColor={COLORS.textSecondary}
+                  onChangeText={handleSearch}
+                  value={searchQuery}
+                  textAlign='right'
+                  style={styles.searchInput}
+                />
+              </View>
+              {contactTypes && contactTypes.length > 0 && (
+                <View style={styles.tabSection}>
+                  <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
+                </View>
+              )}
+            </>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchQuery.trim()
+                  ? `${i18n.t('no_search_results_for')} "${searchQuery}"`
+                  : selectedTab === 0
+                    ? i18n.t('no_persons_found_in_units')
+                    : i18n.t('no_persons_found_for_type')}
+              </Text>
+              {!searchQuery.trim() && (
+                <CustomButton
+                  text={i18n.t('refresh')}
+                  onPress={onRefresh}
+                  style={styles.retryButton}
+                  viewStyle={styles.retryButtonView}
+                  textStyle={styles.retryButtonText}
+                />
+              )}
             </View>
-            <View style={styles.searchContainer}>
-              <Image
-                source={require('@/assets/images/magnifier.png')}
-                style={styles.searchIcon}
-              />
-              <CustomTextInput
-                placeholder={i18n.t('search_by_name_address_phone')}
-                placeholderTextColor={COLORS.textSecondary}
-                onChangeText={handleSearch}
-                value={searchQuery}
-                textAlign='right'
-                style={styles.searchInput}
-              />
-            </View>
-            <View style={styles.tabSection}>
-              <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery.trim()
-                ? `${i18n.t('no_search_results_for')} "${searchQuery}"`
-                : selectedTab === 0
-                  ? i18n.t('no_persons_found_in_units')
-                  : selectedTab === 1
-                    ? i18n.t('no_arkan_found')
-                    : i18n.t('no_participants_found')}
-            </Text>
-            {!searchQuery.trim() && (
-              <CustomButton
-                text={i18n.t('refresh')}
-                onPress={onRefresh}
-                style={styles.retryButton}
-                viewStyle={styles.retryButtonView}
-                textStyle={styles.retryButtonText}
-              />
-            )}
-          </View>
-        }
-      />
-    </KeyboardAvoidingView>
+          }
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

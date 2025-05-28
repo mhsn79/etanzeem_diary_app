@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
@@ -169,6 +168,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
   // Combined function to fetch all necessary data with token refresh
   const fetchAllData = useCallback(async (forceQARefresh = false) => {
+    console.log('Refreshing data...6666666666',userUnitDetails);
+    
     try {
       if (!userUnitDetails) {
         console.error('User unit details not available');
@@ -187,6 +188,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // Step 2: Check if we need to initialize QA data
       // Use the current reportMgmtDetails from props
       const latestReportMgmt = reportMgmtDetails?.[0] || null;
+      console.log('Report management details:', latestReportMgmt,);
       
       if (!latestReportMgmt || !latestReportMgmt.template?.id || !latestReportMgmt.managements?.[0]) {
         console.log('No report management details available for QA initialization');
@@ -536,7 +538,36 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     location={submission.unitDetails?.Name ?? 'نامعلوم'}
                     status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
-                    onEdit={handleEdit}
+                    onEdit={() => {
+                      // Navigate to CREATE_REPORT in edit mode
+                      router.push({
+                        pathname: ROUTES.CREATE_REPORT,
+                        params: {
+                          submissionId: submission.id,
+                          templateId: submission.template_id,
+                          managementId: submission.mgmt_id,
+                          unitId: submission.unit_id,
+                          status: submission.status,
+                          mode: 'edit',
+                          submissionData: submission.submission_data ? JSON.stringify(submission.submission_data) : undefined
+                        }
+                      });
+                    }}
+                    onView={() => {
+                      // Navigate to CREATE_REPORT in view mode
+                      router.push({
+                        pathname: ROUTES.CREATE_REPORT,
+                        params: {
+                          submissionId: submission.id,
+                          templateId: submission.template_id,
+                          managementId: submission.mgmt_id,
+                          unitId: submission.unit_id,
+                          status: submission.status,
+                          mode: 'view',
+                          submissionData: submission.submission_data ? JSON.stringify(submission.submission_data) : undefined
+                        }
+                      });
+                    }}
                   />
                 </Animated.View>
               );

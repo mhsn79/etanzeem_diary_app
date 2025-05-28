@@ -10,6 +10,7 @@ interface ReportCardProps {
   status: string;
   statusColor?: string;
   onEdit?: () => void;
+  onView?: () => void;
   showEdit?: boolean;
   sumbitDateText: string;
 }
@@ -21,29 +22,32 @@ const ReportCard: React.FC<ReportCardProps> = ({
   sumbitDateText,
   statusColor = COLORS.primary,
   onEdit,
+  onView,
   showEdit = true,
 }) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <UrduText style={styles.title}>{title}</UrduText>
-        {showEdit && (
-          <TouchableOpacity onPress={onEdit} style={styles.editButton}>
-            <FontAwesome name="edit" size={18} color={COLORS.black} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <UrduText style={styles.sumbitDateText}>{sumbitDateText}</UrduText>
-      <View style={styles.content}>
-        <UrduText style={styles.location}>{location}</UrduText>
-        
-        <View style={styles.statusContainer}>
-          <UrduText style={[styles.statusLabel,{ color: statusColor }]}>اسٹیٹس</UrduText>
-          <UrduText style={[styles.statusLabel,{ color: statusColor }]}>:</UrduText>
-          <UrduText style={[styles.statusValue, { color: statusColor }]}>{status}</UrduText>
+    <TouchableOpacity onPress={onView} activeOpacity={0.7}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <UrduText style={styles.title}>{title}</UrduText>
+          {showEdit && (
+            <TouchableOpacity onPress={onEdit} style={styles.editButton}>
+              <FontAwesome name="edit" size={18} color={COLORS.black} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <UrduText style={styles.sumbitDateText}>{sumbitDateText}</UrduText>
+        <View style={styles.content}>
+          <UrduText style={styles.location}>{location}</UrduText>
+          
+          <View style={styles.statusContainer}>
+            <UrduText style={[styles.statusLabel,{ color: statusColor }]}>اسٹیٹس</UrduText>
+            <UrduText style={[styles.statusLabel,{ color: statusColor }]}>:</UrduText>
+            <UrduText style={[styles.statusValue, { color: statusColor }]}>{status}</UrduText>
+          </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

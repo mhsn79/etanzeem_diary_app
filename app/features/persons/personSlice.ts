@@ -9,6 +9,11 @@ import { API_BASE_URL } from '@/app/constants/api';
 import { Platform } from 'react-native';
 import { TanzeemiUnit } from '@/app/models/TanzeemiUnit';
 
+interface ContactType {
+  id: number;
+  type: string;
+}
+
 // Entity adapter for persons
 const personsAdapter = createEntityAdapter<Person>({
   selectId: person => person.id,
@@ -29,6 +34,9 @@ interface PersonsExtraState {
   nazimDetails: Person | null;
   nazimDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   nazimDetailsError: string | null;
+  contactTypes: ContactType[];
+  contactTypesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  contactTypesError: string | null;
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -46,6 +54,9 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   nazimDetails: null,
   nazimDetailsStatus: 'idle',
   nazimDetailsError: null,
+  contactTypes: [],
+  contactTypesStatus: 'idle',
+  contactTypesError: null,
 });
 
 // Helper function for API requests
@@ -415,6 +426,37 @@ export const fetchNazimDetails = createAsyncThunk<
   }
 });
 
+// Fetch contact types
+export const fetchContactTypes = createAsyncThunk<
+  ContactType[],
+  void,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchContactTypes', async (_, { getState, dispatch, rejectWithValue }) => {
+  try {
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    const auth = selectAuthState(getState());
+    const token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+
+    const fetchContactTypesRequest = async (accessToken: string) => {
+      const response = await apiRequest<{ data: ContactType[] }>(
+        '/items/contact_type',
+        'GET',
+        accessToken
+      );
+      console.log('Fetching contact types response:-------------------------------->>>>>>>>', response);
+      
+      if (!response.data) throw new Error('Failed to fetch contact types');
+      return response.data;
+    };
+
+    return await executeWithTokenRefresh(fetchContactTypesRequest, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch contact types error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch contact types');
+  }
+});
+
 // Persons slice
 const personsSlice = createSlice({
   name: 'persons',
@@ -430,6 +472,9 @@ const personsSlice = createSlice({
       state.nazimDetails = null;
       state.nazimDetailsStatus = 'idle';
       state.nazimDetailsError = null;
+      state.contactTypes = [];
+      state.contactTypesStatus = 'idle';
+      state.contactTypesError = null;
     },
     resetCreateStatus(state) {
       state.createStatus = 'idle';
@@ -524,6 +569,19 @@ const personsSlice = createSlice({
       .addCase(fetchNazimDetails.rejected, (state, action) => {
         state.nazimDetailsStatus = 'failed';
         state.nazimDetailsError = action.payload ?? 'Failed to fetch Nazim details';
+      })
+      // Fetch contact types
+      .addCase(fetchContactTypes.pending, state => {
+        state.contactTypesStatus = 'loading';
+        state.contactTypesError = null;
+      })
+      .addCase(fetchContactTypes.fulfilled, (state, action: PayloadAction<ContactType[]>) => {
+        state.contactTypesStatus = 'succeeded';
+        state.contactTypes = action.payload;
+      })
+      .addCase(fetchContactTypes.rejected, (state, action) => {
+        state.contactTypesStatus = 'failed';
+        state.contactTypesError = action.payload ?? 'Failed to fetch contact types';
       });
   },
 });
@@ -554,5 +612,10 @@ export const selectUserDetailsError = (state: RootState) => selectPersonsState(s
 export const selectNazimDetails = (state: RootState) => selectPersonsState(state).nazimDetails;
 export const selectNazimDetailsStatus = (state: RootState) => selectPersonsState(state).nazimDetailsStatus;
 export const selectNazimDetailsError = (state: RootState) => selectPersonsState(state).nazimDetailsError;
+
+// Contact types selectors
+export const selectContactTypes = (state: RootState) => selectPersonsState(state).contactTypes;
+export const selectContactTypesStatus = (state: RootState) => selectPersonsState(state).contactTypesStatus;
+export const selectContactTypesError = (state: RootState) => selectPersonsState(state).contactTypesError;
 
 export default personsSlice.reducer;

@@ -36,7 +36,9 @@ const CreateReportScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
   const params = useLocalSearchParams();
   const templateId = params.templateId ? Number(params.templateId) : null;
-  
+  const mode = params.mode as 'view' | 'edit' | undefined;
+  const isViewMode = mode === 'view';
+  const isEditMode = mode === 'edit';
   // Use our token refresh hook
   const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
   
@@ -209,7 +211,10 @@ const CreateReportScreen = () => {
     );
   }
   return (
-    <ScreenLayout title="رپورٹ بنائیں" onBack={() => navigation.goBack()}>
+    <ScreenLayout
+      title={isViewMode ? 'رپورٹ دیکھیں' : isEditMode ? 'رپورٹ ترمیم کریں' : 'رپورٹ بنائیں'}
+      onBack={() => navigation.goBack()}
+    >
       <View style={styles.container}>
         <ScrollView 
           style={styles.scrollContainer} 
@@ -235,30 +240,33 @@ const CreateReportScreen = () => {
             questions={questionsArray}
             answers={Object.values(storedAnswers.byId)}
             onAnswerChange={handleAnswerChange}
+            disabled={isViewMode}
           />
         </ScrollView>
 
-        <Animated.View 
-          style={[
-            styles.buttonContainer,
-            { transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          <CustomButton
-            text="جمع کروائیں"
-            onPress={handleSubmit}
-            viewStyle={{
-              backgroundColor: COLORS.primary,
-              flex: 1,
-              marginHorizontal: SPACING.md,
-            }}
-            textStyle={{
-              color: COLORS.white,
-            }}
-            disabled={submitStatus === 'loading'}
-            loading={submitStatus === 'loading'}
-          />
-        </Animated.View>
+        {!isViewMode && (
+          <Animated.View 
+            style={[
+              styles.buttonContainer,
+              { transform: [{ scale: scaleAnim }] }
+            ]}
+          >
+            <CustomButton
+              text="جمع کروائیں"
+              onPress={handleSubmit}
+              viewStyle={{
+                backgroundColor: COLORS.primary,
+                flex: 1,
+                marginHorizontal: SPACING.md,
+              }}
+              textStyle={{
+                color: COLORS.white,
+              }}
+              disabled={submitStatus === 'loading'}
+              loading={submitStatus === 'loading'}
+            />
+          </Animated.View>
+        )}
         
         {/* Status indicators */}
         {/* {saveStatus === 'loading' && (
@@ -280,41 +288,43 @@ const CreateReportScreen = () => {
         )} */}
         
         {/* Submit Confirmation Dialog */}
-        <Dialog
-          visible={showSubmitDialog}
-          onConfirm={handleConfirmSubmit}
-          onCancel={() => setShowSubmitDialog(false)}
-          onClose={() => setShowSubmitDialog(false)}
-          title="رپورٹ جمع کروائیں"
-          description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟"
-          confirmText="جمع کروائیں"
-          cancelText="منسوخ کریں"
-          type="confirm"
-          showWarningIcon={true}
-        />
+        {!isViewMode && (
+          <Dialog
+            visible={showSubmitDialog}
+            onConfirm={handleConfirmSubmit}
+            onCancel={() => setShowSubmitDialog(false)}
+            onClose={() => setShowSubmitDialog(false)}
+            title="رپورٹ جمع کروائیں"
+            description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟"
+            confirmText="جمع کروائیں"
+            cancelText="منسوخ کریں"
+            type="confirm"
+            showWarningIcon={true}
+          />
+        )}
         
         {/* Success Dialog */}
-        <Dialog
-          visible={showSuccessDialog}
-          onConfirm={() => {
-            setShowSuccessDialog(false);
-            // Navigate back to refresh the reports list
-            navigation.goBack();
-          }}
-          onClose={() => {
-            setShowSuccessDialog(false);
-            // Navigate back to refresh the reports list
-            navigation.goBack();
-          }}
-          title="رپورٹ جمع ہو گئی"
-          description="آپ کی رپورٹ کامیابی سے جمع کروا دی گئی ہے۔"
-          confirmText="ٹھیک ہے"
-          type="success"
-          showSuccessIcon={true}
-          autoClose={true}
-          autoCloseTime={2000}
-          showCloseButton={false} // Hide close button for cleaner look
-        />
+        {!isViewMode && (
+          <Dialog
+            visible={showSuccessDialog}
+            onConfirm={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            onClose={() => {
+              setShowSuccessDialog(false);
+              navigation.goBack();
+            }}
+            title="رپورٹ جمع ہو گئی"
+            description="آپ کی رپورٹ کامیابی سے جمع کروا دی گئی ہے۔"
+            confirmText="ٹھیک ہے"
+            type="success"
+            showSuccessIcon={true}
+            autoClose={true}
+            autoCloseTime={2000}
+            showCloseButton={false}
+          />
+        )}
       </View>
     </ScreenLayout>
   );
