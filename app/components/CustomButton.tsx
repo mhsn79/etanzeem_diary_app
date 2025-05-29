@@ -2,17 +2,19 @@ import { useState } from "react";
 import { ActivityIndicator, Image, ImageStyle, Pressable, PressableProps, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
 import { ImageSource } from "react-native-vector-icons/Icon";
 import { COLORS } from "../constants/theme";
+import React from "react";
 
-interface CustomButtonProps extends PressableProps {
-  text: String;
+export interface CustomButtonProps extends PressableProps {
+  text: String | string;
   viewStyle?: any;
   textStyle?: any;
   iconImage?: ImageSource;
   iconStyle?: [ImageStyle?];
   loading?: boolean;
+  icon?: React.ReactNode; // Add support for React Node icons
 }
 
-export default function CustomButton({ text, viewStyle, textStyle, loading = false, ...rest }: CustomButtonProps) {
+export default function CustomButton({ text, viewStyle, textStyle, loading = false, icon, ...rest }: CustomButtonProps) {
 
   const [pressed, setPressed] = useState(false);
   const isDisabled = !rest.onPress || rest.disabled || loading;
@@ -34,6 +36,8 @@ export default function CustomButton({ text, viewStyle, textStyle, loading = fal
           <ActivityIndicator size="small" color={COLORS.white} style={styles.loader} />
         ) : (
           <>
+            {/* Support for both icon types */}
+            {icon && icon}
             {rest.iconImage && <Image
               source={rest.iconImage}
               style={[styles.icon]}

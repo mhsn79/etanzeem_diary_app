@@ -75,21 +75,15 @@ export const login = createAsyncThunk<
     }
 
     try {
-      // Get user data
-      const userData = await directus.request(() => ({
-        path: '/users/me',
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${authResponse.access_token}` },
-      }));
-
-      // Create auth result object
+      // Create auth result object with minimal user info
+      // We'll fetch complete user details from Person collection later
       const authResult = {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
           expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000,
         },
-        user: userData as User,
+        user: { id: 'pending', email: credentials.email },
       };
 
       // Check if the person exists in the database before allowing login
@@ -130,8 +124,8 @@ export const login = createAsyncThunk<
       }
 
       return authResult;
-    } catch (userDataError: any) {
-      // If we can't get user data but have tokens, return minimal user info
+    } catch (error: any) {
+      // If we can't check person data but have tokens, return minimal user info
       return {
         tokens: {
           accessToken: authResponse.access_token,
@@ -414,6 +408,14 @@ export const logout = createAsyncThunk(
       // First dispatch the auth logout action to clear auth state and log out from Directus
       dispatch(logoutAction());
       
+      // Clear user details from person slice
+      try {
+        const { clearUserDetails } = await import('../persons/personSlice');
+        dispatch(clearUserDetails());
+      } catch (clearError) {
+        console.warn('Error clearing user details:', clearError);
+      }
+      
       // Then dispatch the reset action to reset all slices to their initial state
       dispatch({ type: RESET_STATE });
       
@@ -425,7 +427,7 @@ export const logout = createAsyncThunk(
         console.warn('Error purging persisted data:', purgeError);
       }
       
-      console.log('Logout complete: Auth state cleared, Redux state reset, and persisted data purged');
+      console.log('Logout complete: Auth state cleared, user details cleared, Redux state reset, and persisted data purged');
       
       return true;
     } catch (error) {
@@ -487,8 +489,13 @@ export const loginAndFetchUserDetails = createAsyncThunk<
     // First, perform the login which already checks if person exists
     const authResult = await dispatch(login(credentials)).unwrap();
     
-    // Then fetch the complete person data
+    // Then fetch the complete person data directly from Person collection
     const userDetails = await dispatch(fetchPersonByEmail(credentials.email)).unwrap();
+    
+    // If we couldn't get user details, throw an error
+    if (!userDetails) {
+      throw new Error('Failed to fetch user details. Please try again.');
+    }
     
     return { 
       auth: authResult,

@@ -171,6 +171,8 @@
     "block_codes": "بلاک کوڈز",
     "close": "بند کریں",
     "level": "سطح",
+    "tanzeem_level": "تنظیمی سطح",
+    "nazim_label": "ناظم کا عہدہ",
     "access_denied": "رسائی مسترد",
     "access_denied_message": "آپ کو ایپ تک رسائی کی اجازت نہیں ہے۔ براہ کرم منتظم سے رابطہ کریں۔",
     "ok": "ٹھیک ہے",
@@ -178,5 +180,14 @@
     "umeedwar": "امیدوار",
     "karkun": "کارکن",
     "others": "دیگر",
-    "no_persons_found_for_type": "اس قسم کے لیے کوئی افراد نہیں ملے"
+    "no_persons_found_for_type": "اس قسم کے لیے کوئی افراد نہیں ملے",
+    "rukn_no": "رکن نمبر",
+    "profession": "پیشہ",
+    "education": "تعلیم",
+    "gender": "جنس",
+    "male": "مرد",
+    "draft": "مسودہ",
+    "published": "شائع شدہ",
+    "pending": "زیر التواء",
+    "loading_profile": "پروفائل لوڈ ہو رہا ہے"
 } 

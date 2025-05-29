@@ -1,102 +1,193 @@
-import React from 'react';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import i18n from '../i18n';
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// import { commonStyles, lightThemeStyles, darkThemeStyles } from '../_layout';
-import { Appearance, useColorScheme } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
 import { router } from 'expo-router';
-import { profileData } from '@/app/data/profile';
-import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '@/src/types/RootStackParamList';
-type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/ProfileEdit'>;
+import { useSelector } from 'react-redux';
+import { selectUserDetails, selectUserDetailsStatus } from '@/app/features/persons/personSlice';
+import { COLORS } from '@/app/constants/theme';
+import { FontAwesome5 } from '@expo/vector-icons';
 
 export default function ProfileEdit() {
   const insets = useSafeAreaInsets();
+  
+  // Get user details from Redux store
+  const userDetails = useSelector(selectUserDetails);
+  const userDetailsStatus = useSelector(selectUserDetailsStatus);
+  
+  // Local state for form fields
+  const [formData, setFormData] = useState({
+    name: '',
+    parent: '',
+    dob: '',
+    cnic: '',
+    unit: '',
+    status: '',
+    phone: '',
+    whatsApp: '',
+    email: '',
+  });
+  
+  // Update form data when userDetails changes
+  useEffect(() => {
+    if (userDetails) {
+      setFormData({
+        name: userDetails.Name || userDetails.name || '',
+        parent: userDetails.Father_Name || userDetails.parent || '',
+        dob: userDetails.Date_of_birth || userDetails.dob || '',
+        cnic: userDetails.CNIC || userDetails.cnic || '',
+        unit: userDetails.Tanzeemi_Unit?.toString() || userDetails.unit?.toString() || '',
+        status: userDetails.status || '',
+        phone: userDetails.Phone_Number || userDetails.phone || '',
+        whatsApp: userDetails.additional_phones || '',
+        email: userDetails.Email || userDetails.email || '',
+      });
+    }
+  }, [userDetails]);
 
   const handlePictureUpdate = () => {
-    // throw new Error('Function not implemented.');
+    // Image upload functionality would go here
   };
+  
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  const handleSave = () => {
+    // Save functionality would go here
+    console.log('Saving profile data:', formData);
+    router.back();
+  };
+
+  // Show loading indicator when initially loading
+  if (userDetailsStatus === 'loading' && !userDetails) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>{i18n.t('loading_profile')}</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome5 name="arrow-left" size={20} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{i18n.t('profile')}</Text>
+        </View>
 
         <View style={[{ direction: i18n.locale === 'ur' ? 'rtl' : 'ltr' }]}>
-          <Pressable onPress={handlePictureUpdate}>
-            <Image
-              source={require('@/assets/images/edit-icon-2.png')}
-              style={[{ width: 20, height: 20 }]}
-            />
-          </Pressable>
-          <View style={[styles.imageContainer, { padding: 10, alignContent: "center", alignItems: "center", marginTop: 10 }]}>
+          <View style={styles.imageContainer}>
             <Image
               source={require('@/assets/images/avatar.png')}
-              style={[styles.logo]}
+              style={styles.logo}
             />
+            <Pressable onPress={handlePictureUpdate} style={styles.editIconContainer}>
+              <FontAwesome5 name="camera" size={16} color={COLORS.white} />
+            </Pressable>
           </View>
-          <View style={[{ alignContent: "center", alignItems: "center", marginTop: 10 }]}>
-            <Text style={[styles.nameStyle, { flex: 1, flexWrap: 'wrap', alignContent: "center", alignItems: "center", justifyContent: "center" }]}>{profileData.name}</Text>
-            <View style={[{ flex: 1, flexDirection: "row", alignItems: "center", alignContent: "center" }]}>
-              {/* <Spacer height={10} width={"100%"}></Spacer> */}
-              {/* <UrduText style={{ color: "white", fontSize: 18 }}>{address}</UrduText> */}
-              <Image
-                source={require('@/assets/images/location-icon-blue.png')}
-                style={[{ height: 16, width: 16 }]}
+          
+          <View style={styles.nameContainer}>
+            <Text style={styles.nameStyle}>{formData.name}</Text>
+          </View>
+          
+          <View style={styles.formContainer}>
+            <Text style={styles.sectionTitle}>{i18n.t('personal_information')}</Text>
+            
+            <Text style={styles.textItem}>{i18n.t('name')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.name}
+              onChangeText={(value) => handleInputChange('name', value)}
+              placeholder={i18n.t('name')}
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('parent')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.parent}
+              onChangeText={(value) => handleInputChange('parent', value)}
+              placeholder={i18n.t('parent')}
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('dob')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.dob}
+              onChangeText={(value) => handleInputChange('dob', value)}
+              placeholder={i18n.t('dob')}
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('cnic')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.cnic}
+              onChangeText={(value) => handleInputChange('cnic', value)}
+              placeholder={i18n.t('cnic')}
+            />
+            
+            <Text style={styles.sectionTitle}>{i18n.t('contact_information')}</Text>
+            
+            <Text style={styles.textItem}>{i18n.t('phone_number')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.phone}
+              onChangeText={(value) => handleInputChange('phone', value)}
+              placeholder={i18n.t('phone_number')}
+              keyboardType="phone-pad"
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('whatsapp_number')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.whatsApp}
+              onChangeText={(value) => handleInputChange('whatsApp', value)}
+              placeholder={i18n.t('whatsapp_number')}
+              keyboardType="phone-pad"
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('email')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              placeholder={i18n.t('email')}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            
+            <Text style={styles.sectionTitle}>{i18n.t('tanzeemi_information')}</Text>
+            
+            <Text style={styles.textItem}>{i18n.t('unit')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.unit}
+              onChangeText={(value) => handleInputChange('unit', value)}
+              placeholder={i18n.t('unit')}
+            />
+            
+            <Text style={styles.textItem}>{i18n.t('status')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.status}
+              onChangeText={(value) => handleInputChange('status', value)}
+              placeholder={i18n.t('status')}
+            />
+            
+            <View style={styles.buttonContainer}>
+              <CustomButton
+                text={i18n.t('save')}
+                onPress={handleSave}
+                viewStyle={styles.saveButton}
               />
-              <Text style={[{ flexWrap: 'wrap' }]}>{profileData.address}</Text>
             </View>
-          </View>
-          <View style={[{ flexDirection: "column", flex: 1 }]}>
-            <Text style={[styles.textItem]}>
-              {i18n.t("parent")}
-            </Text>
-            <TextInput>
-              {profileData.parent}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("dob")}
-            </Text>
-            <TextInput>
-              {profileData.dob}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("cnic")}
-            </Text>
-            <TextInput>
-              {profileData.cnic}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("unit")}
-            </Text>
-            <TextInput>
-              {profileData.unit}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("status")}
-            </Text>
-            <TextInput>
-              {profileData.status}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("phone_number")}
-            </Text>
-            <TextInput>
-              {profileData.phone}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("whatsapp_number")}
-            </Text>
-            <TextInput>
-              {profileData.whatsApp}
-            </TextInput>
-            <Text style={[styles.textItem]}>
-              {i18n.t("email")}
-            </Text>
-            <TextInput>
-              {profileData.email}
-            </TextInput>
           </View>
         </View>
       </ScrollView>
@@ -105,36 +196,107 @@ export default function ProfileEdit() {
 }
 
 const styles = StyleSheet.create({
-  imageContainer: {
-    // backgroundColor: '#F3F3F3',
-    // borderRadius: 15,
-    // alignItems: 'center', // Center the image
-    // marginTop: -30, // To overlap slightly above the header (optional)
-  },
-  logo: {
-    width: 122, // Adjust your image size
-    height: 122, // Adjust your image size
-    resizeMode: 'contain', // Ensure it fits inside the container
-    borderColor: '#0BA241',
-    borderWidth: 1,
-    borderRadius: 65,
-    padding: 2,
-    margin: 10
-  },
-  nameStyle: {
-    color: '#008CFF',
-    fontSize: 28,
-    // marginStart: 0,
-  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginLeft: 10,
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+    position: 'relative',
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  editIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: '35%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  nameContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  nameStyle: {
+    color: COLORS.primary,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  formContainer: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginTop: 20,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    paddingBottom: 5,
+  },
   textItem: {
-    color: '#000000',
+    color: COLORS.textSecondary,
     fontFamily: "JameelNooriNastaleeq",
     fontSize: 16,
-    marginVertical: 5,
-  }
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: '#F9F9F9',
+  },
+  buttonContainer: {
+    marginTop: 30,
+    marginBottom: 20,
+  },
+  saveButton: {
+    backgroundColor: COLORS.primary,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
 });

@@ -34,6 +34,8 @@ interface PersonsExtraState {
   nazimDetails: Person | null;
   nazimDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   nazimDetailsError: string | null;
+  selectedPersonStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  selectedPersonError: string | null;
   contactTypes: ContactType[];
   contactTypesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   contactTypesError: string | null;
@@ -54,6 +56,8 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   nazimDetails: null,
   nazimDetailsStatus: 'idle',
   nazimDetailsError: null,
+  selectedPersonStatus: 'idle',
+  selectedPersonError: null,
   contactTypes: [],
   contactTypesStatus: 'idle',
   contactTypesError: null,
@@ -218,29 +222,66 @@ export const fetchPersonByEmail = createAsyncThunk<
       const url = `/items/Person`;
       const params = new URLSearchParams();
       params.append('filter[Email][_eq]', normalizedEmail);
+      // Request all fields to ensure we have complete user details
       params.append('fields', '*');
       
-      const response = await apiRequest<PersonResponse>(
-        `${url}?${params.toString()}`,
-        'GET',
-        accessToken
-      );
-      console.log('Fetching person response by email:', Platform.OS, response);
+      try {
+        const response = await apiRequest<PersonResponse>(
+          `${url}?${params.toString()}`,
+          'GET',
+          accessToken
+        );
+        console.log('Fetching person response by email:', Platform.OS, response);
 
-      if (!response.data || response.data.length === 0) {
-        console.log(`No person found with email ${normalizedEmail}`);
-        return null;
+        if (!response.data || response.data.length === 0) {
+          console.log(`No person found with email ${normalizedEmail}`);
+          return null;
+        }
+        
+        // Normalize the person data to ensure consistent field names
+        return normalizePersonData(response.data[0]);
+      } catch (apiError: any) {
+        // Handle specific API errors
+        if (apiError.message?.includes('401') || apiError.message?.includes('Unauthorized')) {
+          throw new Error('Authentication error. Please log in again.');
+        }
+        if (apiError.message?.includes('403') || apiError.message?.includes('Forbidden')) {
+          throw new Error('You do not have permission to access this data.');
+        }
+        if (apiError.message?.includes('404') || apiError.message?.includes('Not Found')) {
+          console.log(`Person with email ${normalizedEmail} not found`);
+          return null;
+        }
+        if (apiError.message?.includes('500')) {
+          throw new Error('Server error. Please try again later.');
+        }
+        
+        // Rethrow other errors
+        throw apiError;
       }
-      return normalizePersonData(response.data[0]);
     };
 
     const person = await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
+    
+    // If we have a person with a Tanzeemi Unit, fetch the unit details
     if (person && (person.Tanzeemi_Unit || person.unit)) {
       const unitId = person.Tanzeemi_Unit || person.unit;
       if (typeof unitId === 'number') {
-        dispatch(fetchUserTanzeemiUnit(unitId));
+        try {
+          // Fetch unit details but don't block the person data return
+          dispatch(fetchUserTanzeemiUnit(unitId));
+        } catch (unitError) {
+          console.error('Error fetching Tanzeemi Unit:', unitError);
+          // Continue even if unit fetch fails
+        }
       }
     }
+    
+    // Set userDetails in the state
+    if (person) {
+      dispatch(setUserDetails(person));
+    }
+    
     return person;
   } catch (error: any) {
     console.error('Fetch person by email error:', error);
@@ -377,6 +418,44 @@ export const updatePersonImage = createAsyncThunk<
  * This function fetches the person details for a Nazim from the Person table
  * by matching the Nazim_id with the person.id
  */
+/**
+ * Fetch a person by ID
+ * This function fetches the details of a specific person from the Person table
+ * by their ID
+ */
+export const fetchPersonById = createAsyncThunk<
+  Person,
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchById', async (personId, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log(`Fetching person details for ID: ${personId}`);
+    
+    // Refresh token if needed
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    
+    const auth = selectAuthState(getState());
+    const token = auth.tokens?.accessToken;
+    if (!token) return rejectWithValue('No access token');
+    
+    const fetchPerson = async (accessToken: string) => {
+      const response = await apiRequest<SinglePersonResponse>(
+        `/items/Person/${personId}?fields=*`,
+        'GET',
+        accessToken
+      );
+      
+      if (!response.data) throw new Error(`Failed to fetch person with ID ${personId}`);
+      return normalizePersonData(response.data);
+    };
+    
+    return await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
+  } catch (error: any) {
+    console.error('Fetch person by ID error:', error);
+    return rejectWithValue(error.message || `Failed to fetch person with ID ${personId}`);
+  }
+});
+
 export const fetchNazimDetails = createAsyncThunk<
   Person,
   TanzeemiUnit | number,
@@ -484,6 +563,20 @@ const personsSlice = createSlice({
       state.updateStatus = 'idle';
       state.updateError = null;
     },
+    // Add a new action to set user details directly
+    setUserDetails(state, action: PayloadAction<Person>) {
+      state.userDetails = action.payload;
+      state.userDetailsStatus = 'succeeded';
+      state.userDetailsError = null;
+      // Also add to the entities collection
+      personsAdapter.upsertOne(state, action.payload);
+    },
+    // Add an action to clear user details (useful for logout)
+    clearUserDetails(state) {
+      state.userDetails = null;
+      state.userDetailsStatus = 'idle';
+      state.userDetailsError = null;
+    },
   },
   extraReducers: builder => {
     builder
@@ -506,10 +599,15 @@ const personsSlice = createSlice({
         state.userDetailsError = null;
       })
       .addCase(fetchPersonByEmail.fulfilled, (state, action: PayloadAction<Person | null>) => {
-        state.userDetailsStatus = 'succeeded';
-        state.userDetails = action.payload;
         if (action.payload) {
+          state.userDetailsStatus = 'succeeded';
+          state.userDetails = action.payload;
           personsAdapter.upsertOne(state, action.payload);
+        } else {
+          // If no person was found, set error state
+          state.userDetailsStatus = 'failed';
+          state.userDetailsError = 'User details not found';
+          state.userDetails = null;
         }
       })
       .addCase(fetchPersonByEmail.rejected, (state, action) => {
@@ -582,11 +680,30 @@ const personsSlice = createSlice({
       .addCase(fetchContactTypes.rejected, (state, action) => {
         state.contactTypesStatus = 'failed';
         state.contactTypesError = action.payload ?? 'Failed to fetch contact types';
+      })
+      // Fetch Person by ID
+      .addCase(fetchPersonById.pending, (state) => {
+        state.selectedPersonStatus = 'loading';
+        state.selectedPersonError = null;
+      })
+      .addCase(fetchPersonById.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.selectedPersonStatus = 'succeeded';
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(fetchPersonById.rejected, (state, action) => {
+        state.selectedPersonStatus = 'failed';
+        state.selectedPersonError = action.payload ?? 'Failed to fetch person details';
       });
   },
 });
 
-export const { clearPersons, resetCreateStatus, resetUpdateStatus } = personsSlice.actions;
+export const { 
+  clearPersons, 
+  resetCreateStatus, 
+  resetUpdateStatus,
+  setUserDetails,
+  clearUserDetails
+} = personsSlice.actions;
 
 // Selectors
 const selectPersonsState = (state: RootState): PersonsState =>

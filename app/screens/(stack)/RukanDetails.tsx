@@ -1,20 +1,21 @@
-// app/screens/ProfileView.tsx
-import React from 'react';
+// app/screens/(stack)/RukanDetails.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
-  StyleProp,
-  ViewStyle,
+  Text,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation, router } from 'expo-router';
-import { useDispatch } from 'react-redux';
+import { useFocusEffect, useNavigation, router, useLocalSearchParams } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
 
-
-import { profileData } from '@/app/data/profile';
 import { logout } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store';
+import { selectPersonById } from '@/app/features/persons/personSlice';
+import { COLORS } from '@/app/constants/theme';
 
 import CustomButton from '@/app/components/CustomButton';
 import CustomDropdown from '@/app/components/CustomDropdown';
@@ -27,11 +28,11 @@ import i18n from '@/app/i18n';
 /* ──────────────────────
    Helper for read-only text fields
    ────────────────────── */
-const StaticField = (label: string, value: string) => (
+const StaticField = (label: string, value: string | undefined | null) => (
   <FormInput
     key={label}
     inputTitle={label}
-    value={value}
+    value={value || 'N/A'}
     onChange={() => {}}
     editable={false}
   />
@@ -46,21 +47,65 @@ export default function RukanDetails() {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
+  const params = useLocalSearchParams();
+  const personId = params.id as string;
+  
+  // Get person details from Redux store
+  const personDetails = useSelector((state: any) => selectPersonById(state, personId));
+  
+  // Local state
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(!personDetails);
 
-  const handleLogout = () => {
-    dispatch(logout())
-      .then(() => {
-        router.replace('/screens/LoginScreen');
-      })
-      .catch((err) => {
-        console.error('Error during logout:', err);
-        router.replace('/screens/LoginScreen');
-      });
+  // Format date if available
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return dateString;
+    }
+  };
+  
+  // Refresh person details
+  const refreshPersonDetails = async () => {
+    setRefreshing(true);
+    // Here you would dispatch an action to fetch the person details
+    // For now, we'll just simulate a delay
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   };
   
   useFocusEffect(() => {
     navigation.setOptions({ headerShown: false });
   });
+
+  // Show loading indicator when initially loading
+  if (loading && !personDetails) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>{i18n.t('loading_profile')}</Text>
+      </View>
+    );
+  }
+
+  // Show empty state if no person details
+  if (!personDetails) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>{i18n.t('no_profile_data')}</Text>
+        <CustomButton
+          text={i18n.t('go_back')}
+          onPress={() => router.back()}
+          viewStyle={styles.backButton}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -68,7 +113,8 @@ export default function RukanDetails() {
       <ProfileHeader
         title={i18n.t('profile')}
         backgroundSource={COMMON_IMAGES.profileBackground}
-      
+        avatarSource={require('@/assets/images/avatar.png')}
+        showCamera={false}
       />
 
       {/*──────────── Content ────────────*/}
@@ -76,36 +122,46 @@ export default function RukanDetails() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollWrapper}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refreshPersonDetails}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
       >
-        <UrduText style={styles.personName}>{profileData.name}</UrduText>
-        <UrduText style={styles.personSub}>{profileData.parent}</UrduText>
+        <UrduText style={styles.personName}>{personDetails.Name || personDetails.name || ''}</UrduText>
+        <UrduText style={styles.personSub}>{personDetails.Father_Name || personDetails.parent || ''}</UrduText>
 
-        {StaticField(i18n.t('name'), profileData.name)}
-        {StaticField(i18n.t('parent'), profileData.parent)}
-        {StaticField(i18n.t('dob'), profileData.dob)}
-        {StaticField(i18n.t('cnic'), profileData.cnic)}
-        {StaticField(i18n.t('unit'), profileData.unit)}
-        {StaticField(i18n.t('status'), profileData.status)}
-        {StaticField(i18n.t('phone_number'), profileData.phone)}
-        {StaticField(i18n.t('whatsapp_number'), profileData.whatsApp)}
-        {StaticField(i18n.t('email'), profileData.email)}
+        {personDetails.Name && StaticField(i18n.t('name'), personDetails.Name || personDetails.name)}
+        {personDetails.Father_Name && StaticField(i18n.t('parent'), personDetails.Father_Name || personDetails.parent)}
+        {personDetails.Date_of_birth && StaticField(i18n.t('dob'), formatDate(personDetails.Date_of_birth || personDetails.dob))}
+        {personDetails.CNIC && StaticField(i18n.t('cnic'), personDetails.CNIC || personDetails.cnic)}
+        {personDetails.Tanzeemi_Unit && StaticField(i18n.t('unit'), personDetails.Tanzeemi_Unit?.toString() || personDetails.unit?.toString())}
+        {personDetails.status && StaticField(i18n.t('status'), personDetails.status)}
+        {personDetails.Phone_Number && StaticField(i18n.t('phone_number'), personDetails.Phone_Number || personDetails.phone)}
+        {personDetails.additional_phones && StaticField(i18n.t('whatsapp_number'), personDetails.additional_phones)}
+        {personDetails.Email && StaticField(i18n.t('email'), personDetails.Email || personDetails.email)}
+        
+        {/* Additional fields */}
+        {personDetails.Rukn_No && StaticField(i18n.t('rukn_no'), personDetails.Rukn_No.toString())}
+        {personDetails.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(personDetails.Rukinat_Date))}
+        {personDetails.Profession && StaticField(i18n.t('profession'), personDetails.Profession)}
+        {personDetails.Education && StaticField(i18n.t('education'), personDetails.Education)}
+        {personDetails.Gender && StaticField(i18n.t('gender'), 
+          personDetails.Gender === 'm' ? i18n.t('male') : 
+          personDetails.Gender === 'f' ? i18n.t('female') : 
+          personDetails.Gender
+        )}
 
-        <CustomDropdown
-          dropdownTitle={i18n.t('language')}
-          placeholder={i18n.t('language')}
-          onSelect={() => {}}
-          options={[
-            { id: 'ur', label: 'اردو', value: 'ur' },
-            { id: 'en', label: 'English', value: 'en' },
-          ]}
-        />
-
-        <CustomButton
-          text={i18n.t('logout')}
-          onPress={handleLogout}
-          viewStyle={[styles.logoutBtn]}
-          textStyle={[styles.logoutBtnText]}
-        />
+        <View style={styles.buttonContainer}>
+          <CustomButton
+            text={i18n.t('go_back')}
+            onPress={() => router.back()}
+            viewStyle={styles.backButton}
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -133,7 +189,7 @@ const styles = StyleSheet.create({
   /* text */
   personName: {
     fontSize: 28,
-    color: '#008CFF',
+    color: COLORS.primary,
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -145,13 +201,34 @@ const styles = StyleSheet.create({
   },
 
   /* buttons */
-  logoutBtn: {
-    backgroundColor: '#EA5455',
-    marginTop: 32,
-    alignSelf: 'center',
-    color: '#fff',
+  buttonContainer: {
+    marginTop: 30,
+    marginBottom: 20,
   },
-  logoutBtnText: {
-    color: '#fff',
+  backButton: {
+    backgroundColor: COLORS.primary,
+    marginTop: 20,
+  },
+  
+  /* loading and error states */
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: 20,
   },
 });
