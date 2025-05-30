@@ -1,13 +1,13 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import { selectAuthState, isTokenExpiredOrExpiring, refresh, checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
+import { selectAuthState } from '../auth/authSlice';
 import { fetchUserTanzeemiUnit } from '../tanzeem/tanzeemSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
 import { uploadImage } from '@/app/utils/imageUpload';
-import { API_BASE_URL } from '@/app/constants/api';
 import { Platform } from 'react-native';
 import { TanzeemiUnit } from '@/app/models/TanzeemiUnit';
+import apiRequest, { directApiRequest } from '../../services/apiClient';
 
 interface ContactType {
   id: number;
@@ -34,6 +34,8 @@ interface PersonsExtraState {
   nazimDetails: Person | null;
   nazimDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   nazimDetailsError: string | null;
+  selectedPersonStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  selectedPersonError: string | null;
   contactTypes: ContactType[];
   contactTypesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   contactTypesError: string | null;
@@ -54,87 +56,17 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   nazimDetails: null,
   nazimDetailsStatus: 'idle',
   nazimDetailsError: null,
+  selectedPersonStatus: 'idle',
+  selectedPersonError: null,
   contactTypes: [],
   contactTypesStatus: 'idle',
   contactTypesError: null,
 });
 
-// Helper function for API requests
-const apiRequest = async <T>(url: string, method: string, token: string, body?: any): Promise<T> => {
-  const headers: HeadersInit = {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+// We use the centralized apiRequest function from services/apiClient
 
-  const options: RequestInit = {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  };
-
-  // Ensure URL is properly formatted
-  const requestUrl = `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
-  console.log(`Making ${method} request to: ${requestUrl}`, Platform.OS);
-  
-  const response = await fetch(requestUrl, options);
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API Error:', errorText, Platform.OS);
-    throw new Error(errorText || `Request failed with status ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-};
-
-// Helper function for token refresh with improved error handling
-const executeWithTokenRefresh = async <T>(
-  apiCall: (token: string) => Promise<T>,
-  token: string,
-  dispatch: AppDispatch,
-  getState: () => RootState
-): Promise<T> => {
-  try {
-    // First, check if token is about to expire and refresh if needed
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    
-    // Get the latest token after potential refresh
-    const auth = selectAuthState(getState());
-    const currentToken = auth.tokens?.accessToken || token;
-    
-    // Try the API call with the current token
-    return await apiCall(currentToken);
-  } catch (err: any) {
-    // If the error is due to token expiration
-    const auth = selectAuthState(getState());
-    const isTokenError = 
-      err?.response?.status === 401 || 
-      (err?.errors && err?.errors[0]?.message === 'Token expired.') ||
-      err?.message?.includes('401') ||
-      err?.message?.includes('Token expired');
-    
-    if (isTokenError && auth.tokens?.refreshToken) {
-      console.log('Token expired during API call in personSlice. Attempting to refresh...');
-      
-      try {
-        // Try to refresh the token
-        const { tokens } = await dispatch(refresh()).unwrap();
-        if (!tokens?.accessToken) throw new Error('Token refresh failed');
-        
-        console.log('Token refreshed successfully in personSlice. Retrying API call...');
-        // Retry the API call with the new token
-        return await apiCall(tokens.accessToken);
-      } catch (refreshError: any) {
-        console.error('Failed to refresh token in personSlice:', refreshError);
-        // If refresh fails, log the user out
-        dispatch(logout());
-        throw new Error('Authentication expired. Please log in again.');
-      }
-    }
-    
-    // If it's not a token issue or refresh failed, rethrow the original error
-    throw new Error(String(err?.message ?? err));
-  }
-};
+// We no longer need the executeWithTokenRefresh function here
+// Token refresh is now handled centrally by the auth middleware and apiClient
 
 // Fetch persons by Tanzeemi Unit IDs
 export const fetchPersonsByUnit = createAsyncThunk<
@@ -143,11 +75,6 @@ export const fetchPersonsByUnit = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchByUnit', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
     const { tanzeem } = getState();
     const tanzeemiUnitIds = tanzeem?.userUnitHierarchyIds ?? [];
     if (!tanzeemiUnitIds.length) {
@@ -161,37 +88,34 @@ export const fetchPersonsByUnit = createAsyncThunk<
     params.append('sort', 'id');
     params.append('fields', '*');
     
-    console.log('Fetching persons by unit:', Platform.OS, 'Unit IDs:', tanzeemiUnitIds);
+    console.log(`[Persons] Fetching persons by unit (${Platform.OS}), Unit IDs:`, tanzeemiUnitIds);
 
-    const fetchPersons = async (accessToken: string) => {
-      // Construct the URL with proper encoding
-      const url = `/items/Person`;
-      const queryString = params.toString();
-      
-      console.log('API request URL:', `${url}?${queryString}`);
-      
-      const response = await apiRequest<PersonResponse>(
-        `${url}?${queryString}`,
-        'GET',
-        accessToken
-      );
-      if (!response.data) throw new Error('Failed to fetch persons');
-      const transformedData = normalizePersonDataArray(response.data);
+    // Construct the URL with proper encoding
+    const url = `/items/Person`;
+    const queryString = params.toString();
+    
+    console.log(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
+    
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<PersonResponse>(
+      `${url}?${queryString}`,
+      'GET'
+    );
+    
+    if (!response.data) throw new Error('Failed to fetch persons');
+    const transformedData = normalizePersonDataArray(response.data);
 
-      // Fetch unit details for each person
-      transformedData.forEach(person => {
-        const unitId = person.Tanzeemi_Unit || person.unit;
-        if (typeof unitId === 'number') {
-          dispatch(fetchUserTanzeemiUnit(unitId));
-        }
-      });
+    // Fetch unit details for each person
+    transformedData.forEach(person => {
+      const unitId = person.Tanzeemi_Unit || person.unit;
+      if (typeof unitId === 'number') {
+        dispatch(fetchUserTanzeemiUnit(unitId));
+      }
+    });
 
-      return transformedData;
-    };
-
-    return await executeWithTokenRefresh(fetchPersons, token, dispatch, getState);
+    return transformedData;
   } catch (error: any) {
-    console.error('Fetch persons error:', error);
+    console.error(`[Persons] Fetch persons error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch persons');
   }
 });
@@ -203,47 +127,121 @@ export const fetchPersonByEmail = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchByEmail', async (email, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchPerson = async (accessToken: string) => {
-      // Normalize the email to lowercase to ensure consistent handling across platforms
-      const normalizedEmail = email.trim().toLowerCase();
-      
-      console.log('Fetching person by email:', Platform.OS, normalizedEmail);
-      
-      // Construct the URL with proper encoding and use a more robust approach
-      const url = `/items/Person`;
-      const params = new URLSearchParams();
-      params.append('filter[Email][_eq]', normalizedEmail);
-      params.append('fields', '*');
-      
-      const response = await apiRequest<PersonResponse>(
-        `${url}?${params.toString()}`,
-        'GET',
-        accessToken
+    // Normalize the email to lowercase to ensure consistent handling across platforms
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    console.log(`[Persons] Fetching person by email: ${normalizedEmail} (${Platform.OS})`);
+    
+    // Construct the URL with proper encoding and use a more robust approach
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+    const endpoint = '/items/Person';
+    const filter = encodeURIComponent(`{"Email":{"_eq":"${normalizedEmail}"}}`);
+    const fields = encodeURIComponent('*');
+    const fullUrl = `${baseUrl}${endpoint}?filter=${filter}&fields=${fields}`;
+    
+    console.log(`[Persons] Making request to: ${fullUrl} (${Platform.OS})`);
+    
+    try {
+      // First try with directApiRequest which uses fetch directly
+      const response = await directApiRequest<PersonResponse>(
+        `${endpoint}?filter=${filter}&fields=${fields}`,
+        'GET'
       );
-      console.log('Fetching person response by email:', Platform.OS, response);
+      
+      console.log(`[Persons] Fetching person response by email (${Platform.OS})`, response);
 
       if (!response.data || response.data.length === 0) {
-        console.log(`No person found with email ${normalizedEmail}`);
+        console.log(`[Persons] No person found with email ${normalizedEmail} (${Platform.OS})`);
         return null;
       }
-      return normalizePersonData(response.data[0]);
-    };
-
-    const person = await executeWithTokenRefresh(fetchPerson, token, dispatch, getState);
-    if (person && (person.Tanzeemi_Unit || person.unit)) {
-      const unitId = person.Tanzeemi_Unit || person.unit;
-      if (typeof unitId === 'number') {
-        dispatch(fetchUserTanzeemiUnit(unitId));
+      
+      // Normalize the person data to ensure consistent field names
+      const person = normalizePersonData(response.data[0]);
+      
+      // If we have a person with a Tanzeemi Unit, fetch the unit details
+      if (person && (person.Tanzeemi_Unit || person.unit)) {
+        const unitId = person.Tanzeemi_Unit || person.unit;
+        if (typeof unitId === 'number') {
+          try {
+            // Fetch unit details but don't block the person data return
+            dispatch(fetchUserTanzeemiUnit(unitId));
+          } catch (unitError) {
+            console.error(`[Persons] Error fetching Tanzeemi Unit: ${unitError} (${Platform.OS})`);
+            // Continue even if unit fetch fails
+          }
+        }
+      }
+      
+      // Set userDetails in the state
+      if (person) {
+        dispatch(setUserDetails(person));
+      }
+      
+      return person;
+    } catch (apiError: any) {
+      console.warn(`[Persons] First attempt failed: ${apiError.message} (${Platform.OS})`);
+      
+      // If the first attempt fails, try a fallback approach with apiRequest
+      try {
+        console.log(`[Persons] Trying fallback approach... (${Platform.OS})`);
+        
+        const params = new URLSearchParams();
+        params.append('filter[Email][_eq]', normalizedEmail);
+        params.append('fields', '*');
+        
+        const response = await apiRequest<PersonResponse>(() => ({
+          path: `/items/Person?${params.toString()}`,
+          method: 'GET'
+        }));
+        
+        console.log(`[Persons] Fallback response: (${Platform.OS})`, response);
+        
+        if (!response.data || response.data.length === 0) {
+          console.log(`[Persons] No person found with email ${normalizedEmail} in fallback (${Platform.OS})`);
+          return null;
+        }
+        
+        // Normalize the person data to ensure consistent field names
+        const person = normalizePersonData(response.data[0]);
+        
+        // If we have a person with a Tanzeemi Unit, fetch the unit details
+        if (person && (person.Tanzeemi_Unit || person.unit)) {
+          const unitId = person.Tanzeemi_Unit || person.unit;
+          if (typeof unitId === 'number') {
+            dispatch(fetchUserTanzeemiUnit(unitId));
+          }
+        }
+        
+        // Set userDetails in the state
+        if (person) {
+          dispatch(setUserDetails(person));
+        }
+        
+        return person;
+      } catch (fallbackError: any) {
+        console.error(`[Persons] Fallback attempt also failed: ${fallbackError.message} (${Platform.OS})`);
+        
+        // Handle specific API errors
+        if (fallbackError.message?.includes('401') || fallbackError.message?.includes('Unauthorized')) {
+          throw new Error('Authentication error. Please log in again.');
+        }
+        if (fallbackError.message?.includes('403') || fallbackError.message?.includes('Forbidden')) {
+          throw new Error('You do not have permission to access this data.');
+        }
+        if (fallbackError.message?.includes('404') || fallbackError.message?.includes('Not Found')) {
+          console.log(`[Persons] Person with email ${normalizedEmail} not found (${Platform.OS})`);
+          return null;
+        }
+        if (fallbackError.message?.includes('500')) {
+          throw new Error('Server error. Please try again later.');
+        }
+        
+        // Rethrow other errors
+        throw fallbackError;
       }
     }
-    return person;
   } catch (error: any) {
-    console.error('Fetch person by email error:', error);
+    console.error(`[Persons] Fetch person by email error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to fetch person with email ${email}`);
   }
 });
@@ -255,11 +253,6 @@ export const createPerson = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/create', async (personData, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
     const apiPersonData = {
       Name: personData.name,
       Address: personData.address,
@@ -273,20 +266,17 @@ export const createPerson = createAsyncThunk<
       Gender: 'm',
     };
 
-    const createPersonRequest = async (accessToken: string) => {
-      const response = await apiRequest<SinglePersonResponse>(
-        '/items/Person',
-        'POST',
-        accessToken,
-        apiPersonData
-      );
-      if (!response.data) throw new Error('Failed to create person');
-      return normalizePersonData(response.data);
-    };
-
-    return await executeWithTokenRefresh(createPersonRequest, token, dispatch, getState);
+    // Use the centralized apiRequest function which handles token refresh automatically
+    const response = await apiRequest<SinglePersonResponse>(() => ({
+      path: '/items/Person',
+      method: 'POST',
+      body: apiPersonData
+    }));
+    
+    if (!response.data) throw new Error('Failed to create person');
+    return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error('Create person error:', error);
+    console.error(`[Persons] Create person error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to create person');
   }
 });
@@ -298,11 +288,6 @@ export const updatePerson = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/update', async (personData, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
     const { id, ...updateData } = personData;
     const apiPersonData: Record<string, any> = {};
     if (updateData.name !== undefined) apiPersonData.Name = updateData.name;
@@ -315,20 +300,17 @@ export const updatePerson = createAsyncThunk<
     if (updateData.unit !== undefined) apiPersonData.Tanzeemi_Unit = updateData.unit;
     if (updateData.status !== undefined) apiPersonData.status = updateData.status;
 
-    const updatePersonRequest = async (accessToken: string) => {
-      const response = await apiRequest<SinglePersonResponse>(
-        `/items/Person/${id}`,
-        'PATCH',
-        accessToken,
-        apiPersonData
-      );
-      if (!response.data) throw new Error(`Failed to update person with ID ${id}`);
-      return normalizePersonData(response.data);
-    };
-
-    return await executeWithTokenRefresh(updatePersonRequest, token, dispatch, getState);
+    // Use the centralized apiRequest function which handles token refresh automatically
+    const response = await apiRequest<SinglePersonResponse>(() => ({
+      path: `/items/Person/${id}`,
+      method: 'PATCH',
+      body: apiPersonData
+    }));
+    
+    if (!response.data) throw new Error(`Failed to update person with ID ${id}`);
+    return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error('Update person error:', error);
+    console.error(`[Persons] Update person error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to update person with ID ${personData.id}`);
   }
 });
@@ -346,28 +328,29 @@ export const updatePersonImage = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/updateImage', async ({ id, imageUri, onProgress }, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    // Get the current token for image upload
     const auth = selectAuthState(getState());
     const token = auth.tokens?.accessToken;
     if (!token) return rejectWithValue('No access token');
-
-    const updatePersonImageRequest = async (accessToken: string) => {
-      const fileId = await uploadImage(imageUri, accessToken, onProgress);
-      if (!fileId) throw new Error('Failed to upload image');
-      const apiPersonData = { picture: fileId };
-      const response = await apiRequest<SinglePersonResponse>(
-        `/items/Person/${id}`,
-        'PATCH',
-        accessToken,
-        apiPersonData
-      );
-      if (!response.data) throw new Error(`Failed to update person image with ID ${id}`);
-      return normalizePersonData(response.data);
-    };
-
-    return await executeWithTokenRefresh(updatePersonImageRequest, token, dispatch, getState);
+    
+    // Upload the image first
+    const fileId = await uploadImage(imageUri, token, onProgress);
+    if (!fileId) throw new Error('Failed to upload image');
+    
+    // Then update the person record with the new image ID
+    const apiPersonData = { picture: fileId };
+    
+    // Use the centralized apiRequest function which handles token refresh automatically
+    const response = await apiRequest<SinglePersonResponse>(() => ({
+      path: `/items/Person/${id}`,
+      method: 'PATCH',
+      body: apiPersonData
+    }));
+    
+    if (!response.data) throw new Error(`Failed to update person image with ID ${id}`);
+    return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error('Update person image error:', error);
+    console.error(`[Persons] Update person image error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to update image for person with ID ${id}`);
   }
 });
@@ -377,20 +360,40 @@ export const updatePersonImage = createAsyncThunk<
  * This function fetches the person details for a Nazim from the Person table
  * by matching the Nazim_id with the person.id
  */
+/**
+ * Fetch a person by ID
+ * This function fetches the details of a specific person from the Person table
+ * by their ID
+ */
+export const fetchPersonById = createAsyncThunk<
+  Person,
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchById', async (personId, { getState, dispatch, rejectWithValue }) => {
+  try {
+    console.log(`[Persons] Fetching person details for ID: ${personId} (${Platform.OS})`);
+    
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SinglePersonResponse>(
+      `/items/Person/${personId}?fields=*`,
+      'GET'
+    );
+    
+    if (!response.data) throw new Error(`Failed to fetch person with ID ${personId}`);
+    return normalizePersonData(response.data);
+  } catch (error: any) {
+    console.error(`[Persons] Fetch person by ID error: ${error.message} (${Platform.OS})`);
+    return rejectWithValue(error.message || `Failed to fetch person with ID ${personId}`);
+  }
+});
+
 export const fetchNazimDetails = createAsyncThunk<
   Person,
   TanzeemiUnit | number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchNazimDetails', async (unitOrNazimId, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching Nazim details...');
-    
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
+    console.log(`[Persons] Fetching Nazim details... (${Platform.OS})`);
     
     // Extract Nazim_id from the unit object or use the provided ID directly
     let nazimId: number;
@@ -403,25 +406,21 @@ export const fetchNazimDetails = createAsyncThunk<
       }
     }
     
-    console.log(`Fetching Nazim details for Nazim_id: ${nazimId}`);
+    console.log(`[Persons] Fetching Nazim details for Nazim_id: ${nazimId} (${Platform.OS})`);
     
-    const fetchNazim = async (accessToken: string) => {
-      const response = await apiRequest<SinglePersonResponse>(
-        `/items/Person/${nazimId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for Nazim details:', response);
-      if (!response.data) throw new Error(`Person with ID ${nazimId} not found`);
-      
-      // Transform the API response to match our expected format
-      return normalizePersonData(response.data);
-    };
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SinglePersonResponse>(
+      `/items/Person/${nazimId}?fields=*`,
+      'GET'
+    );
     
-    return await executeWithTokenRefresh(fetchNazim, token, dispatch, getState);
+    console.log(`[Persons] API Response for Nazim details (${Platform.OS})`, response);
+    if (!response.data) throw new Error(`Person with ID ${nazimId} not found`);
+    
+    // Transform the API response to match our expected format
+    return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error('Fetch Nazim details error:', error);
+    console.error(`[Persons] Fetch Nazim details error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch Nazim details');
   }
 });
@@ -433,26 +432,20 @@ export const fetchContactTypes = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchContactTypes', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchContactTypesRequest = async (accessToken: string) => {
-      const response = await apiRequest<{ data: ContactType[] }>(
-        '/items/contact_type',
-        'GET',
-        accessToken
-      );
-      console.log('Fetching contact types response:-------------------------------->>>>>>>>', response);
-      
-      if (!response.data) throw new Error('Failed to fetch contact types');
-      return response.data;
-    };
-
-    return await executeWithTokenRefresh(fetchContactTypesRequest, token, dispatch, getState);
+    console.log(`[Persons] Fetching contact types... (${Platform.OS})`);
+    
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<{ data: ContactType[] }>(
+      '/items/contact_type',
+      'GET'
+    );
+    
+    console.log(`[Persons] Fetching contact types response (${Platform.OS})`);
+    
+    if (!response.data) throw new Error('Failed to fetch contact types');
+    return response.data;
   } catch (error: any) {
-    console.error('Fetch contact types error:', error);
+    console.error(`[Persons] Fetch contact types error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch contact types');
   }
 });
@@ -484,6 +477,20 @@ const personsSlice = createSlice({
       state.updateStatus = 'idle';
       state.updateError = null;
     },
+    // Add a new action to set user details directly
+    setUserDetails(state, action: PayloadAction<Person>) {
+      state.userDetails = action.payload;
+      state.userDetailsStatus = 'succeeded';
+      state.userDetailsError = null;
+      // Also add to the entities collection
+      personsAdapter.upsertOne(state, action.payload);
+    },
+    // Add an action to clear user details (useful for logout)
+    clearUserDetails(state) {
+      state.userDetails = null;
+      state.userDetailsStatus = 'idle';
+      state.userDetailsError = null;
+    },
   },
   extraReducers: builder => {
     builder
@@ -506,10 +513,15 @@ const personsSlice = createSlice({
         state.userDetailsError = null;
       })
       .addCase(fetchPersonByEmail.fulfilled, (state, action: PayloadAction<Person | null>) => {
-        state.userDetailsStatus = 'succeeded';
-        state.userDetails = action.payload;
         if (action.payload) {
+          state.userDetailsStatus = 'succeeded';
+          state.userDetails = action.payload;
           personsAdapter.upsertOne(state, action.payload);
+        } else {
+          // If no person was found, set error state
+          state.userDetailsStatus = 'failed';
+          state.userDetailsError = 'User details not found';
+          state.userDetails = null;
         }
       })
       .addCase(fetchPersonByEmail.rejected, (state, action) => {
@@ -582,11 +594,30 @@ const personsSlice = createSlice({
       .addCase(fetchContactTypes.rejected, (state, action) => {
         state.contactTypesStatus = 'failed';
         state.contactTypesError = action.payload ?? 'Failed to fetch contact types';
+      })
+      // Fetch Person by ID
+      .addCase(fetchPersonById.pending, (state) => {
+        state.selectedPersonStatus = 'loading';
+        state.selectedPersonError = null;
+      })
+      .addCase(fetchPersonById.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.selectedPersonStatus = 'succeeded';
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(fetchPersonById.rejected, (state, action) => {
+        state.selectedPersonStatus = 'failed';
+        state.selectedPersonError = action.payload ?? 'Failed to fetch person details';
       });
   },
 });
 
-export const { clearPersons, resetCreateStatus, resetUpdateStatus } = personsSlice.actions;
+export const { 
+  clearPersons, 
+  resetCreateStatus, 
+  resetUpdateStatus,
+  setUserDetails,
+  clearUserDetails
+} = personsSlice.actions;
 
 // Selectors
 const selectPersonsState = (state: RootState): PersonsState =>

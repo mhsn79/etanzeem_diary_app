@@ -165,6 +165,8 @@
     "block_codes": "Block Codes",
     "close": "Close",
     "level": "Level",
+    "tanzeem_level": "Tanzeem Level",
+    "nazim_label": "Nazim Label",
     "access_denied": "Access Denied",
     "access_denied_message": "You don't have any access to the app. Please contact administrator.",
     "ok": "OK"

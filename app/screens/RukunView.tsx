@@ -26,8 +26,8 @@ import {
   fetchPersonById,
   updatePersonImage,
   selectPersonById,
-  selectSelectedPersonStatus,
-  selectSelectedPersonError,
+  selectPersonsStatus,
+  selectPersonsError,
 } from '@/app/features/persons/personSlice';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
@@ -67,8 +67,8 @@ export default function RukunView() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
-  const status = useAppSelector(selectSelectedPersonStatus);
-  const error = useAppSelector(selectSelectedPersonError);
+  const status = useAppSelector(selectPersonsStatus);
+  const error = useAppSelector(selectPersonsError);
 
   const displayPerson = person ?? rukun;
   

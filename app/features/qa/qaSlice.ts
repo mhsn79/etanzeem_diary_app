@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import apiRequest from '../../services/apiClient';
+import apiRequest, { directApiRequest } from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import { calculateAverageSectionProgress } from './utils';
 import {
@@ -173,63 +173,89 @@ export const initializeReportData = createAsyncThunk<
       return rejectWithValue('Authentication expired. Please log in again.');
     }
     
-    // Step 1: Check for existing draft submission
-    const filter = {
-      _and: [
-        { template_id: { _eq: params.template_id } },
-        { unit_id: { _eq: params.unit_id } },
-        { mgmt_id: { _eq: params.mgmt_id } },
-        { status: { _eq: 'draft' } }
-      ]
-    };
-    
-    console.log('Checking for existing draft submission');
-    const existingSubmissionsResponse = await apiRequest<ReportSubmission[]>(() => ({
-      path: '/items/reports_submissions',
-      method: 'GET',
-      params: { filter },
-    }));
-    console.log('Existing submissions response:', existingSubmissionsResponse);
-    
     // Initialize submission variable
     let submission: ReportSubmission;
     
-    // Step 2: Use existing submission or create a new one
-    if (existingSubmissionsResponse?.length > 0) {
-      submission = existingSubmissionsResponse[0];
-      console.log('Found existing draft submission:', submission);
+    // Step 1: If a specific submission_id was provided, fetch that submission directly
+    if (params.submission_id) {
+      console.log(`Fetching specific submission with ID: ${params.submission_id}`);
+      
+      try {
+        const submissionResponse = await directApiRequest<{ data: ReportSubmission }>(
+          `/items/reports_submissions/${params.submission_id}`,
+          'GET'
+        );
+        
+        console.log('Specific submission response:', submissionResponse);
+        
+        if (submissionResponse?.data) {
+          submission = submissionResponse.data;
+          console.log('Found specific submission:', submission);
+        } else {
+          console.error(`Submission with ID ${params.submission_id} not found`);
+          return rejectWithValue(`Submission with ID ${params.submission_id} not found`);
+        }
+      } catch (error) {
+        console.error(`Error fetching submission with ID ${params.submission_id}:`, error);
+        return rejectWithValue(`Error fetching submission with ID ${params.submission_id}`);
+      }
     } else {
-      console.log('No existing draft submission found. Creating new one.');
-      const submissionData = {
-        template_id: params.template_id,
-        unit_id: params.unit_id,
-        mgmt_id: params.mgmt_id,
-        status: 'draft',
+      // Step 1b: Check for existing draft submission if no specific ID was provided
+      const filter = {
+        _and: [
+          { template_id: { _eq: params.template_id } },
+          { unit_id: { _eq: params.unit_id } },
+          { mgmt_id: { _eq: params.mgmt_id } },
+          { status: { _eq: 'draft' } }
+        ]
       };
       
-      submission = await apiRequest<ReportSubmission>(() => ({
-        path: '/items/reports_submissions',
-        method: 'POST',
-        body: JSON.stringify(submissionData),
-        headers: { 'Content-Type': 'application/json' },
-      }));
+      console.log('Checking for existing draft submission');
+      const existingSubmissionsResponse = await directApiRequest<{ data: ReportSubmission[] }>(
+        '/items/reports_submissions',
+        'GET',
+        { filter }
+      );
       
-      if (!submission.id) {
-        console.error('New submission created but missing ID:', submission);
-        return rejectWithValue('Created submission is missing an ID');
+      console.log('Existing submissions response:', existingSubmissionsResponse);
+      
+      // Step 2: Use existing submission or create a new one
+      if (existingSubmissionsResponse?.data && existingSubmissionsResponse.data.length > 0) {
+        submission = existingSubmissionsResponse.data[0];
+        console.log('Found existing draft submission:', submission);
+      } else {
+        console.log('No existing draft submission found. Creating new one.');
+        const submissionData = {
+          template_id: params.template_id,
+          unit_id: params.unit_id,
+          mgmt_id: params.mgmt_id,
+          status: 'draft',
+        };
+        
+        submission = await apiRequest<ReportSubmission>(() => ({
+          path: '/items/reports_submissions',
+          method: 'POST',
+          body: JSON.stringify(submissionData),
+          headers: { 'Content-Type': 'application/json' },
+        }));
+        
+        if (!submission.id) {
+          console.error('New submission created but missing ID:', submission);
+          return rejectWithValue('Created submission is missing an ID');
+        }
+        
+        console.log('Created new draft submission:', submission);
       }
-      
-      console.log('Created new draft submission:', submission);
     }
     
     // Step 3: Fetch sections for the template
     console.log('Fetching sections for template ID:', params.template_id);
     const sectionsFilter = { template_id: { _eq: params.template_id } };
-    const sectionsResponse = await apiRequest<ReportSection[] | { data: ReportSection[] }>(() => ({
-      path: '/items/report_sections',
-      method: 'GET',
-      params: { filter: sectionsFilter, sort: 'sort' }
-    }));
+    const sectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
+      '/items/report_sections',
+      'GET',
+      { filter: sectionsFilter, sort: 'sort' }
+    );
     console.log('Successfully fetched Report Sections:',sectionsResponse);
     
     // Handle both response formats: direct array or {data: array}
@@ -254,11 +280,11 @@ export const initializeReportData = createAsyncThunk<
     }
     
     const questionsFilter = { section_id: { _in: sectionIds } };
-    const questionsResponse = await apiRequest<ReportQuestion[] | { data: ReportQuestion[] }>(() => ({
-      path: '/items/report_questions',
-      method: 'GET',
-      params: { filter: questionsFilter, sort: 'sort' }
-    }));
+    const questionsResponse = await directApiRequest<{ data: ReportQuestion[] }>(
+      '/items/report_questions',
+      'GET',
+      { filter: questionsFilter, sort: 'sort' }
+    );
     console.log('quest ionsResponse --------------------->>>>',questionsResponse);
     
     // Handle both response formats: direct array or {data: array}
@@ -281,11 +307,11 @@ export const initializeReportData = createAsyncThunk<
       const answersFilter = { submission_id: { _eq: submission.id } };
       
       try {
-        const answersResponse = await apiRequest<ReportAnswer[] | { data: ReportAnswer[] }>(() => ({
-          path: '/items/report_answers',
-          method: 'GET',
-          params: { filter: answersFilter }
-        }));
+        const answersResponse = await directApiRequest<{ data: ReportAnswer[] }>(
+          '/items/report_answers',
+          'GET',
+          { filter: answersFilter }
+        );
         console.log('Fetched answers for submission:', answersResponse);
         
         // Handle both response formats: direct array or {data: array}
@@ -384,11 +410,14 @@ export const saveAnswer = createAsyncThunk<
       ]
     };
     
-    const existingAnswers = await apiRequest<ReportAnswer[]>(() => ({
-      path: '/items/report_answers',
-      method: 'GET',
-      params: { filter }
-    }));
+    const existingAnswersResponse = await directApiRequest<{ data: ReportAnswer[] }>(
+      '/items/report_answers',
+      'GET',
+      { filter }
+    );
+    
+    // Extract data from response
+    const existingAnswers = existingAnswersResponse?.data || [];
     
     let existingAnswer: ReportAnswer | null = null;
     if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
@@ -664,6 +693,9 @@ const qaSlice = createSlice({
 
 // Export actions
 export const { setCurrentSubmissionId, resetState, updateProgress } = qaSlice.actions;
+
+// Add a clearSubmissions function for logout
+export const clearSubmissions = () => resetState();
 
 // Basic selectors
 export const selectQAState = (state: RootState) => state.qa;

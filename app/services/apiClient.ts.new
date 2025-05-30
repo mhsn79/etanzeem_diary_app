@@ -6,7 +6,8 @@ import {
   selectAuthState,
   checkAndRefreshTokenIfNeeded,
   logout,
-  setIsRefreshing
+  setIsRefreshing,
+  setError
 } from '../features/auth/authSlice';
 import directus from './directus';
 import { Platform } from 'react-native';
@@ -32,11 +33,6 @@ let requestQueue: Array<{
 
 // Maximum number of retry attempts for API requests
 const MAX_REQUEST_RETRIES = 2;
-
-// Exponential backoff for retry attempts
-const getBackoffDelay = (attempt: number): number => {
-  return Math.min(1000 * Math.pow(2, attempt), 5000); // Max 5 seconds
-};
 
 /**
  * Process all queued requests after token refresh
@@ -75,7 +71,6 @@ const waitForTokenRefresh = async (): Promise<void> => {
  * 1. Check if a token refresh is in progress and wait for it to complete
  * 2. Make the API call with the current token
  * 3. If the API call fails with a 401, trigger a token refresh via the auth middleware and retry once
- * 4. Handle network errors with exponential backoff
  */
 export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
   // Get the current state
@@ -121,50 +116,44 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
         error?.message?.includes('Token expired') ||
         error?.message?.includes('Invalid token');
       
-      // Check if it's a network error
-      const isNetworkError = 
-        error?.message?.includes('Network') || 
-        error?.message?.includes('timeout') || 
-        error?.message?.includes('connection');
-      
-      // Handle token errors
       if (isTokenError && retryCount < MAX_REQUEST_RETRIES) {
         console.log(`[API] Token error during request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
         
         try {
-          // Let the auth middleware handle the token refresh
-          // This will queue our request if a refresh is already in progress
-          await checkAndRefreshTokenIfNeeded();
+          // Mark that a refresh is in progress
+          store.dispatch(setIsRefreshing(true));
           
-          // Get the new token after refresh
-          const newState = store.getState();
-          const newToken = newState.auth.tokens?.accessToken;
+          // Dispatch the refresh action
+          const refreshResult = await store.dispatch(refresh()).unwrap();
           
-          if (!newToken) {
+          // Mark that refresh is complete
+          store.dispatch(setIsRefreshing(false));
+          
+          // Process any queued requests
+          processQueue(null);
+          
+          if (!refreshResult.tokens?.accessToken) {
             throw new Error('Failed to refresh token: No new token received');
           }
           
           console.log(`[API] Token refreshed successfully. Retrying request... (${Platform.OS})`);
           
           // Retry the request with the new token
-          return await tryRequest(newToken, retryCount + 1);
+          return await tryRequest(refreshResult.tokens.accessToken, retryCount + 1);
         } catch (refreshError: any) {
           console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           
-          // Log the user out - this will be handled by the auth middleware
+          // Mark that refresh is complete
+          store.dispatch(setIsRefreshing(false));
+          
+          // Process any queued requests with the error
+          processQueue(refreshError);
+          
+          // Log the user out with a message that will be displayed in our custom Toast
           store.dispatch(logout('Authentication expired. Please log in again.'));
           
           throw new Error('Authentication expired. Please log in again.');
         }
-      }
-      
-      // Handle network errors with exponential backoff
-      if (isNetworkError && retryCount < MAX_REQUEST_RETRIES) {
-        const delay = getBackoffDelay(retryCount);
-        console.log(`[API] Network error, retrying in ${delay}ms... (${Platform.OS})`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return tryRequest(accessToken, retryCount + 1);
       }
       
       // If it's not a token issue or we've exhausted retries, rethrow the original error
@@ -240,49 +229,44 @@ export const directApiRequest = async <T>(
         error.message.includes('Token expired') ||
         error.message.includes('Invalid token');
       
-      // Check if it's a network error
-      const isNetworkError = 
-        error.message.includes('Network') || 
-        error.message.includes('timeout') || 
-        error.message.includes('connection');
-      
-      // Handle token errors
       if (isTokenError && retryCount < MAX_REQUEST_RETRIES) {
         console.log(`[API] Token error during direct request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
         
         try {
-          // Let the auth middleware handle the token refresh
-          await checkAndRefreshTokenIfNeeded();
+          // Mark that a refresh is in progress
+          store.dispatch(setIsRefreshing(true));
           
-          // Get the new token after refresh
-          const newState = store.getState();
-          const newToken = newState.auth.tokens?.accessToken;
+          // Dispatch the refresh action
+          const refreshResult = await store.dispatch(refresh()).unwrap();
           
-          if (!newToken) {
+          // Mark that refresh is complete
+          store.dispatch(setIsRefreshing(false));
+          
+          // Process any queued requests
+          processQueue(null);
+          
+          if (!refreshResult.tokens?.accessToken) {
             throw new Error('Failed to refresh token: No new token received');
           }
           
           console.log(`[API] Token refreshed successfully. Retrying direct request... (${Platform.OS})`);
           
           // Retry the request with the new token
-          return await tryFetch(newToken, retryCount + 1);
+          return await tryFetch(refreshResult.tokens.accessToken, retryCount + 1);
         } catch (refreshError: any) {
           console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           
-          // Log the user out - this will be handled by the auth middleware
+          // Mark that refresh is complete
+          store.dispatch(setIsRefreshing(false));
+          
+          // Process any queued requests with the error
+          processQueue(refreshError);
+          
+          // Log the user out with a message that will be displayed in our custom Toast
           store.dispatch(logout('Authentication expired. Please log in again.'));
           
           throw new Error('Authentication expired. Please log in again.');
         }
-      }
-      
-      // Handle network errors with exponential backoff
-      if (isNetworkError && retryCount < MAX_REQUEST_RETRIES) {
-        const delay = getBackoffDelay(retryCount);
-        console.log(`[API] Network error, retrying in ${delay}ms... (${Platform.OS})`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return tryFetch(accessToken, retryCount + 1);
       }
       
       // If it's not a token issue or we've exhausted retries, rethrow the original error
@@ -306,27 +290,56 @@ export const directApiRequest = async <T>(
  * before making multiple API calls
  */
 export const ensureFreshToken = async (): Promise<string> => {
-  try {
-    // Use the centralized token refresh mechanism
-    await checkAndRefreshTokenIfNeeded();
-    
-    // Get the current state after potential refresh
-    const state = store.getState();
-    const auth = selectAuthState(state);
-    
-    if (!auth.tokens?.accessToken) {
-      throw new Error('No authentication token available');
-    }
-    
-    return auth.tokens.accessToken;
-  } catch (error: any) {
-    console.error(`[API] Failed to ensure fresh token: ${error.message} (${Platform.OS})`);
-    
-    // Log the user out if token refresh failed
-    store.dispatch(logout('Authentication expired. Please log in again.'));
-    
-    throw new Error('Authentication expired. Please log in again.');
+  // First check if a refresh is already in progress
+  await waitForTokenRefresh();
+  
+  // Get the current state
+  const state = store.getState();
+  const auth = selectAuthState(state);
+  
+  if (!auth.tokens?.accessToken) {
+    throw new Error('No authentication token available');
   }
+  
+  // Check if token is expired or about to expire
+  if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
+    console.log(`[API] Token is expired or about to expire, refreshing in ensureFreshToken... (${Platform.OS})`);
+    
+    try {
+      // Mark that a refresh is in progress
+      store.dispatch(setIsRefreshing(true));
+      
+      // Dispatch the refresh action
+      const refreshResult = await store.dispatch(refresh()).unwrap();
+      
+      // Mark that refresh is complete
+      store.dispatch(setIsRefreshing(false));
+      
+      // Process any queued requests
+      processQueue(null);
+      
+      if (!refreshResult.tokens?.accessToken) {
+        throw new Error('Failed to refresh token: No new token received');
+      }
+      
+      return refreshResult.tokens.accessToken;
+    } catch (error: any) {
+      console.error(`[API] Failed to refresh token in ensureFreshToken: ${error.message} (${Platform.OS})`);
+      
+      // Mark that refresh is complete
+      store.dispatch(setIsRefreshing(false));
+      
+      // Process any queued requests with the error
+      processQueue(error);
+      
+      // Log the user out with a message that will be displayed in our custom Toast
+      store.dispatch(logout('Authentication expired. Please log in again.'));
+      
+      throw new Error('Authentication expired. Please log in again.');
+    }
+  }
+  
+  return auth.tokens.accessToken;
 };
 
 /**
@@ -349,13 +362,18 @@ export const validateTokensOnStartup = async (): Promise<void> => {
       console.log(`[API] Tokens in secure storage are expired on startup, attempting refresh... (${Platform.OS})`);
       
       try {
-        // Try to refresh the tokens using the centralized mechanism
-        await checkAndRefreshTokenIfNeeded();
+        // Try to refresh the tokens
+        const refreshResult = await store.dispatch(refresh()).unwrap();
+        
+        if (!refreshResult.tokens?.accessToken) {
+          throw new Error('Failed to refresh token: No new token received');
+        }
+        
         console.log(`[API] Tokens refreshed successfully on startup (${Platform.OS})`);
       } catch (error: any) {
         console.error(`[API] Failed to refresh tokens on startup: ${error.message} (${Platform.OS})`);
         
-        // Clear tokens and log out
+        // Clear tokens and log out with a message that will be displayed in our custom Toast
         store.dispatch(logout('Your session has expired. Please log in again.'));
       }
     } else {

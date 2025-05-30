@@ -82,6 +82,7 @@ export interface FetchReportDataParams {
   template_id: number;
   unit_id: number;
   mgmt_id: number;
+  submission_id?: number; // Optional parameter for loading existing submissions
 }
 
 export interface SaveAnswerParams {

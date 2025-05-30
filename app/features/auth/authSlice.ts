@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { persistor } from '../../store';
 import { RESET_STATE } from '../../store/reducers';
+import { saveTokens, clearTokens } from '../../services/secureStorage';
 
 // Utility function to check if a token is expired or about to expire
 export const isTokenExpiredOrExpiring = (expiresAt: number | undefined): boolean => {
@@ -39,6 +40,7 @@ export interface AuthState {
   user: User | null;
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
+  isRefreshing: boolean;
 }
 
 const initialState: AuthState = {
@@ -46,6 +48,7 @@ const initialState: AuthState = {
   user: null,
   status: 'idle',
   error: null,
+  isRefreshing: false,
 };
 
 export interface LoginCredentials {
@@ -75,22 +78,19 @@ export const login = createAsyncThunk<
     }
 
     try {
-      // Get user data
-      const userData = await directus.request(() => ({
-        path: '/users/me',
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${authResponse.access_token}` },
-      }));
-
-      // Create auth result object
+      // Create auth result object with minimal user info
+      // We'll fetch complete user details from Person collection later
       const authResult = {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
           expiresAt: authResponse.expires ? Date.now() + authResponse.expires : Date.now() + 3600000,
         },
-        user: userData as User,
+        user: { id: 'pending', email: credentials.email },
       };
+
+      // Save tokens to secure storage
+      await saveTokens(authResult.tokens);
 
       // Check if the person exists in the database before allowing login
       if (credentials.email) {
@@ -124,15 +124,17 @@ export const login = createAsyncThunk<
         if (!personData.data || personData.data.length === 0) {
           // Logout from Directus to clean up the session
           directus.logout();
+          // Clear tokens from secure storage
+          await clearTokens();
           // Clear error message with a more professional message
           return rejectWithValue("Access denied. You don't have permission to use this application. Please contact your administrator.");
         }
       }
 
       return authResult;
-    } catch (userDataError: any) {
-      // If we can't get user data but have tokens, return minimal user info
-      return {
+    } catch (error: any) {
+      // If we can't check person data but have tokens, return minimal user info
+      const authResult = {
         tokens: {
           accessToken: authResponse.access_token,
           refreshToken: authResponse.refresh_token,
@@ -140,6 +142,11 @@ export const login = createAsyncThunk<
         },
         user: { id: 'unknown', email: credentials.email },
       };
+      
+      // Save tokens to secure storage
+      await saveTokens(authResult.tokens);
+      
+      return authResult;
     }
   } catch (error: any) {
     const errorMessage = error?.response?.data?.message || error?.message || 'Authentication failed';
@@ -147,7 +154,7 @@ export const login = createAsyncThunk<
   }
 });
 
-// Refresh token thunk
+// Enhanced refresh token thunk with better error handling
 export const refresh = createAsyncThunk<
   AuthResponse,
   void,
@@ -161,19 +168,23 @@ export const refresh = createAsyncThunk<
   }
 
   try {
+    // First try using the Directus SDK
     try {
+      console.log(`[Auth] Refreshing token using Directus SDK (${Platform.OS})`);
       const response = await directus.refresh();
+      
       if (!response.access_token || !response.refresh_token) {
         throw new Error('Invalid refresh response from SDK');
       }
 
+      // Get user data with the new token
       const userData = await directus.request(() => ({
         path: '/users/me',
         method: 'GET',
         headers: { 'Authorization': `Bearer ${response.access_token}` },
       }));
 
-      return {
+      const authResult = {
         tokens: {
           accessToken: response.access_token,
           refreshToken: response.refresh_token,
@@ -181,7 +192,15 @@ export const refresh = createAsyncThunk<
         },
         user: userData as User,
       };
-    } catch (sdkError) {
+      
+      // Save tokens to secure storage
+      await saveTokens(authResult.tokens);
+      
+      return authResult;
+    } catch (sdkError: any) {
+      console.log(`[Auth] SDK refresh failed, trying manual refresh (${Platform.OS}): ${sdkError.message}`);
+      
+      // If SDK refresh fails, try manual refresh
       const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
       const response = await fetch(`${baseUrl}/auth/refresh`, {
         method: 'POST',
@@ -191,7 +210,16 @@ export const refresh = createAsyncThunk<
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || `Manual refresh failed with status ${response.status}`);
+        const errorMessage = `Manual refresh failed with status ${response.status}: ${errorText}`;
+        console.error(`[Auth] ${errorMessage} (${Platform.OS})`);
+        
+        // Check for specific error conditions that indicate invalid/revoked tokens
+        if (response.status === 401 || response.status === 403 || errorText.includes('expired') || errorText.includes('invalid')) {
+          await clearTokens();
+          throw new Error('Authentication expired. Please log in again.');
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const json = await response.json();
@@ -199,6 +227,7 @@ export const refresh = createAsyncThunk<
         throw new Error('Invalid manual refresh response format');
       }
 
+      // Get user data with the new token
       const userResponse = await fetch(`${baseUrl}/users/me`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${json.data.access_token}` },
@@ -210,7 +239,7 @@ export const refresh = createAsyncThunk<
 
       const userData = await userResponse.json();
 
-      return {
+      const authResult = {
         tokens: {
           accessToken: json.data.access_token,
           refreshToken: json.data.refresh_token,
@@ -218,9 +247,28 @@ export const refresh = createAsyncThunk<
         },
         user: userData.data as User,
       };
+      
+      // Save tokens to secure storage
+      await saveTokens(authResult.tokens);
+      
+      return authResult;
     }
   } catch (error: any) {
+    // Handle specific error conditions
     const errorMessage = error?.response?.data?.message || error?.message || 'Token refresh failed';
+    
+    // Check for critical auth failures
+    if (
+      errorMessage.includes('expired') || 
+      errorMessage.includes('invalid') || 
+      errorMessage.includes('revoked') ||
+      errorMessage.includes('401') ||
+      errorMessage.includes('403')
+    ) {
+      // Clear tokens from secure storage for critical auth failures
+      await clearTokens();
+    }
+    
     return rejectWithValue(errorMessage);
   }
 });
@@ -339,6 +387,7 @@ const authSlice = createSlice({
       state.user = null;
       state.status = 'idle';
       state.error = null;
+      state.isRefreshing = false;
       
       // Logout from Directus
       directus.logout();
@@ -348,6 +397,12 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    setError: (state, action: PayloadAction<string>) => {
+      state.error = action.payload;
+    },
+    setIsRefreshing: (state, action: PayloadAction<boolean>) => {
+      state.isRefreshing = action.payload;
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -360,28 +415,33 @@ const authSlice = createSlice({
         state.tokens = action.payload.tokens;
         state.user = action.payload.user;
         state.error = null;
+        state.isRefreshing = false;
       })
       .addCase(login.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Login failed';
         state.tokens = null;
         state.user = null;
+        state.isRefreshing = false;
       })
       .addCase(refresh.pending, (state) => {
         state.status = 'loading';
         state.error = null;
+        state.isRefreshing = true;
       })
       .addCase(refresh.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.status = 'succeeded';
         state.tokens = action.payload.tokens;
         state.user = action.payload.user;
         state.error = null;
+        state.isRefreshing = false;
       })
       .addCase(refresh.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Token refresh failed';
         state.tokens = null;
         state.user = null;
+        state.isRefreshing = false;
       })
       .addCase(updateUserAvatar.pending, (state) => {
         state.status = 'loading';
@@ -399,43 +459,100 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout: logoutAction, clearError } = authSlice.actions;
+export const { logout: logoutAction, clearError, setError, setIsRefreshing } = authSlice.actions;
 
 /**
- * Complete logout thunk that:
+ * Enhanced complete logout thunk that:
  * 1. Clears the auth state
- * 2. Resets all Redux slices to their initial state
- * 3. Purges the persisted Redux data
+ * 2. Clears tokens from secure storage
+ * 3. Clears all relevant state from all slices
+ * 4. Resets all Redux slices to their initial state
+ * 5. Purges the persisted Redux data
+ * 6. Shows a toast notification to inform the user
+ * 7. Navigates to the login screen
  */
 export const logout = createAsyncThunk(
   'auth/logoutComplete',
-  async (_, { dispatch }) => {
+  async (message: string | undefined = undefined, { dispatch }) => {
     try {
-      // First dispatch the auth logout action to clear auth state and log out from Directus
+      console.log(`[Auth] Starting logout process (${Platform.OS})`);
+      
+      // First clear tokens from secure storage
+      try {
+        await clearTokens();
+        console.log(`[Auth] Tokens cleared from secure storage (${Platform.OS})`);
+      } catch (clearTokensError) {
+        console.error(`[Auth] Error clearing tokens from secure storage: ${clearTokensError} (${Platform.OS})`);
+      }
+      
+      // Dispatch the auth logout action to clear auth state and log out from Directus
       dispatch(logoutAction());
+      
+      // Clear state from all relevant slices
+      try {
+        // Clear persons state
+        const { clearPersons, clearUserDetails } = await import('../persons/personSlice');
+        dispatch(clearUserDetails());
+        dispatch(clearPersons());
+        
+        // Clear activities state
+        const { clearActivities } = await import('../activities/activitySlice');
+        dispatch(clearActivities());
+        
+        // Clear QA state
+        const { clearSubmissions } = await import('../qa/qaSlice');
+        dispatch(clearSubmissions());
+        
+        // Clear reports state
+        const { clearReports, clearSubmissions: clearReportSubmissions } = await import('../reports/reportsSlice_new');
+        dispatch(clearReports());
+        dispatch(clearReportSubmissions());
+        
+        console.log(`[Auth] All slice states cleared (${Platform.OS})`);
+      } catch (clearStateError) {
+        console.error(`[Auth] Error clearing slice states: ${clearStateError} (${Platform.OS})`);
+      }
       
       // Then dispatch the reset action to reset all slices to their initial state
       dispatch({ type: RESET_STATE });
+      console.log(`[Auth] Redux state reset (${Platform.OS})`);
       
       try {
         // Finally, purge the persisted Redux data
         await persistor.purge();
+        console.log(`[Auth] Persisted data purged (${Platform.OS})`);
       } catch (purgeError) {
         // If purge fails, log the error but continue with logout
-        console.warn('Error purging persisted data:', purgeError);
+        console.error(`[Auth] Error purging persisted data: ${purgeError} (${Platform.OS})`);
       }
       
-      console.log('Logout complete: Auth state cleared, Redux state reset, and persisted data purged');
+      // Set error message to show in our custom Toast component
+      try {
+        const logoutMessage = message || 'Session expired. Please log in again.';
+        // We'll use our custom Toast component which reads from the auth.error state
+        dispatch(authSlice.actions.setError(logoutMessage));
+        
+        // Clear the error after a delay to hide the toast
+        setTimeout(() => {
+          dispatch(authSlice.actions.clearError());
+        }, 4000);
+      } catch (toastError) {
+        console.error(`[Auth] Error setting error message: ${toastError} (${Platform.OS})`);
+      }
+      
+      console.log(`[Auth] Logout complete (${Platform.OS})`);
       
       return true;
     } catch (error) {
-      console.error('Error during logout process:', error);
+      console.error(`[Auth] Error during logout process: ${error} (${Platform.OS})`);
+      
       // Even if there's an error, we should still try to reset the state
       try {
         dispatch({ type: RESET_STATE });
       } catch (resetError) {
-        console.error('Failed to reset state during error recovery:', resetError);
+        console.error(`[Auth] Failed to reset state during error recovery: ${resetError} (${Platform.OS})`);
       }
+      
       return true; // Return true anyway to allow navigation to continue
     }
   }
@@ -487,8 +604,13 @@ export const loginAndFetchUserDetails = createAsyncThunk<
     // First, perform the login which already checks if person exists
     const authResult = await dispatch(login(credentials)).unwrap();
     
-    // Then fetch the complete person data
+    // Then fetch the complete person data directly from Person collection
     const userDetails = await dispatch(fetchPersonByEmail(credentials.email)).unwrap();
+    
+    // If we couldn't get user details, throw an error
+    if (!userDetails) {
+      throw new Error('Failed to fetch user details. Please try again.');
+    }
     
     return { 
       auth: authResult,

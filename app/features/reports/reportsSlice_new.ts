@@ -6,7 +6,6 @@ import {
 } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
 import apiRequest from '../../services/apiClient';
-import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import { TanzeemiUnit } from '../../models/TanzeemiUnit';
 
 // Types
@@ -101,15 +100,6 @@ export const fetchReportSubmissions = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('reports/fetchReportSubmissions', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    // Ensure we have a fresh token before making the request
-    try {
-      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    } catch (refreshError) {
-      console.error('Token refresh failed in fetchReportSubmissions:', refreshError);
-      dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
-    }
-    
     const { tanzeem } = getState();
     const tanzeemiUnitIds = tanzeem?.ids ?? [];
 
@@ -122,6 +112,7 @@ export const fetchReportSubmissions = createAsyncThunk<
       sort: 'id',
     };
 
+    // The centralized API client handles token refresh automatically
     const response = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
       path: '/items/reports_submissions',
       method: 'GET',
@@ -135,15 +126,6 @@ export const fetchReportSubmissions = createAsyncThunk<
     }));
   } catch (error: any) {
     console.error('Error in fetchReportSubmissions:', error);
-    
-    // Check if it's an authentication error
-    if (error.message?.includes('Authentication expired') || 
-        error.message?.includes('No authentication') ||
-        error.message?.includes('401')) {
-      // Dispatch logout action if it's an auth error
-      dispatch(logout());
-    }
-    
     return rejectWithValue(error.message || 'Failed to fetch report submissions');
   }
 });
@@ -154,19 +136,11 @@ export const fetchReportsByUnitId = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('reports/fetchReportsByUnitId', async (unitId, { dispatch, rejectWithValue }) => {
   try {
-    // Ensure we have a fresh token before making the request
-    try {
-      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    } catch (refreshError) {
-      console.error('Token refresh failed in fetchReportsByUnitId:', refreshError);
-      dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
-    }
-
     if (!unitId || isNaN(unitId) || unitId <= 0) {
       return rejectWithValue('Invalid unit ID provided');
     }
 
+    // The centralized API client handles token refresh automatically
     const templateResponse = await apiRequest<ReportTemplate[] | { data: ReportTemplate[] }>(() => ({
       path: '/items/report_templates',
       method: 'GET',
@@ -189,15 +163,6 @@ export const fetchReportsByUnitId = createAsyncThunk<
     return [{ template, managements }];
   } catch (error: any) {
     console.error('Error in fetchReportsByUnitId:', error);
-    
-    // Check if it's an authentication error
-    if (error.message?.includes('Authentication expired') || 
-        error.message?.includes('Token expired') ||
-        error.message?.includes('401')) {
-      // Dispatch logout action if it's an auth error
-      dispatch(logout());
-    }
-    
     return rejectWithValue(error.message || 'Failed to fetch reports');
   }
 });
