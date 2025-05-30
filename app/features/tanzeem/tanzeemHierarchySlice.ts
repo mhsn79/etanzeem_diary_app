@@ -1,16 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import {
-  selectAuthState,
-  checkAndRefreshTokenIfNeeded,
-  logout,
-} from '../auth/authSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { fetchTanzeemLevelById } from './tanzeemSlice';
 import { TanzeemiUnit, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { Person, PersonResponse } from '@/app/models/Person';
 import { normalizeTanzeemiUnitData, normalizePersonData } from '@/app/utils/apiNormalizer';
-import { API_BASE_URL } from '@/app/constants/api';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -47,67 +41,8 @@ const initialState: TanzeemHierarchyState = {
  * ────────────────────────────────────────────────────────────────────────────────
  */
 
-// Helper function to handle API requests with token
-const apiRequest = async <T>(
-  url: string,
-  method: string,
-  token: string,
-  body?: any,
-  dispatch?: AppDispatch,
-  getState?: () => RootState
-): Promise<T> => {
-  const headers: HeadersInit = {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
-
-  const options: RequestInit = {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${url}`, options);
-
-  if (!response.ok) {
-    let errorText = '';
-    try {
-      const errorData = await response.json();
-      errorText = JSON.stringify(errorData);
-    } catch (e) {
-      errorText = await response.text();
-    }
-    console.error('API Error:', errorText);
-    throw new Error(errorText || `Request failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data as T;
-};
-
-// Helper function to handle API requests with token refresh
-const executeWithTokenRefresh = async <T>(
-  apiCall: (token: string) => Promise<T>,
-  token: string,
-  dispatch: AppDispatch,
-  getState: () => RootState
-): Promise<T> => {
-  try {
-    return await apiCall(token);
-  } catch (err: any) {
-    const auth = selectAuthState(getState());
-    const msg = String(err?.message ?? err);
-
-    if (auth.tokens?.expiresAt && new Date(auth.tokens.expiresAt).getTime() < Date.now() + 60000) {
-      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-      const newAuth = selectAuthState(getState());
-      const newToken = newAuth.tokens?.accessToken;
-      if (!newToken) throw new Error('Refresh failed');
-      return await apiCall(newToken);
-    }
-    throw new Error(msg);
-  }
-};
+// Import the centralized API client
+import apiClient from '../../services/apiClient';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -127,7 +62,6 @@ const executeWithTokenRefresh = async <T>(
  */
 const fetchAndProcessParentHierarchy = async (
   unitId: number | null,
-  token: string,
   dispatch: AppDispatch,
   getState: () => RootState,
   processedIds: Set<number> = new Set(),
@@ -141,27 +75,19 @@ const fetchAndProcessParentHierarchy = async (
   processedIds.add(unitId);
   
   try {
-    const fetchUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      if (!response.data) {
-        console.log(`Tanzeemi unit with ID ${unitId} not found`);
-        return null;
-      }
-      
-      // Transform the API response to match our expected format
-      return normalizeTanzeemiUnitData(response.data);
-    };
-
-    const unit = await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    // Use the centralized API client which handles token refresh automatically
+    const response = await apiClient<SingleTanzeemiUnitResponse>(() => ({
+      path: `/items/Tanzeemi_Unit/${unitId}?fields=*`,
+      method: 'GET'
+    }));
     
-    if (!unit) {
+    if (!response.data) {
+      console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { parentUnits: allUnits };
     }
+    
+    // Transform the API response to match our expected format
+    const unit = normalizeTanzeemiUnitData(response.data);
     
     // Add the current unit to our collection as a parent unit (under_mine: false)
     const hierarchyUnit: HierarchyUnit = {
@@ -189,7 +115,6 @@ const fetchAndProcessParentHierarchy = async (
     if (parentId && typeof parentId === 'number' && !processedIds.has(parentId)) {
       const result = await fetchAndProcessParentHierarchy(
         parentId,
-        token,
         dispatch,
         getState,
         processedIds,
@@ -219,7 +144,6 @@ const fetchAndProcessParentHierarchy = async (
  */
 const fetchAndProcessSubordinateHierarchy = async (
   unitId: number,
-  token: string,
   dispatch: AppDispatch,
   getState: () => RootState,
   processedIds: Set<number> = new Set(),
@@ -233,27 +157,19 @@ const fetchAndProcessSubordinateHierarchy = async (
   processedIds.add(unitId);
   
   try {
-    const fetchUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      if (!response.data) {
-        console.log(`Tanzeemi unit with ID ${unitId} not found`);
-        return null;
-      }
-      
-      // Transform the API response to match our expected format
-      return normalizeTanzeemiUnitData(response.data);
-    };
-
-    const unit = await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    // Use the centralized API client which handles token refresh automatically
+    const response = await apiClient<SingleTanzeemiUnitResponse>(() => ({
+      path: `/items/Tanzeemi_Unit/${unitId}?fields=*`,
+      method: 'GET'
+    }));
     
-    if (!unit) {
+    if (!response.data) {
+      console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { subordinateUnits: allUnits };
     }
+    
+    // Transform the API response to match our expected format
+    const unit = normalizeTanzeemiUnitData(response.data);
     
     // Add the current unit to our collection as a subordinate unit (under_mine: true)
     // except for the user's unit itself which should be under_mine: false
@@ -287,7 +203,6 @@ const fetchAndProcessSubordinateHierarchy = async (
         if (typeof childId === 'number' && !processedIds.has(childId)) {
           const result = await fetchAndProcessSubordinateHierarchy(
             childId, 
-            token, 
             dispatch, 
             getState, 
             processedIds,
@@ -319,48 +234,29 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
   try {
     console.log('Fetching complete tanzeemi hierarchy for user email:', userEmail);
     
-    // Refresh token if needed
-    try {
-      await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
-    } catch (refreshError) {
-      console.error('Token refresh failed in fetchCompleteTanzeemiHierarchy:', refreshError);
-      dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
+    // Step 1: Fetch user details by email using the centralized API client
+    // Normalize the email to lowercase to ensure consistent handling
+    const normalizedEmail = userEmail.trim().toLowerCase();
+    
+    console.log('Fetching person by email:', normalizedEmail);
+    
+    // Construct the URL with proper encoding
+    const params = new URLSearchParams();
+    params.append('filter[Email][_eq]', normalizedEmail);
+    params.append('fields', '*');
+    
+    const personResponse = await apiClient<PersonResponse>(() => ({
+      path: `/items/Person?${params.toString()}`,
+      method: 'GET'
+    }));
+    
+    console.log('API Response for person by email:', personResponse);
+    
+    if (!personResponse.data || personResponse.data.length === 0) {
+      throw new Error(`No person found with email ${normalizedEmail}`);
     }
-
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    // Step 1: Fetch user details by email
-    const fetchUserByEmail = async (accessToken: string) => {
-      // Normalize the email to lowercase to ensure consistent handling
-      const normalizedEmail = userEmail.trim().toLowerCase();
-      
-      console.log('Fetching person by email:', normalizedEmail);
-      
-      // Construct the URL with proper encoding
-      const url = `/items/Person`;
-      const params = new URLSearchParams();
-      params.append('filter[Email][_eq]', normalizedEmail);
-      params.append('fields', '*');
-      
-      const response = await apiRequest<PersonResponse>(
-        `${url}?${params.toString()}`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for person by email:', response);
-      
-      if (!response.data || response.data.length === 0) {
-        throw new Error(`No person found with email ${normalizedEmail}`);
-      }
-      
-      return normalizePersonData(response.data[0]);
-    };
-
-    const user = await executeWithTokenRefresh(fetchUserByEmail, token, dispatch, getState);
+    
+    const user = normalizePersonData(personResponse.data[0]);
     
     // Step 2: Extract the Tanzeemi_Unit ID from the user's record
     const userUnitId = user.Tanzeemi_Unit || user.unit;
@@ -371,23 +267,18 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
     console.log(`User ${user.Name || user.name} has Tanzeemi unit ID: ${userUnitId}`);
     
     // Step 3: Fetch the user's unit details
-    const fetchUserUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${userUnitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for user tanzeemi unit:', response);
-      
-      if (!response.data) {
-        throw new Error(`Tanzeemi unit with ID ${userUnitId} not found`);
-      }
-      
-      return normalizeTanzeemiUnitData(response.data);
-    };
-
-    const userUnit = await executeWithTokenRefresh(fetchUserUnit, token, dispatch, getState);
+    const unitResponse = await apiClient<SingleTanzeemiUnitResponse>(() => ({
+      path: `/items/Tanzeemi_Unit/${userUnitId}?fields=*`,
+      method: 'GET'
+    }));
+    
+    console.log('API Response for user tanzeemi unit:', unitResponse);
+    
+    if (!unitResponse.data) {
+      throw new Error(`Tanzeemi unit with ID ${userUnitId} not found`);
+    }
+    
+    const userUnit = normalizeTanzeemiUnitData(unitResponse.data);
     
     // Create the user's unit with under_mine: false
     const userHierarchyUnit: HierarchyUnit = {
@@ -413,7 +304,6 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
     const parentId = userUnit.Parent_id || userUnit.parent_id;
     const { parentUnits } = await fetchAndProcessParentHierarchy(
       parentId as number,
-      token,
       dispatch,
       getState
     );
@@ -432,7 +322,6 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
         if (typeof childId === 'number' && !processedIds.has(childId)) {
           const result = await fetchAndProcessSubordinateHierarchy(
             childId,
-            token,
             dispatch,
             getState,
             processedIds

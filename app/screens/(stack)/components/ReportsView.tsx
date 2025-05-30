@@ -495,7 +495,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
         <View style={styles.reportContainer}>
           {filteredSubmissions.length > 0 ? (
-            filteredSubmissions.slice(0, 3).map((submission) => {
+            filteredSubmissions.slice(0, 3).map((submission, index) => {
+              // Add detailed logging for each submission
+              console.log(`[ReportsView] Rendering submission at index ${index}:`, {
+                id: submission.id,
+                template_id: submission.template_id,
+                mgmt_id: submission.mgmt_id,
+                unit_id: submission.unit_id,
+                status: submission.status,
+                date_created: submission.date_created,
+                hasSubmissionData: !!submission.submission_data
+              });
+              
               const formattedDate = submission.date_created
                 ? new Date(submission.date_created).toLocaleDateString('ur-PK')
                 : 'تاریخ دستیاب نہیں';
@@ -519,6 +530,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
             
               } : {};
 
+              // Create a title that includes the index for easier identification
+              const cardTitle = management
+                ? `[${index}] ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}ء`
+                : `[${index}] رپورٹ ${submission.id}`;
+
               return (
                 <Animated.View 
                   key={`submission-container-${submission.id}`}
@@ -529,16 +545,22 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 >
                   <ReportCard
                     key={`submission-${submission.id}`}
-                    title={
-                      management
-                        ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}ء`
-                        : `رپورٹ ${submission.id}`
-                    }
+                    title={cardTitle}
                     sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
                     location={submission.unitDetails?.Name ?? 'نامعلوم'}
                     status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
                     onEdit={() => {
+                      // Log detailed information before navigation
+                      console.log(`[ReportsView] Editing submission at index ${index}:`, {
+                        id: submission.id,
+                        template_id: submission.template_id,
+                        mgmt_id: submission.mgmt_id,
+                        unit_id: submission.unit_id,
+                        status: submission.status,
+                        submissionData: submission.submission_data ? 'Present' : 'Not present'
+                      });
+                      
                       // Navigate to CREATE_REPORT in edit mode
                       router.push({
                         pathname: ROUTES.CREATE_REPORT,
@@ -554,6 +576,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                       });
                     }}
                     onView={() => {
+                      // Log detailed information before navigation
+                      console.log(`[ReportsView] Viewing submission at index ${index}:`, {
+                        id: submission.id,
+                        template_id: submission.template_id,
+                        mgmt_id: submission.mgmt_id,
+                        unit_id: submission.unit_id,
+                        status: submission.status,
+                        submissionData: submission.submission_data ? 'Present' : 'Not present'
+                      });
+                      
                       // Navigate to CREATE_REPORT in view mode
                       router.push({
                         pathname: ROUTES.CREATE_REPORT,

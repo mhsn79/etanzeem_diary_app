@@ -35,10 +35,37 @@ const CreateReportScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
   const params = useLocalSearchParams();
+  
+  // Log all received parameters for debugging
+  console.log('[CreateReportScreen] Received parameters:', {
+    templateId: params.templateId,
+    submissionId: params.submissionId,
+    managementId: params.managementId,
+    unitId: params.unitId,
+    status: params.status,
+    mode: params.mode,
+    hasSubmissionData: !!params.submissionData,
+    submissionDataLength: params.submissionData ? params.submissionData.toString().length : 0
+  });
+  
   const templateId = params.templateId ? Number(params.templateId) : null;
+  const submissionId = params.submissionId ? Number(params.submissionId) : null;
+  const managementId = params.managementId ? Number(params.managementId) : null;
+  const unitId = params.unitId ? Number(params.unitId) : null;
   const mode = params.mode as 'view' | 'edit' | undefined;
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
+  
+  // Log parsed parameters
+  console.log('[CreateReportScreen] Parsed parameters:', {
+    templateId,
+    submissionId,
+    managementId,
+    unitId,
+    mode,
+    isViewMode,
+    isEditMode
+  });
   // Use our token refresh hook
   const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
   
@@ -79,7 +106,89 @@ const CreateReportScreen = () => {
 
   // Initialize report data
   useEffect(() => {
+    console.log('[CreateReportScreen] Checking conditions for report initialization:', {
+      templateId,
+      submissionId,
+      managementId,
+      unitId,
+      userUnitId: userUnitDetails?.id,
+      latestMgmtId: latestReportMgmt[0]?.managements[0]?.id,
+      mode
+    });
+    
+    // If we're in edit or view mode and have a submissionId, we need to load existing data
+    if ((isEditMode || isViewMode) && submissionId) {
+      console.log('[CreateReportScreen] In edit/view mode with submissionId:', submissionId);
+      
+      // Check if we have submission data passed as a parameter
+      if (params.submissionData) {
+        try {
+          console.log('[CreateReportScreen] Parsing submission data from params');
+          const submissionData = JSON.parse(params.submissionData.toString());
+          console.log('[CreateReportScreen] Successfully parsed submission data:', {
+            dataType: typeof submissionData,
+            hasData: !!submissionData,
+            keys: submissionData ? Object.keys(submissionData) : []
+          });
+          
+          // TODO: Process the submission data to populate the form
+          
+        } catch (error) {
+          console.error('[CreateReportScreen] Error parsing submission data:', error);
+        }
+      } else {
+        console.log('[CreateReportScreen] No submission data provided in params, need to fetch it');
+        
+        // If no submission data was passed, we need to initialize with the existing submissionId
+        if (templateId && unitId && managementId && submissionId) {
+          console.log('[CreateReportScreen] Initializing with existing submission ID:', submissionId);
+          
+          const initParams = {
+            template_id: templateId,
+            unit_id: unitId,
+            mgmt_id: managementId,
+            submission_id: submissionId
+          };
+          
+          // First ensure we have a fresh token
+          ensureFreshTokenBeforeOperation()
+            .then(() => {
+              // Then initialize the report data with the existing submission ID
+              console.log('[CreateReportScreen] Dispatching initializeReportData with existing submission');
+              return dispatch(initializeReportData(initParams)).unwrap();
+            })
+            .then((result) => {
+              console.log('[CreateReportScreen] Existing report data loaded successfully:', {
+                submissionId: result.submission.id,
+                sectionsCount: result.sections.length,
+                questionsCount: result.questions.length,
+                answersCount: result.answers.length
+              });
+            })
+            .catch((error) => {
+              console.error('[CreateReportScreen] Error loading existing report data:', error);
+            });
+        } else {
+          console.error('[CreateReportScreen] Missing required parameters for loading existing submission:', {
+            templateId,
+            unitId,
+            managementId,
+            submissionId
+          });
+        }
+      }
+      
+      return;
+    }
+    
+    // For new report creation
     if (templateId && userUnitDetails?.id && latestReportMgmt[0]?.managements[0]?.id) {
+      console.log('[CreateReportScreen] Initializing new report with params:', {
+        template_id: templateId,
+        unit_id: userUnitDetails.id,
+        mgmt_id: latestReportMgmt[0]?.managements[0]?.id
+      });
+      
       const initParams = {
         template_id: templateId,
         unit_id: userUnitDetails.id,
@@ -90,17 +199,28 @@ const CreateReportScreen = () => {
       ensureFreshTokenBeforeOperation()
         .then(() => {
           // Then initialize the report data
+          console.log('[CreateReportScreen] Dispatching initializeReportData');
           return dispatch(initializeReportData(initParams)).unwrap();
         })
-        .then(() => {
-          console.table('رپورٹ ڈیٹا لوڈ ہو گیا ہے');
+        .then((result) => {
+          console.log('[CreateReportScreen] Report data initialized successfully:', {
+            submissionId: result.submission.id,
+            sectionsCount: result.sections.length,
+            questionsCount: result.questions.length,
+            answersCount: result.answers.length
+          });
         })
         .catch((error) => {
-          console.error('Error initializing report data:', error);
-          console.error('رپورٹ ڈیٹا لوڈ کرنے میں خرابی');
+          console.error('[CreateReportScreen] Error initializing report data:', error);
         });
+    } else {
+      console.log('[CreateReportScreen] Missing required parameters for initialization:', {
+        templateId,
+        userUnitId: userUnitDetails?.id,
+        mgmtId: latestReportMgmt[0]?.managements[0]?.id
+      });
     }
-  }, [templateId, userUnitDetails?.id, latestReportMgmt[0]?.managements[0]?.id]);
+  }, [templateId, userUnitDetails?.id, latestReportMgmt[0]?.managements[0]?.id, submissionId, isEditMode, isViewMode]);
 
   // Handle answer changes
   const handleAnswerChange = useCallback((questionId: number, value: string | number) => {

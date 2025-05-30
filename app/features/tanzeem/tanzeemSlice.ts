@@ -1,15 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import {
-  selectAuthState,
-  isTokenExpiredOrExpiring,
-  refresh,
-  checkAndRefreshTokenIfNeeded,
-} from '../auth/authSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
-import { API_BASE_URL } from '@/app/constants/api';
 
 // Define the TanzeemLevel interface
 export interface TanzeemLevel {
@@ -87,65 +80,8 @@ const initialState: TanzeemState = tanzeemAdapter.getInitialState<TanzeemExtraSt
  * ────────────────────────────────────────────────────────────────────────────────
  */
 
-// Helper function to handle API requests with token
-const apiRequest = async <T>(
-  url: string,
-  method: string,
-  token: string,
-  body?: any,
-  dispatch?: AppDispatch,
-  getState?: () => RootState
-): Promise<T> => {
-  const headers: HeadersInit = {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
-
-  const options: RequestInit = {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${url}`, options);
-
-  if (!response.ok) {
-    let errorText = '';
-    try {
-      const errorData = await response.json();
-      errorText = JSON.stringify(errorData);
-    } catch (e) {
-      errorText = await response.text();
-    }
-    console.error('API Error:', errorText);
-    throw new Error(errorText || `Request failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data as T;
-};
-
-// Helper function to handle API requests with token refresh
-const executeWithTokenRefresh = async <T>(
-  apiCall: (token: string) => Promise<T>,
-  token: string,
-  dispatch: AppDispatch,
-  getState: () => RootState
-): Promise<T> => {
-  try {
-    return await apiCall(token);
-  } catch (err: any) {
-    const auth = selectAuthState(getState());
-    const msg = String(err?.message ?? err);
-
-    if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
-      const { tokens } = await dispatch(refresh()).unwrap();
-      if (!tokens?.accessToken) throw new Error('Refresh failed');
-      return await apiCall(tokens.accessToken);
-    }
-    throw new Error(msg);
-  }
-};
+// Import the centralized API client
+import apiClient, { directApiRequest } from '../../services/apiClient';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -160,29 +96,19 @@ export const fetchTanzeemiUnits = createAsyncThunk<
   try {
     console.log('Fetching tanzeemi units...');
 
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    const token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchUnits = async (accessToken: string) => {
-      const response = await apiRequest<TanzeemiUnitResponse>(
-        '/items/Tanzeemi_Unit?fields=*',
-        'GET',
-        accessToken
-      );
-      console.log('API Response for tanzeemi units:', response);
-      if (!response.data) throw new Error('Failed to fetch tanzeemi units');
-      
-      // Transform the API response to match our expected format
-      const transformedData = normalizeTanzeemiUnitDataArray(response.data);
-      
-      return transformedData;
-    };
-
-    return await executeWithTokenRefresh(fetchUnits, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<TanzeemiUnitResponse>(
+      '/items/Tanzeemi_Unit?fields=*',
+      'GET'
+    );
+    
+    console.log('API Response for tanzeemi units:', response);
+    if (!response.data) throw new Error('Failed to fetch tanzeemi units');
+    
+    // Transform the API response to match our expected format
+    const transformedData = normalizeTanzeemiUnitDataArray(response.data);
+    
+    return transformedData;
   } catch (error: any) {
     console.error('Fetch tanzeemi units error:', error);
     return rejectWithValue(error.message || 'Failed to fetch tanzeemi units');
@@ -202,36 +128,25 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
   try {
     console.log('Fetching tanzeemi unit by ID:', unitId);
     
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    let token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for tanzeemi unit:', response);
-      if (!response.data) throw new Error(`Tanzeemi unit with ID ${unitId} not found`);
-      
-      // Transform the API response to match our expected format
-      const transformedUnit = normalizeTanzeemiUnitData(response.data);
-      
-      // If the unit has a Nazim_id, fetch the Nazim details
-      if (transformedUnit.Nazim_id) {
-        console.log(`Unit has Nazim_id: ${transformedUnit.Nazim_id}, fetching Nazim details...`);
-        dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
-      }
-      
-      return transformedUnit;
-    };
-
-    return await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SingleTanzeemiUnitResponse>(
+      `/items/Tanzeemi_Unit/${unitId}?fields=*`,
+      'GET'
+    );
+    
+    console.log('API Response for tanzeemi unit:', response);
+    if (!response.data) throw new Error(`Tanzeemi unit with ID ${unitId} not found`);
+    
+    // Transform the API response to match our expected format
+    const transformedUnit = normalizeTanzeemiUnitData(response.data);
+    
+    // If the unit has a Nazim_id, fetch the Nazim details
+    if (transformedUnit.Nazim_id) {
+      console.log(`Unit has Nazim_id: ${transformedUnit.Nazim_id}, fetching Nazim details...`);
+      dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
+    }
+    
+    return transformedUnit;
   } catch (error: any) {
     console.error('Fetch tanzeemi unit error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi unit with ID ${unitId}`);
@@ -251,29 +166,18 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
   try {
     console.log('Fetching tanzeemi units by level ID:', levelId);
     
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    let token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchUnitsByLevel = async (accessToken: string) => {
-      const response = await apiRequest<TanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit?filter[Level_id][_eq]=${levelId}&fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log(`API Response for tanzeemi units with level ID ${levelId}:`, response);
-      if (!response.data) throw new Error(`Failed to fetch tanzeemi units with level ID ${levelId}`);
-      
-      // Transform the API response to match our expected format
-      const transformedUnits = normalizeTanzeemiUnitDataArray(response.data);
-      return { units: transformedUnits, levelId };
-    };
-
-    return await executeWithTokenRefresh(fetchUnitsByLevel, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<TanzeemiUnitResponse>(
+      `/items/Tanzeemi_Unit?filter[Level_id][_eq]=${levelId}&fields=*`,
+      'GET'
+    );
+    
+    console.log(`API Response for tanzeemi units with level ID ${levelId}:`, response);
+    if (!response.data) throw new Error(`Failed to fetch tanzeemi units with level ID ${levelId}`);
+    
+    // Transform the API response to match our expected format
+    const transformedUnits = normalizeTanzeemiUnitDataArray(response.data);
+    return { units: transformedUnits, levelId };
   } catch (error: any) {
     console.error('Fetch tanzeemi units by level error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi units with level ID ${levelId}`);
@@ -328,7 +232,6 @@ export const fetchUnitHierarchy = createAsyncThunk<
  */
 const fetchAndProcessHierarchy = async (
   unitId: number,
-  token: string,
   dispatch: AppDispatch,
   getState: () => RootState,
   processedIds: Set<number> = new Set(),
@@ -343,27 +246,19 @@ const fetchAndProcessHierarchy = async (
   processedIds.add(unitId);
   
   try {
-    const fetchUnit = async (accessToken: string) => {
-      const response = await apiRequest<SingleTanzeemiUnitResponse>(
-        `/items/Tanzeemi_Unit/${unitId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      if (!response.data) {
-        console.log(`Tanzeemi unit with ID ${unitId} not found`);
-        return null;
-      }
-      
-      // Transform the API response to match our expected format
-      return normalizeTanzeemiUnitData(response.data);
-    };
-
-    const unit = await executeWithTokenRefresh(fetchUnit, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SingleTanzeemiUnitResponse>(
+      `/items/Tanzeemi_Unit/${unitId}?fields=*`,
+      'GET'
+    );
     
-    if (!unit) {
+    if (!response.data) {
+      console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
     }
+    
+    // Transform the API response to match our expected format
+    const unit = normalizeTanzeemiUnitData(response.data);
     
     // Add the current unit to our collection of all units
     allUnits.push(unit);
@@ -387,7 +282,6 @@ const fetchAndProcessHierarchy = async (
         if (typeof childId === 'number' && !processedIds.has(childId)) {
           const result = await fetchAndProcessHierarchy(
             childId, 
-            token, 
             dispatch, 
             getState, 
             processedIds,
@@ -421,27 +315,16 @@ export const fetchTanzeemLevelById = createAsyncThunk<
   try {
     console.log('Fetching tanzeem level by ID:', levelId);
     
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    let token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchLevel = async (accessToken: string) => {
-      const response = await apiRequest<TanzeemLevelResponse>(
-        `/items/Tanzeemi_Level/${levelId}?fields=*`,
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for tanzeem level:', response);
-      if (!response.data) throw new Error(`Tanzeem level with ID ${levelId} not found`);
-      
-      return response.data;
-    };
-
-    return await executeWithTokenRefresh(fetchLevel, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<TanzeemLevelResponse>(
+      `/items/Tanzeemi_Level/${levelId}?fields=*`,
+      'GET'
+    );
+    
+    console.log('API Response for tanzeem level:', response);
+    if (!response.data) throw new Error(`Tanzeem level with ID ${levelId} not found`);
+    
+    return response.data;
   } catch (error: any) {
     console.error('Fetch tanzeem level error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeem level with ID ${levelId}`);
@@ -461,27 +344,16 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
   try {
     console.log('Fetching all tanzeem levels');
     
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    let token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    const fetchLevels = async (accessToken: string) => {
-      const response = await apiRequest<TanzeemLevelsResponse>(
-        '/items/Tanzeemi_Level?fields=*',
-        'GET',
-        accessToken
-      );
-      
-      console.log('API Response for all tanzeem levels:', response);
-      if (!response.data) throw new Error('Failed to fetch tanzeem levels');
-      
-      return response.data;
-    };
-
-    return await executeWithTokenRefresh(fetchLevels, token, dispatch, getState);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<TanzeemLevelsResponse>(
+      '/items/Tanzeemi_Level?fields=*',
+      'GET'
+    );
+    
+    console.log('API Response for all tanzeem levels:', response);
+    if (!response.data) throw new Error('Failed to fetch tanzeem levels');
+    
+    return response.data;
   } catch (error: any) {
     console.error('Fetch all tanzeem levels error:', error);
     return rejectWithValue(error.message || 'Failed to fetch tanzeem levels');
@@ -501,15 +373,8 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
       return { unit: null, hierarchyIds: [], hierarchyUnits: [] };
     }
     
-    // Refresh token if needed
-    await dispatch(checkAndRefreshTokenIfNeeded());
-
-    const auth = selectAuthState(getState());
-    let token = auth.tokens?.accessToken;
-    if (!token) return rejectWithValue('No access token');
-
-    // Fetch the unit and process its hierarchy
-    const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, token, dispatch, getState);
+    // Fetch the unit and process its hierarchy using the centralized API client
+    const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, dispatch, getState);
     console.log('unit------------------->>', unit);
     console.log('==================this hierarchyUnits which are under mine==============>>>',hierarchyUnits);
     

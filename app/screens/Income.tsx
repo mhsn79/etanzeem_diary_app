@@ -3,7 +3,8 @@ import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View } fr
 import i18n from '../i18n';
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { commonStyles, lightThemeStyles, darkThemeStyles } from '../_layout';
+// Import theme constants
+import { COLORS, SPACING } from '../constants/theme';
 import { Appearance, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
 import { router } from 'expo-router';

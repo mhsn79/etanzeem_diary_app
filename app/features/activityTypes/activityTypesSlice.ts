@@ -1,11 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import {
-  selectAuthState,
-  isTokenExpiredOrExpiring,
-  refresh,
-  checkAndRefreshTokenIfNeeded,
-} from '../auth/authSlice';
+import  { directApiRequest } from '../../services/apiClient';
 
 // Define the ActivityType interface
 export interface ActivityType {
@@ -51,35 +46,18 @@ export const fetchActivityTypes = createAsyncThunk<
   ActivityType[],
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('activityTypes/fetch', async (_, { getState, dispatch, rejectWithValue }) => {
-  // Refresh token if needed (does not throw on failure)
-  await dispatch(checkAndRefreshTokenIfNeeded());
-
-  const auth = selectAuthState(getState());
-  let token = auth.tokens?.accessToken;
-  if (!token) return rejectWithValue('No access token');
-
-  const tryFetch = async (bearer: string) => {
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
-    const res = await fetch(`${baseUrl}/items/Activity_Type?fields=*`, {
-      headers: { Authorization: `Bearer ${bearer}` },
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const json = await res.json();
-    return (json.data ?? []) as ActivityType[];
-  };
-
+>('activityTypes/fetch', async (_, { rejectWithValue }) => {
   try {
-    return await tryFetch(token);
-  } catch (err: any) {
-    const msg = String(err?.message ?? err);
-    if (isTokenExpiredOrExpiring(auth.tokens?.expiresAt)) {
-      // try refresh once
-      const { tokens } = await dispatch(refresh()).unwrap();
-      if (!tokens?.accessToken) return rejectWithValue('Refresh failed');
-      return await tryFetch(tokens.accessToken);
-    }
-    return rejectWithValue(msg);
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<{ data: ActivityType[] }>(
+      '/items/Activity_Type?fields=*',
+      'GET'
+    );
+    
+    return response.data ?? [];
+  } catch (error: any) {
+    console.error('Fetch activity types error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch activity types');
   }
 });
 
