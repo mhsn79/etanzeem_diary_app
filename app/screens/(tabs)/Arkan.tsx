@@ -46,7 +46,7 @@ export default function Arkan() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState(0);
 
-  // Define tabs with badges
+  // Define tabs with badges in custom order
   const tabs = useMemo(() => {
     const allCount = persons.length;
     const typeCounts = (contactTypes || []).reduce((acc, type) => {
@@ -54,9 +54,17 @@ export default function Arkan() {
       return acc;
     }, {} as Record<number, number>);
 
+    // Define the desired order of contact types
+    const desiredOrder = ['umeedwar', 'rukun', 'karkun', 'others'];
+    
+    // Create ordered contact types array
+    const orderedContactTypes = desiredOrder
+      .map(typeString => contactTypes?.find(type => type.type === typeString))
+      .filter((type): type is NonNullable<typeof type> => Boolean(type)); // Remove undefined values with type guard
+
     return [
       { label: i18n.t('all'), value: 0, badge: allCount.toString() },
-      ...(contactTypes || []).map(type => ({
+      ...orderedContactTypes.map(type => ({
         label: i18n.t(type.type) || type.type,
         value: type.id,
         badge: typeCounts[type.id]?.toString() || '0'
@@ -133,6 +141,30 @@ export default function Arkan() {
     navigation.navigate('screens/RukunAddEdit', { rukun });
   }, [navigation]);
 
+  // Get the contact type label for a person
+  const getContactTypeLabel = useCallback((person: Person) => {
+    if (!person.contact_type || !contactTypes.length) {
+      return 'رکن'; // Default fallback
+    }
+    
+    const contactType = contactTypes.find(type => type.id === person.contact_type);
+    if (contactType) {
+      // Try to get translated label first, fallback to type name
+      return i18n.t(contactType.type) || contactType.type;
+    }
+    
+    return 'رکن'; // Default fallback
+  }, [contactTypes]);
+
+  // Handle card press to show detailed view
+  const handleCardPress = useCallback((item: Person) => {
+    const contactTypeLabel = getContactTypeLabel(item);
+    navigation.navigate('screens/RukunView', { 
+      rukun: item, 
+      contactTypeLabel 
+    });
+  }, [navigation, getContactTypeLabel]);
+
   // Render loading state
   if ((status === 'loading' || contactTypesStatus === 'loading') && !refreshing) {
     return (
@@ -199,7 +231,7 @@ export default function Arkan() {
           }}
           data={filteredData}
           keyExtractor={item => item.id.toString()}
-          renderItem={({ item }) => <RukunCard item={item} />}
+          renderItem={({ item }) => <RukunCard item={item} onCardPress={handleCardPress} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

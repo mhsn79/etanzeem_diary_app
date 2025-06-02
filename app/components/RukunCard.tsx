@@ -11,9 +11,10 @@ import ContactActionButton from './ContactActionButton';
 
 interface RukunCardProps {
   item: RukunData;
+  onCardPress?: (item: RukunData) => void;
 }
 
-const RukunCard: React.FC<RukunCardProps> = ({ item }) => {
+const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress }) => {
   const handleCall = (e: GestureResponderEvent) => {
     // Prevent the touch event from propagating to the parent
     e.stopPropagation();
@@ -41,7 +42,11 @@ const RukunCard: React.FC<RukunCardProps> = ({ item }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleViewDetails = () => {
-    navigation.navigate('screens/RukunView', { rukun: item });
+    if (onCardPress) {
+      onCardPress(item);
+    } else {
+      navigation.navigate('screens/RukunView', { rukun: item });
+    }
   };
 
   const handleEditDetails = (e: GestureResponderEvent) => {

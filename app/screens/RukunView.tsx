@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   GestureResponderEvent,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { Linking } from 'react-native';
 import {
@@ -55,7 +56,7 @@ const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 export default function RukunView() {
   /* ──────────── Navigation & Redux ────────────*/
   const {
-    params: { rukun },
+    params: { rukun, contactTypeLabel },
   } = useRoute<RukunDetailsRouteProp>();
 
   const dispatch = useAppDispatch();
@@ -65,12 +66,18 @@ export default function RukunView() {
   // Image upload state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
 
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
   const status = useAppSelector(selectPersonsStatus);
   const error = useAppSelector(selectPersonsError);
 
   const displayPerson = person ?? rukun;
+  
+  // Use the passed contact type label or fallback to default
+  const displayContactTypeLabel = contactTypeLabel || 'رکن';
   
   // Handle image upload
   const handleImageUpload = async (imageUri: string) => {
@@ -103,6 +110,18 @@ export default function RukunView() {
     }
   };
 
+  // Handle pull to refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await dispatch(fetchPersonById(rukun.id)).unwrap();
+    } catch (error) {
+      console.error('Error refreshing person data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dispatch, rukun.id]);
+
   /* ──────────── Data fetching ────────────*/
   useEffect(() => {
     // Always fetch the latest data when the screen is focused
@@ -130,19 +149,51 @@ export default function RukunView() {
   );
 
   /* ──────────── Derived state ────────────*/
-  const detailRows = useMemo(
-    () => [
-      { label: i18n.t('parent'), value: displayPerson.parent },
-      { label: i18n.t('dob'), value: displayPerson.dob },
-      { label: i18n.t('cnic'), value: displayPerson.cnic },
-      { label: i18n.t('unit'), value: displayPerson.unit },
-      { label: i18n.t('status'), value: displayPerson.status },
-      { label: i18n.t('phone_number'), value: displayPerson.phone_number },
-      { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
-      { label: i18n.t('email'), value: displayPerson.email },
-    ],
-    [displayPerson],
-  );
+  // Determine if this is a detailed contact type (umeedwar or rukun)
+  const isDetailedContactType = useMemo(() => {
+    // Check if contactTypeLabel contains umeedwar or rukun (in any language)
+    const label = contactTypeLabel?.toLowerCase() || '';
+    return label.includes('umeedwar') || label.includes('rukun') || 
+           label.includes('امیدوار') || label.includes('ارکان');
+  }, [contactTypeLabel]);
+
+  const detailRows = useMemo(() => {
+
+    console.log('=============7777777======isDetailedContactType--',isDetailedContactType,JSON.stringify(displayPerson));
+    
+    if (isDetailedContactType) {
+      // Comprehensive fields for umeedwar and rukun
+      return [
+        { label: i18n.t('father'), value: displayPerson.parent || displayPerson.Father_Name },
+        { label: i18n.t('unit'), value: displayPerson.unit || displayPerson.unit_name || displayPerson.Tanzeemi_Unit },
+        { label: i18n.t('gender'), value: displayPerson.gender || displayPerson.Gender },
+        { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
+        { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
+        { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
+        { label: i18n.t('cnic'), value: displayPerson.cnic || displayPerson.CNIC },
+        { label: i18n.t('dob'), value: displayPerson.dob || displayPerson.Date_of_birth },
+        { label: i18n.t('education'), value: displayPerson.education || displayPerson.Education },
+        { label: i18n.t('profession'), value: displayPerson.profession || displayPerson.Profession },
+        { label: i18n.t('rukn_no'), value: displayPerson.rukn_no || displayPerson.Rukn_No },
+        { label: i18n.t('rukinat_date'), value: displayPerson.rukinat_date || displayPerson.Rukinat_Date },
+        { label: i18n.t('transfer_from'), value: displayPerson.transfer_from || displayPerson.Transfer_from },
+        { label: i18n.t('transfer_to'), value: displayPerson.transfer_to || displayPerson.Transfet_to },
+      ].filter(row => row.value); // Only show rows with values
+    } else {
+      // Limited fields for karkun and others
+      return [
+        { label: i18n.t('unit'), value: displayPerson.unit || displayPerson.unit_name },
+        { label: i18n.t('unit_id'), value: displayPerson.unit_id },
+        { label: i18n.t('gender'), value: displayPerson.gender || displayPerson.Gender },
+        { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
+        { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
+        { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
+      ].filter(row => row.value); // Only show rows with values
+    }
+  }, [displayPerson, isDetailedContactType]);
+
+  // Get additional phone numbers if available
+  const additionalPhones = displayPerson.additional_phone_numbers || [];
 
   /* ──────────── Helpers ────────────*/
   const openLink = (url: string) =>
@@ -184,7 +235,7 @@ export default function RukunView() {
       <View style={styles.root}>
         {/* Header */}
         <ProfileHeader
-          title={'رکن'}
+          title={displayContactTypeLabel}
           backgroundSource={COMMON_IMAGES.profileBackground}
           avatarSource={
             displayPerson.picture
@@ -205,6 +256,14 @@ export default function RukunView() {
           contentContainerStyle={styles.scrollContent}
           style={styles.scrollWrapper}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
         >
           {/* Name & address */}
           <View style={styles.alignCenter}>
@@ -250,6 +309,22 @@ export default function RukunView() {
             {detailRows.map(({ label, value }) => (
               <DetailRow key={label} label={label} value={value ?? '-'} />
             ))}
+            
+            {/* Additional Phone Numbers Section */}
+            {additionalPhones.length > 0 && (
+              <View style={styles.additionalPhonesSection}>
+                <UrduText style={styles.sectionTitle}>
+                  {i18n.t('additional_phone_numbers')}
+                </UrduText>
+                {additionalPhones.map((phone: string, index: number) => (
+                  <DetailRow 
+                    key={`additional-phone-${index}`} 
+                    label={`${i18n.t('phone')} ${index + 2}`} 
+                    value={phone} 
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -330,6 +405,21 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontFamily: 'JameelNooriNastaleeq',
     fontSize: 20,
+  },
+  
+  /* additional sections */
+  additionalPhonesSection: {
+    marginTop: SPACING.lg,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: SPACING.sm,
+    fontFamily: 'JameelNooriNastaleeq',
   },
 
   /* async states */

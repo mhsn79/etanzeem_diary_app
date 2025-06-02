@@ -84,6 +84,7 @@
     "night": "رات",
     "organizational": "تنظیمی",
     "parent": "والدین",
+    "father": "والد",
     "participation": "شرکت",
     "password": "پاس ورڈ",
     "password_is_required": "پاس ورڈ لازمی ہے",
@@ -96,7 +97,7 @@
     "reports": "رپورٹیں",
     "reset_your_password": "اپنا پاس ورڈ دوبارہ ترتیب دیں",
     "role": "کردار",
-    "rukun": "رکن",
+    "rukun": "ارکان",
     "search_by_name_or_id": "نام یا شناختی کارڈ نمبر سے تلاش کریں",
     "secondary": "دوسرا",
     "select_duration": "مدت منتخب کریں",
@@ -176,7 +177,7 @@
     "access_denied": "رسائی مسترد",
     "access_denied_message": "آپ کو ایپ تک رسائی کی اجازت نہیں ہے۔ براہ کرم منتظم سے رابطہ کریں۔",
     "ok": "ٹھیک ہے",
-    "rukn": "رکن",
+    "rukn": "ارکان",
     "umeedwar": "امیدوار",
     "karkun": "کارکن",
     "others": "دیگر",
@@ -189,5 +190,6 @@
     "draft": "مسودہ",
     "published": "شائع شدہ",
     "pending": "زیر التواء",
+    "contacts":"رابطے",
     "loading_profile": "پروفائل لوڈ ہو رہا ہے"
 } 

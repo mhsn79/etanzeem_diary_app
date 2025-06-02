@@ -4,7 +4,7 @@ import { Person } from "@/app/models/Person";
 // Define your navigation params
 export type RootStackParamList = {
     // Home: undefined;
-    'screens/RukunView': { rukun: RukunData | Person };
+    'screens/RukunView': { rukun: RukunData | Person; contactTypeLabel?: string };
     'screens/RukunAddEdit': { rukun?: RukunData | Person };
     'screens/ProfileView': { profile?: RukunData | Person };
     'screens/ProfileEdit': { profile?: any };

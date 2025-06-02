@@ -88,7 +88,7 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
             <>
               {fullPath !== 'screens/(tabs)/Arkan' && <SmallTarazu style={{ width: 24, height: 24 }} />}
               <UrduText style={[styles.title, { color: "white" }]}>
-                {fullPath === 'screens/(tabs)/Arkan' ? i18n.t('arkan') : i18n.t('e-tanzeem')}
+                {fullPath === 'screens/(tabs)/Arkan' ? i18n.t('contacts') : i18n.t('e-tanzeem')}
               </UrduText>
             </>
           }
