@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
 import { fetchNazimDetails } from '../persons/personSlice';
+import { fetchCompleteTanzeemiHierarchy } from './tanzeemHierarchySlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
 
@@ -143,7 +144,7 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
     // If the unit has a Nazim_id, fetch the Nazim details
     if (transformedUnit.Nazim_id) {
       console.log(`Unit has Nazim_id: ${transformedUnit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
+      // dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
     }
     
     return transformedUnit;
@@ -266,7 +267,7 @@ const fetchAndProcessHierarchy = async (
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit.Nazim_id) {
       console.log(`Unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(unit.Nazim_id));
+      // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
     // Process zaili_unit_hierarchy if it exists and is an array
@@ -387,6 +388,15 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     // Add all units to the store at once
     dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
     
+    // Also populate the tanzeemHierarchy state for the new hierarchy system
+    const authState = getState().auth;
+    if (authState.user?.email) {
+      console.log('🔄 Dispatching fetchCompleteTanzeemiHierarchy for user:', authState.user.email);
+      dispatch(fetchCompleteTanzeemiHierarchy(authState.user.email));
+    } else {
+      console.log('❌ No user email found in auth state, cannot dispatch fetchCompleteTanzeemiHierarchy');
+    }
+    
     // If the unit has a level_id, fetch the level details
     if (unit && (unit.Level_id || unit.level_id)) {
       const levelId = unit.Level_id || unit.level_id;
@@ -399,7 +409,7 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit && unit.Nazim_id) {
       console.log(`User unit has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(unit.Nazim_id));
+      // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
     return { unit, hierarchyIds: uniqueHierarchyIds, hierarchyUnits };

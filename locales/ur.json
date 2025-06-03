@@ -187,9 +187,12 @@
     "education": "تعلیم",
     "gender": "جنس",
     "male": "مرد",
+    "female": "عورت",
+    "contact_type": "رابطے کی قسم",
     "draft": "مسودہ",
     "published": "شائع شدہ",
     "pending": "زیر التواء",
     "contacts":"رابطے",
-    "loading_profile": "پروفائل لوڈ ہو رہا ہے"
+    "loading_profile": "پروفائل لوڈ ہو رہا ہے",
+    "select_unit":"یونٹ منتخب کریں"
 } 

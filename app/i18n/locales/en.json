@@ -40,6 +40,8 @@
   "unit": "Tanzeemi Unit",
   "unit_id": "Unit ID",
   "unit_name": "Unit Name",
+  "tanzeemi_unit": "Tanzeemi Unit",
+  "select_tanzeemi_unit": "Select Tanzeemi Unit",
   "contact_type": "Contact Type",
   "contact_details": "Contact Details",
   "status": "Status",

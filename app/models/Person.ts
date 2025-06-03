@@ -47,16 +47,20 @@ export interface SinglePersonResponse {
 
 export interface CreatePersonPayload {
   name: string;
+  email?: string;
+  gender?: string;
+  phone?: string;
+  contact_type?: number;
+  tanzeemi_unit?: number;
+  status?: string;
+  // Optional fields for backward compatibility
   parent?: string;
   dob?: string;
   cnic?: string;
   unit?: string;
-  status?: string;
   address?: string;
-  phone?: string;
   whatsApp?: string;
   sms?: string;
-  email?: string;
   picture?: string | null;
 }
 

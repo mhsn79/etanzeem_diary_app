@@ -169,5 +169,12 @@
     "nazim_label": "Nazim Label",
     "access_denied": "Access Denied",
     "access_denied_message": "You don't have any access to the app. Please contact administrator.",
-    "ok": "OK"
+    "ok": "OK",
+    "update": "Update",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "contact_type": "Contact Type",
+    "karkun": "Karkun",
+    "others": "Others"
 }

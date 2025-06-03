@@ -1,5 +1,5 @@
 // app/screens/RukunAddEdit.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,7 +8,6 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Linking,
   Text,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,13 +27,21 @@ import {
   selectCreatePersonStatus,
   selectCreatePersonError,
   resetUpdateStatus,
-  resetCreateStatus
+  resetCreateStatus,
+  fetchContactTypes,
+  selectContactTypes,
+  selectContactTypesStatus,
+  selectContactTypesError
 } from '@/app/features/persons/personSlice';
+import {
+  selectSubordinateUnitsForDropdown
+} from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { Person, UpdatePersonPayload, CreatePersonPayload } from '@/app/models/Person';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
+import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import { COMMON_IMAGES } from '@/app/constants/images';
@@ -54,28 +61,47 @@ export default function RukunAddEdit() {
   const route = useRoute<RukunAddEditRouteProp>();
   
   // Get the rukun data from route params if it exists (for edit mode)
-  const isEditMode = !!route.params?.rukun;
   const initialRukun = route.params?.rukun;
+  const isEditMode = !!initialRukun && !!initialRukun.id;
   
   // Redux state for tracking API operations
   const updateStatus = useSelector(selectUpdatePersonStatus);
   const updateError = useSelector(selectUpdatePersonError);
   const createStatus = useSelector(selectCreatePersonStatus);
   const createError = useSelector(selectCreatePersonError);
+  const contactTypes = useSelector(selectContactTypes);
+  const contactTypesStatus = useSelector(selectContactTypesStatus);
+  const contactTypesError = useSelector(selectContactTypesError);
   
-  // Form state
-  const [formData, setFormData] = useState<UpdatePersonPayload | CreatePersonPayload>({
-    id: initialRukun?.id || 0,
-    name: initialRukun?.name || '',
-    parent: initialRukun?.parent || '',
-    dob: initialRukun?.dob || '',
-    cnic: initialRukun?.cnic || '',
-    status: initialRukun?.status || 'active',
-    address: initialRukun?.address || '',
-    phone: initialRukun?.phone || '',
-    whatsApp: initialRukun?.whatsApp || '',
-    email: initialRukun?.email || '',
-    picture: initialRukun?.picture || '',
+  // Redux state for hierarchy units (subordinate units for dropdown)
+  const tanzeemiUnitOptions = useSelector(selectSubordinateUnitsForDropdown);
+  
+  
+  // Form state - simplified to only required fields
+  const [formData, setFormData] = useState<UpdatePersonPayload | CreatePersonPayload>(() => {
+    if (isEditMode && initialRukun) {
+      return {
+        id: initialRukun.id,
+        name: initialRukun.name || initialRukun.Name || '',
+        email: initialRukun.email || initialRukun.Email || '',
+        gender: initialRukun.gender || initialRukun.Gender || 'male',
+        phone: initialRukun.phone || initialRukun.Phone_Number || '',
+        contact_type: initialRukun.contact_type || undefined,
+        tanzeemi_unit: initialRukun.Tanzeemi_Unit || undefined,
+        status: initialRukun.status || 'draft',
+      };
+    } else {
+      // Create mode - start with empty form
+      return {
+        name: '',
+        email: '',
+        gender: 'male',
+        phone: '',
+        contact_type: undefined,
+        tanzeemi_unit: undefined,
+        status: 'draft',
+      };
+    }
   });
   
   // Image upload state
@@ -85,6 +111,13 @@ export default function RukunAddEdit() {
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
   
+  // Fetch contact types on component mount
+  useEffect(() => {
+    if (contactTypesStatus === 'idle') {
+      dispatch(fetchContactTypes());
+    }
+  }, [dispatch, contactTypesStatus]);
+
   // Hide the header
   useEffect(() => {
     navigation.setOptions({ 
@@ -92,9 +125,28 @@ export default function RukunAddEdit() {
       title: isEditMode ? i18n.t('edit_rukun') : i18n.t('add_rukun')
     });
   }, [navigation, isEditMode]);
+
+  // Gender options
+  const genderOptions: Option[] = useMemo(() => [
+    { id: 'male', label: i18n.t('male'), value: 'male' },
+    { id: 'female', label: i18n.t('female'), value: 'female' },
+  ], []);
+
+  // Contact type options - filtered to only show "karkun" and "others"
+  const contactTypeOptions: Option[] = useMemo(() => {
+    if (!contactTypes || contactTypes.length === 0) return [];
+    
+    return contactTypes
+      .filter(type => type.type === 'karkun' || type.type === 'others')
+      .map(type => ({
+        id: type.id.toString(),
+        label: i18n.t(type.type) || type.type,
+        value: type.id.toString()
+      }));
+  }, [contactTypes]);
   
   // Handle form input changes
-  const handleChange = (field: keyof typeof formData, value: string) => {
+  const handleChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Clear error for this field if it exists
@@ -106,22 +158,31 @@ export default function RukunAddEdit() {
       });
     }
   };
+
+  // Handle dropdown selections
+  const handleGenderSelect = (option: Option) => {
+    handleChange('gender', option.value);
+  };
+
+  const handleContactTypeSelect = (option: Option) => {
+    handleChange('contact_type', parseInt(option.value));
+  };
+
+  const handleTanzeemiUnitSelect = (option: Option) => {
+    handleChange('tanzeemi_unit', parseInt(option.value));
+  };
   
   // Validate form
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
     // Required fields
-    if (!formData.name) newErrors.name = i18n.t('field_required');
-    if (!formData.phone) newErrors.phone = i18n.t('field_required');
-    
-    // CNIC validation (if provided)
-    if (formData.cnic && !/^\d{5}-\d{7}-\d{1}$/.test(formData.cnic)) {
-      newErrors.cnic = i18n.t('invalid_cnic_format');
-    }
+    if (!formData.name?.trim()) newErrors.name = i18n.t('field_required');
+    if (!formData.phone?.trim()) newErrors.phone = i18n.t('field_required');
+    if (!formData.contact_type) newErrors.contact_type = i18n.t('field_required');
     
     // Email validation (if provided)
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.email && formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = i18n.t('invalid_email_format');
     }
     
@@ -137,12 +198,22 @@ export default function RukunAddEdit() {
       if (isEditMode && 'id' in formData) {
         // Update existing rukun
         await dispatch(updatePerson(formData as UpdatePersonPayload)).unwrap();
+        Alert.alert(
+          i18n.t('success'),
+          'Person updated successfully',
+          [{ text: i18n.t('ok') }]
+        );
       } else {
         // Create new rukun
         await dispatch(createPerson(formData as CreatePersonPayload)).unwrap();
+        Alert.alert(
+          i18n.t('success'),
+          'Person created successfully',
+          [{ text: i18n.t('ok') }]
+        );
       }
       
-      // Navigate back on success
+      // Navigate back on success and refresh the list
       navigation.goBack();
     } catch (error) {
       console.error('Error saving rukun:', error);
@@ -222,8 +293,8 @@ export default function RukunAddEdit() {
           title={isEditMode ? 'رکن': i18n.t('add_rukun')}
           backgroundSource={COMMON_IMAGES.profileBackground}
           avatarSource={
-            formData.picture
-              ? { uri: getImageUrl(formData.picture as string) }
+            (isEditMode && initialRukun?.picture)
+              ? { uri: getImageUrl(initialRukun.picture as string) }
               : require('@/assets/images/avatar.png')
           }
           onBackPress={handleBackPress}
@@ -240,7 +311,7 @@ export default function RukunAddEdit() {
           contentContainerStyle={styles.scrollContent}
           style={styles.scrollWrapper}
         >
-          {/* Form Fields */}
+          {/* Simplified Form Fields */}
           <FormInput
             inputTitle={i18n.t('name')}
             value={formData.name || ''}
@@ -248,61 +319,6 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_name')}
             error={errors.name}
             required
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('parent')}
-            value={formData.parent || ''}
-            onChange={(value) => handleChange('parent', value)}
-            placeholder={i18n.t('enter_parent_name')}
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('dob')}
-            value={formData.dob || ''}
-            onChange={(value) => handleChange('dob', value)}
-            placeholder="DD/MM/YYYY"
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('cnic')}
-            value={formData.cnic || ''}
-            onChange={(value) => handleChange('cnic', value)}
-            placeholder="00000-0000000-0"
-            error={errors.cnic}
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('unit')}
-            value={formData.unit !== undefined ? formData.unit.toString() : ''}
-            onChange={(value) => handleChange('unit', value)}
-            placeholder={i18n.t('enter_unit')}
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('address')}
-            value={formData.address || ''}
-            onChange={(value) => handleChange('address', value)}
-            placeholder={i18n.t('enter_address')}
-            multiline
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('phone_number')}
-            value={formData.phone || ''}
-            onChange={(value) => handleChange('phone', value)}
-            placeholder={i18n.t('enter_phone')}
-            keyboardType="phone-pad"
-            error={errors.phone}
-            required
-          />
-          
-          <FormInput
-            inputTitle={i18n.t('whatsapp_number')}
-            value={formData.whatsApp || ''}
-            onChange={(value) => handleChange('whatsApp', value)}
-            placeholder={i18n.t('enter_whatsapp')}
-            keyboardType="phone-pad"
           />
           
           <FormInput
@@ -314,6 +330,51 @@ export default function RukunAddEdit() {
             error={errors.email}
           />
 
+          <CustomDropdown
+            dropdownTitle={i18n.t('gender')}
+            options={genderOptions}
+            onSelect={handleGenderSelect}
+            selectedValue={formData.gender}
+            placeholder={i18n.t('gender')}
+            viewStyle={styles.dropdownContainer}
+          />
+          
+          <FormInput
+            inputTitle={i18n.t('phone_number')}
+            value={formData.phone || ''}
+            onChange={(value) => handleChange('phone', value)}
+            placeholder={i18n.t('enter_phone')}
+            keyboardType="phone-pad"
+            error={errors.phone}
+            required
+          />
+
+          <CustomDropdown
+            dropdownTitle={i18n.t('contact_type')}
+            options={contactTypeOptions}
+            onSelect={handleContactTypeSelect}
+            selectedValue={formData.contact_type?.toString()}
+            placeholder={i18n.t('contact_type')}
+            loading={contactTypesStatus === 'loading'}
+            viewStyle={styles.dropdownContainer}
+          />
+          
+          {errors.contact_type && (
+            <Text style={styles.fieldErrorText}>{errors.contact_type}</Text>
+          )}
+          <CustomDropdown
+            dropdownTitle={i18n.t('unit')}
+            options={tanzeemiUnitOptions}
+            onSelect={handleTanzeemiUnitSelect}
+            selectedValue={formData.tanzeemi_unit?.toString()}
+            placeholder={i18n.t('select_unit')}
+            viewStyle={styles.dropdownContainer}
+          />
+          
+          {errors.tanzeemi_unit && (
+            <Text style={styles.fieldErrorText}>{errors.tanzeemi_unit}</Text>
+          )}
+
           {/* Error messages */}
           {(updateError || createError) && (
             <Text style={styles.errorText}>
@@ -324,7 +385,7 @@ export default function RukunAddEdit() {
           {/* Submit Button */}
           <View style={styles.buttonContainer}>
             <CustomButton
-              text={isEditMode ? 'اپڈیٹ کریں' : i18n.t('save')}
+              text={isEditMode ? i18n.t('update') : i18n.t('save')}
               onPress={handleSubmit}
               viewStyle={styles.submitBtn}
               disabled={isLoading}
@@ -384,5 +445,14 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: SPACING.md,
+  },
+  dropdownContainer: {
+    marginBottom: SPACING.md,
+  },
+  fieldErrorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
 });

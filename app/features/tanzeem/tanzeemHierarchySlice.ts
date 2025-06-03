@@ -81,13 +81,21 @@ const fetchAndProcessParentHierarchy = async (
       method: 'GET'
     }));
     
-    if (!response.data) {
+    // Handle both possible response structures
+    let unitData: any;
+    if (response.data) {
+      // Wrapped in data property
+      unitData = response.data;
+    } else if ((response as any).id) {
+      // Direct unit object response
+      unitData = response;
+    } else {
       console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { parentUnits: allUnits };
     }
     
     // Transform the API response to match our expected format
-    const unit = normalizeTanzeemiUnitData(response.data);
+    const unit = normalizeTanzeemiUnitData(unitData);
     
     // Add the current unit to our collection as a parent unit (under_mine: false)
     const hierarchyUnit: HierarchyUnit = {
@@ -99,7 +107,7 @@ const fetchAndProcessParentHierarchy = async (
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit.Nazim_id) {
       console.log(`Parent unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(unit.Nazim_id));
+      // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
     // If the unit has a Level_id, fetch the level details
@@ -163,13 +171,21 @@ const fetchAndProcessSubordinateHierarchy = async (
       method: 'GET'
     }));
     
-    if (!response.data) {
+    // Handle both possible response structures
+    let unitData: any;
+    if (response.data) {
+      // Wrapped in data property
+      unitData = response.data;
+    } else if ((response as any).id) {
+      // Direct unit object response
+      unitData = response;
+    } else {
       console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { subordinateUnits: allUnits };
     }
     
     // Transform the API response to match our expected format
-    const unit = normalizeTanzeemiUnitData(response.data);
+    const unit = normalizeTanzeemiUnitData(unitData);
     
     // Add the current unit to our collection as a subordinate unit (under_mine: true)
     // except for the user's unit itself which should be under_mine: false
@@ -182,7 +198,7 @@ const fetchAndProcessSubordinateHierarchy = async (
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit.Nazim_id) {
       console.log(`Subordinate unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(unit.Nazim_id));
+      // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
     // If the unit has a Level_id, fetch the level details
@@ -252,11 +268,23 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
     
     console.log('API Response for person by email:', personResponse);
     
-    if (!personResponse.data || personResponse.data.length === 0) {
+    // Handle both possible response structures
+    let personData: any[];
+    if (Array.isArray(personResponse)) {
+      // Direct array response
+      personData = personResponse;
+    } else if (personResponse.data && Array.isArray(personResponse.data)) {
+      // Wrapped in data property
+      personData = personResponse.data;
+    } else {
+      throw new Error(`Invalid response structure for email ${normalizedEmail}`);
+    }
+    
+    if (!personData || personData.length === 0) {
       throw new Error(`No person found with email ${normalizedEmail}`);
     }
     
-    const user = normalizePersonData(personResponse.data[0]);
+    const user = normalizePersonData(personData[0]);
     
     // Step 2: Extract the Tanzeemi_Unit ID from the user's record
     const userUnitId = user.Tanzeemi_Unit || user.unit;
@@ -274,11 +302,19 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
     
     console.log('API Response for user tanzeemi unit:', unitResponse);
     
-    if (!unitResponse.data) {
+    // Handle both possible response structures
+    let unitData: any;
+    if (unitResponse.data) {
+      // Wrapped in data property
+      unitData = unitResponse.data;
+    } else if ((unitResponse as any).id) {
+      // Direct unit object response
+      unitData = unitResponse;
+    } else {
       throw new Error(`Tanzeemi unit with ID ${userUnitId} not found`);
     }
     
-    const userUnit = normalizeTanzeemiUnitData(unitResponse.data);
+    const userUnit = normalizeTanzeemiUnitData(unitData);
     
     // Create the user's unit with under_mine: false
     const userHierarchyUnit: HierarchyUnit = {
@@ -377,16 +413,20 @@ const tanzeemHierarchySlice = createSlice({
   extraReducers: builder => {
     builder
       .addCase(fetchCompleteTanzeemiHierarchy.pending, state => {
+        console.log('⏳ fetchCompleteTanzeemiHierarchy.pending');
         state.status = 'loading';
         state.error = null;
       })
       .addCase(fetchCompleteTanzeemiHierarchy.fulfilled, (state, action) => {
+        console.log('🎉 fetchCompleteTanzeemiHierarchy.fulfilled - payload:', action.payload);
         state.status = 'succeeded';
         state.hierarchyUnits = action.payload.hierarchyUnits;
         state.hierarchyIds = action.payload.hierarchyIds;
         state.userUnitId = action.payload.userUnitId;
+        console.log('🎉 Updated state - hierarchyUnits:', state.hierarchyUnits?.length || 0, 'units');
       })
       .addCase(fetchCompleteTanzeemiHierarchy.rejected, (state, action) => {
+        console.log('❌ fetchCompleteTanzeemiHierarchy.rejected - error:', action.payload);
         state.status = 'failed';
         state.error = action.payload || 'Failed to fetch hierarchy';
       });
@@ -405,7 +445,11 @@ export const selectTanzeemHierarchyState = (state: RootState) => state.tanzeemHi
 // Memoized selectors
 export const selectAllHierarchyUnits = createSelector(
   [selectTanzeemHierarchyState],
-  (hierarchyState) => hierarchyState.hierarchyUnits
+  (hierarchyState) => {
+    console.log('selectAllHierarchyUnits - hierarchyState:', hierarchyState);
+    console.log('selectAllHierarchyUnits - hierarchyUnits:', hierarchyState.hierarchyUnits?.length || 0, 'units');
+    return hierarchyState.hierarchyUnits;
+  }
 );
 
 export const selectHierarchyIds = createSelector(
@@ -431,6 +475,52 @@ export const selectSubordinateUnits = createSelector(
 export const selectParentUnits = createSelector(
   [selectAllHierarchyUnits, selectUserUnitId],
   (units, userUnitId) => units.filter(unit => !unit.under_mine && unit.id !== userUnitId)
+);
+
+// Selector for subordinate units display text (used in Dashboard)
+export const selectSubordinateUnitsDisplayText = createSelector(
+  [selectAllHierarchyUnits],
+  (hierarchyUnits) => {
+    console.log('selectSubordinateUnitsDisplayText - hierarchyUnits:', hierarchyUnits?.length || 0, 'units');
+    console.log('selectSubordinateUnitsDisplayText - hierarchyUnits data:', hierarchyUnits);
+    
+    if (!hierarchyUnits || hierarchyUnits.length <= 1) return '';
+    
+    const subordinateText = hierarchyUnits
+      .slice(1)
+      .map((unit) => unit.Name || unit.name)
+      .filter(Boolean)
+      .join('، ');
+    
+    console.log('selectSubordinateUnitsDisplayText - subordinateText:', subordinateText);
+    
+    return subordinateText.length > 30 
+      ? subordinateText.substring(0, 27) + '...' 
+      : subordinateText;
+  }
+);
+
+// Selector for dropdown options (subordinate units only)
+export const selectSubordinateUnitsForDropdown = createSelector(
+  [selectAllHierarchyUnits],
+  (hierarchyUnits) => {
+    console.log('selectSubordinateUnitsForDropdown - hierarchyUnits:', hierarchyUnits?.length || 0, 'units');
+    console.log('selectSubordinateUnitsForDropdown - hierarchyUnits data:', hierarchyUnits);
+    
+    if (!hierarchyUnits || hierarchyUnits.length <= 1) return [];
+    
+    const dropdownOptions = hierarchyUnits
+      .slice(1) // Skip the first unit (user's own unit)
+      .map(unit => ({
+        id: unit.id.toString(),
+        label: unit.name || unit.Name || `Unit ${unit.id}`,
+        value: unit.id.toString()
+      }));
+    
+    console.log('selectSubordinateUnitsForDropdown - dropdownOptions:', dropdownOptions);
+    
+    return dropdownOptions;
+  }
 );
 
 export const selectHierarchyStatus = createSelector(

@@ -75,6 +75,13 @@ export const fetchPersonsByUnit = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchByUnit', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping fetch persons by unit (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
     const { tanzeem } = getState();
     const tanzeemiUnitIds = tanzeem?.userUnitHierarchyIds ?? [];
     if (!tanzeemiUnitIds.length) {
@@ -127,6 +134,13 @@ export const fetchPersonByEmail = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchByEmail', async (email, { getState, dispatch, rejectWithValue }) => {
   try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping fetch person by email (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
     // Normalize the email to lowercase to ensure consistent handling across platforms
     const normalizedEmail = email.trim().toLowerCase();
     
@@ -148,7 +162,7 @@ export const fetchPersonByEmail = createAsyncThunk<
         'GET'
       );
       
-      console.log(`[Persons] Fetching person response by email (${Platform.OS})`, response);
+      // console.log(`[Persons] Fetching person response by email (${Platform.OS})`, response);
 
       if (!response.data || response.data.length === 0) {
         console.log(`[Persons] No person found with email ${normalizedEmail} (${Platform.OS})`);
@@ -253,30 +267,64 @@ export const createPerson = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/create', async (personData, { getState, dispatch, rejectWithValue }) => {
   try {
-    const apiPersonData = {
+
+    // Map form fields to API payload structure
+    const apiPersonData: Record<string, any> = {
       Name: personData.name,
-      Address: personData.address,
+      Email: personData.email || '',
+      Gender: personData.gender || 'male',
       Phone_Number: personData.phone,
-      Email: personData.email,
-      Father_Name: personData.parent,
-      Date_of_birth: personData.dob,
-      CNIC: personData.cnic,
-      Tanzeemi_Unit: personData.unit,
+      contact_type: personData.contact_type,
       status: personData.status || 'draft',
-      Gender: 'm',
+      // Add some default values that might be required
+      Address: '',
+      Father_Name: '',
+      CNIC: '',
+      Date_of_birth: null,
+      Tanzeemi_Unit: personData.tanzeemi_unit || null,
+      Education: null,
+      Profession: null,
     };
 
-    // Use the centralized apiRequest function which handles token refresh automatically
-    const response = await apiRequest<SinglePersonResponse>(() => ({
-      path: '/items/Person',
-      method: 'POST',
-      body: apiPersonData
-    }));
+    // Remove undefined values to keep payload clean
+    Object.keys(apiPersonData).forEach(key => {
+      if (apiPersonData[key] === undefined) {
+        delete apiPersonData[key];
+      }
+    });
+
+    console.log(`[Persons][CreatePerson] API payload (${Platform.OS}):`, apiPersonData);
+    console.log(`[Persons][CreatePerson] API request details - URL: /items/Person, Method: POST (${Platform.OS})`);
+
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SinglePersonResponse>(
+      '/items/Person',
+      'POST',
+      apiPersonData
+    );
     
-    if (!response.data) throw new Error('Failed to create person');
-    return normalizePersonData(response.data);
+    console.log(`[Persons][CreatePerson] API response (${Platform.OS}):`, response);
+    
+    if (!response) {
+      const errorMsg = 'Failed to create person - no response';
+      console.error(`[Persons][CreatePerson] Error: ${errorMsg} (${Platform.OS})`);
+      throw new Error(errorMsg);
+    }
+
+    // Check if the response has the expected data
+    if (!response.data || !response.data.id) {
+      const errorMsg = 'Failed to create person - response missing data or ID';
+      if (response.data) {
+        console.error(`[Persons][CreatePerson] Data structure:`, Object.keys(response.data));
+      }
+      throw new Error(errorMsg);
+    }
+
+    const normalizedPerson = normalizePersonData(response.data);
+    
+    return normalizedPerson;
   } catch (error: any) {
-    console.error(`[Persons] Create person error: ${error.message} (${Platform.OS})`);
+   
     return rejectWithValue(error.message || 'Failed to create person');
   }
 });
@@ -290,22 +338,28 @@ export const updatePerson = createAsyncThunk<
   try {
     const { id, ...updateData } = personData;
     const apiPersonData: Record<string, any> = {};
+    
+    // Map new simplified fields
     if (updateData.name !== undefined) apiPersonData.Name = updateData.name;
-    if (updateData.address !== undefined) apiPersonData.Address = updateData.address;
-    if (updateData.phone !== undefined) apiPersonData.Phone_Number = updateData.phone;
     if (updateData.email !== undefined) apiPersonData.Email = updateData.email;
+    if (updateData.gender !== undefined) apiPersonData.Gender = updateData.gender;
+    if (updateData.phone !== undefined) apiPersonData.Phone_Number = updateData.phone;
+    if (updateData.contact_type !== undefined) apiPersonData.contact_type = updateData.contact_type;
+    if (updateData.status !== undefined) apiPersonData.status = updateData.status;
+    
+    // Keep backward compatibility for existing fields
+    if (updateData.address !== undefined) apiPersonData.Address = updateData.address;
     if (updateData.parent !== undefined) apiPersonData.Father_Name = updateData.parent;
     if (updateData.dob !== undefined) apiPersonData.Date_of_birth = updateData.dob;
     if (updateData.cnic !== undefined) apiPersonData.CNIC = updateData.cnic;
     if (updateData.unit !== undefined) apiPersonData.Tanzeemi_Unit = updateData.unit;
-    if (updateData.status !== undefined) apiPersonData.status = updateData.status;
 
-    // Use the centralized apiRequest function which handles token refresh automatically
-    const response = await apiRequest<SinglePersonResponse>(() => ({
-      path: `/items/Person/${id}`,
-      method: 'PATCH',
-      body: apiPersonData
-    }));
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<SinglePersonResponse>(
+      `/items/Person/${id}`,
+      'PATCH',
+      apiPersonData
+    );
     
     if (!response.data) throw new Error(`Failed to update person with ID ${id}`);
     return normalizePersonData(response.data);
@@ -393,6 +447,13 @@ export const fetchNazimDetails = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchNazimDetails', async (unitOrNazimId, { getState, dispatch, rejectWithValue }) => {
   try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping fetch Nazim details (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
     console.log(`[Persons] Fetching Nazim details... (${Platform.OS})`);
     
     // Extract Nazim_id from the unit object or use the provided ID directly
@@ -432,6 +493,13 @@ export const fetchContactTypes = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchContactTypes', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping fetch contact types (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
     console.log(`[Persons] Fetching contact types... (${Platform.OS})`);
     
     // Use directApiRequest which uses fetch directly for more reliable results

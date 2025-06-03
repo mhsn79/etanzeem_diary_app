@@ -25,12 +25,15 @@ import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/const
 import { AntDesign } from '@expo/vector-icons';
 import Dialog from '@/app/components/Dialog';
 import {
-  selectAllHierarchyUnits,
   selectUserUnitDetails,
   selectUserUnitStatus,
   selectUserUnitError,
   selectUserTanzeemiLevelStatus,
 } from '@/app/features/tanzeem/tanzeemSlice';
+import {
+  selectAllHierarchyUnits,
+  selectSubordinateUnitsDisplayText
+} from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { selectNazimDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store';
 import HeaderInfoItem from './components/HeaderInfoItem';
@@ -78,12 +81,11 @@ const Dashboard = () => {
   const colorScheme = useColorScheme();
   const styles = getStyles(colorScheme);
   const isRtl = i18n.locale === 'ur';
-  const dispatch = useDispatch<AppDispatch>();
   const userUnit = useSelector(selectUserUnitDetails);
   const userUnitStatus = useSelector(selectUserUnitStatus);
   const userUnitError = useSelector(selectUserUnitError);
-  const userTanzeemLevelStatus = useSelector(selectUserTanzeemiLevelStatus);
-  const hierarchyUnits = useSelector(selectAllHierarchyUnits);
+
+  const subordinateUnitsDisplayText = useSelector(selectSubordinateUnitsDisplayText);
   const nazimDetails = useSelector(selectNazimDetails);
   const [showDialog, setShowDialog] = useState(false);
   const [showUnitSelectionModal, setShowUnitSelectionModal] = useState(false);
@@ -97,21 +99,9 @@ const Dashboard = () => {
     }
   }, [userUnitStatus, userUnit, userUnitError]);
 
-  useEffect(() => {
-    console.log('User tanzeemi level status:', userTanzeemLevelStatus);
-  }, [userTanzeemLevelStatus]);
+ 
 
-  useEffect(() => {
-    console.log('Hierarchy units:', hierarchyUnits);
-  }, [hierarchyUnits]);
 
-  const scheduleForToday: ScheduleItem[] = [
-    { eventName: 'Event 1', startTime: '10:00 AM', endTime: '12:00 PM', location: 'Room 101', description: 'Description for Event 1', type: 'type-1' },
-    { eventName: 'Event 2', startTime: '2:00 PM', endTime: '4:00 PM', location: 'Room 102', description: 'Description for Event 2', type: 'type-2' },
-    { eventName: 'Event 3', startTime: '5:00 PM', endTime: '7:00 PM', location: 'Room 103', description: 'Description for Event 3', type: 'type-3' },
-    { eventName: 'Event 4', startTime: '8:00 PM', endTime: '10:00 PM', location: 'Room 104', description: 'Description for Event 4', type: 'type-4' },
-    { eventName: 'Event 5', startTime: '11:00 PM', endTime: '1:00 AM', location: 'Room 105', description: 'Description for Event 5', type: 'type-5' },
-  ];
 
   const durationItemNames: Option[] = [
     { id: '1', label: i18n.t('last_2_weeks'), value: 'last_2_weeks' },
@@ -229,16 +219,7 @@ const Dashboard = () => {
                   isLeftUpArrowWhite
                 />
                 <HeaderInfoItem
-                  text={
-                    hierarchyUnits && hierarchyUnits.length > 1
-                      ? hierarchyUnits
-                          .slice(1)
-                          .map((unit) => unit.Name || unit.name)
-                          .filter(Boolean)
-                          .join('، ')
-                          .substring(0, 27) + (hierarchyUnits.length > 1 && hierarchyUnits.slice(1).join('، ').length > 30 ? '...' : '')
-                      : i18n.t('zone')
-                  }
+                  text={subordinateUnitsDisplayText || i18n.t('zone')}
                   icon={LocationIcon}
                   iconProps={{ style: styles.locationIcon }}
                   colorScheme={colorScheme}
@@ -253,7 +234,7 @@ const Dashboard = () => {
               </View>
             </View>
             <ScheduleCard
-              schedule={scheduleForToday}
+              scheduleLength={4}
               formattedDate={formattedDate}
               onPress={() => router.push('/screens/Activities')}
               colorScheme={colorScheme}

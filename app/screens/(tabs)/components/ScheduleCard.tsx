@@ -5,13 +5,13 @@ import { COLORS, SPACING } from '@/app/constants/theme';
 import { ScheduleItem } from './types';
 
 interface ScheduleCardProps {
-  schedule: ScheduleItem[];
+  scheduleLength: number;
   formattedDate: string;
   onPress: () => void;
   colorScheme?: string | null | undefined;
 }
 
-const ScheduleCard = memo(({ schedule, formattedDate, onPress, colorScheme }: ScheduleCardProps) => {
+const ScheduleCard = memo(({ scheduleLength=0, formattedDate, onPress, colorScheme }: ScheduleCardProps) => {
   const styles = getStyles(colorScheme);
   
   return (
@@ -19,7 +19,7 @@ const ScheduleCard = memo(({ schedule, formattedDate, onPress, colorScheme }: Sc
     <View style={styles.scheduleCard}>
       <TouchableOpacity onPress={onPress} style={styles.scheduleItemContainer}>
         <UrduText style={styles.scheduleText}>
-          {schedule.length > 0 ? 'آج آپ کے شیڈول میں تین سرگرمیاں ہیں۔' : 'آج آپ کے شیڈول میں کوئی سرگرمی نہیں ہے۔'}
+          {scheduleLength > 0 ? 'آج آپ کے شیڈول میں'+ scheduleLength+ ' سرگرمیاں ہیں۔' : 'آج آپ کے شیڈول میں کوئی سرگرمی نہیں ہے۔'}
         </UrduText>
         <UrduText style={styles.scheduleText}>{formattedDate}</UrduText>
       </TouchableOpacity>

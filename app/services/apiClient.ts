@@ -55,7 +55,7 @@ const processQueue = (error: Error | null) => {
 };
 
 /**
- * Wait for token refresh to complete
+ * Wait for token refresh to complete with timeout
  * This function checks if a refresh is in progress and waits for it to complete
  */
 const waitForTokenRefresh = async (): Promise<void> => {
@@ -63,9 +63,21 @@ const waitForTokenRefresh = async (): Promise<void> => {
   
   if (state.auth.isRefreshing) {
     console.log(`[API] Token refresh in progress, waiting... (${Platform.OS})`);
-    return new Promise<void>((resolve, reject) => {
-      requestQueue.push({ resolve, reject });
-    });
+    
+    // Wait for refresh to complete with a timeout
+    const timeout = 10000; // 10 seconds timeout
+    const startTime = Date.now();
+    
+    while (store.getState().auth.isRefreshing && (Date.now() - startTime) < timeout) {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+    }
+    
+    if (store.getState().auth.isRefreshing) {
+      console.warn(`[API] Token refresh timeout after ${timeout}ms (${Platform.OS})`);
+      throw new Error('Token refresh timeout');
+    }
+    
+    console.log(`[API] Token refresh completed, proceeding with request (${Platform.OS})`);
   }
 };
 

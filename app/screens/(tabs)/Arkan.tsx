@@ -130,15 +130,8 @@ export default function Arkan() {
 
   // Handle adding a new person
   const handleAddNewRukun = useCallback(() => {
-    const rukun: Person = {
-      id: 0,
-      name: '',
-      address: '',
-      phone: '',
-      picture: '',
-      status: 'draft',
-    };
-    navigation.navigate('screens/RukunAddEdit', { rukun });
+    // Navigate to create mode by not passing any rukun parameter
+    navigation.navigate('screens/RukunAddEdit', {});
   }, [navigation]);
 
   // Get the contact type label for a person
