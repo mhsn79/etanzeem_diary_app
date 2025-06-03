@@ -224,7 +224,7 @@ export default function Arkan() {
           }}
           data={filteredData}
           keyExtractor={item => item.id.toString()}
-          renderItem={({ item }) => <RukunCard item={item} onCardPress={handleCardPress} />}
+          renderItem={({ item }) => <RukunCard item={item} onCardPress={handleCardPress} contactTypes={contactTypes} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

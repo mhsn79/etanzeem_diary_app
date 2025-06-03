@@ -475,7 +475,6 @@ export const fetchNazimDetails = createAsyncThunk<
       'GET'
     );
     
-    console.log(`[Persons] API Response for Nazim details (${Platform.OS})`, response);
     if (!response.data) throw new Error(`Person with ID ${nazimId} not found`);
     
     // Transform the API response to match our expected format

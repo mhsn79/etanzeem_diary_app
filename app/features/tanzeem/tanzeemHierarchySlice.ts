@@ -299,9 +299,7 @@ export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
       path: `/items/Tanzeemi_Unit/${userUnitId}?fields=*`,
       method: 'GET'
     }));
-    
-    console.log('API Response for user tanzeemi unit:', unitResponse);
-    
+        
     // Handle both possible response structures
     let unitData: any;
     if (unitResponse.data) {
@@ -418,12 +416,10 @@ const tanzeemHierarchySlice = createSlice({
         state.error = null;
       })
       .addCase(fetchCompleteTanzeemiHierarchy.fulfilled, (state, action) => {
-        console.log('🎉 fetchCompleteTanzeemiHierarchy.fulfilled - payload:', action.payload);
         state.status = 'succeeded';
         state.hierarchyUnits = action.payload.hierarchyUnits;
         state.hierarchyIds = action.payload.hierarchyIds;
         state.userUnitId = action.payload.userUnitId;
-        console.log('🎉 Updated state - hierarchyUnits:', state.hierarchyUnits?.length || 0, 'units');
       })
       .addCase(fetchCompleteTanzeemiHierarchy.rejected, (state, action) => {
         console.log('❌ fetchCompleteTanzeemiHierarchy.rejected - error:', action.payload);
@@ -446,7 +442,6 @@ export const selectTanzeemHierarchyState = (state: RootState) => state.tanzeemHi
 export const selectAllHierarchyUnits = createSelector(
   [selectTanzeemHierarchyState],
   (hierarchyState) => {
-    console.log('selectAllHierarchyUnits - hierarchyState:', hierarchyState);
     console.log('selectAllHierarchyUnits - hierarchyUnits:', hierarchyState.hierarchyUnits?.length || 0, 'units');
     return hierarchyState.hierarchyUnits;
   }
@@ -482,7 +477,6 @@ export const selectSubordinateUnitsDisplayText = createSelector(
   [selectAllHierarchyUnits],
   (hierarchyUnits) => {
     console.log('selectSubordinateUnitsDisplayText - hierarchyUnits:', hierarchyUnits?.length || 0, 'units');
-    console.log('selectSubordinateUnitsDisplayText - hierarchyUnits data:', hierarchyUnits);
     
     if (!hierarchyUnits || hierarchyUnits.length <= 1) return '';
     

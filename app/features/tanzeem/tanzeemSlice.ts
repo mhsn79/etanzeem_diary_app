@@ -322,7 +322,6 @@ export const fetchTanzeemLevelById = createAsyncThunk<
       'GET'
     );
     
-    console.log('API Response for tanzeem level:', response);
     if (!response.data) throw new Error(`Tanzeem level with ID ${levelId} not found`);
     
     return response.data;
@@ -377,13 +376,12 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     // Fetch the unit and process its hierarchy using the centralized API client
     const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, dispatch, getState);
     console.log('unit------------------->>', unit);
-    console.log('==================this hierarchyUnits which are under mine==============>>>',hierarchyUnits);
+    console.log('==================this hierarchyUnits which are under mine==============>>>',hierarchyUnits.length);
     
     // Remove duplicates from the hierarchy IDs
     const uniqueHierarchyIds = [...new Set([...allIds, unitId])];
     console.log(`Completed hierarchy processing for unit ${unitId}. Found ${uniqueHierarchyIds.length} unique hierarchy IDs:`, uniqueHierarchyIds);
     console.log(`Collected ${hierarchyUnits.length} units in the hierarchy tree`);
-    console.log(hierarchyUnits);
     
     // Add all units to the store at once
     dispatch(addMultipleTanzeemiUnits(hierarchyUnits));

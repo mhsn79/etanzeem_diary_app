@@ -90,14 +90,6 @@ const Dashboard = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [showUnitSelectionModal, setShowUnitSelectionModal] = useState(false);
 
-  useEffect(() => {
-    console.log('User unit status:', userUnitStatus);
-    if (userUnitStatus === 'succeeded') {
-      console.log('User unit details:', userUnit);
-    } else if (userUnitStatus === 'failed') {
-      console.error('Error fetching user unit:', userUnitError);
-    }
-  }, [userUnitStatus, userUnit, userUnitError]);
 
  
 

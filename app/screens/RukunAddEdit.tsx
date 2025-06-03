@@ -368,6 +368,7 @@ export default function RukunAddEdit() {
             onSelect={handleTanzeemiUnitSelect}
             selectedValue={formData.tanzeemi_unit?.toString()}
             placeholder={i18n.t('select_unit')}
+            disabled={isEditMode}
             viewStyle={styles.dropdownContainer}
           />
           

@@ -9,12 +9,29 @@ import { COLORS, SIZES, SPACING, TYPOGRAPHY, SHADOWS } from '../constants/theme'
 import { Feather } from '@expo/vector-icons';
 import ContactActionButton from './ContactActionButton';
 
+interface ContactType {
+  id: number;
+  type: string;
+}
+
 interface RukunCardProps {
   item: RukunData;
   onCardPress?: (item: RukunData) => void;
+  contactTypes?: ContactType[];
 }
 
-const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress }) => {
+const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }) => {
+  // Helper function to determine if edit icon should be hidden
+  const shouldHideEditIcon = (): boolean => {
+    if (!contactTypes || !item.contact_type) return false;
+    
+    const contactType = contactTypes.find(type => type.id === item.contact_type);
+    if (!contactType) return false;
+    
+    // Hide edit icon for umeedwar and rukun contact types
+    return contactType.type === 'umeedwar' || contactType.type === 'rukun';
+  };
+
   const handleCall = (e: GestureResponderEvent) => {
     // Prevent the touch event from propagating to the parent
     e.stopPropagation();
@@ -76,13 +93,15 @@ const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress }) => {
             <UrduText style={styles.detail}>{item.address || 'No address'}</UrduText>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.viewIcon} 
-          onPress={handleEditDetails}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
-        </TouchableOpacity>
+        {!shouldHideEditIcon() && (
+          <TouchableOpacity 
+            style={styles.viewIcon} 
+            onPress={handleEditDetails}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
+          </TouchableOpacity>
+        )}
       </View>
       <View style={styles.divider} />
       <View style={styles.buttonContainer}>
