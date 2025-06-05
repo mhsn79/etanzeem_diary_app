@@ -157,10 +157,13 @@ export default function RukunView() {
            label.includes('امیدوار') || label.includes('ارکان');
   }, [contactTypeLabel]);
 
-  const detailRows = useMemo(() => {
+  // Determine if this is specifically a "rukun" contact type
+  const isRukunContactType = useMemo(() => {
+    const label = contactTypeLabel?.toLowerCase() || '';
+    return label.includes('rukun') || label.includes('ارکان');
+  }, [contactTypeLabel]);
 
-    console.log('=============7777777======isDetailedContactType--',isDetailedContactType,JSON.stringify(displayPerson));
-    
+  const detailRows = useMemo(() => {    
     if (isDetailedContactType) {
       // Comprehensive fields for umeedwar and rukun
       return [
@@ -226,6 +229,14 @@ export default function RukunView() {
     // Navigate to edit screen with the most up-to-date person data
     navigation.navigate('screens/RukunAddEdit', { rukun: displayPerson });
   };
+
+  const handleGenerateRukunUpdateRequest = () => {
+    // Navigate to Rukun Update screen
+    navigation.navigate('screens/RukunUpdateScreen', { 
+      rukun: displayPerson, 
+      contactTypeLabel: displayContactTypeLabel 
+    });
+  };
   /* ──────────── Main UI ────────────*/
   return (
     <KeyboardAvoidingView
@@ -242,7 +253,7 @@ export default function RukunView() {
               ? { uri: getImageUrl(displayPerson.picture) }
               : require('@/assets/images/avatar.png')
           }
-          showEditIcon
+          showEditIcon={!isDetailedContactType}
           onEditPress={handleEditDetails}
           showSettings={false}
           showCamera={true}
@@ -323,6 +334,19 @@ export default function RukunView() {
                     value={phone} 
                   />
                 ))}
+              </View>
+            )}
+
+            {/* Rukun Update Request Button */}
+            {isRukunContactType && (
+              <View style={styles.rukunUpdateSection}>
+                <CustomButton
+                  text={i18n.t('generate_rukun_update_request')}
+                  onPress={handleGenerateRukunUpdateRequest}
+                  viewStyle={styles.rukunUpdateButton}
+                  textStyle={styles.rukunUpdateButtonText}
+                 
+                />
               </View>
             )}
           </View>
@@ -440,5 +464,20 @@ const styles = StyleSheet.create({
   retryBtnText: {
     fontSize: 14,
     color: COLORS.black,
+  },
+
+  /* Rukun Update Section */
+  rukunUpdateSection: {
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+  },
+  rukunUpdateButton: {
+    backgroundColor: COLORS.primary,
+
+  },
+  rukunUpdateButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
   },
 });

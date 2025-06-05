@@ -64,5 +64,24 @@
   "role": "Role",
   "last_login": "Last Login",
   "go_back": "Go Back",
-  "save": "Save"
+  "save": "Save",
+  
+  "transfer_rukun": "Transfer Rukun",
+  "transfer_rukun_title": "Transfer Rukun",
+  "select_new_unit": "Select New Unit",
+  "choose_destination_unit": "Choose destination unit",
+  "current_unit": "Current Unit",
+  "confirm_transfer": "Confirm Transfer",
+  "confirm_transfer_title": "Confirm Transfer",
+  "confirm_transfer_description": "Are you sure you want to transfer \"{rukunName}\" from \"{currentUnit}\" to \"{newUnit}\"?\n\nThis action cannot be undone.",
+  "transfer": "Transfer",
+  "transferring": "Transferring...",
+  "transfer_successful": "Transfer Successful",
+  "transfer_successful_message": "{rukunName} has been successfully transferred to the new unit.",
+  "transfer_failed": "Transfer Failed",
+  "transfer_failed_message": "Transfer failed. Please try again.",
+  "please_select_unit": "Please select a unit to transfer to",
+  "unknown_unit": "Unknown Unit",
+  "success": "Success",
+  "ok": "OK"
 } 

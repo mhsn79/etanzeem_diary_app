@@ -39,6 +39,11 @@ interface PersonsExtraState {
   contactTypes: ContactType[];
   contactTypesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   contactTypesError: string | null;
+  transferStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  transferError: string | null;
+  rukunUpdateStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  rukunUpdateError: string | null;
+  rukunUpdateRequests: Record<number, any>; // Store update requests by contact_id
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -61,6 +66,11 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   contactTypes: [],
   contactTypesStatus: 'idle',
   contactTypesError: null,
+  transferStatus: 'idle',
+  transferError: null,
+  rukunUpdateStatus: 'idle',
+  rukunUpdateError: null,
+  rukunUpdateRequests: {},
 });
 
 // We use the centralized apiRequest function from services/apiClient
@@ -517,6 +527,419 @@ export const fetchContactTypes = createAsyncThunk<
   }
 });
 
+// Transfer Rukun to new unit
+export interface TransferRukunPayload {
+  id: number;
+  contact_id: number; // This is the new tanzeemi_unit ID
+}
+
+export interface RukunUpdateResponse {
+  data: {
+    id: number;
+    status: string;
+    sort: null | number;
+    user_created: string;
+    date_created: string;
+    user_updated: null | string;
+    date_updated: string;
+    date_of_birth: string;
+    Father_Name: string;
+    Phone_Number: string;
+    Email: string;
+    Address: string;
+    Profession: string;
+    Education: string;
+    Additional_Phones: null | string;
+    contact_id: number;
+  };
+}
+
+export const transferRukun = createAsyncThunk<
+  Person,
+  TransferRukunPayload,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/transferRukun', async (transferData, { getState, dispatch, rejectWithValue }) => {
+  try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping transfer rukun (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
+    console.log(`[Persons] Transferring Rukun ID ${transferData.id} to unit ${transferData.contact_id} (${Platform.OS})`);
+    
+    // First, get the current person data to capture the previous unit
+    let previousUnit = null;
+    try {
+      const currentPersonResponse = await directApiRequest<SinglePersonResponse>(
+        `/items/Person/${transferData.id}`,
+        'GET'
+      );
+      previousUnit = currentPersonResponse.data?.Tanzeemi_Unit || null;
+      console.log(`[Persons] Previous unit: ${previousUnit} (${Platform.OS})`);
+    } catch (error) {
+      console.warn(`[Persons] Could not fetch current person data: ${error} (${Platform.OS})`);
+    }
+    
+    // Step 1: Update the Person record with the new Tanzeemi_Unit
+    const updatePersonPayload = {
+      Tanzeemi_Unit: transferData.contact_id
+    };
+    
+    console.log('Updating Person record:', updatePersonPayload);
+    
+    const updateResponse = await directApiRequest<SinglePersonResponse>(
+      `/items/Person/${transferData.id}`,
+      'PATCH',
+      updatePersonPayload
+    );
+    console.log('----->>>>>>',updateResponse);
+    
+    
+    if (!updateResponse.data) throw new Error(`Failed to update person with ID ${transferData.id}`);
+    
+    console.log(`[Persons] Person update successful (${Platform.OS}):`, updateResponse.data);
+    
+    // Step 2: Log the transfer in Rukun_Update collection (optional)
+    try {
+      const transferLogPayload = {
+        // Transfer details
+        contact_id: updateResponse.data.Tanzeemi_Unit, // New unit ID        
+        // Person details from the updated response
+        Name: updateResponse.data.Name,
+        Email: updateResponse.data.Email,
+        Phone_Number: updateResponse.data.Phone_Number,
+        Father_Name: updateResponse.data.Father_Name,
+        Gender: updateResponse.data.Gender,
+        CNIC: updateResponse.data.CNIC,
+        Address: updateResponse.data.Address,
+        Profession: updateResponse.data.Profession,
+        Education: updateResponse.data.Education,
+        Date_of_birth: updateResponse.data.Date_of_birth,
+      
+        
+        // Transfer tracking
+        person_id: updateResponse.data.id,
+        Transfer_from: previousUnit, // Previous unit ID
+        Transfer_to: updateResponse.data.Tanzeemi_Unit, // New unit ID
+
+      };
+      
+      console.log('Logging transfer:', transferLogPayload);
+      
+      await directApiRequest<any>(
+        '/items/Rukn_Update',
+        'POST',
+        transferLogPayload
+      );
+      
+      console.log(`[Persons] Transfer logged successfully (${Platform.OS})`);
+    } catch (logError) {
+      console.warn(`[Persons] Failed to log transfer, but person update was successful (${Platform.OS}):`, logError);
+      // Don't throw error here as the main operation (person update) was successful
+    }
+    
+    // Return the normalized updated person data
+    return normalizePersonData(updateResponse.data);
+  } catch (error: any) {
+    console.error(`[Persons] Transfer rukun error: ${error.message || error} (${Platform.OS})`);
+    
+    // Handle specific API errors
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      return rejectWithValue('Authentication error. Please log in again.');
+    }
+    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      return rejectWithValue('You do not have permission to transfer this rukun.');
+    }
+    if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+      return rejectWithValue('Rukun or destination unit not found.');
+    }
+    if (error.message?.includes('500')) {
+      return rejectWithValue('Server error. Please try again later.');
+    }
+    
+    return rejectWithValue(error.message || `Failed to transfer rukun with ID ${transferData.id}`);
+  }
+});
+
+// Rukun Update Request interface
+export interface RukunUpdateRequest {
+  id?: number;
+  contact_id: number;
+  status: 'draft' | 'published';
+  Name?: string;
+  Father_Name?: string;
+  date_of_birth?: string;
+  Phone_Number?: string;
+  Email?: string;
+  Address?: string;
+  Profession?: string;
+  Education?: string;
+  Additional_Phones?: string;
+  date_created?: string;
+  user_created?: string | null;
+}
+
+// Fetch Rukun Update Request by contact_id
+export const fetchRukunUpdateRequest = createAsyncThunk<
+  RukunUpdateRequest | null,
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchRukunUpdateRequest', async (contactId, { getState, rejectWithValue }) => {
+  try {
+    console.log(`[Persons] 🚀 Starting fetchRukunUpdateRequest for contact_id: ${contactId} (${Platform.OS})`);
+    
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] ❌ User not authenticated for contact_id: ${contactId} (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+
+    console.log(`[Persons] ✅ Authentication verified for contact_id: ${contactId} (${Platform.OS})`);
+
+    const params = new URLSearchParams();
+    params.append('filter[contact_id][_eq]', contactId.toString());
+    params.append('fields', '*');
+    params.append('sort', '-date_created'); // Get the latest request
+
+    const apiUrl = `/items/Rukn_Update?${params.toString()}`;
+    console.log(`[Persons] 📡 Making API request to: ${apiUrl} (${Platform.OS})`);
+
+    const response = await directApiRequest<{ data: RukunUpdateRequest[] }>(
+      apiUrl,
+      'GET'
+    );
+
+    console.log(`[Persons] 📥 API Response received for contact_id: ${contactId} (${Platform.OS}):`, {
+      hasData: !!response.data,
+      dataLength: response.data?.length || 0,
+      responseKeys: Object.keys(response)
+    });
+
+    if (!response.data || response.data.length === 0) {
+      console.log(`[Persons] 📭 No Rukun Update Request found for contact_id: ${contactId} (${Platform.OS})`);
+      return null;
+    }
+
+    // Return the latest request
+    const latestRequest = response.data[0];
+    console.log(`[Persons] ✅ Found Rukun Update Request for contact_id: ${contactId} (${Platform.OS}):`, {
+      id: latestRequest.id,
+      status: latestRequest.status,
+      contact_id: latestRequest.contact_id,
+      hasName: !!latestRequest.Name,
+      hasPhone: !!latestRequest.Phone_Number,
+      hasEmail: !!latestRequest.Email,
+    });
+    
+    return latestRequest;
+  } catch (error: any) {
+    console.error(`[Persons] ❌ Fetch Rukun Update Request error for contact_id: ${contactId} (${Platform.OS}):`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return rejectWithValue(error.message || 'Failed to fetch Rukun Update Request');
+  }
+});
+
+// Submit Rukun Update Request
+export const submitRukunUpdateRequest = createAsyncThunk<
+  RukunUpdateRequest,
+  RukunUpdateRequest,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/submitRukunUpdateRequest', async (requestData, { getState, rejectWithValue }) => {
+  try {
+    console.log(`[Persons] 🚀 Starting submitRukunUpdateRequest for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+    console.log(`[Persons] 📝 Request data:`, {
+      contact_id: requestData.contact_id,
+      status: requestData.status,
+      hasId: !!requestData.id,
+      hasName: !!requestData.Name,
+      hasPhone: !!requestData.Phone_Number,
+      hasEmail: !!requestData.Email
+    });
+    
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] ❌ User not authenticated for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+
+    console.log(`[Persons] ✅ Authentication verified for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+
+    // Prepare payload matching the successful API format
+    const apiPayload: any = {
+      contact_id: Number(requestData.contact_id), // Convert to string as shown in successful example
+      status: requestData.status || 'draft', // Use 'draft' as default like in the example
+    };
+
+    // Add fields conditionally and with validation
+    if (requestData.Name && requestData.Name.trim()) {
+      apiPayload.Name = requestData.Name.trim().substring(0, 100); // Limit length
+    }
+    
+    if (requestData.Father_Name && requestData.Father_Name.trim()) {
+      apiPayload.Father_Name = requestData.Father_Name.trim().substring(0, 100);
+    }
+    
+    // Always include Phone_Number (can be null/empty)
+    if (requestData.Phone_Number && requestData.Phone_Number.trim()) {
+      // Clean and validate phone number
+      const phone = requestData.Phone_Number.trim().replace(/[^\d+\-\s()]/g, '');
+      if (phone.length <= 20) {
+        apiPayload.Phone_Number = phone;
+      } else {
+        apiPayload.Phone_Number = null;
+      }
+    } else {
+      apiPayload.Phone_Number = null;
+    }
+    
+    if (requestData.Email && requestData.Email.trim()) {
+      const email = requestData.Email.trim();
+      if (email.length <= 100 && email.includes('@')) {
+        apiPayload.Email = email;
+      }
+    }
+    
+    if (requestData.Address && requestData.Address.trim()) {
+      apiPayload.Address = requestData.Address.trim().substring(0, 255);
+    }
+    
+    if (requestData.Profession && requestData.Profession.trim()) {
+      apiPayload.Profession = requestData.Profession.trim().substring(0, 100);
+    }
+    
+    if (requestData.Education && requestData.Education.trim()) {
+      apiPayload.Education = requestData.Education.trim().substring(0, 100);
+    }
+    
+    // Always include Additional_Phones (can be null/empty)
+    if (requestData.Additional_Phones && requestData.Additional_Phones.trim()) {
+      const additionalPhone = requestData.Additional_Phones.trim().replace(/[^\d+\-\s()]/g, '');
+      if (additionalPhone.length <= 20) {
+        apiPayload.Additional_Phones = additionalPhone;
+      } else {
+        apiPayload.Additional_Phones = null;
+      }
+    } else {
+      apiPayload.Additional_Phones = null;
+    }
+    
+    if (requestData.date_of_birth) {
+      // Convert date to DD/MM/YYYY format as shown in successful example
+      let dateValue = requestData.date_of_birth;
+      
+      // Remove time component if present
+      if (dateValue.includes('T')) {
+        dateValue = dateValue.split('T')[0];
+      }
+      
+      // Convert from YYYY-MM-DD to DD/MM/YYYY
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        const [year, month, day] = dateValue.split('-');
+        apiPayload.date_of_birth = `${day}/${month}/${year}`;
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
+        // Already in DD/MM/YYYY format
+        apiPayload.date_of_birth = dateValue;
+      }
+    }
+
+    console.log(`[Persons] 📋 Validation summary for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+      hasName: !!apiPayload.Name,
+      hasPhone: !!apiPayload.Phone_Number,
+      hasEmail: !!apiPayload.Email,
+      hasDate: !!apiPayload.date_of_birth,
+      contactIdType: typeof apiPayload.contact_id,
+      fieldCount: Object.keys(apiPayload).length
+    });
+
+    console.log(`[Persons] 📋 Prepared API payload for contact_id: ${requestData.contact_id} (${Platform.OS}):`, apiPayload);
+    console.log(`[Persons] 🔍 Payload field types:`, {
+      contact_id: typeof apiPayload.contact_id,
+      status: typeof apiPayload.status,
+      Phone_Number: typeof apiPayload.Phone_Number,
+      Additional_Phones: typeof apiPayload.Additional_Phones,
+      payloadKeys: Object.keys(apiPayload)
+    });
+
+    let response;
+    
+    if (requestData.id) {
+      // Update existing request using the record ID
+      console.log(`[Persons] 🔄 Updating existing Rukun Update Request ID: ${requestData.id} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      const updateUrl = `/items/Rukn_Update/${requestData.id}`;
+      console.log(`[Persons] 📡 PATCH request to: ${updateUrl} (${Platform.OS})`);
+      
+      response = await directApiRequest<{ data: RukunUpdateRequest }>(
+        updateUrl,
+        'PATCH',
+        apiPayload
+      );
+    } else {
+      // Create new request - this is the main case based on your example
+      console.log(`[Persons] 🆕 Creating new Rukun Update Request for contact_id: ${requestData.contact_id} (${Platform.OS})`,apiPayload);
+      const createUrl = '/items/Rukn_Update';
+      console.log(`[Persons] 📡 POST request to: ${createUrl} (${Platform.OS})`);
+      
+      response = await directApiRequest<{ data: RukunUpdateRequest }>(
+        createUrl,
+        'POST',
+        apiPayload
+      );
+    }
+
+    console.log(`[Persons] 📥 API Response received for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+      hasData: !!response.data,
+      responseKeys: Object.keys(response)
+    });
+
+    if (!response.data) {
+      console.log(`[Persons] ❌ No response data for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      throw new Error('Failed to submit Rukun Update Request - no response data');
+    }
+
+    console.log(`[Persons] ✅ Rukun Update Request submitted successfully for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+      id: response.data.id,
+      status: response.data.status,
+      contact_id: response.data.contact_id
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    console.error(`[Persons] ❌ Submit Rukun Update Request error for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      status: error.status,
+      response: error.response
+    });
+    
+    // Handle specific API errors
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      console.log(`[Persons] 🔐 Authentication error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      return rejectWithValue('Authentication error. Please log in again.');
+    }
+    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      console.log(`[Persons] 🚫 Permission error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      return rejectWithValue('You do not have permission to submit this request.');
+    }
+    if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+      console.log(`[Persons] 🔍 Not found error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      return rejectWithValue('Contact not found.');
+    }
+    if (error.message?.includes('500')) {
+      console.log(`[Persons] 🔥 Server error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      return rejectWithValue('Server error. Please try again later.');
+    }
+    
+    console.log(`[Persons] ⚠️ Generic error for contact_id: ${requestData.contact_id} (${Platform.OS}): ${error.message}`);
+    return rejectWithValue(error.message || 'Failed to submit Rukun Update Request');
+  }
+});
+
 // Persons slice
 const personsSlice = createSlice({
   name: 'persons',
@@ -543,6 +966,14 @@ const personsSlice = createSlice({
     resetUpdateStatus(state) {
       state.updateStatus = 'idle';
       state.updateError = null;
+    },
+    resetTransferStatus(state) {
+      state.transferStatus = 'idle';
+      state.transferError = null;
+    },
+    resetRukunUpdateStatus(state) {
+      state.rukunUpdateStatus = 'idle';
+      state.rukunUpdateError = null;
     },
     // Add a new action to set user details directly
     setUserDetails(state, action: PayloadAction<Person>) {
@@ -674,6 +1105,73 @@ const personsSlice = createSlice({
       .addCase(fetchPersonById.rejected, (state, action) => {
         state.selectedPersonStatus = 'failed';
         state.selectedPersonError = action.payload ?? 'Failed to fetch person details';
+      })
+      // Transfer Rukun
+      .addCase(transferRukun.pending, state => {
+        state.transferStatus = 'loading';
+        state.transferError = null;
+      })
+      .addCase(transferRukun.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.transferStatus = 'succeeded';
+        personsAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(transferRukun.rejected, (state, action) => {
+        state.transferStatus = 'failed';
+        state.transferError = action.payload ?? 'Failed to transfer rukun';
+      })
+      // Fetch Rukun Update Request
+      .addCase(fetchRukunUpdateRequest.pending, (state, action) => {
+        console.log(`[PersonsSlice] 🔄 fetchRukunUpdateRequest.pending for contact_id: ${action.meta.arg}`);
+        state.rukunUpdateStatus = 'loading';
+        state.rukunUpdateError = null;
+      })
+      .addCase(fetchRukunUpdateRequest.fulfilled, (state, action) => {
+        console.log(`[PersonsSlice] ✅ fetchRukunUpdateRequest.fulfilled for contact_id: ${action.meta.arg}`, {
+          hasPayload: !!action.payload,
+          payloadStatus: action.payload?.status,
+          payloadId: action.payload?.id
+        });
+        state.rukunUpdateStatus = 'succeeded';
+        if (action.payload && action.meta.arg) {
+          state.rukunUpdateRequests[action.meta.arg] = action.payload;
+          console.log(`[PersonsSlice] 💾 Stored Rukun Update Request in state for contact_id: ${action.meta.arg}`);
+        } else {
+          console.log(`[PersonsSlice] 📭 No Rukun Update Request to store for contact_id: ${action.meta.arg}`);
+        }
+      })
+      .addCase(fetchRukunUpdateRequest.rejected, (state, action) => {
+        console.log(`[PersonsSlice] ❌ fetchRukunUpdateRequest.rejected for contact_id: ${action.meta.arg}`, {
+          error: action.payload,
+          errorMessage: action.error?.message
+        });
+        state.rukunUpdateStatus = 'failed';
+        state.rukunUpdateError = action.payload ?? 'Failed to fetch Rukun Update Request';
+      })
+      // Submit Rukun Update Request
+      .addCase(submitRukunUpdateRequest.pending, (state, action) => {
+        console.log(`[PersonsSlice] 🔄 submitRukunUpdateRequest.pending for contact_id: ${action.meta.arg.contact_id}`);
+        state.rukunUpdateStatus = 'loading';
+        state.rukunUpdateError = null;
+      })
+      .addCase(submitRukunUpdateRequest.fulfilled, (state, action) => {
+        console.log(`[PersonsSlice] ✅ submitRukunUpdateRequest.fulfilled for contact_id: ${action.payload.contact_id}`, {
+          requestId: action.payload.id,
+          status: action.payload.status,
+          hasName: !!action.payload.Name
+        });
+        state.rukunUpdateStatus = 'succeeded';
+        if (action.payload && action.payload.contact_id) {
+          state.rukunUpdateRequests[action.payload.contact_id] = action.payload;
+          console.log(`[PersonsSlice] 💾 Updated Rukun Update Request in state for contact_id: ${action.payload.contact_id}`);
+        }
+      })
+      .addCase(submitRukunUpdateRequest.rejected, (state, action) => {
+        console.log(`[PersonsSlice] ❌ submitRukunUpdateRequest.rejected for contact_id: ${action.meta.arg.contact_id}`, {
+          error: action.payload,
+          errorMessage: action.error?.message
+        });
+        state.rukunUpdateStatus = 'failed';
+        state.rukunUpdateError = action.payload ?? 'Failed to submit Rukun Update Request';
       });
   },
 });
@@ -682,13 +1180,21 @@ export const {
   clearPersons, 
   resetCreateStatus, 
   resetUpdateStatus,
+  resetTransferStatus,
+  resetRukunUpdateStatus,
   setUserDetails,
   clearUserDetails
 } = personsSlice.actions;
 
 // Selectors
-const selectPersonsState = (state: RootState): PersonsState =>
-  (state as any).persons ?? (initialState as PersonsState);
+const selectPersonsState = (state: RootState): PersonsState => {
+  try {
+    return (state as any).persons ?? (initialState as PersonsState);
+  } catch (error) {
+    console.error('Error selecting persons state:', error);
+    return initialState as PersonsState;
+  }
+};
 
 export const {
   selectAll: selectAllPersons,
@@ -715,5 +1221,58 @@ export const selectNazimDetailsError = (state: RootState) => selectPersonsState(
 export const selectContactTypes = (state: RootState) => selectPersonsState(state).contactTypes;
 export const selectContactTypesStatus = (state: RootState) => selectPersonsState(state).contactTypesStatus;
 export const selectContactTypesError = (state: RootState) => selectPersonsState(state).contactTypesError;
+
+// Transfer selectors
+export const selectTransferStatus = (state: RootState) => selectPersonsState(state).transferStatus;
+export const selectTransferError = (state: RootState) => selectPersonsState(state).transferError;
+
+// Rukun Update selectors
+export const selectRukunUpdateStatus = (state: RootState) => {
+  try {
+    return selectPersonsState(state).rukunUpdateStatus;
+  } catch (error) {
+    console.error('Error selecting rukun update status:', error);
+    return 'idle';
+  }
+};
+
+export const selectRukunUpdateError = (state: RootState) => {
+  try {
+    return selectPersonsState(state).rukunUpdateError;
+  } catch (error) {
+    console.error('Error selecting rukun update error:', error);
+    return null;
+  }
+};
+
+export const selectRukunUpdateRequests = (state: RootState) => {
+  try {
+    return selectPersonsState(state).rukunUpdateRequests;
+  } catch (error) {
+    console.error('Error selecting rukun update requests:', error);
+    return {};
+  }
+};
+
+export const selectRukunUpdateRequestByContactId = (state: RootState, contactId: number) => {
+  try {
+    console.log(`[PersonsSlice] 🔍 selectRukunUpdateRequestByContactId called for contact_id: ${contactId}`);
+    const requests = selectPersonsState(state).rukunUpdateRequests;
+    const request = requests ? requests[contactId] : null;
+    
+    console.log(`[PersonsSlice] 📋 Rukun Update Request selector result for contact_id: ${contactId}:`, {
+      found: !!request,
+      status: request?.status,
+      requestId: request?.id,
+      hasName: !!request?.Name,
+      totalRequestsInState: Object.keys(requests || {}).length
+    });
+    
+    return request;
+  } catch (error) {
+    console.error(`[PersonsSlice] ❌ Error selecting rukun update request by contact ID ${contactId}:`, error);
+    return null;
+  }
+};
 
 export default personsSlice.reducer;

@@ -22,12 +22,16 @@ import {
   updatePerson, 
   createPerson, 
   updatePersonImage,
+  transferRukun,
   selectUpdatePersonStatus, 
   selectUpdatePersonError,
   selectCreatePersonStatus,
   selectCreatePersonError,
+  selectTransferStatus,
+  selectTransferError,
   resetUpdateStatus,
   resetCreateStatus,
+  resetTransferStatus,
   fetchContactTypes,
   selectContactTypes,
   selectContactTypesStatus,
@@ -44,6 +48,7 @@ import FormInput from '@/app/components/FormInput';
 import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
+import TransferRukunModal from '@/app/components/TransferRukunModal';
 import { COMMON_IMAGES } from '@/app/constants/images';
 import { COLORS, SPACING } from '../constants/theme';
 
@@ -75,6 +80,10 @@ export default function RukunAddEdit() {
   
   // Redux state for hierarchy units (subordinate units for dropdown)
   const tanzeemiUnitOptions = useSelector(selectSubordinateUnitsForDropdown);
+  
+  // Transfer status
+  const transferStatus = useSelector(selectTransferStatus);
+  const transferError = useSelector(selectTransferError);
   
   
   // Form state - simplified to only required fields
@@ -111,20 +120,15 @@ export default function RukunAddEdit() {
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
   
+  // Transfer Rukun state
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  
   // Fetch contact types on component mount
   useEffect(() => {
     if (contactTypesStatus === 'idle') {
       dispatch(fetchContactTypes());
     }
   }, [dispatch, contactTypesStatus]);
-
-  // Hide the header
-  useEffect(() => {
-    navigation.setOptions({ 
-      headerShown: false,
-      title: isEditMode ? i18n.t('edit_rukun') : i18n.t('add_rukun')
-    });
-  }, [navigation, isEditMode]);
 
   // Gender options
   const genderOptions: Option[] = useMemo(() => [
@@ -144,6 +148,38 @@ export default function RukunAddEdit() {
         value: type.id.toString()
       }));
   }, [contactTypes]);
+
+  // Dynamic header title based on contact type
+  const headerTitle = useMemo(() => {
+    if (!isEditMode) {
+      return i18n.t('add_rukun');
+    }
+    
+    // In edit mode, get the contact type label
+    if (formData.contact_type && contactTypes && contactTypes.length > 0) {
+      const contactType = contactTypes.find(type => type.id === formData.contact_type);
+      if (contactType) {
+        // Return the localized contact type name
+        return i18n.t(contactType.type) || contactType.type;
+      }
+    }
+    
+    // Show loading state if contact types are still being fetched
+    if (contactTypesStatus === 'loading') {
+      return i18n.t('loading') || 'Loading...';
+    }
+    
+    // Fallback to generic "رکن" if contact type not found or not loaded yet
+    return 'رکن';
+  }, [isEditMode, formData.contact_type, contactTypes, contactTypesStatus]);
+
+  // Hide the header
+  useEffect(() => {
+    navigation.setOptions({ 
+      headerShown: false,
+      title: headerTitle
+    });
+  }, [navigation, headerTitle]);
   
   // Handle form input changes
   const handleChange = (field: keyof typeof formData, value: string | number) => {
@@ -171,6 +207,16 @@ export default function RukunAddEdit() {
   const handleTanzeemiUnitSelect = (option: Option) => {
     handleChange('tanzeemi_unit', parseInt(option.value));
   };
+
+  // Transfer Rukun handlers
+  const handleTransferRukun = () => {
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSuccess = () => {
+    // Refresh the data or navigate back
+    navigation.goBack();
+  };
   
   // Validate form
   const validateForm = (): boolean => {
@@ -194,42 +240,47 @@ export default function RukunAddEdit() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
     
-    try {
-      if (isEditMode && 'id' in formData) {
-        // Update existing rukun
-        await dispatch(updatePerson(formData as UpdatePersonPayload)).unwrap();
-        Alert.alert(
-          i18n.t('success'),
-          'Person updated successfully',
-          [{ text: i18n.t('ok') }]
-        );
-      } else {
-        // Create new rukun
-        await dispatch(createPerson(formData as CreatePersonPayload)).unwrap();
-        Alert.alert(
-          i18n.t('success'),
-          'Person created successfully',
-          [{ text: i18n.t('ok') }]
-        );
-      }
-      
-      // Navigate back on success and refresh the list
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error saving rukun:', error);
-      Alert.alert(
-        i18n.t('error'),
-        typeof error === 'string' ? error : i18n.t('save_failed'),
-        [{ text: i18n.t('ok') }]
-      );
-    }
+
   };
   
+  // Handle transfer success and error
+  useEffect(() => {
+    if (transferStatus === 'succeeded') {
+      setShowTransferModal(false);
+      Alert.alert(
+        i18n.t('transfer_successful'),
+        i18n.t('transfer_successful_message', { rukunName: formData.name || 'Rukun' }),
+        [
+          {
+            text: i18n.t('ok'),
+            onPress: () => {
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } else if (transferStatus === 'failed' && transferError) {
+      Alert.alert(
+        i18n.t('transfer_failed'),
+        transferError,
+        [
+          {
+            text: i18n.t('ok'),
+            onPress: () => {
+              dispatch(resetTransferStatus());
+            }
+          }
+        ]
+      );
+    }
+  }, [transferStatus, transferError, formData.name, navigation, dispatch]);
+
   // Clean up status when component unmounts
   useEffect(() => {
     return () => {
       dispatch(resetUpdateStatus());
       dispatch(resetCreateStatus());
+      dispatch(resetTransferStatus());
     };
   }, [dispatch]);
   
@@ -290,7 +341,7 @@ export default function RukunAddEdit() {
       <View style={styles.root}>
         {/*──────────── Header (wave + avatar) ────────────*/}
         <ProfileHeader
-          title={isEditMode ? 'رکن': i18n.t('add_rukun')}
+          title={headerTitle}
           backgroundSource={COMMON_IMAGES.profileBackground}
           avatarSource={
             (isEditMode && initialRukun?.picture)
@@ -400,8 +451,42 @@ export default function RukunAddEdit() {
               />
             )}
           </View>
+
+          {/* Transfer Rukun Feature - Only visible in edit mode */}
+          {isEditMode && (
+            <View style={styles.transferContainer}>
+              <CustomButton
+                text={transferStatus === 'loading' ? i18n.t('transferring') : i18n.t('transfer_rukun')}
+                onPress={handleTransferRukun}
+                viewStyle={styles.transferBtn}
+                disabled={isLoading || transferStatus === 'loading'}
+              />
+              
+              {transferStatus === 'loading' && (
+                <ActivityIndicator 
+                  size="small" 
+                  color={COLORS.primary} 
+                  style={styles.transferLoader} 
+                />
+              )}
+            </View>
+          )}
         </ScrollView>
       </View>
+
+      {/* Transfer Rukun Modal */}
+      {isEditMode && 'id' in formData && formData.id && (
+        <TransferRukunModal
+          visible={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          onSuccess={handleTransferSuccess}
+          rukunId={formData.id}
+          rukunName={formData.name || 'Unknown Rukun'}
+          currentUnit={tanzeemiUnitOptions.find(unit => 
+            unit.value === formData.tanzeemi_unit?.toString()
+          )?.label}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -455,5 +540,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+  },
+  
+  // Transfer Rukun styles
+  transferContainer: {
+    marginTop: SPACING.lg,
+    alignItems: 'center',
+  },
+  transferBtn: {
+    backgroundColor: COLORS.warning,
+    minWidth: 200,
+  },
+  transferLoader: {
+    marginTop: SPACING.sm,
   },
 });
