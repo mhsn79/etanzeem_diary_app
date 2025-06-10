@@ -377,15 +377,13 @@ export default function RukunUpdateScreen() {
         status: formData.status || 'draft', // Ensure status is set
       };
       
-      // If there's an existing request, include the ID for updating
-      if (existingRequest && existingRequest.id) {
-        submissionData.id = existingRequest.id;
-        console.log(`[RukunUpdateScreen] 🔄 Including existing request ID for update: ${existingRequest.id}`);
-      } else {
-        console.log(`[RukunUpdateScreen] 🆕 No existing request ID, will create new record`);
-      }
-      
       console.log(`[RukunUpdateScreen] 📋 Final submission data:`, submissionData);
+      console.log(`[RukunUpdateScreen] � Existing request info:`, {
+        hasExistingRequest: !!existingRequest,
+        existingRequestId: existingRequest?.id,
+        existingRequestStatus: existingRequest?.status,
+        note: 'API layer will automatically handle update vs create'
+      });
       
       // Submit the actual API request
       console.log(`[RukunUpdateScreen] 📡 Dispatching submitRukunUpdateRequest...`);
@@ -567,9 +565,11 @@ export default function RukunUpdateScreen() {
             onChange={(value) => handleChange('Phone_Number', value)}
             placeholder={i18n.t('enter_phone')}
             keyboardType="phone-pad"
+            maxLength={15} // Allow for formatting characters like +, -, spaces
             error={errors.Phone_Number}
             editable={isEditable}
             disabled={!isEditable}
+            helpText="Maximum 11 digits allowed"
           />
           
           {/* Email */}
@@ -623,8 +623,11 @@ export default function RukunUpdateScreen() {
             onChange={handleAdditionalPhoneChange}
             placeholder={i18n.t('enter_phone')}
             keyboardType="phone-pad"
+            maxLength={15} // Allow for formatting characters like +, -, spaces
+            error={errors.Additional_Phones}
             editable={isEditable}
             disabled={!isEditable}
+            helpText="Maximum 11 digits allowed"
           />
           
           {/* Submit Button */}

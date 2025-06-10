@@ -866,29 +866,70 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     });
 
     let response;
+    let existingRecordId = null;
     
-    if (requestData.id) {
-      // Update existing request using the record ID
-      console.log(`[Persons] 🔄 Updating existing Rukun Update Request ID: ${requestData.id} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
-      const updateUrl = `/items/Rukn_Update/${requestData.id}`;
+    // Step 1: Check if a Rukun Update record already exists for this contact_id
+    console.log(`[Persons] 🔍 Checking for existing Rukun Update record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+    
+    try {
+      const checkUrl = `/items/Rukn_Update`;
+      const checkParams = new URLSearchParams();
+      checkParams.append('filter[contact_id][_eq]', String(requestData.contact_id));
+      checkParams.append('limit', '1');
+      checkParams.append('fields', 'id,contact_id,status');
+      
+      const checkResponse = await directApiRequest<{ data: Array<{ id: number; contact_id: string | number; status: string }> }>(
+        `${checkUrl}?${checkParams.toString()}`,
+        'GET'
+      );
+      
+      console.log(`[Persons] 📋 Existing record check result for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+        found: checkResponse.data && checkResponse.data.length > 0,
+        recordCount: checkResponse.data ? checkResponse.data.length : 0,
+        firstRecord: checkResponse.data && checkResponse.data.length > 0 ? checkResponse.data[0] : null
+      });
+      
+      if (checkResponse.data && checkResponse.data.length > 0) {
+        existingRecordId = checkResponse.data[0].id;
+        console.log(`[Persons] ✅ Found existing Rukun Update record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      } else {
+        console.log(`[Persons] 🆕 No existing Rukun Update record found for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      }
+    } catch (checkError) {
+      console.log(`[Persons] ⚠️ Error checking for existing record for contact_id: ${requestData.contact_id} (${Platform.OS}):`, checkError);
+      // Continue with creation if check fails
+      existingRecordId = null;
+    }
+    
+    // Step 2: Decide whether to UPDATE (PATCH) or CREATE (POST)
+    if (existingRecordId) {
+      // Update existing record using PATCH
+      console.log(`[Persons] 🔄 Updating existing Rukun Update Request ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      const updateUrl = `/items/Rukn_Update/${existingRecordId}`;
       console.log(`[Persons] 📡 PATCH request to: ${updateUrl} (${Platform.OS})`);
+      console.log(`[Persons] 📤 PATCH payload:`, apiPayload);
       
       response = await directApiRequest<{ data: RukunUpdateRequest }>(
         updateUrl,
         'PATCH',
         apiPayload
       );
+      
+      console.log(`[Persons] ✅ Successfully updated existing record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
     } else {
-      // Create new request - this is the main case based on your example
-      console.log(`[Persons] 🆕 Creating new Rukun Update Request for contact_id: ${requestData.contact_id} (${Platform.OS})`,apiPayload);
+      // Create new record using POST
+      console.log(`[Persons] 🆕 Creating new Rukun Update Request for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       const createUrl = '/items/Rukn_Update';
       console.log(`[Persons] 📡 POST request to: ${createUrl} (${Platform.OS})`);
+      console.log(`[Persons] 📤 POST payload:`, apiPayload);
       
       response = await directApiRequest<{ data: RukunUpdateRequest }>(
         createUrl,
         'POST',
         apiPayload
       );
+      
+      console.log(`[Persons] ✅ Successfully created new record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
     }
 
     console.log(`[Persons] 📥 API Response received for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
