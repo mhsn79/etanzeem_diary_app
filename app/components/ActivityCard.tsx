@@ -1,11 +1,16 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import UrduText from './UrduText';
 import ActivityActionButton from './ActivityActionButton';
 import { COLORS, SIZES, SPACING, TYPOGRAPHY } from '../constants/theme';
 import { Feather, FontAwesome, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
+import Dialog from './Dialog';
+import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
+import { deleteActivity, selectDeleteActivityStatus } from '../features/activities/activitySlice';
+import { selectCurrentUser } from '../features/auth/authSlice';
 
 interface ActivityCardProps {
+  id: string;
   title: string;
   location: string;
   status: string;
@@ -13,12 +18,15 @@ interface ActivityCardProps {
   attendance: string;
   dateCreated: string;
   dateUpdated: string;
+  user_created?: string;
   handleRight: () => void;
   handleMiddle: () => void;
   handleLeft: () => void;
+  onDeleteSuccess?: () => void;
 }
 
 const ActivityCard: React.FC<ActivityCardProps> = ({
+  id,
   title,
   location,
   status,
@@ -26,17 +34,64 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   attendance,
   dateCreated,
   dateUpdated,
+  user_created,
   handleLeft,
   handleMiddle,
   handleRight,
+  onDeleteSuccess,
 }) => {
+  const dispatch = useAppDispatch();
+  const deleteStatus = useAppSelector(selectDeleteActivityStatus);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Check if the current user is the creator of this activity
+  const isCreator = useMemo(() => {
+    if (!currentUser || !user_created) {
+      console.log(`Activity ${id}: User check failed - currentUser: ${currentUser?.id}, user_created: ${user_created}`);
+      return false;
+    }
+    const result = String(currentUser.id) === String(user_created);
+    console.log(`Activity ${id}: User check - currentUser: ${currentUser.id}, user_created: ${user_created}, isCreator: ${result}`);
+    return result;
+  }, [currentUser, user_created, id]);
+
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    setIsDeleting(true);
+    dispatch(deleteActivity(Number(id)))
+      .unwrap()
+      .then(() => {
+        setIsDeleting(false);
+        setShowDeleteDialog(false);
+        if (onDeleteSuccess) {
+          onDeleteSuccess();
+        }
+      })
+      .catch((error) => {
+        setIsDeleting(false);
+        setShowDeleteDialog(false);
+        Alert.alert('خرابی', error || 'سرگرمی کو آرکائیو کرنے میں ناکامی');
+      });
+  };
   return (
     <View style={styles.cardContainer}>
       <View style={styles.titleContainer}>
         <UrduText style={styles.title}>{title}</UrduText>
-        <TouchableOpacity style={styles.icon}>
-          <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
-        </TouchableOpacity>
+        <View style={styles.iconContainer}>
+          {isCreator && (
+            <TouchableOpacity style={styles.icon} onPress={handleDelete}>
+              <Feather name="archive" size={SIZES.icon.sSmall} color={COLORS.warning} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.icon}>
+            <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.detailsContainer}>
         <UrduText style={styles.detail}>تاریخ وقت: {dateTime}</UrduText>
@@ -52,6 +107,19 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
         <ActivityActionButton text=" ایپ نوٹیفکیشن" onPress={handleMiddle} iconComponent={<MaterialIcons name="notifications-none" size={20} color="black" />} />
         <ActivityActionButton text="واٹس ایپ" onPress={handleRight} iconComponent={<FontAwesome name="whatsapp" size={20} color="black" />} />
       </View>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog
+        visible={showDeleteDialog}
+        onConfirm={confirmDelete}
+        onClose={() => setShowDeleteDialog(false)}
+        title="سرگرمی آرکائیو کرنے کی تصدیق"
+        description="کیا آپ واقعاً اس سرگرمی کو آرکائیو کرنا چاہتے ہیں؟ آرکائیو کی گئی سرگرمیاں فہرست میں نظر نہیں آئیں گی۔"
+        confirmText="ہاں، آرکائیو کریں"
+        cancelText="نہیں، واپس جائیں"
+        showWarningIcon={true}
+        loading={isDeleting}
+      />
     </View>
   );
 };
@@ -73,6 +141,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  iconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   icon: {
     width: SPACING.lg,
     height: SPACING.lg,
@@ -80,6 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: SPACING.xs,
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize.lg,

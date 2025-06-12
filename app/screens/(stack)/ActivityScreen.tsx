@@ -37,7 +37,9 @@ const ActivityScreen = () => {
   const [activityDetails, setActivityDetails] = useState({
     activityType: '',
     location: '',
+    locationLabel: '',
     notes: '',
+
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -133,6 +135,7 @@ const ActivityScreen = () => {
     setActivityDetails((prev) => ({
       ...prev,
       location: option.value,
+      locationLabel: option.label,
     }));
   };
 
@@ -160,13 +163,24 @@ const ActivityScreen = () => {
   };
 
   const handleConfirmSubmit = () => {
+    // Get the selected date
+    const activityDate = selectedActivityDate!;
+    
+    // Extract month and year for reporting
+    const reportMonth = activityDate.getMonth() + 1; // JavaScript months are 0-indexed
+    const reportYear = activityDate.getFullYear();
+    
     const payload = {
       activity_type: Number(activityDetails.activityType),
-      activity_date_and_time: selectedActivityDate!.toISOString(),
-      location: activityDetails.location,
+      activity_date_and_time: activityDate.toISOString(),
       activity_details: activityDetails.notes,
+      location: activityDetails.locationLabel,
       status: 'draft',
+      report_month: reportMonth,
+      report_year: reportYear
     };
+    console.log('============payloadpayloadpayloadpayloadpayload=============',payload);
+    
     setIsSubmitting(true);
     dispatch(createActivity(payload));
   };

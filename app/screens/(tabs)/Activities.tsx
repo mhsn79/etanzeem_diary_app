@@ -26,6 +26,8 @@ import {
   selectAllActivities,
   selectActivitiesStatus,
   selectActivitiesError,
+  selectDeleteActivityStatus,
+  selectDeleteActivityError,
 } from '@/app/features/activities/activitySlice';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
@@ -68,6 +70,9 @@ export default function Activities() {
   const activities = useAppSelector(selectAllActivities);
   const status = useAppSelector(selectActivitiesStatus);
   const error = useAppSelector(selectActivitiesError);
+  const deleteStatus = useAppSelector(selectDeleteActivityStatus);
+  const deleteError = useAppSelector(selectDeleteActivityError);
+  const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
 
   const onRefresh = useCallback(() => {
     console.log('Pull-to-refresh triggered');
@@ -103,13 +108,14 @@ export default function Activities() {
         })
       : 'غير متعين',
     attendance: activity.attendance != null ? activity.attendance.toString() : 'غير متعين',
-    dateCreated: activity.date_created
-      ? new Date(activity.date_created).toLocaleDateString('ur-PK')
+    dateCreated: activity.created_at
+      ? new Date(activity.created_at).toLocaleDateString('ur-PK')
       : 'غير متعين',
-    dateUpdated: activity.date_updated
-      ? new Date(activity.date_updated).toLocaleDateString('ur-PK')
+    dateUpdated: activity.updated_at
+      ? new Date(activity.updated_at).toLocaleDateString('ur-PK')
       : 'غير متعين',
     rawDateTime: activity.activity_date_and_time,
+    user_created: activity.user_created,
   });
 
   const currentDate = new Date();
@@ -137,6 +143,16 @@ export default function Activities() {
       params: { mode: 'schedule' },
     });
   }, [router]);
+  
+  const handleDeleteSuccess = useCallback(() => {
+    setShowDeleteSuccessToast(true);
+    // Hide toast after 3 seconds
+    setTimeout(() => {
+      setShowDeleteSuccessToast(false);
+    }, 3000);
+    // Refresh the activities list
+    dispatch(fetchActivities());
+  }, [dispatch]);
 
   // Loading state
   if (status === 'loading' && !refreshing) {
@@ -171,6 +187,7 @@ export default function Activities() {
           renderItem={({ item }) => (
             <ActivityCard
               key={item.id}
+              id={item.id}
               title={item.title}
               location={item.location}
               status={item.status}
@@ -178,9 +195,11 @@ export default function Activities() {
               attendance={item.attendance}
               dateCreated={item.dateCreated}
               dateUpdated={item.dateUpdated}
+              user_created={item.user_created}
               handleLeft={() => {}}
               handleMiddle={() => {}}
               handleRight={() => {}}
+              onDeleteSuccess={handleDeleteSuccess}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -226,6 +245,16 @@ export default function Activities() {
         confirmTextStyle={styles.confirmTextStyle}
         cancelTextStyle={styles.cancelTextStyle}
       />
+      
+      {/* Success Toast for Archive */}
+      {showDeleteSuccessToast && (
+        <View style={styles.toastContainer}>
+          <View style={styles.toast}>
+            <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+            <Text style={styles.toastText}>سرگرمی کامیابی سے آرکائیو کر دی گئی ہے</Text>
+          </View>
+        </View>
+      )}
     </ScreenWrapper>
   );
 }
@@ -305,5 +334,29 @@ const styles = StyleSheet.create({
   },
   titleStyle: {
     textAlign: 'left',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: SPACING.xl + hp('20%'),
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1001,
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.medium,
+    maxWidth: '80%',
+  },
+  toastText: {
+    marginLeft: SPACING.sm,
+    color: COLORS.success,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -9,11 +9,16 @@ export interface Activity {
     updated_at: string;
     user_created: string;
     user_updated: string | null;
+    report_month: number;
+    report_year: number;
+    activity_summary?: string | null;
+    attendance?: number | null;
+    location?: string;
+    activity_type?: number;
     // Add any other fields that might be returned by the API
     title?: string;
     description?: string;
     location_name?: string;
-    activity_type?: string;
     participants?: number[];
     attachments?: string[];
     [key: string]: any; // Allow for additional fields

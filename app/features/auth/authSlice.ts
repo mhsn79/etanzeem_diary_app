@@ -621,4 +621,8 @@ export const loginAndFetchUserDetails = createAsyncThunk<
   }
 });
 
+// Additional selectors
+export const selectCurrentUser = (state: RootState) => state.auth.user;
+export const selectIsRefreshing = (state: RootState) => state.auth.isRefreshing;
+
 export default authSlice.reducer;

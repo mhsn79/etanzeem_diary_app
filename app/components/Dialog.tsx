@@ -42,6 +42,7 @@ interface DialogProps {
   autoClose?: boolean;
   autoCloseTime?: number;
   customContent?: React.ReactNode;
+  loading?: boolean; // Add loading prop
 }
 
 const Dialog: React.FC<DialogProps> = ({
@@ -70,6 +71,7 @@ const Dialog: React.FC<DialogProps> = ({
   autoClose = false,
   autoCloseTime = 3000,
   customContent,
+  loading = false,
 }) => {
   // Auto close dialog after specified time if autoClose is true
   React.useEffect(() => {
@@ -182,16 +184,22 @@ const Dialog: React.FC<DialogProps> = ({
                   styles.confirmButton, 
                   getConfirmButtonStyle(),
                   confirmButtonStyle,
-                  disableButtons && styles.disabledButton
+                  (disableButtons || loading) && styles.disabledButton
                 ]}
-                onPress={disableButtons ? undefined : onConfirm}
-                disabled={disableButtons}
+                onPress={(disableButtons || loading) ? undefined : onConfirm}
+                disabled={disableButtons || loading}
               >
                 <View style={styles.confirmButtonContent}>
-                  {upperRightIcon && (
-                    <AntDesign style={{ marginRight: SPACING.sm }} name="calendar" size={24} color={COLORS.white} />
+                  {loading ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <>
+                      {upperRightIcon && (
+                        <AntDesign style={{ marginRight: SPACING.sm }} name="calendar" size={24} color={COLORS.white} />
+                      )}
+                      <UrduText style={[styles.confirmButtonText, confirmTextStyle]}>{confirmText}</UrduText>
+                    </>
                   )}
-                  <UrduText style={[styles.confirmButtonText, confirmTextStyle]}>{confirmText}</UrduText>
                 </View>
               </TouchableOpacity>
 
@@ -200,13 +208,13 @@ const Dialog: React.FC<DialogProps> = ({
                   style={[
                     styles.cancelButton, 
                     cancelButtonStyle,
-                    disableButtons && styles.disabledCancelButton
+                    (disableButtons || loading) && styles.disabledCancelButton
                   ]}
-                  onPress={disableButtons ? undefined : () => {
+                  onPress={(disableButtons || loading) ? undefined : () => {
                     onCancel && onCancel();
                     onClose && onClose();
                   }}
-                  disabled={disableButtons}
+                  disabled={disableButtons || loading}
                 >
                   <View style={styles.cancelButtonContent}>
                     {lowerRightIcon && (
@@ -220,11 +228,11 @@ const Dialog: React.FC<DialogProps> = ({
           )}
 
           {/* Close Button */}
-          {showCloseButton && type !== 'loading' && (
+          {showCloseButton && type !== 'loading' && !loading && (
             <TouchableOpacity 
               style={styles.closeButton} 
-              onPress={disableButtons ? undefined : onClose}
-              disabled={disableButtons}
+              onPress={(disableButtons || loading) ? undefined : onClose}
+              disabled={disableButtons || loading}
             >
               <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
