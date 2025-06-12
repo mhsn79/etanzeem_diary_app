@@ -482,9 +482,11 @@ export default function RukunAddEdit() {
           onSuccess={handleTransferSuccess}
           rukunId={formData.id}
           rukunName={formData.name || 'Unknown Rukun'}
-          currentUnit={tanzeemiUnitOptions.find(unit => 
+          currentUnitId={formData.tanzeemi_unit}
+          currentUnitName={tanzeemiUnitOptions.find(unit => 
             unit.value === formData.tanzeemi_unit?.toString()
           )?.label}
+          tanzeemiUnitOptions={tanzeemiUnitOptions}
         />
       )}
     </KeyboardAvoidingView>

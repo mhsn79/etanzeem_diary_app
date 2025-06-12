@@ -103,7 +103,6 @@ export const fetchTanzeemiUnits = createAsyncThunk<
       'GET'
     );
     
-    console.log('API Response for tanzeemi units:', response);
     if (!response.data) throw new Error('Failed to fetch tanzeemi units');
     
     // Transform the API response to match our expected format
@@ -454,7 +453,7 @@ const tanzeemSlice = createSlice({
       })
       .addCase(fetchTanzeemiUnits.fulfilled, (state, action: PayloadAction<TanzeemiUnit[]>) => {
         state.status = 'succeeded';
-        console.log('Setting tanzeemi units:', action.payload);
+        // console.log('Setting tanzeemi units:', action.payload);
         tanzeemAdapter.setAll(state, action.payload);
       })
       .addCase(fetchTanzeemiUnits.rejected, (state, action) => {
@@ -673,5 +672,22 @@ export const selectChildUnits = (unitId: number) => {
     }
   );
 };
+
+/**
+ * Selector to get all tanzeemi units formatted for dropdown
+ * Returns an array of objects with label and value properties
+ */
+export const selectAllTanzeemiUnitsForDropdown = createSelector(
+  [selectAllTanzeemiUnits],
+  (units) => {
+    if (!units || units.length === 0) return [];
+    
+    return units.map(unit => ({
+      id: unit.id.toString(),
+      label: unit.Name || `Unit ${unit.id}`,
+      value: unit.id.toString()
+    }));
+  }
+);
 
 export default tanzeemSlice.reducer;

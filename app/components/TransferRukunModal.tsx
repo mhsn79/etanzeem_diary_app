@@ -7,9 +7,12 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { formatDate } from '../utils/dateFormat';
 
 import UrduText from './UrduText';
 import CustomDropdown, { Option } from './CustomDropdown';
@@ -17,9 +20,12 @@ import CustomButton from './CustomButton';
 import Dialog from './Dialog';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import i18n from '../i18n';
-import { AppDispatch } from '../store';
-import { transferRukun, selectTransferStatus, selectTransferError, resetTransferStatus } from '../features/persons/personSlice';
-import { selectSubordinateUnitsForDropdown } from '../features/tanzeem/tanzeemHierarchySlice';
+import { AppDispatch, RootState } from '../store';
+import { 
+  createRukunTransfer, 
+  checkExistingTransfer,
+  resetTransferStatus
+} from '../features/persons/personSlice';
 
 interface TransferRukunModalProps {
   visible: boolean;
@@ -27,7 +33,9 @@ interface TransferRukunModalProps {
   onSuccess: () => void;
   rukunId: number;
   rukunName: string;
-  currentUnit?: string;
+  currentUnitId?: number;
+  currentUnitName?: string;
+  tanzeemiUnitOptions: Option[];
 }
 
 const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
@@ -36,95 +44,218 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
   onSuccess,
   rukunId,
   rukunName,
-  currentUnit,
+  currentUnitId,
+  currentUnitName,
+  tanzeemiUnitOptions,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const tanzeemiUnitOptions = useSelector(selectSubordinateUnitsForDropdown);
-  const transferStatus = useSelector(selectTransferStatus);
-  const transferError = useSelector(selectTransferError);
   
-  const [selectedUnit, setSelectedUnit] = useState<number | undefined>(undefined);
+  // Redux selectors
+  const createStatus = useSelector((state: RootState) => state.persons.createTransferStatus);
+  const createError = useSelector((state: RootState) => state.persons.createTransferError);
+  const checkStatus = useSelector((state: RootState) => state.persons.checkTransferStatus);
+  const existingTransfers = useSelector((state: RootState) => state.persons.existingTransfers);
+  // Safely find the existing transfer (if any)
+  const existingTransfer = Array.isArray(existingTransfers) ? 
+    existingTransfers.find(transfer => transfer && transfer.contact_id === rukunId) : undefined;
+  
+  // Local state
+  const [transferType, setTransferType] = useState<'local' | 'outside'>('local');
+  const [selectedLocalUnitId, setSelectedLocalUnitId] = useState<number | undefined>(undefined);
+  const [cityName, setCityName] = useState<string>('');
+  const [transferDate, setTransferDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState<string>('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
   
-  const isLoading = transferStatus === 'loading';
+  const isLoading = createStatus === 'loading' || checkStatus === 'loading';
+  // Only consider a rukun as having an existing transfer if there's a non-empty array
+  // with at least one item that has the same contact_id
+  const hasExistingTransfer = Array.isArray(existingTransfers) && 
+    existingTransfers.length > 0 && 
+    existingTransfers.some(transfer => transfer.contact_id === rukunId);
 
-  // Reset state when modal opens/closes
+  // Reset state when modal opens/closes or when rukunId changes
   useEffect(() => {
     if (visible) {
-      setSelectedUnit(undefined);
+      // Reset form first
+      setTransferType('local');
+      setSelectedLocalUnitId(undefined);
+      setCityName('');
+      setTransferDate(new Date());
+      setShowDatePicker(false);
       setError('');
       setShowConfirmDialog(false);
+      setShowSuccessDialog(false);
+      setShowErrorDialog(false);
+      
+      // Then check for existing transfer when modal opens
+      dispatch(resetTransferStatus()); // Clear any previous state
+      setTimeout(() => {
+        dispatch(checkExistingTransfer(rukunId));
+      }, 300); // Small delay to ensure clean state
+    } else {
+      // Reset Redux state when modal closes
       dispatch(resetTransferStatus());
     }
-  }, [visible, dispatch]);
+  }, [visible, dispatch, rukunId]); // Include rukunId dependency
 
-
-  // Handle transfer success
+  // Handle create status changes
   useEffect(() => {
-    if (transferStatus === 'succeeded') {
-      Alert.alert(
-        i18n.t('transfer_successful'),
-        i18n.t('transfer_successful_message', { rukunName }),
-        [
-          {
-            text: i18n.t('ok'),
-            onPress: () => {
-              onSuccess();
-              onClose();
-            }
-          }
-        ]
-      );
+    if (createStatus === 'succeeded') {
+      // Show success dialog and clear any error message
+      setShowSuccessDialog(true);
+      setError('');
+      // Also ensure no transfer checks will run 
+      dispatch(resetTransferStatus());
+    } else if (createStatus === 'failed' && createError) {
+      setError(createError || i18n.t('transfer_request_failed'));
     }
-  }, [transferStatus, rukunName, onSuccess, onClose]);
+  }, [createStatus, createError]);
 
-  // Handle transfer error
+  // React to rukunId changes even when modal is already open
   useEffect(() => {
-    if (transferError) {
-      setError(transferError);
+    if (visible) {
+      // Reset the state whenever the rukunId changes while modal is open
+      setError('');
+      setShowErrorDialog(false);
+      dispatch(resetTransferStatus());
+      
+      // Check for existing transfer for the new rukun
+      setTimeout(() => {
+        dispatch(checkExistingTransfer(rukunId));
+      }, 300);
     }
-  }, [transferError]);
+  }, [rukunId, visible, dispatch]);
 
-  const handleUnitSelect = (option: Option) => {
-    setSelectedUnit(parseInt(option.value));
+  // Check if a transfer already exists and show appropriate error
+  useEffect(() => {
+    // Only show the error if:
+    // 1. The check succeeded AND
+    // 2. There's an existing transfer AND
+    // 3. We haven't just created a transfer successfully in this session
+    if (checkStatus === 'succeeded' && hasExistingTransfer && createStatus !== 'succeeded') {
+      // Store the error message
+      const errorMessage = i18n.t('transfer_request_exists');
+      setError(errorMessage);
+      
+      // Show the error dialog instead of inline error for existing transfer
+      setShowErrorDialog(true);
+    }
+  }, [checkStatus, hasExistingTransfer, createStatus]);
+
+  const handleTransferTypeChange = (type: 'local' | 'outside') => {
+    setTransferType(type);
+    setError('');
+    
+    // Reset related fields
+    if (type === 'local') {
+      setCityName('');
+    } else {
+      setSelectedLocalUnitId(undefined);
+    }
+  };
+
+  const handleLocalUnitSelect = (option: Option) => {
+    setSelectedLocalUnitId(parseInt(option.value));
     setError('');
   };
 
-  const handleTransferClick = () => {
-    if (!selectedUnit) {
-      setError(i18n.t('please_select_unit'));
-      return;
+  const handleCityNameChange = (text: string) => {
+    setCityName(text);
+    setError('');
+  };
+
+  const handleDateConfirm = (selectedDate: Date) => {
+    setShowDatePicker(false);
+    setTransferDate(selectedDate);
+  };
+
+  const handleDateCancel = () => {
+    setShowDatePicker(false);
+  };
+
+  const toggleDatePicker = () => {
+    setShowDatePicker(!showDatePicker);
+  };
+
+  const validateForm = (): boolean => {
+    // Check for existing transfer
+    if (hasExistingTransfer) {
+      setError(i18n.t('transfer_request_exists'));
+      return false;
     }
+    
+    // Validate fields based on transfer type
+    if (transferType === 'local' && !selectedLocalUnitId) {
+      setError(i18n.t('please_select_unit'));
+      return false;
+    }
+    
+    if (transferType === 'outside' && !cityName.trim()) {
+      setError(i18n.t('please_enter_city'));
+      return false;
+    }
+    
+    // Always validate transfer date
+    if (!transferDate) {
+      setError(i18n.t('please_select_date'));
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSaveTransfer = () => {
+    if (!validateForm()) return;
     setShowConfirmDialog(true);
   };
 
   const handleConfirmTransfer = async () => {
-    if (!selectedUnit) return;
-
+    if (!validateForm()) return;
+    setShowConfirmDialog(false);
     setError('');
 
     try {
-      console.log(selectedUnit);
-      
-      await dispatch(transferRukun({
-        id: rukunId,
-        contact_id: selectedUnit
-      })).unwrap();
+      const payload: {
+        contact_id: number;
+        transfer_type: 'local' | 'outside';
+        transfer_date: string;
+        status: 'draft' | 'pending' | 'approved' | 'rejected';
+        local_unit_id?: number;
+        city_name?: string;
+      } = {
+        contact_id: rukunId,
+        transfer_type: transferType,
+        transfer_date: formatDate(transferDate, 'yyyy-MM-dd'),
+        status: 'draft',
+      };
+
+      // Add type-specific fields
+      if (transferType === 'local' && selectedLocalUnitId) {
+        Object.assign(payload, { local_unit_id: selectedLocalUnitId });
+      } else if (transferType === 'outside' && cityName) {
+        Object.assign(payload, { city_name: cityName });
+      }
+
+      await dispatch(createRukunTransfer(payload)).unwrap();
     } catch (error) {
-      console.error('Error transferring rukun:', error);
-      setError(typeof error === 'string' ? error : i18n.t('transfer_failed_message'));
+      console.error('Error creating transfer request:', error);
+      setError(typeof error === 'string' ? error : i18n.t('transfer_request_failed'));
     }
   };
 
-  const selectedUnitName = tanzeemiUnitOptions.find(
-    unit => unit.value === selectedUnit?.toString()
-  )?.label || i18n.t('unknown_unit');
+  const selectedUnitName = selectedLocalUnitId && tanzeemiUnitOptions && tanzeemiUnitOptions.length > 0
+    ? tanzeemiUnitOptions.find(unit => unit.value === selectedLocalUnitId.toString())?.label || i18n.t('unknown_unit')
+    : i18n.t('unknown_unit');
 
   return (
     <>
+      {/* Only show the transfer modal if we don't have an existing transfer error */}
       <Modal
-        visible={visible}
+        visible={visible && !showErrorDialog}
         transparent
         animationType="slide"
         onRequestClose={onClose}
@@ -147,39 +278,131 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
                 <MaterialIcons name="swap-horiz" size={40} color={COLORS.primary} />
               </View>
 
-              <UrduText style={styles.title}>{i18n.t('transfer_rukun_title')}</UrduText>
+              <UrduText style={styles.title}>{i18n.t('initiate_rukun_transfer')}</UrduText>
               
+              {/* Status Display */}
+              <View style={styles.statusContainer}>
+                <UrduText style={styles.statusLabel}>{i18n.t('status')}:</UrduText>
+                <UrduText style={styles.statusValue}>{i18n.t('draft')}</UrduText>
+              </View>
+              
+              {/* Rukun Info */}
               <View style={styles.rukunInfo}>
                 <UrduText style={styles.rukunName}>{rukunName}</UrduText>
-                {currentUnit && (
+                {currentUnitName && (
                   <UrduText style={styles.currentUnit}>
-                    {i18n.t('current_unit')}: {currentUnit}
+                    {i18n.t('current_unit')}: {currentUnitName}
                   </UrduText>
                 )}
               </View>
 
-              <View style={styles.dropdownSection}>
-                <UrduText style={styles.sectionLabel}>{i18n.t('select_new_unit')}</UrduText>
-                <CustomDropdown
-                  dropdownTitle=""
-                  options={tanzeemiUnitOptions}
-                  onSelect={handleUnitSelect}
-                  selectedValue={selectedUnit?.toString()}
-                  placeholder={i18n.t('choose_destination_unit')}
-                  viewStyle={styles.dropdown}
-                />
-                
-                {error && (
-                  <UrduText style={styles.errorText}>{error}</UrduText>
-                )}
+              {/* Transfer Type */}
+              <View style={styles.transferTypeContainer}>
+                <UrduText style={styles.sectionLabel}>{i18n.t('transfer_type')}</UrduText>
+                <View style={styles.radioButtonsContainer}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.radioButton, 
+                      transferType === 'local' && styles.radioButtonSelected
+                    ]}
+                    onPress={() => handleTransferTypeChange('local')}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.radioCircle}>
+                      {transferType === 'local' && <View style={styles.selectedRb} />}
+                    </View>
+                    <UrduText style={styles.radioText}>{i18n.t('local')}</UrduText>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.radioButton, 
+                      transferType === 'outside' && styles.radioButtonSelected
+                    ]}
+                    onPress={() => handleTransferTypeChange('outside')}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.radioCircle}>
+                      {transferType === 'outside' && <View style={styles.selectedRb} />}
+                    </View>
+                    <UrduText style={styles.radioText}>{i18n.t('outside')}</UrduText>
+                  </TouchableOpacity>
+                </View>
               </View>
 
+              {/* Local Unit Dropdown */}
+              {transferType === 'local' && (
+                <View style={styles.fieldContainer}>
+                  <UrduText style={styles.sectionLabel}>{i18n.t('select_new_unit')}</UrduText>
+                  <CustomDropdown
+                    dropdownTitle=""
+                    options={tanzeemiUnitOptions || []}
+                    onSelect={handleLocalUnitSelect}
+                    selectedValue={selectedLocalUnitId?.toString()}
+                    placeholder={i18n.t('choose_destination_unit')}
+                    viewStyle={styles.dropdown}
+                    disabled={isLoading || hasExistingTransfer || !tanzeemiUnitOptions || tanzeemiUnitOptions.length === 0}
+                  />
+                  {(!tanzeemiUnitOptions || tanzeemiUnitOptions.length === 0) && (
+                    <UrduText style={styles.helperText}>{i18n.t('loading_units')}</UrduText>
+                  )}
+                </View>
+              )}
+
+              {/* City Name Input */}
+              {transferType === 'outside' && (
+                <View style={styles.fieldContainer}>
+                  <UrduText style={styles.sectionLabel}>{i18n.t('city_name')}</UrduText>
+                  <TextInput
+                    style={styles.textInput}
+                    value={cityName}
+                    onChangeText={handleCityNameChange}
+                    placeholder={i18n.t('enter_city_name')}
+                    placeholderTextColor={COLORS.textSecondary}
+                    editable={!isLoading && !hasExistingTransfer}
+                  />
+                </View>
+              )}
+
+              {/* Transfer Date */}
+              <View style={styles.fieldContainer}>
+                <UrduText style={styles.sectionLabel}>{i18n.t('transfer_date')}</UrduText>
+                <TouchableOpacity 
+                  style={styles.datePickerButton}
+                  onPress={toggleDatePicker}
+                  disabled={isLoading || hasExistingTransfer}
+                >
+                  <UrduText style={styles.dateText}>
+                    {formatDate(transferDate, 'yyyy-MM-dd')}
+                  </UrduText>
+                  <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+                
+                <DateTimePickerModal
+                  isVisible={showDatePicker}
+                  mode="date"
+                  date={transferDate}
+                  onConfirm={handleDateConfirm}
+                  onCancel={handleDateCancel}
+                  minimumDate={new Date()}
+                />
+              </View>
+              {/* Error Display - only show inline errors that aren't about existing transfers */}
+              {error && error !== i18n.t('transfer_request_exists') && (
+                <UrduText style={styles.errorText}>{error}</UrduText>
+              )}
+
+              {/* Buttons */}
               <View style={styles.buttonContainer}>
                 <CustomButton
-                  text={i18n.t('transfer_rukun')}
-                  onPress={handleTransferClick}
-                  viewStyle={[styles.button, styles.primaryButton]}
-                  disabled={!selectedUnit || isLoading}
+                  text={i18n.t('save')}
+                  onPress={handleSaveTransfer}
+                  viewStyle={[
+                    styles.button, 
+                    styles.primaryButton,
+                    (hasExistingTransfer || isLoading) && styles.disabledButton
+                  ]}
+                  disabled={isLoading || hasExistingTransfer}
                 />
                 
                 <CustomButton
@@ -207,17 +430,60 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
         visible={showConfirmDialog}
         type="warning"
         title={i18n.t('confirm_transfer_title')}
-        description={i18n.t('confirm_transfer_description', { 
-          rukunName, 
-          currentUnit: currentUnit || i18n.t('current_unit'), 
-          newUnit: selectedUnitName 
-        })}
-        confirmText={i18n.t('transfer')}
+        description={
+          transferType === 'local'
+            ? i18n.t('confirm_transfer_description', { 
+                rukunName, 
+                currentUnit: currentUnitName || i18n.t('current_unit'), 
+                newUnit: selectedUnitName 
+              })
+            : i18n.t('confirm_outside_transfer_description', {
+                rukunName,
+                cityName
+              })
+        }
+        confirmText={i18n.t('confirm')}
         cancelText={i18n.t('cancel')}
         onConfirm={handleConfirmTransfer}
         onCancel={() => setShowConfirmDialog(false)}
         onClose={() => setShowConfirmDialog(false)}
         disableButtons={isLoading}
+      />
+      
+      {/* Success Dialog */}
+      <Dialog
+        visible={showSuccessDialog}
+        type="success"
+        title={i18n.t('success')}
+        description={i18n.t('transfer_request_created', { rukunName })}
+        confirmText={i18n.t('ok')}
+        onConfirm={() => {
+          setShowSuccessDialog(false);
+          onSuccess();
+          onClose();
+        }}
+        onClose={() => {
+          setShowSuccessDialog(false);
+          onSuccess();
+          onClose();
+        }}
+      />
+      
+      {/* Error Dialog for Existing Transfer */}
+      <Dialog
+        visible={showErrorDialog}
+        type="error"
+        title={i18n.t('error')}
+        description={i18n.t('transfer_request_exists')}
+        confirmText={i18n.t('ok')}
+        onConfirm={() => {
+          setShowErrorDialog(false);
+          onClose(); // Close the modal when user acknowledges the error
+        }}
+        onClose={() => {
+          setShowErrorDialog(false);
+          onClose(); // Close the modal when user dismisses the dialog
+        }}
       />
     </>
   );
@@ -232,7 +498,7 @@ const styles = StyleSheet.create({
   },
   container: {
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '90%',
     backgroundColor: COLORS.background,
     borderRadius: BORDER_RADIUS.lg,
     ...SHADOWS.medium,
@@ -270,6 +536,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
+  statusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  statusLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+    marginRight: SPACING.xs,
+  },
+  statusValue: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: TYPOGRAPHY.fontFamily.bold,
+    color: COLORS.primary,
+  },
   rukunInfo: {
     backgroundColor: COLORS.lightGray,
     padding: SPACING.md,
@@ -287,8 +569,50 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
   },
-  dropdownSection: {
-    marginBottom: SPACING.lg,
+  transferTypeContainer: {
+    marginBottom: SPACING.md,
+  },
+  radioButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: SPACING.sm,
+  },
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  radioButtonSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.lightPrimary,
+  },
+  radioCircle: {
+    height: 20,
+    width: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.xs,
+  },
+  selectedRb: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
+  },
+  radioText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+  },
+  fieldContainer: {
+    marginBottom: SPACING.md,
   },
   sectionLabel: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -299,8 +623,32 @@ const styles = StyleSheet.create({
   dropdown: {
     marginBottom: SPACING.sm,
   },
+  textInput: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.white,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+  },
+  dateText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+  },
   buttonContainer: {
     gap: SPACING.sm,
+    marginTop: SPACING.md,
   },
   button: {
     minWidth: '100%',
@@ -311,11 +659,20 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: COLORS.lightGray2,
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   errorText: {
     color: COLORS.error,
     fontSize: TYPOGRAPHY.fontSize.sm,
     textAlign: 'center',
     marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  helperText: {
+    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    marginTop: SPACING.xs,
   },
   loader: {
     marginTop: SPACING.md,

@@ -29,7 +29,11 @@ import {
   selectPersonById,
   selectPersonsStatus,
   selectPersonsError,
+  createRukunTransfer,
+  checkExistingTransfer,
+  resetTransferStatus,
 } from '@/app/features/persons/personSlice';
+import { selectAllTanzeemiUnitsForDropdown, fetchTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
 import { COLORS, SPACING } from '@/app/constants/theme';
@@ -43,6 +47,7 @@ import CustomButton from '@/app/components/CustomButton';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import ContactActionButton from '../components/ContactActionButton';
+import TransferRukunModal from '@/app/components/TransferRukunModal';
 import { COMMON_IMAGES } from '@/app/constants/images';
 
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunView'>;
@@ -69,10 +74,14 @@ export default function RukunView() {
   
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Transfer modal state
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
   const status = useAppSelector(selectPersonsStatus);
   const error = useAppSelector(selectPersonsError);
+  const tanzeemiUnitOptions = useAppSelector(selectAllTanzeemiUnitsForDropdown);
 
   const displayPerson = person ?? rukun;
   
@@ -126,6 +135,9 @@ export default function RukunView() {
   useEffect(() => {
     // Always fetch the latest data when the screen is focused
     dispatch(fetchPersonById(rukun.id));
+    
+    // Fetch all tanzeemi units for the transfer dropdown
+    dispatch(fetchTanzeemiUnits());
   }, [dispatch, rukun.id]);
   
   // Also refetch when the screen comes into focus (e.g., after editing)
@@ -237,6 +249,15 @@ export default function RukunView() {
       contactTypeLabel: displayContactTypeLabel 
     });
   };
+  
+  const handleInitiateRukunTransfer = () => {
+    setShowTransferModal(true);
+  };
+  
+  const handleTransferSuccess = () => {
+    // Refresh the rukun data after successful transfer
+    dispatch(fetchPersonById(rukun.id));
+  };
   /* ──────────── Main UI ────────────*/
   return (
     <KeyboardAvoidingView
@@ -337,7 +358,7 @@ export default function RukunView() {
               </View>
             )}
 
-            {/* Rukun Update Request Button */}
+            {/* Rukun Update and Transfer Buttons */}
             {isRukunContactType && (
               <View style={styles.rukunUpdateSection}>
                 <CustomButton
@@ -345,13 +366,33 @@ export default function RukunView() {
                   onPress={handleGenerateRukunUpdateRequest}
                   viewStyle={styles.rukunUpdateButton}
                   textStyle={styles.rukunUpdateButtonText}
-                 
+                />
+                
+                <CustomButton
+                  text={i18n.t('initiate_rukun_transfer')}
+                  onPress={handleInitiateRukunTransfer}
+                  viewStyle={[styles.rukunUpdateButton, styles.rukunTransferButton]}
+                  textStyle={styles.rukunUpdateButtonText}
                 />
               </View>
             )}
           </View>
         </ScrollView>
       </View>
+      
+      {/* Transfer Rukun Modal */}
+      {showTransferModal && (
+        <TransferRukunModal
+          visible={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          onSuccess={handleTransferSuccess}
+          rukunId={rukun.id}
+          rukunName={displayPerson.name || ''}
+          currentUnitId={displayPerson.tanzeemi_unit || displayPerson.unit_id}
+          currentUnitName={displayPerson.unit || displayPerson.unit_name}
+          tanzeemiUnitOptions={tanzeemiUnitOptions}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -471,13 +512,17 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.md,
+    gap: SPACING.md,
   },
   rukunUpdateButton: {
     backgroundColor: COLORS.primary,
-
+   
   },
   rukunUpdateButtonText: {
     color: COLORS.white,
     fontSize: 16,
+  },
+  rukunTransferButton: {
+    backgroundColor: COLORS.tertiary 
   },
 });

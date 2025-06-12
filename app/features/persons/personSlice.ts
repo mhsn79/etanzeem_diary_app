@@ -44,6 +44,11 @@ interface PersonsExtraState {
   rukunUpdateStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   rukunUpdateError: string | null;
   rukunUpdateRequests: Record<number, any>; // Store update requests by contact_id
+  existingTransfers: RukunTransferRequest[];
+  checkTransferStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  checkTransferError: string | null;
+  createTransferStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  createTransferError: string | null;
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -71,6 +76,11 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   rukunUpdateStatus: 'idle',
   rukunUpdateError: null,
   rukunUpdateRequests: {},
+  existingTransfers: [],
+  checkTransferStatus: 'idle',
+  checkTransferError: null,
+  createTransferStatus: 'idle',
+  createTransferError: null,
 });
 
 // We use the centralized apiRequest function from services/apiClient
@@ -533,6 +543,35 @@ export interface TransferRukunPayload {
   contact_id: number; // This is the new tanzeemi_unit ID
 }
 
+export interface RukunTransferRequestPayload {
+  contact_id: number;
+  transfer_type: 'local' | 'outside';
+  local_unit_id?: number;
+  city_name?: string;
+  transfer_date: string;
+  status?: 'draft' | 'pending' | 'approved' | 'rejected';
+}
+
+export interface RukunTransferRequest {
+  id?: number;
+  contact_id: number;
+  transfer_type: 'local' | 'outside';
+  local_unit_id?: number;
+  city_name?: string;
+  transfer_date: string;
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  date_created?: string;
+  date_updated?: string;
+}
+
+export interface CheckExistingTransferResponse {
+  data: RukunTransferRequest[];
+}
+
+export interface CreateRukunTransferResponse {
+  data: RukunTransferRequest;
+}
+
 export interface RukunUpdateResponse {
   data: {
     id: number;
@@ -660,6 +699,101 @@ export const transferRukun = createAsyncThunk<
     }
     
     return rejectWithValue(error.message || `Failed to transfer rukun with ID ${transferData.id}`);
+  }
+});
+
+// Check for existing transfer requests
+export const checkExistingTransfer = createAsyncThunk<
+  RukunTransferRequest[],
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/checkExistingTransfer', async (contactId, { getState, rejectWithValue }) => {
+  try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping check existing transfer (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
+    console.log(`[Persons] Checking existing transfers for contact ID ${contactId} (${Platform.OS})`);
+    
+    // Only check for active transfer requests (pending or draft status)
+    const response = await directApiRequest<CheckExistingTransferResponse>(
+      `/items/rukun_transfers?filter[contact_id][_eq]=${contactId}&filter[status][_in]=pending,draft`,
+      'GET'
+    );
+    
+    if (!response.data) {
+      throw new Error('Failed to check existing transfer requests');
+    }
+    
+    console.log(`[Persons] Found ${response.data.length} existing transfers for contact ID ${contactId}:`, response.data);
+    
+    // If there are no active transfers, return an empty array
+    if (response.data.length === 0) {
+      return [];
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    console.error(`[Persons] Check existing transfer error: ${error.message || error} (${Platform.OS})`);
+    return rejectWithValue(error.message || 'Failed to check existing transfer requests');
+  }
+});
+
+// Create a new transfer request
+export const createRukunTransfer = createAsyncThunk<
+  RukunTransferRequest,
+  RukunTransferRequestPayload,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/createRukunTransfer', async (transferData, { getState, rejectWithValue }) => {
+  try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping create transfer (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
+    console.log(`[Persons] Creating transfer request for contact ID ${transferData.contact_id} (${Platform.OS})`);
+    
+    // Set default status if not provided
+    const payload = {
+      ...transferData,
+      status: transferData.status || 'draft'
+    };
+    
+    const response = await directApiRequest<CreateRukunTransferResponse>(
+      '/items/rukun_transfers',
+      'POST',
+      payload
+    );
+    
+    if (!response.data) {
+      throw new Error('Failed to create transfer request');
+    }
+    
+    console.log(`[Persons] Transfer request created successfully (${Platform.OS})`);
+    return response.data;
+  } catch (error: any) {
+    console.error(`[Persons] Create transfer error: ${error.message || error} (${Platform.OS})`);
+    
+    // Handle specific API errors
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      return rejectWithValue('Authentication error. Please log in again.');
+    }
+    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      return rejectWithValue('You do not have permission to create a transfer request.');
+    }
+    if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+      return rejectWithValue('Resource not found.');
+    }
+    if (error.message?.includes('500')) {
+      return rejectWithValue('Server error. Please try again later.');
+    }
+    
+    return rejectWithValue(error.message || 'Failed to create transfer request');
   }
 });
 
@@ -1011,6 +1145,12 @@ const personsSlice = createSlice({
     resetTransferStatus(state) {
       state.transferStatus = 'idle';
       state.transferError = null;
+      state.checkTransferStatus = 'idle';
+      state.checkTransferError = null;
+      state.createTransferStatus = 'idle';
+      state.createTransferError = null;
+      // Also clear existing transfers to start with a fresh state
+      state.existingTransfers = [];
     },
     resetRukunUpdateStatus(state) {
       state.rukunUpdateStatus = 'idle';
@@ -1160,6 +1300,44 @@ const personsSlice = createSlice({
         state.transferStatus = 'failed';
         state.transferError = action.payload ?? 'Failed to transfer rukun';
       })
+      
+      // Check Existing Transfer
+      .addCase(checkExistingTransfer.pending, state => {
+        state.checkTransferStatus = 'loading';
+        state.checkTransferError = null;
+      })
+      .addCase(checkExistingTransfer.fulfilled, (state, action: PayloadAction<RukunTransferRequest[]>) => {
+        state.checkTransferStatus = 'succeeded';
+        
+        // Ensure we're setting a valid array and log for debugging
+        console.log('[PersonsSlice] Saving existing transfers:', action.payload);
+        
+        // Only set existingTransfers if we got a valid array
+        if (Array.isArray(action.payload)) {
+          state.existingTransfers = action.payload;
+        } else {
+          console.warn('[PersonsSlice] Invalid existingTransfers data:', action.payload);
+          state.existingTransfers = [];
+        }
+      })
+      .addCase(checkExistingTransfer.rejected, (state, action) => {
+        state.checkTransferStatus = 'failed';
+        state.checkTransferError = action.payload ?? 'Failed to check existing transfer requests';
+      })
+      
+      // Create Rukun Transfer Request
+      .addCase(createRukunTransfer.pending, state => {
+        state.createTransferStatus = 'loading';
+        state.createTransferError = null;
+      })
+      .addCase(createRukunTransfer.fulfilled, (state, action: PayloadAction<RukunTransferRequest>) => {
+        state.createTransferStatus = 'succeeded';
+        state.existingTransfers.push(action.payload);
+      })
+      .addCase(createRukunTransfer.rejected, (state, action) => {
+        state.createTransferStatus = 'failed';
+        state.createTransferError = action.payload ?? 'Failed to create transfer request';
+      })
       // Fetch Rukun Update Request
       .addCase(fetchRukunUpdateRequest.pending, (state, action) => {
         console.log(`[PersonsSlice] 🔄 fetchRukunUpdateRequest.pending for contact_id: ${action.meta.arg}`);
@@ -1266,6 +1444,15 @@ export const selectContactTypesError = (state: RootState) => selectPersonsState(
 // Transfer selectors
 export const selectTransferStatus = (state: RootState) => selectPersonsState(state).transferStatus;
 export const selectTransferError = (state: RootState) => selectPersonsState(state).transferError;
+
+// New Transfer Request selectors
+export const selectCheckStatus = (state: RootState) => selectPersonsState(state).checkTransferStatus;
+export const selectCheckError = (state: RootState) => selectPersonsState(state).checkTransferError;
+export const selectCreateStatus = (state: RootState) => selectPersonsState(state).createTransferStatus;
+export const selectCreateError = (state: RootState) => selectPersonsState(state).createTransferError;
+export const selectExistingTransfers = (state: RootState) => selectPersonsState(state).existingTransfers;
+export const selectExistingTransfer = (state: RootState, contactId: number) => 
+  selectPersonsState(state).existingTransfers.find(transfer => transfer.contact_id === contactId);
 
 // Rukun Update selectors
 export const selectRukunUpdateStatus = (state: RootState) => {

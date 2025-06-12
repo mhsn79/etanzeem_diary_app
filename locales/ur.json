@@ -238,5 +238,20 @@
     "missing_required_fields": "براہ کرم تمام ضروری فیلڈز بھریں",
     "phone_format_invalid": "براہ کرم صحیح فون نمبر درج کریں",
     "email_format_invalid": "براہ کرم صحیح ای میل ایڈریس درج کریں",
-    "go_back": "واپس جائیں"
+    "go_back": "واپس جائیں",
+    "initiate_rukun_transfer": "رکن کی منتقلی شروع کریں",
+    "transfer_request_exists": "اس رکن کے لیے منتقلی کی درخواست پہلے سے موجود ہے",
+    "transfer_request_created": "منتقلی کی درخواست کامیابی سے بنائی گئی",
+    "transfer_request_failed": "منتقلی کی درخواست بنانے میں ناکامی",
+    "local": "مقامی",
+    "outside": "باہر",
+    "city_name": "شہر کا نام",
+    "enter_city_name": "شہر کا نام درج کریں",
+    "transfer_date": "منتقلی کی تاریخ",
+    "loading_units": "یونٹس لوڈ ہو رہی ہیں...",
+    "transfer_confirmation": "منتقلی کی تصدیق",
+    "confirm_transfer_message": "کیا آپ واقعی اس رکن کو منتقل کرنا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔",
+    "confirm": "تصدیق کریں",
+    "transfer_type":"منتقلی کی قسم",
+    "confirm_outside_transfer_description": "کیا آپ واقعی {rukunName} کو باہر {cityName} میں منتقل کرنا چاہتے ہیں؟"
 } 
