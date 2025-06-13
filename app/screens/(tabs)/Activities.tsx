@@ -98,7 +98,8 @@ export default function Activities() {
 
   const formatActivityData = (activity:any) => ({
     id: activity.id.toString(),
-    title: activity.activity_details || activity.title || 'غير متعين',
+    title: activity.activity_details || 'غير متعين',
+    details: activity.title || 'غير متعين',
     location: activity.location || activity.location_coordinates || 'غير متعين',
     status: activity.status || 'غير متعين',
     dateTime: activity.activity_date_and_time
@@ -189,6 +190,7 @@ export default function Activities() {
               key={item.id}
               id={item.id}
               title={item.title}
+              details={item.details}
               location={item.location}
               status={item.status}
               dateTime={item.dateTime}

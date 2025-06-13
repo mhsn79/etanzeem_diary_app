@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import UrduText from './UrduText';
 import ActivityActionButton from './ActivityActionButton';
 import { COLORS, SIZES, SPACING, TYPOGRAPHY } from '../constants/theme';
@@ -7,11 +8,12 @@ import { Feather, FontAwesome, MaterialIcons, SimpleLineIcons } from '@expo/vect
 import Dialog from './Dialog';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { deleteActivity, selectDeleteActivityStatus } from '../features/activities/activitySlice';
-import { selectCurrentUser } from '../features/auth/authSlice';
+import { selectUser as selectCurrentUser } from '../features/auth/authSlice';
 
 interface ActivityCardProps {
   id: string;
   title: string;
+  details:string;
   location: string;
   status: string;
   dateTime: string;
@@ -28,6 +30,7 @@ interface ActivityCardProps {
 const ActivityCard: React.FC<ActivityCardProps> = ({
   id,
   title,
+  details,
   location,
   status,
   dateTime,
@@ -40,6 +43,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   handleRight,
   onDeleteSuccess,
 }) => {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const deleteStatus = useAppSelector(selectDeleteActivityStatus);
   const currentUser = useAppSelector(selectCurrentUser);
@@ -52,6 +56,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
       console.log(`Activity ${id}: User check failed - currentUser: ${currentUser?.id}, user_created: ${user_created}`);
       return false;
     }
+    console.log('=====================user',currentUser,user_created);
+    
     const result = String(currentUser.id) === String(user_created);
     console.log(`Activity ${id}: User check - currentUser: ${currentUser.id}, user_created: ${user_created}, isCreator: ${result}`);
     return result;
@@ -81,32 +87,40 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   return (
     <View style={styles.cardContainer}>
       <View style={styles.titleContainer}>
+        <View>
         <UrduText style={styles.title}>{title}</UrduText>
+        <UrduText style={styles.title}>{details}</UrduText>
+
+        </View>
         <View style={styles.iconContainer}>
           {isCreator && (
             <TouchableOpacity style={styles.icon} onPress={handleDelete}>
               <Feather name="archive" size={SIZES.icon.sSmall} color={COLORS.warning} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.icon}>
-            <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
-          </TouchableOpacity>
+          {isCreator && (
+            <TouchableOpacity 
+              style={styles.icon} 
+              onPress={() => router.push({
+                pathname: '/screens/(stack)/ActivityScreen',
+                params: { mode: 'edit', id: id }
+              })}
+            >
+              <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       <View style={styles.detailsContainer}>
         <UrduText style={styles.detail}>تاریخ وقت: {dateTime}</UrduText>
         <UrduText style={styles.detail}>مقام: {location}</UrduText>
       </View>
-      <View style={styles.chairmenContainer}>
-        <UrduText style={styles.detail}> ناظمین:</UrduText>
-        <UrduText style={styles.chairmenText}> محمد علی (زون A)</UrduText>
-        <UrduText style={styles.chairmenText}> محمد علی (زون B)</UrduText>
-      </View>
-      <View style={styles.buttonContainer}>
+    
+      {/* <View style={styles.buttonContainer}>
         <ActivityActionButton text="ایس ایم ایس" onPress={handleRight} iconComponent={<SimpleLineIcons name="envelope" size={20} color="black" />} />
         <ActivityActionButton text=" ایپ نوٹیفکیشن" onPress={handleMiddle} iconComponent={<MaterialIcons name="notifications-none" size={20} color="black" />} />
         <ActivityActionButton text="واٹس ایپ" onPress={handleRight} iconComponent={<FontAwesome name="whatsapp" size={20} color="black" />} />
-      </View>
+      </View> */}
 
       {/* Archive Confirmation Dialog */}
       <Dialog

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
 import UrduText from '@/app/components/UrduText';
 import ScreenLayout from '@/app/components/ScreenLayout';
@@ -18,8 +18,16 @@ import {
 } from '@/app/features/activityTypes/activityTypesSlice';
 import {
   createActivity,
+  editActivity,
+  fetchActivityById,
   selectCreateActivityStatus,
   selectCreateActivityError,
+  selectEditActivityStatus,
+  selectEditActivityError,
+  selectActivityById,
+  getActivityById,
+  selectFetchActivityByIdStatus,
+  selectFetchActivityByIdError,
 } from '@/app/features/activities/activitySlice';
 import DateTimePicker from '@/app/components/DateTimePicker';
 
@@ -27,57 +35,34 @@ const ActivityScreen = () => {
   const navigation = useNavigation();
   const params = useLocalSearchParams();
   const dispatch = useAppDispatch();
-  const mode = (params.mode || 'schedule') as 'report' | 'schedule';
-  const initialDate =
-    mode === 'report'
-      ? new Date() // Today for report mode
-      : new Date(new Date().setDate(new Date().getDate() + 1)); // Tomorrow for schedule mode
+  const mode = (params.mode || 'schedule') as 'report' | 'schedule' | 'edit';
+  const activityId = params.id ? Number(params.id) : undefined;
+  const isEditMode = mode === 'edit' && activityId !== undefined;
+  
+  // Get initial date based on mode
+  const getInitialDate = () => {
+    if (mode === 'report') return new Date(); // Today for report mode
+    if (mode === 'schedule') return new Date(new Date().setDate(new Date().getDate() + 1)); // Tomorrow for schedule mode
+    return new Date(); // Default for edit mode (will be overridden)
+  };
 
-  const [selectedActivityDate, setSelectedActivityDate] = useState<Date | null>(initialDate);
+  // Initialize state with default values
+  const [selectedActivityDate, setSelectedActivityDate] = useState<Date | null>(getInitialDate());
   const [activityDetails, setActivityDetails] = useState({
     activityType: '',
     location: '',
     locationLabel: '',
     notes: '',
-
   });
+  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  // Redux selectors
-  const activityTypes = useAppSelector(selectAllActivityTypes);
-  const activityTypesStatus = useAppSelector(selectActivityTypesStatus);
-  const activityTypesError = useAppSelector(selectActivityTypesError);
-  const createActivityStatus = useAppSelector(selectCreateActivityStatus);
-  const createActivityError = useAppSelector(selectCreateActivityError);
-
-  // Fetch activity types on component mount
-  useEffect(() => {
-    if (activityTypesStatus === 'idle') {
-      dispatch(fetchActivityTypes());
-    }
-  }, [dispatch, activityTypesStatus]);
-
-  // Handle activity creation status changes
-  useEffect(() => {
-    if (createActivityStatus === 'succeeded' && isSubmitting) {
-      setShowSuccessDialog(true);
-      setIsSubmitting(false);
-    } else if (createActivityStatus === 'failed' && isSubmitting) {
-      setShowConfirmDialog(false);
-      setIsSubmitting(false);
-    }
-  }, [createActivityStatus, createActivityError, isSubmitting]);
-
-  // Map activity types from API to dropdown options
-  const activityTypeOptions = activityTypes.map((type) => ({
-    id: String(type.id),
-    label: type.Name,
-    value: String(type.id),
-  }));
-
+  const [isLoading, setIsLoading] = useState(isEditMode);
+  
+  // Define location options
   const locationOptions = [
     { id: '1', label: 'پارٹی کا ہیڈ آفس، لاہور', value: '1' },
     { id: '2', label: 'یونین کونسل 1', value: '2' },
@@ -90,6 +75,132 @@ const ActivityScreen = () => {
     { id: '9', label: 'یونین کونسل 8', value: '9' },
     { id: '10', label: 'یونین کونسل 9', value: '10' },
   ];
+
+  // Redux selectors
+  const activityTypes = useAppSelector(selectAllActivityTypes);
+  const activityTypesStatus = useAppSelector(selectActivityTypesStatus);
+  const activityTypesError = useAppSelector(selectActivityTypesError);
+  const createActivityStatus = useAppSelector(selectCreateActivityStatus);
+  const createActivityError = useAppSelector(selectCreateActivityError);
+  const editActivityStatus = useAppSelector(selectEditActivityStatus);
+  const editActivityError = useAppSelector(selectEditActivityError);
+  const fetchByIdStatus = useAppSelector(selectFetchActivityByIdStatus);
+  const fetchByIdError = useAppSelector(selectFetchActivityByIdError);
+  
+  // If in edit mode, get the activity from the store
+  const activity = isEditMode && activityId ? useAppSelector(getActivityById(activityId)) : null;
+  
+  // Debug log to track activity data - only log when important values change
+  useEffect(() => {
+    if (isEditMode) {
+      console.log('Activity data changed:', { 
+        activityId, 
+        activityExists: !!activity,
+        fetchByIdStatus,
+        fetchByIdError
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, activityId, !!activity, fetchByIdStatus, fetchByIdError]);
+
+  // Fetch activity types on component mount
+  useEffect(() => {
+    if (activityTypesStatus === 'idle') {
+      dispatch(fetchActivityTypes());
+    }
+  }, [dispatch, activityTypesStatus]);
+  
+  // Fetch activity data in edit mode - only once when component mounts
+  useEffect(() => {
+    if (isEditMode && activityId) {
+      console.log(`Checking if we need to fetch activity ID: ${activityId}`);
+      
+      // Set loading state immediately
+      setIsLoading(true);
+      
+      // Check if we already have the activity in the store
+      if (activity) {
+        console.log('Activity already in store, no need to fetch:', activity);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If we're already fetching, don't dispatch again
+      if (fetchByIdStatus === 'loading') {
+        console.log('Already fetching activity, waiting for result...');
+        return;
+      }
+      
+      console.log(`Dispatching fetchActivityById for ID: ${activityId}`);
+      dispatch(fetchActivityById(activityId))
+        .unwrap()
+        .then((result) => {
+          console.log('Successfully fetched activity:', result);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch activity:', error);
+          setValidationError('Failed to fetch activity data');
+          setIsLoading(false);
+        });
+    }
+  // Only run this effect once when the component mounts in edit mode
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, activityId]);
+  
+  // Populate form fields when activity data is available in edit mode
+  useEffect(() => {
+    if (isEditMode && activity) {
+      console.log('Populating form with activity data:', activity);
+      
+      // Always update the form fields when in edit mode and activity is available
+      // This ensures the form is populated correctly
+      
+      // Set activity date
+      if (activity.activity_date_and_time) {
+        setSelectedActivityDate(new Date(activity.activity_date_and_time));
+      }
+      
+      // Find the location option that matches the activity's location
+      const locationOption = locationOptions.find(option => 
+        option.label === activity.location
+      );
+      
+      console.log('Location options:', locationOptions);
+      console.log('Activity location:', activity.location);
+      console.log('Found location option:', locationOption);
+      
+      // Set activity details
+      setActivityDetails({
+        activityType: activity.activity_type ? String(activity.activity_type) : '',
+        location: locationOption ? locationOption.value : '',
+        locationLabel: activity.location || '',
+        notes: activity.activity_details || '',
+      });
+      
+      // Set loading to false since we have the data
+      setIsLoading(false);
+    }
+  // Only include dependencies that won't change frequently to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, activity?.id, locationOptions.length]);
+
+  // Handle activity creation/edit status changes
+  useEffect(() => {
+    if ((createActivityStatus === 'succeeded' || editActivityStatus === 'succeeded') && isSubmitting) {
+      setShowSuccessDialog(true);
+      setIsSubmitting(false);
+    } else if ((createActivityStatus === 'failed' || editActivityStatus === 'failed') && isSubmitting) {
+      setShowConfirmDialog(false);
+      setIsSubmitting(false);
+    }
+  }, [createActivityStatus, createActivityError, editActivityStatus, editActivityError, isSubmitting]);
+
+  // Map activity types from API to dropdown options
+  const activityTypeOptions = activityTypes.map((type) => ({
+    id: String(type.id),
+    label: type.Name,
+    value: String(type.id),
+  }));
 
   const navigateBack = () => {
     navigation.goBack();
@@ -175,14 +286,20 @@ const ActivityScreen = () => {
       activity_date_and_time: activityDate.toISOString(),
       activity_details: activityDetails.notes,
       location: activityDetails.locationLabel,
-      status: 'draft',
+      status: isEditMode ? (activity?.status || 'draft') : 'draft',
       report_month: reportMonth,
       report_year: reportYear
     };
-    console.log('============payloadpayloadpayloadpayloadpayload=============',payload);
     
     setIsSubmitting(true);
-    dispatch(createActivity(payload));
+    
+    if (isEditMode && activityId) {
+      // Edit existing activity
+      dispatch(editActivity({ id: activityId, activityData: payload }));
+    } else {
+      // Create new activity
+      dispatch(createActivity(payload));
+    }
   };
 
   const handleSuccessDialogConfirm = () => {
@@ -190,7 +307,26 @@ const ActivityScreen = () => {
     navigation.goBack();
   };
 
-  const screenTitle = mode === 'report' ? 'سرگرمی رپورٹ فارم' : 'سرگرمی شیڈول کریں';
+  const getScreenTitle = () => {
+    if (mode === 'report') return 'سرگرمی رپورٹ فارم';
+    if (mode === 'edit') return 'سرگرمی میں ترمیم کریں';
+    return 'سرگرمی شیڈول کریں';
+  };
+  
+  const screenTitle = getScreenTitle();
+
+  // Show loading indicator when fetching activity data in edit mode
+  if (isLoading && isEditMode) {
+    console.log('Showing loading indicator for edit mode');
+    return (
+      <ScreenLayout title={screenTitle} onBack={navigateBack}>
+        <View style={[styles.container, styles.loadingContainer]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <UrduText style={styles.loadingText}>سرگرمی کی معلومات لوڈ ہو رہی ہیں...</UrduText>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout title={screenTitle} onBack={navigateBack}>
@@ -204,6 +340,8 @@ const ActivityScreen = () => {
             onDateChange={handleDateTimeChange}
             minimumDate={mode === 'schedule' ? new Date() : undefined}
             maximumDate={mode === 'report' ? new Date() : undefined}
+            // In edit mode, don't restrict dates
+            disabled={isEditMode && activity?.status !== 'draft'}
             useUrduText={true}
             confirmText="منتخب کریں"
             cancelText="منسوخ"
@@ -244,28 +382,36 @@ const ActivityScreen = () => {
           <UrduText style={styles.errorText}>{validationError}</UrduText>
         </View>
       )}
-      {createActivityError && createActivityStatus === 'failed' && (
+      {createActivityError && createActivityStatus === 'failed' && !isEditMode && (
         <View style={styles.errorContainer}>
           <UrduText style={styles.errorText}>{createActivityError}</UrduText>
         </View>
       )}
+      {editActivityError && editActivityStatus === 'failed' && isEditMode && (
+        <View style={styles.errorContainer}>
+          <UrduText style={styles.errorText}>{editActivityError}</UrduText>
+        </View>
+      )}
       <View style={styles.buttonContainer}>
         <CustomButton
-          text="سرگرمی جمع کروائیں"
+          text={isEditMode ? "سرگرمی اپڈیٹ کریں" : "سرگرمی جمع کروائیں"}
           onPress={submitActivity}
           viewStyle={[{ backgroundColor: COLORS.primary, flex: 1, marginHorizontal: SPACING.sm }]}
           textStyle={[{ color: COLORS.white }]}
-          loading={createActivityStatus === 'loading'}
-          disabled={createActivityStatus === 'loading'}
+          loading={isEditMode ? editActivityStatus === 'loading' : createActivityStatus === 'loading'}
+          disabled={isEditMode ? editActivityStatus === 'loading' : createActivityStatus === 'loading'}
         />
       </View>
       <Dialog
         visible={showConfirmDialog}
         onConfirm={handleConfirmSubmit}
         onClose={() => setShowConfirmDialog(false)}
-        title="سرگرمی جمع کروانے کی تصدیق"
-        description="کیا آپ واقعاً اس سرگرمی کو جمع کروانا چاہتے ہیں؟ ایک بار جمع ہونے کے بعد، آپ اسے صرف ایڈمن کی اجازت سے ایڈٹ کر سکیں گے"
-        confirmText="ہاں، جمع کروائیں"
+        title={isEditMode ? "سرگرمی اپڈیٹ کرنے کی تصدیق" : "سرگرمی جمع کروانے کی تصدیق"}
+        description={isEditMode 
+          ? "کیا آپ واقعاً اس سرگرمی کو اپڈیٹ کرنا چاہتے ہیں؟"
+          : "کیا آپ واقعاً اس سرگرمی کو جمع کروانا چاہتے ہیں؟ ایک بار جمع ہونے کے بعد، آپ اسے صرف ایڈمن کی اجازت سے ایڈٹ کر سکیں گے"
+        }
+        confirmText={isEditMode ? "ہاں، اپڈیٹ کریں" : "ہاں، جمع کروائیں"}
         cancelText="نہیں، واپس جائیں"
         showWarningIcon={true}
       />
@@ -273,8 +419,14 @@ const ActivityScreen = () => {
         visible={showSuccessDialog}
         onConfirm={handleSuccessDialogConfirm}
         onClose={() => setShowSuccessDialog(false)}
-        title="مبارک ہو! آپ کی سرگرمی جمع کر دی گئی ہے!"
-        description="آپ کی سرگرمی کامیابی سے سبمٹ ہو چکی ہے۔ آپ چاہیں تو جمع شدہ سرگرمیاں دیکھ سکتے ہیں یا واپس ہوم پیج پر جا سکتے ہیں۔"
+        title={isEditMode 
+          ? "مبارک ہو! آپ کی سرگرمی اپڈیٹ کر دی گئی ہے!" 
+          : "مبارک ہو! آپ کی سرگرمی جمع کر دی گئی ہے!"
+        }
+        description={isEditMode
+          ? "آپ کی سرگرمی کامیابی سے اپڈیٹ ہو چکی ہے۔"
+          : "آپ کی سرگرمی کامیابی سے سبمٹ ہو چکی ہے۔ آپ چاہیں تو جمع شدہ سرگرمیاں دیکھ سکتے ہیں یا واپس ہوم پیج پر جا سکتے ہیں۔"
+        }
         confirmText="ٹھیک ہے"
         showSuccessIcon={true}
       />
@@ -286,6 +438,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: COLORS.primary,
+    textAlign: 'center',
   },
   content: {
     padding: SPACING.md,

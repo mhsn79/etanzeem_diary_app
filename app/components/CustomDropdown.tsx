@@ -61,8 +61,25 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const triggerRef = useRef<View | null>(null);
 
+  // Initialize selected option when component mounts or when options/selectedValue change
   useEffect(() => {
-    setSelectedOption(options?.find(opt => opt.value === selectedValue) || null);
+    // Find the matching option based on selectedValue
+    const matchingOption = options?.find(opt => opt.value === selectedValue) || null;
+    
+    // Only update state if necessary to avoid infinite loops
+    const needsUpdate = 
+      // If we have a selectedValue but no selectedOption or it doesn't match
+      (selectedValue && (!selectedOption || selectedOption.value !== selectedValue)) ||
+      // If we don't have a selectedValue but have a selectedOption (need to clear)
+      (!selectedValue && selectedOption !== null) ||
+      // If the IDs don't match (different option with same value)
+      (matchingOption && selectedOption && matchingOption.id !== selectedOption.id);
+    
+    if (needsUpdate) {
+      setSelectedOption(matchingOption);
+    }
+  // Intentionally exclude selectedOption from dependencies to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedValue, options]);
 
   const open = () => {

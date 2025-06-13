@@ -35,9 +35,41 @@ export interface AuthTokens {
   expiresAt: number;
 }
 
+// Extended user interface to include additional details from /users/me endpoint
+export interface ExtendedUser {
+  // Include all User properties
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  status?: string;
+  last_access?: string;
+  
+  // Override role and avatar with detailed objects
+  role_name?: string; // To store the string role from User
+  role?: {
+    id: string;
+    name: string;
+    admin_access?: boolean;
+    app_access?: boolean;
+  };
+  avatar_id?: string; // To store the string avatar from User
+  avatar?: {
+    id: string;
+    storage: string;
+    filename_disk: string;
+    filename_download: string;
+    title: string;
+    type: string;
+    url: string;
+  };
+  // Add any other fields that might be useful
+}
+
 export interface AuthState {
   tokens: AuthTokens | null;
   user: User | null;
+  userDetails: ExtendedUser | null; // Separate state for detailed user data
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
   isRefreshing: boolean;
@@ -46,6 +78,7 @@ export interface AuthState {
 const initialState: AuthState = {
   tokens: null,
   user: null,
+  userDetails: null,
   status: 'idle',
   error: null,
   isRefreshing: false,
@@ -385,6 +418,7 @@ const authSlice = createSlice({
       // Clear auth state
       state.tokens = null;
       state.user = null;
+      state.userDetails = null;
       state.status = 'idle';
       state.error = null;
       state.isRefreshing = false;
@@ -422,6 +456,7 @@ const authSlice = createSlice({
         state.error = action.payload || 'Login failed';
         state.tokens = null;
         state.user = null;
+        state.userDetails = null;
         state.isRefreshing = false;
       })
       .addCase(refresh.pending, (state) => {
@@ -441,6 +476,7 @@ const authSlice = createSlice({
         state.error = action.payload || 'Token refresh failed';
         state.tokens = null;
         state.user = null;
+        state.userDetails = null;
         state.isRefreshing = false;
       })
       .addCase(updateUserAvatar.pending, (state) => {
@@ -455,6 +491,39 @@ const authSlice = createSlice({
       .addCase(updateUserAvatar.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to update avatar';
+      })
+      .addCase(fetchUserMe.pending, (state) => {
+        // Don't set loading state to avoid UI flicker
+        state.error = null;
+      })
+      .addCase(fetchUserMe.fulfilled, (state, action: PayloadAction<ExtendedUser>) => {
+        state.status = 'succeeded';
+        
+        // Update basic user object
+        state.user = {
+          id: action.payload.id,
+          email: action.payload.email,
+          first_name: action.payload.first_name,
+          last_name: action.payload.last_name,
+          role: action.payload.role?.name || action.payload.role_name,
+          status: action.payload.status,
+          last_access: action.payload.last_access,
+          avatar: action.payload.avatar?.id || action.payload.avatar_id
+        };
+        
+        // Store the full detailed user data
+        // Make sure to preserve role_name and avatar_id for consistency
+        state.userDetails = {
+          ...action.payload,
+          role_name: action.payload.role?.name || action.payload.role_name,
+          avatar_id: action.payload.avatar?.id || action.payload.avatar_id
+        };
+        
+        state.error = null;
+      })
+      .addCase(fetchUserMe.rejected, (state, action) => {
+        // Don't set failed state to avoid UI disruption
+        state.error = action.payload || 'Failed to fetch user data';
       });
   },
 });
@@ -558,12 +627,15 @@ export const logout = createAsyncThunk(
   }
 );
 
+// Selectors
 export const selectAuthState = (state: RootState) => state.auth;
 export const selectIsAuthenticated = (state: RootState) => !!state.auth.tokens;
 export const selectAccessToken = (state: RootState) => state.auth.tokens?.accessToken;
 export const selectUser = (state: RootState) => state.auth.user;
+export const selectUserDetails = (state: RootState) => state.auth.userDetails;
 export const selectAuthStatus = (state: RootState) => state.auth.status;
 export const selectAuthError = (state: RootState) => state.auth.error;
+export const selectIsRefreshing = (state: RootState) => state.auth.isRefreshing;
 
 export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
   void,
@@ -592,11 +664,88 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
 });
 
 /**
+ * Thunk to initialize auth state on app startup
+ * This will check for stored tokens, refresh if needed, and fetch user data
+ */
+export const initializeAuth = createAsyncThunk<
+  boolean,
+  void,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('auth/initialize', async (_, { dispatch, rejectWithValue }) => {
+  try {
+    // First check if we need to refresh the token
+    await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
+    
+    // Then fetch the latest user data
+    await dispatch(fetchUserMe()).unwrap();
+    
+    return true;
+  } catch (error: any) {
+    console.log('Auth initialization failed:', error);
+    // Don't reject, just return false to indicate initialization failed
+    // This allows the app to continue in an unauthenticated state
+    return false;
+  }
+});
+
+/**
+ * Thunk to fetch the current user data from Directus
+ */
+export const fetchUserMe = createAsyncThunk<
+  ExtendedUser,
+  void,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('auth/fetchUserMe', async (_, { getState, rejectWithValue, dispatch }) => {
+  try {
+    const state = getState();
+    const accessToken = state.auth.tokens?.accessToken;
+    
+    if (!accessToken) {
+      return rejectWithValue('No access token available');
+    }
+    
+    // Check if token needs refresh
+    if (isTokenExpiredOrExpiring(state.auth.tokens?.expiresAt)) {
+      await dispatch(refresh()).unwrap();
+    }
+    
+    // Get updated token after potential refresh
+    const updatedState = getState();
+    const updatedToken = updatedState.auth.tokens?.accessToken;
+    
+    if (!updatedToken) {
+      return rejectWithValue('Failed to get valid token');
+    }
+    
+    // Fetch user data from Directus with expanded fields
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+    const response = await fetch(`${baseUrl}/users/me?fields=*,role.*,avatar.*`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${updatedToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user data: ${response.status}`);
+    }
+    
+    const userData = await response.json();
+    console.log('Fetched detailed user data:', userData.data);
+    return userData.data as ExtendedUser;
+  } catch (error: any) {
+    console.error('Fetch user me error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch user data');
+  }
+});
+
+/**
  * Combined thunk that handles login and fetches person data
  * This is useful for components that need to wait for both operations to complete
  */
 export const loginAndFetchUserDetails = createAsyncThunk<
-  { auth: AuthResponse, userDetails: any },
+  { auth: AuthResponse, userDetails: any, extendedUserDetails: ExtendedUser },
   LoginCredentials,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/loginAndFetchUserDetails', async (credentials, { dispatch, rejectWithValue }) => {
@@ -612,17 +761,23 @@ export const loginAndFetchUserDetails = createAsyncThunk<
       throw new Error('Failed to fetch user details. Please try again.');
     }
     
+    // Also fetch the latest user data from Directus
+    const extendedUserDetails = await dispatch(fetchUserMe()).unwrap();
+    
     return { 
       auth: authResult,
-      userDetails 
+      userDetails,
+      extendedUserDetails
     };
   } catch (error: any) {
     return rejectWithValue(error.message || 'Login and fetch user details failed');
   }
 });
 
-// Additional selectors
-export const selectCurrentUser = (state: RootState) => state.auth.user;
-export const selectIsRefreshing = (state: RootState) => state.auth.isRefreshing;
+// Alias for selectUser for better semantic meaning
+export const selectCurrentUser = selectUser;
+
+// Selector for user avatar details
+export const selectUserAvatar = (state: RootState) => state.auth.userDetails?.avatar;
 
 export default authSlice.reducer;

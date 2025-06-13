@@ -22,6 +22,10 @@ interface ActivitiesExtraState {
   createError: string | null;
   deleteStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   deleteError: string | null;
+  editStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  editError: string | null;
+  fetchByIdStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  fetchByIdError: string | null;
 }
 
 export type ActivitiesState = ReturnType<typeof activitiesAdapter.getInitialState<ActivitiesExtraState>>;
@@ -33,6 +37,10 @@ const initialState: ActivitiesState = activitiesAdapter.getInitialState<Activiti
   createError: null,
   deleteStatus: 'idle',
   deleteError: null,
+  editStatus: 'idle',
+  editError: null,
+  fetchByIdStatus: 'idle',
+  fetchByIdError: null,
 });
 
 // The centralized API client handles token refresh automatically
@@ -150,6 +158,97 @@ export const deleteActivity = createAsyncThunk<
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch a single activity by ID
+ * ────────────────────────────────────────────────────────────────────────────────*/
+export const fetchActivityById = createAsyncThunk<
+  Activity,
+  string | number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('activities/fetchById', async (activityId, { rejectWithValue, getState }) => {
+  try {
+    console.log(`Fetching activity with ID: ${activityId}`);
+    
+    // Get the current user ID from auth state
+    const state = getState();
+    const userId = state.auth.user?.id;
+    
+    if (!userId) {
+      return rejectWithValue('User not authenticated. Please log in again.');
+    }
+    
+    // Fetch the activity by ID
+    const response = await directApiRequest<{ data: Activity }>(
+      `/items/Activities/${activityId}`,
+      'GET'
+    );
+    
+    if (!response.data) throw new Error('Activity not found');
+    return response.data;
+  } catch (error: any) {
+    console.error('Fetch activity by ID error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch activity');
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to edit an activity
+ * ────────────────────────────────────────────────────────────────────────────────*/
+export const editActivity = createAsyncThunk<
+  Activity,
+  { id: number; activityData: Partial<Activity> },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('activities/edit', async ({ id, activityData }, { rejectWithValue, getState, dispatch }) => {
+  try {
+    console.log(`Editing activity with ID: ${id}`, activityData);
+    
+    // Get the current user ID from auth state
+    const state = getState();
+    const userId = state.auth.user?.id;
+    
+    if (!userId) {
+      return rejectWithValue('User not authenticated. Please log in again.');
+    }
+    
+    // First, fetch the activity to verify ownership
+    const response = await directApiRequest<{ data: Activity }>(
+      `/items/Activities/${id}`,
+      'GET'
+    );
+    
+    if (!response.data) {
+      throw new Error('Activity not found');
+    }
+    
+    // Verify that the current user is the creator of the activity
+    if (String(response.data.user_created) !== String(userId)) {
+      console.log(`User ID mismatch: ${response.data.user_created} !== ${userId}`);
+      return rejectWithValue('Unauthorized: You cannot edit this activity');
+    }
+    
+    // Update the activity
+    const updateResponse = await directApiRequest<{ data: Activity }>(
+      `/items/Activities/${id}`,
+      'PATCH',
+      activityData
+    );
+    
+    if (!updateResponse.data) {
+      throw new Error('Failed to update activity');
+    }
+    
+    // Refresh the activities list
+    dispatch(fetchActivities());
+    
+    return updateResponse.data;
+  } catch (error: any) {
+    console.error('Edit activity error:', error);
+    return rejectWithValue(error.message || 'Failed to edit activity');
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
  * Thunk to fetch activities
  * ────────────────────────────────────────────────────────────────────────────────*/
 export const fetchActivities = createAsyncThunk<
@@ -236,6 +335,30 @@ const activitiesSlice = createSlice({
       .addCase(deleteActivity.rejected, (state, action) => {
         state.deleteStatus = 'failed';
         state.deleteError = action.payload ?? 'Failed to delete activity';
+      })
+      .addCase(fetchActivityById.pending, state => {
+        state.fetchByIdStatus = 'loading';
+        state.fetchByIdError = null;
+      })
+      .addCase(fetchActivityById.fulfilled, (state, action: PayloadAction<Activity>) => {
+        state.fetchByIdStatus = 'succeeded';
+        activitiesAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(fetchActivityById.rejected, (state, action) => {
+        state.fetchByIdStatus = 'failed';
+        state.fetchByIdError = action.payload ?? 'Failed to fetch activity';
+      })
+      .addCase(editActivity.pending, state => {
+        state.editStatus = 'loading';
+        state.editError = null;
+      })
+      .addCase(editActivity.fulfilled, (state, action: PayloadAction<Activity>) => {
+        state.editStatus = 'succeeded';
+        activitiesAdapter.upsertOne(state, action.payload);
+      })
+      .addCase(editActivity.rejected, (state, action) => {
+        state.editStatus = 'failed';
+        state.editError = action.payload ?? 'Failed to edit activity';
       });
   },
 });
@@ -264,5 +387,13 @@ export const selectCreateActivityStatus = (state: RootState) => selectActivities
 export const selectCreateActivityError = (state: RootState) => selectActivitiesState(state).createError;
 export const selectDeleteActivityStatus = (state: RootState) => selectActivitiesState(state).deleteStatus;
 export const selectDeleteActivityError = (state: RootState) => selectActivitiesState(state).deleteError;
+export const selectEditActivityStatus = (state: RootState) => selectActivitiesState(state).editStatus;
+export const selectEditActivityError = (state: RootState) => selectActivitiesState(state).editError;
+export const selectFetchActivityByIdStatus = (state: RootState) => selectActivitiesState(state).fetchByIdStatus;
+export const selectFetchActivityByIdError = (state: RootState) => selectActivitiesState(state).fetchByIdError;
+
+// Custom selector to get an activity by ID (using our own implementation)
+export const getActivityById = (id: string | number) => 
+  (state: RootState) => selectActivityEntities(state)[typeof id === 'string' ? parseInt(id) : id];
 
 export default activitiesSlice.reducer;
