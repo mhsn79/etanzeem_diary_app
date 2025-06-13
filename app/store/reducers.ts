@@ -7,6 +7,7 @@ import reportsNewReducer from '../features/reports/reportsSlice_new';
 import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
 import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
+import strengthReducer from '../features/strength/strengthSlice';
 
 // Define a reset action type
 export const RESET_STATE = 'RESET_STATE';
@@ -21,6 +22,7 @@ const appReducer = combineReducers({
   tanzeem: tanzeemReducer,
   tanzeemHierarchy: tanzeemHierarchyReducer, // Add the tanzeem hierarchy slice
   qa: qaReducer, // Add the QA slice
+  strength: strengthReducer, // Add the strength slice
 });
 
 // Root reducer with state reset capability

@@ -19,7 +19,8 @@ const persistConfig: PersistConfig<RootState> = {
     STORAGE_KEYS.REPORTS, 
     STORAGE_KEYS.TANZEEM, 
     STORAGE_KEYS.TANZEEM_HIERARCHY,
-    STORAGE_KEYS.QA
+    STORAGE_KEYS.QA,
+    STORAGE_KEYS.STRENGTH
   ],
   // Add version control for migrations
   version: 1,

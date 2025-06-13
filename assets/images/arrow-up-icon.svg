@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Arrow Up Icon</title>
+    <g id="Arrow-Up-Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M8,3 L14,9 L11,9 L11,13 L5,13 L5,9 L2,9 L8,3 Z" id="Arrow-Up" fill="#4CAF50" fill-rule="nonzero"></path>
+    </g>
+</svg>

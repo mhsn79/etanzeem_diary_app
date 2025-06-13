@@ -42,6 +42,19 @@ import {
   selectContactTypesStatus,
   selectContactTypesError
 } from '@/app/features/persons/personSlice';
+import {
+  fetchStrengthTypes,
+  fetchStrengthRecords,
+  selectStrengthTypes,
+  selectStrengthRecords,
+  selectStrengthLoading,
+  selectStrengthError,
+  selectStrengthRecordsLoading,
+  selectStrengthRecordsError,
+  selectStrengthByGender,
+  selectLatestStrengthRecordsByType,
+  selectTotalStrengthValue
+} from '@/app/features/strength/strengthSlice';
 import { AppDispatch } from '@/app/store';
 
 // Theme and constants
@@ -234,6 +247,15 @@ export default function Workforce() {
   const contactTypesStatus = useSelector(selectContactTypesStatus);
   const contactTypesError = useSelector(selectContactTypesError);
   
+  // Strength slice state
+  const strengthTypes = useSelector(selectStrengthTypes);
+  const strengthRecords = useSelector(selectStrengthRecords);
+  const strengthLoading = useSelector(selectStrengthLoading);
+  const strengthError = useSelector(selectStrengthError);
+  const strengthByGender = useSelector(selectStrengthByGender);
+  const latestStrengthRecordsByType = useSelector(selectLatestStrengthRecordsByType);
+  const totalStrengthValue = useSelector(selectTotalStrengthValue);
+  
   // Fetch persons and contact types on component mount
   useEffect(() => {
     if (status === 'idle') {
@@ -243,6 +265,31 @@ export default function Workforce() {
       dispatch(fetchContactTypes());
     }
   }, [dispatch, status, contactTypesStatus]);
+  
+  // Fetch strength data and log it
+  useEffect(() => {
+    // Fetch strength types and records
+    dispatch(fetchStrengthTypes());
+    dispatch(fetchStrengthRecords());
+  }, [dispatch]);
+  
+  // Log strength data whenever it changes
+  useEffect(() => {
+    // Log strength types
+    console.log('Strength Types:', JSON.stringify(strengthTypes, null, 2));
+    
+    // Log strength records
+    console.log('Strength Records:', JSON.stringify(strengthRecords, null, 2));
+    
+    // Log strength by gender
+    console.log('Strength By Gender:', JSON.stringify(strengthByGender, null, 2));
+    
+    // Log latest strength records by type
+    console.log('Latest Strength Records By Type:', JSON.stringify(latestStrengthRecordsByType, null, 2));
+    
+    // Log total strength value
+    console.log('Total Strength Value:', totalStrengthValue);
+  }, [strengthTypes, strengthRecords, strengthByGender, latestStrengthRecordsByType, totalStrengthValue]);
   
   // Legacy state for modal functionality
   const [menKarkunan, setMenKarkunan] = useState(50);
@@ -489,6 +536,15 @@ export default function Workforce() {
             onEdit={() => showModal('یوتھ ممبران', 'یوتھ ممبران', womenYouthMembers, setWomenYouthMembers)}
           />
         </View>
+        
+        {/* Debug indicator for strength data logging */}
+        {strengthTypes.length > 0 && (
+          <View style={styles.debugContainer}>
+            <Text style={styles.debugText}>
+              Strength data logged to console ({strengthTypes.length} types, {strengthRecords.length} records)
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
     </View>
@@ -702,5 +758,20 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
+  },
+  // Debug styles
+  debugContainer: {
+    padding: 10,
+    margin: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 20,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   }
 });

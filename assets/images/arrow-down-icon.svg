@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Arrow Down Icon</title>
+    <g id="Arrow-Down-Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M8,13 L2,7 L5,7 L5,3 L11,3 L11,7 L14,7 L8,13 Z" id="Arrow-Down" fill="#F44336" fill-rule="nonzero"></path>
+    </g>
+</svg>

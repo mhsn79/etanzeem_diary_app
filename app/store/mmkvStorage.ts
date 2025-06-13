@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   TANZEEM: 'tanzeem',
   TANZEEM_HIERARCHY: 'tanzeemHierarchy',
   QA: 'qa',
+  STRENGTH: 'strength',
 } as const;
 
 type StorageKeys = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
