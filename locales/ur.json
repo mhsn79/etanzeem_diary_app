@@ -253,5 +253,13 @@
     "confirm_transfer_message": "کیا آپ واقعی اس رکن کو منتقل کرنا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا۔",
     "confirm": "تصدیق کریں",
     "transfer_type":"منتقلی کی قسم",
-    "confirm_outside_transfer_description": "کیا آپ واقعی {rukunName} کو باہر {cityName} میں منتقل کرنا چاہتے ہیں؟"
+    "confirm_outside_transfer_description": "کیا آپ واقعی {rukunName} کو باہر {cityName} میں منتقل کرنا چاہتے ہیں؟",
+    
+    "edit": "ترمیم کریں",
+    "close_modal_without_saving": "تبدیلیاں محفوظ کیے بغیر بند کریں",
+    "save_changes_and_close": "تبدیلیاں محفوظ کریں اور بند کریں",
+    "total_change_icon": "کل تبدیلی کی علامت",
+    "annual_target_icon": "سالانہ ہدف کی علامت",
+    "total_members_icon": "کل ارکان کی علامت",
+    "view_list_of_arkan": "ارکان کی فہرست دیکھیں"
 } 

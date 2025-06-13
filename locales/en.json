@@ -229,5 +229,13 @@
     "transfer_type": "Transfer Type",
     "confirm_transfer_title": "Confirm Transfer",
     "confirm_transfer_description": "Are you sure you want to transfer {rukunName} from {currentUnit} to {newUnit}?",
-    "confirm_outside_transfer_description": "Are you sure you want to transfer {rukunName} outside to {cityName}?"
+    "confirm_outside_transfer_description": "Are you sure you want to transfer {rukunName} outside to {cityName}?",
+    
+    "edit": "Edit",
+    "close_modal_without_saving": "Close without saving changes",
+    "save_changes_and_close": "Save changes and close",
+    "total_change_icon": "Total change icon",
+    "annual_target_icon": "Annual target icon",
+    "total_members_icon": "Total members icon",
+    "view_list_of_arkan": "View List of Arkan"
 }

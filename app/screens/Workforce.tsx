@@ -1,14 +1,56 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, Text, Image, Pressable, ModalProps, Dimensions } from 'react-native';
-import Modal from 'react-native-modal'
-import { Link } from 'expo-router';
-import EditIcon from '../../assets/images/edit-icon.svg'
-import PlusIcon from '../../assets/images/plus-icon.svg'
-import MinusIcon from '../../assets/images/minus-icon.svg'
-import ModalCloseIcon from '../../assets/images/modal-close-icon.svg'
-import CustomButton from '../components/CustomButton';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { 
+  KeyboardAvoidingView, 
+  Platform, 
+  StyleSheet, 
+  ScrollView, 
+  View, 
+  Text, 
+  Image, 
+  Pressable, 
+  ModalProps, 
+  Dimensions,
+  AccessibilityProps,
+  useWindowDimensions,
+  StatusBar,
+  ActivityIndicator
+} from 'react-native';
+import Modal from 'react-native-modal';
+import { Link, useRouter } from 'expo-router';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
 
+// SVG Icons
+import EditIcon from '../../assets/images/edit-icon.svg';
+import PlusIcon from '../../assets/images/plus-icon.svg';
+import MinusIcon from '../../assets/images/minus-icon.svg';
+import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
+
+// Components
+import CustomButton from '../components/CustomButton';
+import UrduText from '../components/UrduText';
+import Header from '../components/Header';
+
+// Redux
+import { 
+  fetchPersonsByUnit, 
+  selectAllPersons, 
+  selectPersonsStatus, 
+  selectPersonsError,
+  fetchContactTypes,
+  selectContactTypes,
+  selectContactTypesStatus,
+  selectContactTypesError
+} from '@/app/features/persons/personSlice';
+import { AppDispatch } from '@/app/store';
+
+// Theme and constants
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX } from '../constants/theme';
+import i18n from '../i18n';
+
+// Types
 interface EditModalProps extends ModalProps {
+  visible: boolean;
   setVisible: React.Dispatch<React.SetStateAction<boolean>>;
   title: string;
   type: string;
@@ -16,56 +58,193 @@ interface EditModalProps extends ModalProps {
   setValue: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function EditModal({ visible, setVisible, title, type, currentValue, setValue}: EditModalProps) {
+interface WorkforceItemProps extends AccessibilityProps {
+  label: string;
+  value: number;
+  onEdit: () => void;
+}
+
+/**
+ * EditModal Component
+ * 
+ * A modal for editing workforce numbers with increment/decrement functionality
+ */
+function EditModal({ 
+  visible, 
+  setVisible, 
+  title, 
+  type, 
+  currentValue, 
+  setValue
+}: EditModalProps) {
   const [addedValue, setAddedValue] = useState(0);
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  
+  // Calculate total after changes
+  const totalValue = useMemo(() => currentValue + addedValue, [currentValue, addedValue]);
+  
+  // Increment/decrement handlers with memoization
+  const handleIncrement = useCallback(() => {
+    setAddedValue(prev => prev + 5);
+  }, []);
+  
+  const handleDecrement = useCallback(() => {
+    setAddedValue(prev => prev === 0 ? 0 : prev - 5);
+  }, []);
+  
+  // Save changes and close modal
+  const handleUpdate = useCallback(() => {
+    setValue(totalValue);
+    setAddedValue(0);
+    setVisible(false);
+  }, [totalValue, setValue, setVisible]);
+  
+  // Close modal without saving
+  const handleClose = useCallback(() => {
+    setAddedValue(0);
+    setVisible(false);
+  }, [setVisible]);
+
   return (
     <Modal
       isVisible={visible}
-      animationIn={"zoomIn"}
-      animationOut={"zoomOut"}
+      animationIn="zoomIn"
+      animationOut="zoomOut"
       useNativeDriver={true}
       coverScreen={true}
-      onBackdropPress={() => setVisible(false)}
-      onBackButtonPress={() => setVisible(false)}
+      onBackdropPress={handleClose}
+      onBackButtonPress={handleClose}
       statusBarTranslucent={true}
-      backdropOpacity={0.2}
+      backdropOpacity={0.5}
       deviceHeight={Dimensions.get('screen').height}
-      style={{margin: 0}}
+      style={styles.modalContainer}
     >
-        <View style={styles.modal}>
-          <Pressable onPress={() => setVisible(false)} style={styles.modalCloseIcon}><ModalCloseIcon /></Pressable>
-          <Text style={styles.blueHeading}>{title}</Text>
-          <View style={styles.modalField1}>
-            <Text style={styles.detailText}>موجودہ {type}</Text>
-            <Text style={styles.detailNum}>{currentValue}</Text>
-          </View>
-          <View style={styles.modalField2}>
-            <Text style={styles.detailText}>نئے شامل کردہ {type}</Text>
-            <Pressable onPress={() => setAddedValue(addedValue == 0 ? 0 : addedValue-5)} style={styles.modalIcons}><MinusIcon/></Pressable>
-            <Text style={{fontSize: 16, marginLeft: "auto"}}>{addedValue}</Text>
-            <Pressable onPress={() => setAddedValue(addedValue+5)} style={styles.modalIcons}><PlusIcon/></Pressable>
-          </View>
-          <View style={styles.modalField1}>
-            <Text style={styles.detailText}>کل {type}</Text>
-            <Text style={styles.detailNum}>{currentValue + addedValue}</Text>
-          </View>
-          <CustomButton
-            text={'اپڈیٹ کریں'}
-            viewStyle={[]}
-            textStyle={[]}
-            onPress={() => {
-              setValue(currentValue + addedValue);
-              setAddedValue(0);
-              setVisible(false);
-            }}
-          />
+      <View style={[
+        styles.modal, 
+        { 
+          width: width * 0.85,
+          paddingTop: SPACING.lg,
+          paddingBottom: SPACING.lg,
+          paddingHorizontal: SPACING.lg,
+        }
+      ]}>
+        <Pressable 
+          onPress={handleClose} 
+          style={styles.modalCloseIcon}
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t('close')}
+          accessibilityHint={i18n.t('close_modal_without_saving')}
+        >
+          <ModalCloseIcon />
+        </Pressable>
+        
+        <UrduText style={styles.modalTitle}>{title}</UrduText>
+        
+        {/* Current Value */}
+        <View style={styles.modalField}>
+          <UrduText style={styles.fieldLabel}>موجودہ {type}</UrduText>
+          <Text style={styles.fieldValue}>{currentValue}</Text>
         </View>
+        
+        {/* New Value with Controls */}
+        <View style={styles.modalFieldEdit}>
+          <UrduText style={styles.fieldLabel}>نئے شامل کردہ {type}</UrduText>
+          
+          <View style={styles.controlsContainer}>
+            <Pressable 
+              onPress={handleDecrement} 
+              style={styles.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('decrease')}
+            >
+              <MinusIcon />
+            </Pressable>
+            
+            <Text style={styles.counterValue}>{addedValue}</Text>
+            
+            <Pressable 
+              onPress={handleIncrement} 
+              style={styles.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('increase')}
+            >
+              <PlusIcon />
+            </Pressable>
+          </View>
+        </View>
+        
+        {/* Total Value */}
+        <View style={styles.modalField}>
+          <UrduText style={styles.fieldLabel}>کل {type}</UrduText>
+          <Text style={styles.fieldValue}>{totalValue}</Text>
+        </View>
+        
+        {/* Update Button */}
+        <CustomButton
+          text={'اپڈیٹ کریں'}
+          viewStyle={styles.updateButton}
+          onPress={handleUpdate}
+          accessibilityLabel={i18n.t('update')}
+          accessibilityHint={i18n.t('save_changes_and_close')}
+        />
+      </View>
     </Modal>
   );
 }
 
+/**
+ * WorkforceItem Component
+ * 
+ * A reusable component for displaying workforce items with edit functionality
+ */
+const WorkforceItem = ({ label, value, onEdit, ...accessibilityProps }: WorkforceItemProps) => {
+  return (
+    <View style={styles.detailBox}>
+      <UrduText style={styles.detailText}>{label}</UrduText>
+      <Text style={styles.detailNum}>{value}</Text>
+      <Pressable 
+        style={styles.editIcon} 
+        onPress={onEdit}
+        accessibilityRole="button"
+        accessibilityLabel={`${i18n.t('edit')} ${label}`}
+        {...accessibilityProps}
+      >
+        <EditIcon />
+      </Pressable>
+    </View>
+  );
+};
+
+/**
+ * Workforce Screen Component
+ * 
+ * Displays and allows editing of workforce statistics
+ */
 export default function Workforce() {
-  //TODO: initialize these states after fetching from directus
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  
+  // Redux state
+  const persons = useSelector(selectAllPersons);
+  const status = useSelector(selectPersonsStatus);
+  const error = useSelector(selectPersonsError);
+  const contactTypes = useSelector(selectContactTypes);
+  const contactTypesStatus = useSelector(selectContactTypesStatus);
+  const contactTypesError = useSelector(selectContactTypesError);
+  
+  // Fetch persons and contact types on component mount
+  useEffect(() => {
+    if (status === 'idle') {
+      dispatch(fetchPersonsByUnit());
+    }
+    if (contactTypesStatus === 'idle') {
+      dispatch(fetchContactTypes());
+    }
+  }, [dispatch, status, contactTypesStatus]);
+  
+  // Legacy state for modal functionality
   const [menKarkunan, setMenKarkunan] = useState(50);
   const [menMembers, setMenMembers] = useState(500);
   const [womenArkan, setWomenArkan] = useState(50);
@@ -73,6 +252,7 @@ export default function Workforce() {
   const [womenMembers, setWomenMembers] = useState(50);
   const [womenYouthMembers, setWomenYouthMembers] = useState(500);
 
+  // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: "",
@@ -81,7 +261,62 @@ export default function Workforce() {
     setValue: setMenKarkunan
   });
 
-  const showModal = (title: string, type: string, currentValue: number, setValue: React.Dispatch<React.SetStateAction<number>>) => {
+  // Calculate counts based on contact types
+  const counts = useMemo(() => {
+    if (!persons.length || !contactTypes.length) {
+      return {
+        rukun: 0,
+        karkun: 0,
+        umeedwar: 0,
+        others: 0,
+        total: 0
+      };
+    }
+    
+    const result = {
+      rukun: 0,
+      karkun: 0,
+      umeedwar: 0,
+      others: 0,
+      total: persons.length
+    };
+    
+    contactTypes.forEach(type => {
+      const count = persons.filter(person => person.contact_type === type.id).length;
+      if (type.type === 'rukun' || type.type === 'karkun' || type.type === 'umeedwar') {
+        result[type.type] = count;
+      } else {
+        result.others += count;
+      }
+    });
+    
+    return result;
+  }, [persons, contactTypes]);
+
+  // Calculate total members for display
+  const totalMembers = useMemo(() => {
+    return counts.total;
+  }, [counts]);
+
+  // Calculate total change (placeholder for actual calculation)
+  const totalChange = useMemo(() => {
+    // This would be calculated based on previous values vs current values
+    return 13;
+  }, []);
+
+  // Calculate annual target (placeholder for actual calculation)
+  const annualTarget = useMemo(() => {
+    // This would be fetched from API or calculated
+    return 2341;
+  }, []);
+
+  // Show modal with specific configuration
+  const showModal = useCallback((
+    title: string, 
+    type: string, 
+    currentValue: number, 
+    setValue: React.Dispatch<React.SetStateAction<number>>
+  ) => {
     setModalConfig({
       title,
       type,
@@ -89,12 +324,76 @@ export default function Workforce() {
       setValue
     });
     setModalVisible(true);
+  }, []);
+
+  // Handle back navigation
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  // Render loading state
+  if ((status === 'loading' || contactTypesStatus === 'loading') && !modalVisible) {
+    return (
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.primary}
+          translucent={Platform.OS === 'android'}
+        />
+        <View style={[styles.centerContent]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{i18n.t('loading')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Render error state
+  if ((status === 'failed' && error) || (contactTypesStatus === 'failed' && contactTypesError)) {
+    return (
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.primary}
+          translucent={Platform.OS === 'android'}
+        />
+        <View style={[styles.centerContent]}>
+          <Text style={styles.errorText}>
+            {error?.includes('{') ? i18n.t('api_error') : error || contactTypesError}
+          </Text>
+          <CustomButton
+            text={i18n.t('try_again')}
+            onPress={() => {
+              dispatch(fetchPersonsByUnit());
+              dispatch(fetchContactTypes());
+            }}
+            style={styles.retryButton}
+            viewStyle={styles.retryButtonView}
+            textStyle={styles.retryButtonText}
+          />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1 }]} style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: COLORS.white }}>
+      {/* Status Bar */}
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor={COLORS.primary} 
+        translucent={true} 
+      />
 
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={[{ flexGrow: 1 }]} 
+          style={styles.container}
+        >
+        {/* Edit Modal */}
         <EditModal
           visible={modalVisible}
           setVisible={setModalVisible}
@@ -104,177 +403,304 @@ export default function Workforce() {
           setValue={modalConfig.setValue}
         />
 
+        {/* Top Container with Stats */}
         <View style={styles.topContainer}>
           <View style={styles.quwatContainer}>
+            {/* Rukun Count */}
             <View style={styles.quwatBox}>
-              <Image source={require('../../assets/images/green-arkan-icon.png')} style={styles.quwatIcon}/>
-              <Text style={{ fontSize: 22 }}>13</Text>
-              <Text style={styles.quwatText}>کل اضافہ اور کمی</Text>
+              <Image 
+                source={require('../../assets/images/green-arkan-icon.png')} 
+                style={styles.quwatIcon}
+                accessibilityLabel={i18n.t('rukun_icon')}
+              />
+              <Text style={styles.quwatValue}>{counts.rukun}</Text>
+              <UrduText style={styles.quwatText}>{i18n.t('rukun')}</UrduText>
             </View>
+            
+            {/* Karkun Count */}
             <View style={styles.quwatBox}>
-              <Image source={require('../../assets/images/red-target-icon.png')} style={styles.quwatIcon}/>
-              <Text style={{ fontSize: 22 }}>2341</Text>
-              <Text style={styles.quwatText}>سالانہ ہدف</Text>
+              <Image 
+                source={require('../../assets/images/red-target-icon.png')} 
+                style={styles.quwatIcon}
+                accessibilityLabel={i18n.t('karkun_icon')}
+              />
+              <Text style={styles.quwatValue}>{counts.karkun}</Text>
+              <UrduText style={styles.quwatText}>{i18n.t('karkun')}</UrduText>
             </View>
+            
+            {/* Umeedwar Count */}
             <View style={styles.quwatBox}>
-              <Image source={require('../../assets/images/yellow-arkan-icon.png')} style={styles.quwatIcon}/>
-              <Text style={{ fontSize: 22 }}>540</Text>
-              <Text style={styles.quwatText}>کل ارکان</Text>
+              <Image 
+                source={require('../../assets/images/yellow-arkan-icon.png')} 
+                style={styles.quwatIcon}
+                accessibilityLabel={i18n.t('umeedwar_icon')}
+              />
+              <Text style={styles.quwatValue}>{counts.umeedwar}</Text>
+              <UrduText style={styles.quwatText}>{i18n.t('umeedwar')}</UrduText>
             </View>
           </View>
-          <Link href={"/screens/Arkan"} style={styles.arkanLink}>View List of Arkan</Link>
+          
+          <Link href="/screens/Arkan" style={styles.arkanLink}>
+            {i18n.t('view_list_of_arkan') || "View List of Arkan"}
+          </Link>
         </View>
+
+        {/* Bottom Container with Sections */}
         <View style={styles.bottomContainer}>
-          <Text style={styles.blueHeading}>مرد امیدواران کی تعداد</Text>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>کارکنان کی تعداد</Text>
-            <Text style={styles.detailNum}>{menKarkunan}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('کارکنان کی تعداد', 'کارکنان', menKarkunan, setMenKarkunan)}><EditIcon/></Pressable>
-          </View>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>ممبران کی تعداد</Text>
-            <Text style={styles.detailNum}>{menMembers}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('ممبران کی تعداد', 'ممبران', menMembers, setMenMembers)}><EditIcon/></Pressable>
-          </View>
-          <Text style={styles.blueHeading}>خواتین امیدواران کی تعداد</Text>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>ارکان</Text>
-            <Text style={styles.detailNum}>{womenArkan}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('ارکان', 'ارکان', womenArkan, setWomenArkan)}><EditIcon/></Pressable>
-          </View>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>کارکنان</Text>
-            <Text style={styles.detailNum}>{womenKarkunan}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('کارکنان', 'کارکنان', womenKarkunan, setWomenKarkunan)}><EditIcon/></Pressable>
-          </View>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>ممبران</Text>
-            <Text style={styles.detailNum}>{womenMembers}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('ممبران', 'ممبران', womenMembers, setWomenMembers)}><EditIcon/></Pressable>
-          </View>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailText}>یوتھ ممبران</Text>
-            <Text style={styles.detailNum}>{womenYouthMembers}</Text>
-            <Pressable style={styles.editIcon} onPress={() =>  showModal('یوتھ ممبران', 'یوتھ ممبران', womenYouthMembers, setWomenYouthMembers)}><EditIcon/></Pressable>
-          </View>
+          {/* Men Section */}
+          <UrduText style={styles.blueHeading}>مرد امیدواران کی تعداد</UrduText>
+          
+          <WorkforceItem 
+            label="کارکنان کی تعداد"
+            value={menKarkunan}
+            onEdit={() => showModal('کارکنان کی تعداد', 'کارکنان', menKarkunan, setMenKarkunan)}
+          />
+          
+          <WorkforceItem 
+            label="ممبران کی تعداد"
+            value={menMembers}
+            onEdit={() => showModal('ممبران کی تعداد', 'ممبران', menMembers, setMenMembers)}
+          />
+          
+          {/* Women Section */}
+          <UrduText style={styles.blueHeading}>خواتین امیدواران کی تعداد</UrduText>
+          
+          <WorkforceItem 
+            label="ارکان"
+            value={womenArkan}
+            onEdit={() => showModal('ارکان', 'ارکان', womenArkan, setWomenArkan)}
+          />
+          
+          <WorkforceItem 
+            label="کارکنان"
+            value={womenKarkunan}
+            onEdit={() => showModal('کارکنان', 'کارکنان', womenKarkunan, setWomenKarkunan)}
+          />
+          
+          <WorkforceItem 
+            label="ممبران"
+            value={womenMembers}
+            onEdit={() => showModal('ممبران', 'ممبران', womenMembers, setWomenMembers)}
+          />
+          
+          <WorkforceItem 
+            label="یوتھ ممبران"
+            value={womenYouthMembers}
+            onEdit={() => showModal('یوتھ ممبران', 'یوتھ ممبران', womenYouthMembers, setWomenYouthMembers)}
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </View>
   );
 }
+
 const styles = StyleSheet.create({
+  // Header styles
+  headerContainer: {
+    backgroundColor: COLORS.primary,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+    zIndex: Z_INDEX.header,
+    ...SHADOWS.medium,
+  },
+  header: {
+    backgroundColor: 'transparent',
+  },
+  
+  // Main container
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.white,
   },
+  
+  // Top section with stats
   topContainer: {
-    backgroundColor: '#008CFF',
+    backgroundColor: COLORS.primary,
     height: "28%",
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 20,
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
+    borderBottomRightRadius:BORDER_RADIUS.lg,
     alignItems: 'center',
-    padding: 16,
-    gap: 16
-  },
-  topText: {
-    fontFamily: "JameelNooriNastaleeq",
-    color: "#ffffff",
-    fontSize: 20,
+    padding: SPACING.md,
+    gap: SPACING.md,
+    ...SHADOWS.medium
   },
   quwatContainer: {
     height: "75%",
     flexDirection: "row-reverse",
-    gap: 20,
-    marginBottom: 5
+    gap: SPACING.lg,
+    marginBottom: SPACING.xs
   },
   quwatBox: {
-    padding: 10,
+    padding: SPACING.sm,
     alignItems: 'center',
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.white,
     width: "30%",
-    borderRadius: 15,
-    gap: 10
+    borderRadius: BORDER_RADIUS.md,
+    gap: SPACING.xs,
+    ...SHADOWS.small
   },
   quwatIcon: {
     width: 50,
     height: 50
   },
+  quwatValue: {
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontWeight: 'bold',
+  },
   quwatText: {
-    fontSize: 18,
-    fontFamily: "JameelNooriNastaleeq"
+    fontSize: TYPOGRAPHY.fontSize.md,
+    textAlign: 'center',
   },
   arkanLink: {
-    color: "#ffffff",
+    color: COLORS.white,
     textDecorationLine: "underline",
-    fontSize: 14
+    fontSize: TYPOGRAPHY.fontSize.sm
   },
+  
+  // Bottom section with workforce details
   bottomContainer: {
-    padding: 20
+    padding: SPACING.lg
   },
   blueHeading: {
-    fontSize: 24,
-    color: "#008CFF",
-    fontFamily: "JameelNooriNastaleeq"
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.primary,
+    textAlign:'left',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm
   },
+  
+  // Detail items
   detailBox: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomColor: "#EBEBEB",
+    borderBottomColor: COLORS.lightGray,
     borderBottomWidth: 1,
-    marginTop: 10,
-    marginBottom: 10,
-    marginLeft: 10,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.sm,
+    paddingVertical: SPACING.xs
   },
   detailText: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontFamily: "JameelNooriNastaleeq"
   },
   detailNum: {
     marginLeft: "auto",
-    fontSize: 16,
-    margin: 10
+    fontSize: TYPOGRAPHY.fontSize.md,
+    margin: SPACING.sm
   },
   editIcon: {
-    padding: 10,
+    padding: SPACING.sm,
+  },
+  
+  // Modal styles
+  modalContainer: {
+    margin: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modal: {
     alignSelf: "center",
     alignItems: "center",
-    width: "80%",
-    height: "45%",
-    backgroundColor: "#ffffff",
-    borderRadius: 15,
-    borderColor: "#EBEBEB",
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.md,
+    borderColor: COLORS.lightGray,
     borderWidth: 1,
-    padding: 20,
-    gap: 20
+    padding: SPACING.lg,
+    gap: SPACING.md,
+    ...SHADOWS.medium
   },
   modalCloseIcon: {
     position: "absolute",
     left: 0,
-    padding: 15,
+    padding: SPACING.md,
+    zIndex: Z_INDEX.modal
   },
-  modalField1: {
+  modalTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.primary,
+    fontFamily: "JameelNooriNastaleeq",
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.lg,
+    textAlign: 'center',
+  },
+  modalField: {
     flexDirection: "row",
     width: "100%",
     backgroundColor: "#E7E7E7",
-    borderRadius: 8,
-    padding: 12,
-    borderColor: "#EBEBEB",
-    borderWidth: 1
+    borderRadius: BORDER_RADIUS.xs,
+    padding: SPACING.md,
+    borderColor: COLORS.lightGray,
+    borderWidth: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  modalField2: {
+  modalFieldEdit: {
     flexDirection: "row",
     alignItems: 'center',
     width: "100%",
     backgroundColor: "#F7F7F7",
-    borderRadius: 8,
-    padding: 12,
-    borderColor: "#EBEBEB",
-    borderWidth: 1
+    borderRadius: BORDER_RADIUS.xs,
+    padding: SPACING.md,
+    borderColor: COLORS.lightGray,
+    borderWidth: 1,
+    justifyContent: 'space-between',
   },
-  modalIcons: {
-    marginLeft: "auto",
-    padding: 10
+  fieldLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: "JameelNooriNastaleeq"
+  },
+  fieldValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: 'bold',
+  },
+  controlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconButton: {
+    padding: SPACING.sm,
+  },
+  counterValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    marginHorizontal: SPACING.sm,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  updateButton: {
+    marginTop: SPACING.sm,
+  },
+  // Loading and error styles
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: COLORS.primary,
+  },
+  errorText: {
+    fontSize: 16,
+    color: COLORS.error,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+  },
+  retryButtonView: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
   }
 });
