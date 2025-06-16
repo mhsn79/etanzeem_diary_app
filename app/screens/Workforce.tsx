@@ -13,12 +13,17 @@ import {
   AccessibilityProps,
   useWindowDimensions,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated,
+  TextInput
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
+
+// We'll use Vibration API from React Native instead of external packages
+import { Vibration } from 'react-native';
 
 // SVG Icons
 import EditIcon from '../../assets/images/edit-icon.svg';
@@ -53,7 +58,7 @@ import {
 import { AppDispatch, RootState } from '@/app/store';
 
 // Theme and constants
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX } from '../constants/theme';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '../constants/theme';
 import i18n from '../i18n';
 
 // Types
@@ -77,7 +82,8 @@ interface WorkforceItemProps extends AccessibilityProps {
 /**
  * EditModal Component
  * 
- * A modal for editing workforce numbers with increment/decrement functionality
+ * A modal for editing workforce numbers with direct input and change type selection
+ * Redesigned for improved visual appeal and user experience
  */
 function EditModal({ 
   visible, 
@@ -88,31 +94,98 @@ function EditModal({
   setValue,
   typeId
 }: EditModalProps) {
-  const [addedValue, setAddedValue] = useState(0);
+  const [inputValue, setInputValue] = useState('');
+  const [changeType, setChangeType] = useState<'plus' | 'minus'>('plus');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const userUnitId = useSelector(selectUserUnitId);
   
+  // Animation values
+  const [scaleAnim] = useState(new Animated.Value(1));
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [inputRef, setInputRef] = useState<TextInput | null>(null);
+  
+  // Calculate numeric value from input
+  const numericValue = useMemo(() => {
+    const parsed = parseInt(inputValue, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }, [inputValue]);
+  
   // Calculate total after changes
-  const totalValue = useMemo(() => currentValue + addedValue, [currentValue, addedValue]);
+  const totalValue = useMemo(() => {
+    if (changeType === 'plus') {
+      return currentValue + numericValue;
+    } else {
+      return Math.max(0, currentValue - numericValue);
+    }
+  }, [currentValue, numericValue, changeType]);
   
-  // Increment/decrement handlers with memoization
-  const handleIncrement = useCallback(() => {
-    setAddedValue(prev => prev + 5);
+  // Handle input change with validation
+  const handleInputChange = useCallback((text: string) => {
+    // Only allow numeric input
+    if (/^\d*$/.test(text)) {
+      setInputValue(text);
+      
+      // Add vibration feedback on supported platforms
+      if (text && Platform.OS !== 'web') {
+        Vibration.vibrate(5); // Very short vibration
+      }
+    }
   }, []);
   
-  const handleDecrement = useCallback(() => {
-    setAddedValue(prev => prev === 0 ? 0 : prev - 5);
-  }, []);
+  // Toggle change type between plus and minus
+  const toggleChangeType = useCallback((type: 'plus' | 'minus') => {
+    if (changeType !== type) {
+      setChangeType(type);
+      
+      // Add vibration feedback on supported platforms
+      if (Platform.OS !== 'web') {
+        Vibration.vibrate(10); // Short vibration
+      }
+      
+      // Animate the change
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: ANIMATION.duration.fast / 2,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: ANIMATION.duration.fast,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  }, [changeType, fadeAnim]);
+  
+  // Reset the form when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      setInputValue('');
+      setChangeType('plus');
+      
+      // Animate fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: ANIMATION.duration.normal,
+        useNativeDriver: true,
+      }).start();
+      
+      // Focus the input field after a short delay
+      setTimeout(() => {
+        if (inputRef) {
+          inputRef.focus();
+        }
+      }, 300);
+    }
+  }, [visible, fadeAnim]);
   
   // Save changes and close modal
   const handleUpdate = useCallback(() => {
     // Only proceed if we have valid data
-    if (typeId && userUnitId && addedValue !== 0) {
-      const changeType = addedValue > 0 ? 'plus' : 'minus';
-      const absValue = Math.abs(addedValue);
-      
+    if (typeId && userUnitId && numericValue > 0) {
       // Calculate the new total based on the change type
       const newTotal = totalValue;
       
@@ -122,7 +195,7 @@ function EditModal({
       // Prepare the record data
       const recordData = {
         Type: typeId,
-        Value: absValue,
+        Value: numericValue,
         change_type: changeType,
         new_total: newTotal,
         Reporting_Time: new Date().toISOString()
@@ -141,12 +214,22 @@ function EditModal({
           
           // Show success feedback (could add a toast notification here)
           console.log(`Successfully updated ${type} to ${newTotal}`);
+          
+          // Add success vibration feedback on supported platforms
+          if (Platform.OS !== 'web') {
+            Vibration.vibrate([0, 50, 50, 50]); // Success pattern
+          }
         })
         .catch(error => {
           console.error('Failed to create strength record:', error);
           
           // Could add error handling UI feedback here
           // For now, we'll keep the UI updated with the new value anyway
+          
+          // Add error vibration feedback on supported platforms
+          if (Platform.OS !== 'web') {
+            Vibration.vibrate([0, 100, 50, 100]); // Error pattern
+          }
         });
     } else {
       // Log appropriate warnings
@@ -154,110 +237,199 @@ function EditModal({
         console.warn('No type ID provided, cannot create strength record');
       } else if (!userUnitId) {
         console.warn('No user unit ID available, cannot create strength record');
-      } else if (addedValue === 0) {
+      } else if (numericValue === 0) {
         console.log('No change in value, skipping record creation');
       }
       
       // Still update the UI value if needed
-      if (addedValue !== 0) {
+      if (numericValue > 0) {
         setValue(totalValue);
       }
     }
     
     // Reset and close
-    setAddedValue(0);
+    setInputValue('');
     setVisible(false);
-  }, [totalValue, setValue, setVisible, typeId, userUnitId, addedValue, dispatch, type]);
+  }, [totalValue, setValue, setVisible, typeId, userUnitId, numericValue, changeType, dispatch, type]);
   
   // Close modal without saving
   const handleClose = useCallback(() => {
-    setAddedValue(0);
+    setInputValue('');
     setVisible(false);
   }, [setVisible]);
+
+  // Determine if update button should be disabled
+  const isUpdateDisabled = numericValue === 0;
 
   return (
     <Modal
       isVisible={visible}
-      animationIn="zoomIn"
-      animationOut="zoomOut"
+      animationIn="fadeIn"
+      animationOut="fadeOut"
+      animationInTiming={ANIMATION.duration.normal}
+      animationOutTiming={ANIMATION.duration.normal}
       useNativeDriver={true}
       coverScreen={true}
       onBackdropPress={handleClose}
       onBackButtonPress={handleClose}
       statusBarTranslucent={true}
-      backdropOpacity={0.5}
+      backdropOpacity={0.6}
       deviceHeight={Dimensions.get('screen').height}
       style={styles.modalContainer}
     >
-      <View style={[
-        styles.modal, 
-        { 
-          width: width * 0.85,
-          paddingTop: SPACING.lg,
-          paddingBottom: SPACING.lg,
-          paddingHorizontal: SPACING.lg,
-        }
-      ]}>
-        <Pressable 
-          onPress={handleClose} 
-          style={styles.modalCloseIcon}
-          accessibilityRole="button"
-          accessibilityLabel={i18n.t('close')}
-          accessibilityHint={i18n.t('close_modal_without_saving')}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ width: width * 0.9 }}
+      >
+        <Animated.View 
+          style={[
+            styles.modalCard, 
+            { transform: [{ scale: scaleAnim }] }
+          ]}
         >
-          <ModalCloseIcon />
-        </Pressable>
-        
-        <UrduText style={styles.modalTitle}>{title}</UrduText>
-        
-        {/* Current Value */}
-        <View style={styles.modalField}>
-          <UrduText style={styles.fieldLabel}>موجودہ {type}</UrduText>
-          <Text style={styles.fieldValue}>{currentValue}</Text>
-        </View>
-        
-        {/* New Value with Controls */}
-        <View style={styles.modalFieldEdit}>
-          <UrduText style={styles.fieldLabel}>نئے شامل کردہ {type}</UrduText>
-          
-          <View style={styles.controlsContainer}>
+          {/* Header with title and close button */}
+          <View style={styles.modalHeader}>
+            <UrduText style={styles.modalTitle}>{title}</UrduText>
             <Pressable 
-              onPress={handleDecrement} 
-              style={styles.iconButton}
+              onPress={handleClose} 
+              style={styles.modalCloseButton}
               accessibilityRole="button"
-              accessibilityLabel={i18n.t('decrease')}
+              accessibilityLabel={i18n.t('close')}
+              accessibilityHint={i18n.t('close_modal_without_saving')}
             >
-              <MinusIcon />
-            </Pressable>
-            
-            <Text style={styles.counterValue}>{addedValue}</Text>
-            
-            <Pressable 
-              onPress={handleIncrement} 
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel={i18n.t('increase')}
-            >
-              <PlusIcon />
+              <ModalCloseIcon height={30} width={30} color={COLORS.white} />
             </Pressable>
           </View>
-        </View>
-        
-        {/* Total Value */}
-        <View style={styles.modalField}>
-          <UrduText style={styles.fieldLabel}>کل {type}</UrduText>
-          <Text style={styles.fieldValue}>{totalValue}</Text>
-        </View>
-        
-        {/* Update Button */}
-        <CustomButton
-          text={'اپڈیٹ کریں'}
-          viewStyle={styles.updateButton}
-          onPress={handleUpdate}
-          accessibilityLabel={i18n.t('update')}
-          accessibilityHint={i18n.t('save_changes_and_close')}
-        />
-      </View>
+          
+          <View style={styles.modalContent}>
+            {/* Current Value */}
+            <View style={styles.fieldContainer}>
+              <UrduText style={styles.fieldLabel}>موجودہ {type}</UrduText>
+              <View style={styles.fieldValueContainer}>
+                <Text style={styles.currentValue}>{currentValue}</Text>
+              </View>
+            </View>
+            
+            {/* Change Type Selection */}
+            <View style={styles.fieldContainer}>
+              <UrduText style={styles.fieldLabel}>تبدیلی کی قسم</UrduText>
+              <View style={styles.changeTypeContainer}>
+                <Pressable 
+                  onPress={() => toggleChangeType('plus')}
+                  style={({pressed}) => [
+                    styles.changeTypeButton,
+                    {
+                      backgroundColor: changeType === 'plus' ? COLORS.success : COLORS.white,
+                      borderColor: changeType === 'plus' ? COLORS.success : COLORS.lightGray2,
+                    },
+                    pressed && styles.buttonPressed
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: changeType === 'plus' }}
+                  accessibilityLabel={i18n.t('increase')}
+                >
+                  <View style={styles.changeTypeIcon}>
+                    <PlusIcon width={20} height={20} color={changeType === 'plus' ? COLORS.white : COLORS.success} />
+                  </View>
+                  <UrduText style={[
+                    styles.changeTypeText,
+                    { color: changeType === 'plus' ? COLORS.white : COLORS.textSecondary }
+                  ]}>اضافہ</UrduText>
+                </Pressable>
+                
+                <Pressable 
+                  onPress={() => toggleChangeType('minus')}
+                  style={({pressed}) => [
+                    styles.changeTypeButton,
+                    {
+                      backgroundColor: changeType === 'minus' ? COLORS.error : COLORS.white,
+                      borderColor: changeType === 'minus' ? COLORS.error : COLORS.lightGray2,
+                    },
+                    pressed && styles.buttonPressed
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: changeType === 'minus' }}
+                  accessibilityLabel={i18n.t('decrease')}
+                >
+                  <View style={styles.changeTypeIcon}>
+                    <MinusIcon width={20} height={20} color={changeType === 'minus' ? COLORS.white : COLORS.error} />
+                  </View>
+                  <UrduText style={[
+                    styles.changeTypeText,
+                    { color: changeType === 'minus' ? COLORS.white : COLORS.textSecondary }
+                  ]}>کمی</UrduText>
+                </Pressable>
+              </View>
+            </View>
+            
+            {/* Value Input */}
+            <View style={styles.fieldContainer}>
+              <UrduText style={styles.fieldLabel}>تعداد</UrduText>
+              <View style={styles.inputWrapper}>
+               
+                
+                <TextInput
+                  ref={ref => setInputRef(ref)}
+                  style={styles.valueInput}
+                  value={inputValue}
+                  onChangeText={handleInputChange}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={COLORS.textSecondary}
+                  maxLength={4}
+                  accessibilityLabel={i18n.t('enter_value')}
+                  accessibilityHint={i18n.t('enter_numeric_value')}
+                />
+                 <Animated.View style={[
+                  styles.inputPrefix,
+                  { opacity: fadeAnim }
+                ]}>
+                  <Text style={[
+                    styles.inputPrefixText,
+                    changeType === 'plus' ? styles.positiveValue : styles.negativeValue
+                  ]}>
+                    {changeType === 'plus' ? '+' : '-'}
+                  </Text>
+                </Animated.View>
+              </View>
+            </View>
+            
+            {/* New Total */}
+            <View style={styles.fieldContainer}>
+              <UrduText style={styles.fieldLabel}>نیا کل {type}</UrduText>
+              <View style={styles.totalValueContainer}>
+                <Text style={styles.totalValue}>{totalValue}</Text>
+              </View>
+            </View>
+          </View>
+          
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsContainer}>
+            <CustomButton
+              text={'منسوخ کریں'}
+              viewStyle={styles.cancelButton}
+              textStyle={styles.cancelButtonText}
+              onPress={handleClose}
+              accessibilityLabel={i18n.t('cancel')}
+              accessibilityHint={i18n.t('close_without_saving')}
+            />
+            
+            <CustomButton
+              text={'اپڈیٹ کریں'}
+              viewStyle={[
+                styles.updateButton,
+                isUpdateDisabled && styles.updateButtonDisabled
+              ]}
+              textStyle={styles.updateButtonText}
+              onPress={handleUpdate}
+              disabled={isUpdateDisabled}
+              accessibilityLabel={i18n.t('update')}
+              accessibilityHint={i18n.t('save_changes_and_close')}
+              accessibilityState={{ disabled: isUpdateDisabled }}
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -720,82 +892,200 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   },
   
-  // Modal styles
+  // Modal styles - Redesigned with consistent heights and improved UI
   modalContainer: {
     margin: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modal: {
+  modalCard: {
     alignSelf: "center",
-    alignItems: "center",
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.md,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    gap: SPACING.md,
-    ...SHADOWS.medium
+    overflow: 'hidden',
+    width: '100%',
+    ...SHADOWS.large
   },
-  modalCloseIcon: {
-    position: "absolute",
-    left: 0,
-    padding: SPACING.md,
-    zIndex: Z_INDEX.modal
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    position: 'relative',
+    height: SPACING.xxl*2,
+    lineHeight:60,
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
-    color: COLORS.primary,
+    color: COLORS.white,
     fontFamily: "JameelNooriNastaleeq",
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.lg,
     textAlign: 'center',
+    flex: 1,
   },
-  modalField: {
-    flexDirection: "row",
-    width: "100%",
-    backgroundColor: "#E7E7E7",
-    borderRadius: BORDER_RADIUS.xs,
-    padding: SPACING.md,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  modalCloseButton: {
+    position: "absolute",
+    right: SPACING.sm,
+    padding: SPACING.sm,
+    zIndex: Z_INDEX.modal,
   },
-  modalFieldEdit: {
-    flexDirection: "row",
-    alignItems: 'center',
-    width: "100%",
-    backgroundColor: "#F7F7F7",
-    borderRadius: BORDER_RADIUS.xs,
+  modalContent: {
     padding: SPACING.md,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    justifyContent: 'space-between',
+  },
+  fieldContainer: {
+    marginBottom: SPACING.md,
   },
   fieldLabel: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontFamily: "JameelNooriNastaleeq"
+    fontFamily: "JameelNooriNastaleeq",
+    marginBottom: SPACING.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'right',
   },
-  fieldValue: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+  fieldValueContainer: {
+    height: 60,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    ...SHADOWS.small
+  },
+  totalValueContainer: {
+    height: 60,
+    backgroundColor: COLORS.lightPrimary,
+    borderRadius: BORDER_RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    ...SHADOWS.small
+  },
+  currentValue: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: 'bold',
+    color: COLORS.textPrimary,
   },
-  controlsContainer: {
+  totalValue: {
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  changeTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 60,
+  },
+  changeTypeButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.sm,
+    marginHorizontal: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    height: '100%',
+    ...SHADOWS.small
   },
-  iconButton: {
-    padding: SPACING.sm,
+  changeTypeButtonSelected: {
+    borderColor: COLORS.primary,
   },
-  counterValue: {
+  changeTypeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginRight: SPACING.sm,
+  },
+  changeTypeText: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    marginHorizontal: SPACING.sm,
-    minWidth: 30,
+    fontFamily: "JameelNooriNastaleeq",
+    color: COLORS.textSecondary,
+  },
+  changeTypeTextSelected: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    height: 60,
+    ...SHADOWS.small
+  },
+  inputPrefix: {
+    width: 50,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: COLORS.lightGray,
+  },
+  inputPrefixText: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: 'bold',
+  },
+  valueInput: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontWeight: 'bold',
     textAlign: 'center',
+    height: '100%',
+    color: COLORS.textPrimary,
+  },
+  positiveValue: {
+    color: COLORS.success,
+  },
+  negativeValue: {
+    color: COLORS.error,
+  },
+  neutralValue: {
+    color: COLORS.textSecondary,
+  },
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }]
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
   },
   updateButton: {
-    marginTop: SPACING.sm,
+    flex: 2,
+    backgroundColor: COLORS.primary,
+    marginLeft: SPACING.sm,
+    height: 50,
+  },
+  updateButtonDisabled: {
+    backgroundColor: COLORS.disabled,
+  },
+  updateButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    lineHeight:30
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: COLORS.warning,
+  },
+  cancelButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    lineHeight:30
   },
   // Loading and error styles
   centerContent: {
