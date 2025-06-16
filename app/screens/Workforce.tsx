@@ -29,7 +29,6 @@ import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
 // Components
 import CustomButton from '../components/CustomButton';
 import UrduText from '../components/UrduText';
-import Header from '../components/Header';
 
 // Redux
 import { 
@@ -43,19 +42,15 @@ import {
   selectContactTypesError
 } from '@/app/features/persons/personSlice';
 import {
-  fetchStrengthTypes,
-  fetchStrengthRecords,
+  refreshStrengthData,
+  setUserUnitId,
   selectStrengthTypes,
-  selectStrengthRecords,
-  selectStrengthLoading,
-  selectStrengthError,
-  selectStrengthRecordsLoading,
-  selectStrengthRecordsError,
-  selectStrengthByGender,
+  selectStrengthByCategory,
   selectLatestStrengthRecordsByType,
-  selectTotalStrengthValue
+  createStrengthRecord,
+  selectUserUnitId
 } from '@/app/features/strength/strengthSlice';
-import { AppDispatch } from '@/app/store';
+import { AppDispatch, RootState } from '@/app/store';
 
 // Theme and constants
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX } from '../constants/theme';
@@ -69,12 +64,14 @@ interface EditModalProps extends ModalProps {
   type: string;
   currentValue: number;
   setValue: React.Dispatch<React.SetStateAction<number>>;
+  typeId?: number;
 }
 
 interface WorkforceItemProps extends AccessibilityProps {
   label: string;
   value: number;
   onEdit: () => void;
+  typeId?: number; // Kept for compatibility with existing code
 }
 
 /**
@@ -88,11 +85,14 @@ function EditModal({
   title, 
   type, 
   currentValue, 
-  setValue
+  setValue,
+  typeId
 }: EditModalProps) {
   const [addedValue, setAddedValue] = useState(0);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const dispatch = useDispatch<AppDispatch>();
+  const userUnitId = useSelector(selectUserUnitId);
   
   // Calculate total after changes
   const totalValue = useMemo(() => currentValue + addedValue, [currentValue, addedValue]);
@@ -108,10 +108,66 @@ function EditModal({
   
   // Save changes and close modal
   const handleUpdate = useCallback(() => {
-    setValue(totalValue);
+    // Only proceed if we have valid data
+    if (typeId && userUnitId && addedValue !== 0) {
+      const changeType = addedValue > 0 ? 'plus' : 'minus';
+      const absValue = Math.abs(addedValue);
+      
+      // Calculate the new total based on the change type
+      const newTotal = totalValue;
+      
+      // Update the local state with the new total immediately for responsive UI
+      setValue(newTotal);
+      
+      // Prepare the record data
+      const recordData = {
+        Type: typeId,
+        Value: absValue,
+        change_type: changeType,
+        new_total: newTotal,
+        Reporting_Time: new Date().toISOString()
+      };
+      
+      console.log('Creating strength record with data:', JSON.stringify(recordData, null, 2));
+      
+      // Create a new strength record
+      dispatch(createStrengthRecord(recordData))
+        .unwrap() // Properly handle the Promise from createAsyncThunk
+        .then((result) => {
+          console.log('Strength record created successfully:', JSON.stringify(result, null, 2));
+          
+          // Refresh the data to show the updated values
+          dispatch(refreshStrengthData());
+          
+          // Show success feedback (could add a toast notification here)
+          console.log(`Successfully updated ${type} to ${newTotal}`);
+        })
+        .catch(error => {
+          console.error('Failed to create strength record:', error);
+          
+          // Could add error handling UI feedback here
+          // For now, we'll keep the UI updated with the new value anyway
+        });
+    } else {
+      // Log appropriate warnings
+      if (!typeId) {
+        console.warn('No type ID provided, cannot create strength record');
+      } else if (!userUnitId) {
+        console.warn('No user unit ID available, cannot create strength record');
+      } else if (addedValue === 0) {
+        console.log('No change in value, skipping record creation');
+      }
+      
+      // Still update the UI value if needed
+      if (addedValue !== 0) {
+        setValue(totalValue);
+      }
+    }
+    
+    // Reset and close
     setAddedValue(0);
     setVisible(false);
-  }, [totalValue, setValue, setVisible]);
+  }, [totalValue, setValue, setVisible, typeId, userUnitId, addedValue, dispatch, type]);
   
   // Close modal without saving
   const handleClose = useCallback(() => {
@@ -211,7 +267,7 @@ function EditModal({
  * 
  * A reusable component for displaying workforce items with edit functionality
  */
-const WorkforceItem = ({ label, value, onEdit, ...accessibilityProps }: WorkforceItemProps) => {
+const WorkforceItem = ({ label, value, onEdit, typeId, ...accessibilityProps }: WorkforceItemProps) => {
   return (
     <View style={styles.detailBox}>
       <UrduText style={styles.detailText}>{label}</UrduText>
@@ -226,6 +282,41 @@ const WorkforceItem = ({ label, value, onEdit, ...accessibilityProps }: Workforc
         <EditIcon />
       </Pressable>
     </View>
+  );
+};
+
+/**
+ * StrengthTypeItem Component
+ * 
+ * A component for displaying and editing strength type items
+ */
+interface StrengthTypeItemProps {
+  type: any;
+  latestRecord: any | null;
+  latestStrengthRecordsByType: any;
+  showModal: (title: string, type: string, currentValue: number, setValue: React.Dispatch<React.SetStateAction<number>>, typeId?: number) => void;
+}
+
+const StrengthTypeItem = ({ type, latestRecord, latestStrengthRecordsByType, showModal }: StrengthTypeItemProps) => {
+  const currentValue = latestRecord?.new_total || latestStrengthRecordsByType[type.id]?.new_total || 0;
+  const [typeValue, setTypeValue] = useState(currentValue);
+  
+  // Update the local state when the latest record changes
+  useEffect(() => {
+    const newValue = latestRecord?.new_total || latestStrengthRecordsByType[type.id]?.new_total || 0;
+    if (newValue !== typeValue) {
+      setTypeValue(newValue);
+    }
+  }, [latestRecord, latestStrengthRecordsByType, type.id]);
+  
+  return (
+    <WorkforceItem 
+      key={type.id}
+      label={type.Name_Plural}
+      value={typeValue}
+      typeId={type.id} // Pass the type ID for debugging
+      onEdit={() => showModal(type.Name_Plural, type.Name_Singular, typeValue, setTypeValue, type.id)}
+    />
   );
 };
 
@@ -249,12 +340,9 @@ export default function Workforce() {
   
   // Strength slice state
   const strengthTypes = useSelector(selectStrengthTypes);
-  const strengthRecords = useSelector(selectStrengthRecords);
-  const strengthLoading = useSelector(selectStrengthLoading);
-  const strengthError = useSelector(selectStrengthError);
-  const strengthByGender = useSelector(selectStrengthByGender);
+
+  const strengthByCategory = useSelector(selectStrengthByCategory);
   const latestStrengthRecordsByType = useSelector(selectLatestStrengthRecordsByType);
-  const totalStrengthValue = useSelector(selectTotalStrengthValue);
   
   // Fetch persons and contact types on component mount
   useEffect(() => {
@@ -266,38 +354,21 @@ export default function Workforce() {
     }
   }, [dispatch, status, contactTypesStatus]);
   
-  // Fetch strength data and log it
-  useEffect(() => {
-    // Fetch strength types and records
-    dispatch(fetchStrengthTypes());
-    dispatch(fetchStrengthRecords());
-  }, [dispatch]);
+  // Get the user's unit details from the tanzeem slice
+  const userUnitDetails = useSelector((state: RootState) => state.tanzeem.userUnitDetails);
   
-  // Log strength data whenever it changes
+  // Fetch strength data
   useEffect(() => {
-    // Log strength types
-    console.log('Strength Types:', JSON.stringify(strengthTypes, null, 2));
+    // Set the user's unit ID in the strength slice if available
+    if (userUnitDetails?.id) {
+      dispatch(setUserUnitId(userUnitDetails.id));
+    }
     
-    // Log strength records
-    console.log('Strength Records:', JSON.stringify(strengthRecords, null, 2));
-    
-    // Log strength by gender
-    console.log('Strength By Gender:', JSON.stringify(strengthByGender, null, 2));
-    
-    // Log latest strength records by type
-    console.log('Latest Strength Records By Type:', JSON.stringify(latestStrengthRecordsByType, null, 2));
-    
-    // Log total strength value
-    console.log('Total Strength Value:', totalStrengthValue);
-  }, [strengthTypes, strengthRecords, strengthByGender, latestStrengthRecordsByType, totalStrengthValue]);
+    // Refresh strength data (this will fetch types and records)
+    dispatch(refreshStrengthData());
+  }, [dispatch, userUnitDetails?.id]);
   
-  // Legacy state for modal functionality
-  const [menKarkunan, setMenKarkunan] = useState(50);
-  const [menMembers, setMenMembers] = useState(500);
-  const [womenArkan, setWomenArkan] = useState(50);
-  const [womenKarkunan, setWomenKarkunan] = useState(500);
-  const [womenMembers, setWomenMembers] = useState(50);
-  const [womenYouthMembers, setWomenYouthMembers] = useState(500);
+  // Modal state management
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -305,7 +376,8 @@ export default function Workforce() {
     title: "",
     type: "",
     currentValue: 0,
-    setValue: setMenKarkunan
+    setValue: (() => {}) as React.Dispatch<React.SetStateAction<number>>,
+    typeId: undefined as number | undefined
   });
 
   // Calculate counts based on contact types
@@ -362,13 +434,15 @@ export default function Workforce() {
     title: string, 
     type: string, 
     currentValue: number, 
-    setValue: React.Dispatch<React.SetStateAction<number>>
+    setValue: React.Dispatch<React.SetStateAction<number>>,
+    typeId?: number
   ) => {
     setModalConfig({
       title,
       type,
       currentValue,
-      setValue
+      setValue,
+      typeId
     });
     setModalVisible(true);
   }, []);
@@ -437,7 +511,12 @@ export default function Workforce() {
         style={{ flex: 1 }}
       >
         <ScrollView 
-          contentContainerStyle={[{ flexGrow: 1 }]} 
+          contentContainerStyle={[
+            { 
+              flexGrow: 1,
+              paddingBottom: 100, // Add extra padding at the bottom to prevent content from being hidden
+            }
+          ]} 
           style={styles.container}
         >
         {/* Edit Modal */}
@@ -448,12 +527,35 @@ export default function Workforce() {
           type={modalConfig.type}
           currentValue={modalConfig.currentValue}
           setValue={modalConfig.setValue}
+          typeId={modalConfig.typeId}
         />
-
+        
         {/* Top Container with Stats */}
         <View style={styles.topContainer}>
           <View style={styles.quwatContainer}>
-            {/* Rukun Count */}
+             {/* Karkun Count */}
+             <View style={styles.quwatBox}>
+              <Image 
+                source={require('../../assets/images/red-target-icon.png')} 
+                style={styles.quwatIcon}
+                accessibilityLabel={i18n.t('karkun_icon')}
+              />
+              <Text style={styles.quwatValue}>{counts.karkun}</Text>
+              <UrduText style={styles.quwatText}>{i18n.t('karkun')}</UrduText>
+            </View>
+         
+              {/* Umeedwar Count */}
+              <View style={styles.quwatBox}>
+              <Image 
+                source={require('../../assets/images/yellow-arkan-icon.png')} 
+                style={styles.quwatIcon}
+                accessibilityLabel={i18n.t('umeedwar_icon')}
+              />
+              <Text style={styles.quwatValue}>{counts.umeedwar}</Text>
+              <UrduText style={styles.quwatText}>{i18n.t('umeedwar')}</UrduText>
+            </View>
+                       {/* Rukun Count */}
+
             <View style={styles.quwatBox}>
               <Image 
                 source={require('../../assets/images/green-arkan-icon.png')} 
@@ -463,28 +565,7 @@ export default function Workforce() {
               <Text style={styles.quwatValue}>{counts.rukun}</Text>
               <UrduText style={styles.quwatText}>{i18n.t('rukun')}</UrduText>
             </View>
-            
-            {/* Karkun Count */}
-            <View style={styles.quwatBox}>
-              <Image 
-                source={require('../../assets/images/red-target-icon.png')} 
-                style={styles.quwatIcon}
-                accessibilityLabel={i18n.t('karkun_icon')}
-              />
-              <Text style={styles.quwatValue}>{counts.karkun}</Text>
-              <UrduText style={styles.quwatText}>{i18n.t('karkun')}</UrduText>
-            </View>
-            
-            {/* Umeedwar Count */}
-            <View style={styles.quwatBox}>
-              <Image 
-                source={require('../../assets/images/yellow-arkan-icon.png')} 
-                style={styles.quwatIcon}
-                accessibilityLabel={i18n.t('umeedwar_icon')}
-              />
-              <Text style={styles.quwatValue}>{counts.umeedwar}</Text>
-              <UrduText style={styles.quwatText}>{i18n.t('umeedwar')}</UrduText>
-            </View>
+          
           </View>
           
           <Link href="/screens/Arkan" style={styles.arkanLink}>
@@ -492,57 +573,39 @@ export default function Workforce() {
           </Link>
         </View>
 
-        {/* Bottom Container with Sections */}
-        <View style={styles.bottomContainer}>
-          {/* Men Section */}
-          <UrduText style={styles.blueHeading}>مرد امیدواران کی تعداد</UrduText>
-          
-          <WorkforceItem 
-            label="کارکنان کی تعداد"
-            value={menKarkunan}
-            onEdit={() => showModal('کارکنان کی تعداد', 'کارکنان', menKarkunan, setMenKarkunan)}
-          />
-          
-          <WorkforceItem 
-            label="ممبران کی تعداد"
-            value={menMembers}
-            onEdit={() => showModal('ممبران کی تعداد', 'ممبران', menMembers, setMenMembers)}
-          />
-          
-          {/* Women Section */}
-          <UrduText style={styles.blueHeading}>خواتین امیدواران کی تعداد</UrduText>
-          
-          <WorkforceItem 
-            label="ارکان"
-            value={womenArkan}
-            onEdit={() => showModal('ارکان', 'ارکان', womenArkan, setWomenArkan)}
-          />
-          
-          <WorkforceItem 
-            label="کارکنان"
-            value={womenKarkunan}
-            onEdit={() => showModal('کارکنان', 'کارکنان', womenKarkunan, setWomenKarkunan)}
-          />
-          
-          <WorkforceItem 
-            label="ممبران"
-            value={womenMembers}
-            onEdit={() => showModal('ممبران', 'ممبران', womenMembers, setWomenMembers)}
-          />
-          
-          <WorkforceItem 
-            label="یوتھ ممبران"
-            value={womenYouthMembers}
-            onEdit={() => showModal('یوتھ ممبران', 'یوتھ ممبران', womenYouthMembers, setWomenYouthMembers)}
-          />
-        </View>
+      
         
-        {/* Debug indicator for strength data logging */}
+        {/* Strength Data by Category */}
         {strengthTypes.length > 0 && (
-          <View style={styles.debugContainer}>
-            <Text style={styles.debugText}>
-              Strength data logged to console ({strengthTypes.length} types, {strengthRecords.length} records)
-            </Text>
+          <View style={styles.strengthDataContainer}>
+            {/* Display categories in the specified order: workforce, place, magazine */}
+            {Object.entries(strengthByCategory).map(([category, types]) => (
+              <React.Fragment key={category}>
+                {/* Only render the category if it has types */}
+                {types.length > 0 && (
+                  <>
+                    {/* Category Heading */}
+                    <UrduText style={styles.blueHeading}>
+                      {category === 'workforce' ? 'قوت کی تفصیلات' : 
+                      category === 'place' ? 'مقامات کی تفصیلات' : 
+                      category === 'magazine' ? 'رسائل کی تفصیلات' : 
+                      category}
+                    </UrduText>
+                    
+                    {/* All Types Combined (regardless of gender) */}
+                    {types.map(type => (
+                      <StrengthTypeItem
+                        key={`type-${type.id}`}
+                        type={type}
+                        latestRecord={null} // We'll use latestStrengthRecordsByType instead
+                        latestStrengthRecordsByType={latestStrengthRecordsByType}
+                        showModal={showModal}
+                      />
+                    ))}
+                  </>
+                )}
+              </React.Fragment>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -575,7 +638,7 @@ const styles = StyleSheet.create({
   // Top section with stats
   topContainer: {
     backgroundColor: COLORS.primary,
-    height: "28%",
+    height: "22%",
     borderBottomLeftRadius: BORDER_RADIUS.lg,
     borderBottomRightRadius:BORDER_RADIUS.lg,
     alignItems: 'center',
@@ -586,16 +649,14 @@ const styles = StyleSheet.create({
   quwatContainer: {
     height: "75%",
     flexDirection: "row-reverse",
-    gap: SPACING.lg,
-    marginBottom: SPACING.xs
-  },
+    gap: SPACING.lg,  },
   quwatBox: {
     padding: SPACING.sm,
     alignItems: 'center',
     backgroundColor: COLORS.white,
     width: "30%",
+    height:160,
     borderRadius: BORDER_RADIUS.md,
-    gap: SPACING.xs,
     ...SHADOWS.small
   },
   quwatIcon: {
@@ -618,7 +679,14 @@ const styles = StyleSheet.create({
   
   // Bottom section with workforce details
   bottomContainer: {
-    padding: SPACING.lg
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg
+  },
+  // Strength data container
+  strengthDataContainer: {
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.xxl,
+    paddingHorizontal: SPACING.md
   },
   blueHeading: {
     fontSize: TYPOGRAPHY.fontSize.xl,
@@ -759,19 +827,59 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
-  // Debug styles
-  debugContainer: {
-    padding: 10,
-    margin: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginTop: 20,
+  // Removed unused strength data styles
+  unitLevelGroup: {
+    marginBottom: 20,
+    backgroundColor: COLORS.lightPrimary,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 15,
+    ...SHADOWS.small,
   },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
+  unitLevelGroupHeading: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+    marginBottom: 10,
     textAlign: 'center',
-  }
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.primary,
+    paddingBottom: 5,
+  },
+  genderSection: {
+    marginBottom: 15,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  genderHeading: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.textSecondary,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  strengthTypeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+    marginBottom: 5,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  strengthTypeLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
+  },
+  strengthTypeValue: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  // Removed unused recent changes styles
 });
