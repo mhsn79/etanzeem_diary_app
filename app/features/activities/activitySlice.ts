@@ -307,8 +307,12 @@ export const fetchActivityCount = createAsyncThunk<
     const userId = state.auth.user?.id;
     const userToken = state.auth.tokens?.accessToken;
     
+    // Get user's unit hierarchy IDs from tanzeem state
+    const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
+    
     console.log(`[ACTIVITY_COUNT] 👤 User ID: ${userId}`);
     console.log(`[ACTIVITY_COUNT] 🔑 Token available: ${!!userToken}`);
+    console.log(`[ACTIVITY_COUNT] 🏢 User unit hierarchy IDs:`, userUnitHierarchyIds);
     
     if (!userId) {
       console.error(`[ACTIVITY_COUNT] ❌ No user ID found in auth state`);
@@ -320,23 +324,52 @@ export const fetchActivityCount = createAsyncThunk<
       return 0;
     }
 
-    // Build the correct filter for the relation
-    const queryString = `/items/Activities?filter[activity_type][_eq]=${linkedToId}&filter[status][_eq]=published`;
-    console.log(`[ACTIVITY_COUNT] 🔗 Query string: ${queryString}`);
+    if (!userUnitHierarchyIds.length) {
+      console.warn('[ACTIVITY_COUNT] ⚠️ No user unit hierarchy IDs found');
+      return 0;
+    }
 
-    // Use directApiRequest to fetch the activities (with limit=0 to get count)
-    const response = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
-      queryString,
+    // Step 1: Get Activity_Type IDs that match both the linked_to_id AND the hierarchy
+    const activityTypeFilter = `filter[id][_eq]=${linkedToId}&filter[Level_id][_in]=${userUnitHierarchyIds.join(',')}`;
+    const activityTypeQuery = `/items/Activity_Type?${activityTypeFilter}`;
+    
+    console.log(`[ACTIVITY_COUNT] 🔍 Step 1 - Activity Type Query: ${activityTypeQuery}`);
+    
+    const activityTypeResponse = await directApiRequest<{ data: any[] }>(
+      activityTypeQuery,
       'GET'
     );
-    console.log(`[ACTIVITY_COUNT] 📥 Response received:`, response);
+    
+    console.log(`[ACTIVITY_COUNT] 📥 Activity Type Response:`, activityTypeResponse);
+    
+    // Check if the Activity_Type exists and matches hierarchy
+    if (!activityTypeResponse.data || activityTypeResponse.data.length === 0) {
+      console.log(`[ACTIVITY_COUNT] ⚠️ No Activity_Type found with id=${linkedToId} and Level_id in hierarchy`);
+      return 0;
+    }
+    
+    // Step 2: Get activities count using the validated activity_type, for current month/year and published status
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const activityFilter = `filter[activity_type][_eq]=${linkedToId}&filter[report_month][_eq]=${currentMonth}&filter[report_year][_eq]=${currentYear}&filter[status][_eq]=published`;
+    const activityQuery = `/items/Activities?${activityFilter}`;
+    
+    console.log(`[ACTIVITY_COUNT] 🔍 Step 2 - Activity Query: ${activityQuery}`);
+    
+    const activityResponse = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
+      activityQuery,
+      'GET'
+    );
+    
+    console.log(`[ACTIVITY_COUNT] 📥 Activity Response:`, activityResponse);
 
     let activityCount = 0;
-    if (response.meta?.filter_count !== undefined) {
-      activityCount = response.meta.filter_count;
+    if (activityResponse.meta?.filter_count !== undefined) {
+      activityCount = activityResponse.meta.filter_count;
       console.log(`[ACTIVITY_COUNT] ✅ Success! Activity count from meta: ${activityCount}`);
-    } else if (response.data) {
-      activityCount = response.data.length;
+    } else if (activityResponse.data) {
+      activityCount = activityResponse.data.length;
       console.log(`[ACTIVITY_COUNT] ✅ Success! Activity count from data length: ${activityCount}`);
     } else {
       throw new Error('No count information in response');
