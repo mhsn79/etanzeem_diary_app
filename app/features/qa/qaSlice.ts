@@ -403,26 +403,36 @@ export const saveAnswer = createAsyncThunk<
     console.log('Saving answer with submission ID:', submissionId);
     
     // Check if an answer for this question already exists
-    const filter = {
-      _and: [
-        { submission_id: { _eq: submissionId } },
-        { question_id: { _eq: answerData.question_id } }
-      ]
-    };
+    // Build the filter as URL parameters for GET request
+    const filterParams = new URLSearchParams();
+    filterParams.append('filter[submission_id][_eq]', submissionId.toString());
+    filterParams.append('filter[question_id][_eq]', answerData.question_id.toString());
     
-    const existingAnswersResponse = await directApiRequest<{ data: ReportAnswer[] }>(
-      '/items/report_answers',
-      'GET',
-      { filter }
-    );
-    
-    // Extract data from response
-    const existingAnswers = existingAnswersResponse?.data || [];
+    const filterUrl = `/items/report_answers?${filterParams.toString()}`;
+    console.log('Checking for existing answers with URL:', filterUrl);
     
     let existingAnswer: ReportAnswer | null = null;
-    if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
-      existingAnswer = existingAnswers[0];
-      console.log('Found existing answer:', existingAnswer);
+    
+    try {
+      const existingAnswersResponse = await directApiRequest<{ data: ReportAnswer[] }>(
+        filterUrl,
+        'GET'
+      );
+      
+      // Extract data from response
+      const existingAnswers = existingAnswersResponse?.data || [];
+      console.log('Existing answers found:', existingAnswers.length, 'for question_id:', answerData.question_id);
+      
+      if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
+        existingAnswer = existingAnswers[0];
+        console.log('Found existing answer:', existingAnswer);
+      } else {
+        console.log('No existing answer found for question_id:', answerData.question_id);
+      }
+    } catch (filterError) {
+      console.error('Error checking for existing answers:', filterError);
+      console.log('Proceeding with creating new answer due to filter error');
+      // Continue with creating a new answer if the filter fails
     }
     
     // Determine if we need to create or update
@@ -431,14 +441,31 @@ export const saveAnswer = createAsyncThunk<
     
     // If we found an existing answer, update it instead of creating a new one
     if (existingAnswer && existingAnswer.id) {
-      method = 'PATCH';
-      path = `/items/report_answers/${existingAnswer.id}`;
-      console.log(`Updating existing answer with ID: ${existingAnswer.id}`);
+      // Validate that the existing answer belongs to the correct question
+      if (existingAnswer.question_id !== answerData.question_id) {
+        console.error('Found existing answer with wrong question_id:', {
+          existingAnswerQuestionId: existingAnswer.question_id,
+          requestedQuestionId: answerData.question_id,
+          existingAnswerId: existingAnswer.id
+        });
+        // If the question_id doesn't match, create a new answer instead
+        console.log('Creating new answer due to question_id mismatch');
+        method = 'POST';
+      } else {
+        method = 'PATCH';
+        path = `/items/report_answers/${existingAnswer.id}`;
+        console.log(`Updating existing answer with ID: ${existingAnswer.id} for question_id: ${answerData.question_id}`);
+      }
     } else {
       console.log('Creating new answer');
     }
     
     // Make API request
+    console.log(`Making ${method} request to: ${path}`);
+    console.log('Request payload:', method === 'PATCH' 
+      ? { string_value: updatedAnswerData.string_value, number_value: updatedAnswerData.number_value }
+      : updatedAnswerData);
+    
     const response = await apiRequest<ReportAnswer | { data: ReportAnswer }>(() => ({
       path,
       method,
@@ -459,6 +486,7 @@ export const saveAnswer = createAsyncThunk<
     }
     
     console.log('Successfully saved answer:', data);
+    console.log('Answer details - ID:', data.id, 'Question ID:', data.question_id, 'Submission ID:', data.submission_id);
     return data;
   } catch (error: any) {
     console.error('Error saving answer:', error);

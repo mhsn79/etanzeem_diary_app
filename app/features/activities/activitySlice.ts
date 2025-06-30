@@ -26,6 +26,9 @@ interface ActivitiesExtraState {
   editError: string | null;
   fetchByIdStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   fetchByIdError: string | null;
+  activityCountStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  activityCountError: string | null;
+  activityCount: number | null;
 }
 
 export type ActivitiesState = ReturnType<typeof activitiesAdapter.getInitialState<ActivitiesExtraState>>;
@@ -41,6 +44,9 @@ const initialState: ActivitiesState = activitiesAdapter.getInitialState<Activiti
   editError: null,
   fetchByIdStatus: 'idle',
   fetchByIdError: null,
+  activityCountStatus: 'idle',
+  activityCountError: null,
+  activityCount: null,
 });
 
 // The centralized API client handles token refresh automatically
@@ -285,6 +291,72 @@ export const fetchActivities = createAsyncThunk<
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch activity count based on filters
+ * ────────────────────────────────────────────────────────────────────────────────*/
+export const fetchActivityCount = createAsyncThunk<
+  number,
+  { linkedToId: number; questionId: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('activities/fetchCount', async ({ linkedToId, questionId }, { rejectWithValue, getState }) => {
+  try {
+    console.log(`[ACTIVITY_COUNT] 🚀 Starting activity count fetch for question ${questionId}`);
+    console.log(`[ACTIVITY_COUNT] 🔗 Using linked_to_id:`, linkedToId);
+    
+    // Get the current user ID from auth state
+    const state = getState();
+    const userId = state.auth.user?.id;
+    const userToken = state.auth.tokens?.accessToken;
+    
+    console.log(`[ACTIVITY_COUNT] 👤 User ID: ${userId}`);
+    console.log(`[ACTIVITY_COUNT] 🔑 Token available: ${!!userToken}`);
+    
+    if (!userId) {
+      console.error(`[ACTIVITY_COUNT] ❌ No user ID found in auth state`);
+      return rejectWithValue('User not authenticated. Please log in again.');
+    }
+
+    if (!linkedToId) {
+      console.warn('[ACTIVITY_COUNT] ⚠️ No linked_to_id provided');
+      return 0;
+    }
+
+    // Build the correct filter for the relation
+    const queryString = `/items/Activities?filter[activity_type][_eq]=${linkedToId}&filter[status][_eq]=published`;
+    console.log(`[ACTIVITY_COUNT] 🔗 Query string: ${queryString}`);
+
+    // Use directApiRequest to fetch the activities (with limit=0 to get count)
+    const response = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
+      queryString,
+      'GET'
+    );
+    console.log(`[ACTIVITY_COUNT] 📥 Response received:`, response);
+
+    let activityCount = 0;
+    if (response.meta?.filter_count !== undefined) {
+      activityCount = response.meta.filter_count;
+      console.log(`[ACTIVITY_COUNT] ✅ Success! Activity count from meta: ${activityCount}`);
+    } else if (response.data) {
+      activityCount = response.data.length;
+      console.log(`[ACTIVITY_COUNT] ✅ Success! Activity count from data length: ${activityCount}`);
+    } else {
+      throw new Error('No count information in response');
+    }
+
+    console.log(`[ACTIVITY_COUNT] 🎯 Final activity count result: ${activityCount}`);
+    return activityCount;
+  } catch (error: any) {
+    console.error('[ACTIVITY_COUNT] 💥 Critical error in fetchActivityCount:', error);
+    console.error('[ACTIVITY_COUNT] 📋 Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return rejectWithValue(error.message || 'Failed to fetch activity count');
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
  * Slice
  * ────────────────────────────────────────────────────────────────────────────────*/
 const activitiesSlice = createSlice({
@@ -359,6 +431,18 @@ const activitiesSlice = createSlice({
       .addCase(editActivity.rejected, (state, action) => {
         state.editStatus = 'failed';
         state.editError = action.payload ?? 'Failed to edit activity';
+      })
+      .addCase(fetchActivityCount.pending, state => {
+        state.activityCountStatus = 'loading';
+        state.activityCountError = null;
+      })
+      .addCase(fetchActivityCount.fulfilled, (state, action: PayloadAction<number>) => {
+        state.activityCountStatus = 'succeeded';
+        state.activityCount = action.payload;
+      })
+      .addCase(fetchActivityCount.rejected, (state, action) => {
+        state.activityCountStatus = 'failed';
+        state.activityCountError = action.payload ?? 'Failed to fetch activity count';
       });
   },
 });
@@ -391,6 +475,11 @@ export const selectEditActivityStatus = (state: RootState) => selectActivitiesSt
 export const selectEditActivityError = (state: RootState) => selectActivitiesState(state).editError;
 export const selectFetchActivityByIdStatus = (state: RootState) => selectActivitiesState(state).fetchByIdStatus;
 export const selectFetchActivityByIdError = (state: RootState) => selectActivitiesState(state).fetchByIdError;
+
+// Activity count selectors
+export const selectActivityCountStatus = (state: RootState) => selectActivitiesState(state).activityCountStatus;
+export const selectActivityCountError = (state: RootState) => selectActivitiesState(state).activityCountError;
+export const selectActivityCount = (state: RootState) => selectActivitiesState(state).activityCount;
 
 // Custom selector to get an activity by ID (using our own implementation)
 export const getActivityById = (id: string | number) => 

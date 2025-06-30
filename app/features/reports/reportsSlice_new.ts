@@ -134,35 +134,67 @@ export const fetchReportsByUnitId = createAsyncThunk<
   ReportData[],
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportsByUnitId', async (unitId, { dispatch, rejectWithValue }) => {
+>('reports/fetchReportsByUnitId', async (unitId, { dispatch, rejectWithValue, getState }) => {
   try {
+    console.log('[reportsSlice] fetchReportsByUnitId called with unitId:', unitId);
+    
     if (!unitId || isNaN(unitId) || unitId <= 0) {
+      console.error('[reportsSlice] Invalid unit ID provided:', unitId);
       return rejectWithValue('Invalid unit ID provided');
     }
 
+    // Get the user's unit details from the state to check if we're using the right ID
+    const state = getState();
+    const userUnitDetails = state.tanzeem?.userUnitDetails;
+    console.log('[reportsSlice] User unit details from state:', JSON.stringify(userUnitDetails));
+    
+    // Check if we should use Level_id instead of the unit ID
+    const levelId = userUnitDetails?.Level_id || userUnitDetails?.level_id;
+    console.log('[reportsSlice] User unit level ID:', levelId);
+    
+    // Determine which ID to use for fetching templates
+    const idToUse = levelId || unitId;
+    console.log('[reportsSlice] Using ID for template fetch:', idToUse);
+
     // The centralized API client handles token refresh automatically
+    console.log('[reportsSlice] Fetching report templates for unit level ID:', idToUse);
     const templateResponse = await apiRequest<ReportTemplate[] | { data: ReportTemplate[] }>(() => ({
       path: '/items/report_templates',
       method: 'GET',
-      params: { filter: { unit_level_id: { _eq: unitId } } },
+      params: { filter: { unit_level_id: { _eq: idToUse } } },
     }));
+    
+    console.log('[reportsSlice] Template response:', JSON.stringify(templateResponse));
 
     const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
+    console.log('[reportsSlice] Normalized templates:', JSON.stringify(templates));
+    
     if (!templates.length) {
+      console.warn('[reportsSlice] No templates found for unit level ID:', idToUse);
       return [];
     }
 
     const template = templates[0];
+    console.log('[reportsSlice] Using template:', JSON.stringify(template));
+    
+    console.log('[reportsSlice] Fetching report managements for template ID:', template.id);
     const managementResponse = await apiRequest<ReportManagement[] | { data: ReportManagement[] }>(() => ({
       path: '/items/reports_mgmt',
       method: 'GET',
       params: { filter: { report_template_id: { _eq: template.id } }, sort: 'id' },
     }));
+    
+    console.log('[reportsSlice] Management response:', JSON.stringify(managementResponse));
 
     const managements = normalizeResponse<ReportManagement[]>(managementResponse, 'Managements');
-    return [{ template, managements }];
+    console.log('[reportsSlice] Normalized managements:', JSON.stringify(managements));
+    
+    const result = [{ template, managements }];
+    console.log('[reportsSlice] Final result:', JSON.stringify(result));
+    
+    return result;
   } catch (error: any) {
-    console.error('Error in fetchReportsByUnitId:', error);
+    console.error('[reportsSlice] Error in fetchReportsByUnitId:', error);
     return rejectWithValue(error.message || 'Failed to fetch reports');
   }
 });
@@ -186,20 +218,40 @@ const reportsNewSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchReportsByUnitId.pending, (state) => {
+        console.log('[reportsSlice] fetchReportsByUnitId.pending');
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchReportsByUnitId.fulfilled, (state, action) => {
+        console.log('[reportsSlice] fetchReportsByUnitId.fulfilled with payload:', JSON.stringify(action.payload));
         state.loading = false;
-        state.reports = action.payload.reduce(
-          (acc, reportData) => ({
-            ...acc,
-            [reportData.template.id]: reportData,
-          }),
+        
+        // Check if payload is empty array
+        if (action.payload.length === 0) {
+          console.warn('[reportsSlice] Empty payload received in fetchReportsByUnitId.fulfilled');
+          state.reports = {};
+          return;
+        }
+        
+        const newReports = action.payload.reduce(
+          (acc, reportData) => {
+            if (!reportData.template || !reportData.template.id) {
+              console.error('[reportsSlice] Invalid report data in payload:', JSON.stringify(reportData));
+              return acc;
+            }
+            return {
+              ...acc,
+              [reportData.template.id]: reportData,
+            };
+          },
           {} as Record<number, ReportData>
         );
+        
+        console.log('[reportsSlice] Updated reports state:', JSON.stringify(newReports));
+        state.reports = newReports;
       })
       .addCase(fetchReportsByUnitId.rejected, (state, action) => {
+        console.error('[reportsSlice] fetchReportsByUnitId.rejected with error:', action.payload);
         state.loading = false;
         state.error = action.payload ?? 'Failed to fetch reports';
       })

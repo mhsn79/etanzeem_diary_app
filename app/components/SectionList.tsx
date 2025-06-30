@@ -3,10 +3,12 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import UrduText from '@/app/components/UrduText';
 import FormInput from '@/app/components/FormInput';
+import AutoQuestionInput from '@/app/components/AutoQuestionInput';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/app/constants/theme';
 import { ReportSection, ReportQuestion, ReportAnswer } from '@/app/features/qa/types';
 import { saveAnswer, selectCurrentSubmissionId } from '@/app/features/qa/qaSlice';
+import { isAutoQuestion } from '@/app/features/qa/utils';
 import { AppDispatch } from '@/app/store';
 
 // Helper function to get the correct answer value based on question type
@@ -70,7 +72,31 @@ const Question = memo(({
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   
-  // Memoize the string representation of the value for comparison
+  // Check if this is an auto-calculated question
+  const isAuto = isAutoQuestion(question);
+  
+  // If it's an auto question, render the AutoQuestionInput component
+  if (isAuto) {
+    return (
+      <AutoQuestionInput
+        question={question}
+        value={value}
+        submissionId={submissionId}
+        disabled={disabled}
+        onValueChange={(newValue) => {
+          if (!submissionId) return;
+          dispatch(saveAnswer({
+            submission_id: submissionId,
+            question_id: question.id,
+            string_value: question.input_type === 'number' ? null : String(newValue),
+            number_value: question.input_type === 'number' ? Number(newValue) : null,
+          }));
+        }}
+      />
+    );
+  }
+  
+  // For manual questions, use the existing logic
   const stringValue = useMemo(() => 
     value === null || value === undefined ? '' : String(value),
   [value]);
@@ -160,7 +186,7 @@ const Question = memo(({
       // For blur events, save immediately
       saveNow();
     } else {
-      // For typing events, debounce to avoid excessive API calls
+      // For typing events
       debounceTimerRef.current = setTimeout(saveNow, 500);
     }
   }, [processValue, saveAnswerToApi]);

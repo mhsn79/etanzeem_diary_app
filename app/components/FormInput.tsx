@@ -14,6 +14,7 @@ export interface FormInputProps {
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   maxLength?: number;
   rightIcon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
   editable?: boolean;
   disabled?: boolean;
   error?: string | null;
@@ -35,6 +36,7 @@ const FormInput: React.FC<FormInputProps> = ({
   keyboardType = 'default',
   maxLength,
   rightIcon,
+  leftIcon,
   editable = true,
   disabled = false,
   error,
@@ -57,16 +59,18 @@ const FormInput: React.FC<FormInputProps> = ({
         styles.inputContainer,
         error ? styles.inputError : null
       ]}>
-      {rightIcon && (
-          <View style={styles.iconContainer}>
-            {rightIcon}
+        {leftIcon && (
+          <View style={styles.leftIconContainer}>
+            {leftIcon}
           </View>
         )}
         <TextInput
           style={[
             styles.input,
             { textAlign: direction === 'rtl' ? 'right' : 'left' },
-            disabled ? styles.disabledInput : null
+            disabled ? styles.disabledInput : null,
+            leftIcon ? styles.inputWithLeftIcon : null,
+            rightIcon ? styles.inputWithRightIcon : null,
           ]}
           value={value}
           onChangeText={onChange}
@@ -80,6 +84,11 @@ const FormInput: React.FC<FormInputProps> = ({
           multiline={multiline}
           numberOfLines={numberOfLines || (multiline ? 3 : 1)}
         />
+        {rightIcon && (
+          <View style={styles.iconContainer}>
+            {rightIcon}
+          </View>
+        )}
         {loading && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={COLORS.primary} />
@@ -105,33 +114,33 @@ const styles = StyleSheet.create({
   titleContainer: {
     marginBottom: SPACING.sm,
     lineHeight: 40,
-    width: '100%', // Ensure the container takes full width
-    alignItems: 'flex-end', // Align children to the end (right in LTR, left in RTL)
+    width: '100%',
+    alignItems: 'flex-end',
   },
   titleRow: {
     flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end', // Align to the right for RTL support
-    width: '100%', // Ensure the row takes full width
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   mainTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: '600',
     color: COLORS.primary,
     marginBottom: SPACING.xs,
-    textAlign: 'right', // Changed to right alignment
+    textAlign: 'right',
     lineHeight: 40,
-    width: '100%', // Ensure the title takes full width
+    width: '100%',
   },
   inputTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
-    textAlign: 'right', // Changed to right alignment
+    textAlign: 'right',
   },
   requiredStar: {
     color: COLORS.error || 'red',
-    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
-    marginLeft: 2, // Small margin on left for spacing
+    marginRight: 4,
+    marginLeft: 2,
     fontSize: TYPOGRAPHY.fontSize.md,
   },
   inputContainer: {
@@ -154,9 +163,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     color: COLORS.black,
   },
+  inputWithLeftIcon: {
+    paddingLeft: SPACING.sm,
+  },
+  inputWithRightIcon: {
+    paddingRight: SPACING.sm,
+  },
   disabledInput: {
     opacity: 0.7,
     color: COLORS.textSecondary,
+  },
+  leftIconContainer: {
+    paddingHorizontal: SPACING.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconContainer: {
     paddingHorizontal: SPACING.sm,
@@ -167,17 +187,17 @@ const styles = StyleSheet.create({
     color: COLORS.error || 'red',
     fontSize: TYPOGRAPHY.fontSize.sm,
     marginTop: 4,
-    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
-    textAlign: 'right', // Ensure error text is right-aligned
-    width: '100%', // Ensure the error text takes full width
+    marginRight: 4,
+    textAlign: 'right',
+    width: '100%',
   },
   helpText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginTop: 4,
-    marginRight: 4, // Changed from marginLeft to marginRight for RTL support
+    marginRight: 4,
     textAlign: 'right',
-    width: '100%', // Ensure the help text takes full width
+    width: '100%',
   },
 });
 

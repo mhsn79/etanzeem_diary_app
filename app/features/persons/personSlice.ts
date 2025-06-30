@@ -49,6 +49,9 @@ interface PersonsExtraState {
   checkTransferError: string | null;
   createTransferStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   createTransferError: string | null;
+  personCountStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  personCountError: string | null;
+  personCount: number | null;
 }
 
 export type PersonsState = ReturnType<typeof personsAdapter.getInitialState<PersonsExtraState>>;
@@ -81,6 +84,9 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   checkTransferError: null,
   createTransferStatus: 'idle',
   createTransferError: null,
+  personCountStatus: 'idle',
+  personCountError: null,
+  personCount: null,
 });
 
 // We use the centralized apiRequest function from services/apiClient
@@ -1115,6 +1121,81 @@ export const submitRukunUpdateRequest = createAsyncThunk<
   }
 });
 
+// Fetch person count based on contact_type
+export const fetchPersonCount = createAsyncThunk<
+  number,
+  { linkedToId: number; questionId: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchCount', async ({ linkedToId, questionId }, { rejectWithValue, getState }) => {
+  try {
+    console.log(`[PERSON_COUNT] 🚀 Starting person count fetch for question ${questionId}`);
+    console.log(`[PERSON_COUNT] 🔗 Using linked_to_id:`, linkedToId);
+    
+    // Get the current user ID from auth state
+    const state = getState();
+    const userId = state.auth.user?.id;
+    const userToken = state.auth.tokens?.accessToken;
+    
+    // Get user's unit hierarchy IDs from tanzeem state
+    const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
+    
+    console.log(`[PERSON_COUNT] 👤 User ID: ${userId}`);
+    console.log(`[PERSON_COUNT] 🔑 Token available: ${!!userToken}`);
+    console.log(`[PERSON_COUNT] 🏢 User unit hierarchy IDs:`, userUnitHierarchyIds);
+    
+    if (!userId) {
+      console.error(`[PERSON_COUNT] ❌ No user ID found in auth state`);
+      return rejectWithValue('User not authenticated. Please log in again.');
+    }
+
+    if (!linkedToId) {
+      console.warn('[PERSON_COUNT] ⚠️ No linked_to_id provided');
+      return 0;
+    }
+
+    if (!userUnitHierarchyIds.length) {
+      console.warn('[PERSON_COUNT] ⚠️ No user unit hierarchy IDs found');
+      return 0;
+    }
+
+    // Build the filter with both contact_type and Tanzeemi_Unit conditions
+    const contactTypeFilter = `filter[contact_type][_eq]=${linkedToId}`;
+    const unitFilter = `filter[Tanzeemi_Unit][_in]=${userUnitHierarchyIds.join(',')}`;
+    const queryString = `/items/Person?${contactTypeFilter}&${unitFilter}`;
+    
+    console.log(`[PERSON_COUNT] 🔗 Query string: ${queryString}`);
+
+    // Use directApiRequest to fetch the persons (with limit=0 to get count)
+    const response = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
+      queryString,
+      'GET'
+    );
+    console.log(`[PERSON_COUNT] 📥 Response received:`, response);
+
+    let personCount = 0;
+    if (response.meta?.filter_count !== undefined) {
+      personCount = response.meta.filter_count;
+      console.log(`[PERSON_COUNT] ✅ Success! Person count from meta: ${personCount}`);
+    } else if (response.data) {
+      personCount = response.data.length;
+      console.log(`[PERSON_COUNT] ✅ Success! Person count from data length: ${personCount}`);
+    } else {
+      throw new Error('No count information in response');
+    }
+
+    console.log(`[PERSON_COUNT] 🎯 Final person count result: ${personCount}`);
+    return personCount;
+  } catch (error: any) {
+    console.error('[PERSON_COUNT] 💥 Critical error in fetchPersonCount:', error);
+    console.error('[PERSON_COUNT] 📋 Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return rejectWithValue(error.message || 'Failed to fetch person count');
+  }
+});
+
 // Persons slice
 const personsSlice = createSlice({
   name: 'persons',
@@ -1391,6 +1472,19 @@ const personsSlice = createSlice({
         });
         state.rukunUpdateStatus = 'failed';
         state.rukunUpdateError = action.payload ?? 'Failed to submit Rukun Update Request';
+      })
+      // Fetch Person Count
+      .addCase(fetchPersonCount.pending, state => {
+        state.personCountStatus = 'loading';
+        state.personCountError = null;
+      })
+      .addCase(fetchPersonCount.fulfilled, (state, action: PayloadAction<number>) => {
+        state.personCountStatus = 'succeeded';
+        state.personCount = action.payload;
+      })
+      .addCase(fetchPersonCount.rejected, (state, action) => {
+        state.personCountStatus = 'failed';
+        state.personCountError = action.payload ?? 'Failed to fetch person count';
       });
   },
 });
@@ -1502,5 +1596,10 @@ export const selectRukunUpdateRequestByContactId = (state: RootState, contactId:
     return null;
   }
 };
+
+// Person count selectors
+export const selectPersonCountStatus = (state: RootState) => selectPersonsState(state).personCountStatus;
+export const selectPersonCountError = (state: RootState) => selectPersonsState(state).personCountError;
+export const selectPersonCount = (state: RootState) => selectPersonsState(state).personCount;
 
 export default personsSlice.reducer;
