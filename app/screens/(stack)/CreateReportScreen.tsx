@@ -2,7 +2,7 @@
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation, useLocalSearchParams } from 'expo-router';
+import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import UrduText from '@/app/components/UrduText';
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
@@ -30,6 +30,8 @@ import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
 import ScreenLayout from '@/app/components/ScreenLayout';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
+import { ensureFreshToken } from '@/app/services/apiClient';
+import { setError } from '@/app/features/auth/authSlice';
 
 const CreateReportScreen = () => {
   const navigation = useNavigation();
@@ -98,13 +100,18 @@ const CreateReportScreen = () => {
       : '';
   }, [latestReportMgmt]);
 
-  // Ensure we have a fresh token before initializing report data
-  useEffect(() => {
-    // Refresh token if needed when the screen loads
-    refreshTokenIfNeeded();
-  }, []);
+  // Force token refresh on screen focus
+  useFocusEffect(
+    React.useCallback(() => {
+      ensureFreshToken()
+        .catch((error) => {
+          dispatch(setError('Your session has expired. Please log in again.'));
+          router.replace('/screens/LoginScreen');
+        });
+    }, [dispatch])
+  );
 
-  // Initialize report data
+  // Ensure we have a fresh token before initializing report data
   useEffect(() => {
     console.log('[CreateReportScreen] Checking conditions for report initialization:', {
       templateId,
@@ -219,6 +226,12 @@ const CreateReportScreen = () => {
         userUnitId: userUnitDetails?.id,
         mgmtId: latestReportMgmt[0]?.managements[0]?.id
       });
+    }
+
+    if (!templateId || !userUnitDetails?.id || !latestReportMgmt[0]?.managements[0]?.id) {
+      dispatch(setError('Missing required information to create a report. Please try again.'));
+      router.replace('/screens/Dashboard');
+      return;
     }
   }, [templateId, userUnitDetails?.id, latestReportMgmt[0]?.managements[0]?.id, submissionId, isEditMode, isViewMode]);
 

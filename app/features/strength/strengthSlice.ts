@@ -35,6 +35,10 @@ export interface StrengthState {
   recordsLoading: boolean;
   recordsError: string | null;
   userUnitId: number | null; // Store the user's unit ID for reference
+  strengthCount: number;
+  strengthTotals: Record<number, number>;
+  strengthSum: number;
+  strengthAvg: number;
 }
 
 // Initial state
@@ -46,6 +50,10 @@ const initialState: StrengthState = {
   recordsLoading: false,
   recordsError: null,
   userUnitId: null,
+  strengthCount: 0,
+  strengthTotals: {},
+  strengthSum: 0,
+  strengthAvg: 0,
 };
 
 // Helper to normalize API response
@@ -236,8 +244,6 @@ export const fetchStrengthRecords = createAsyncThunk<
   }
 });
 
-
-
 export const createStrengthRecord = createAsyncThunk<
   StrengthRecord,
   Omit<StrengthRecord, 'id' | 'Tanzeemi_Unit'> & { Tanzeemi_Unit?: number },
@@ -392,6 +398,40 @@ export const refreshStrengthData = createAsyncThunk<
   }
 });
 
+// Thunk to fetch strength record count and new_total aggregates for a given Type and userUnitHierarchyIds
+export const fetchStrengthCountAndTotals = createAsyncThunk<
+  { count: number, totals: Record<number, number>, sum: number, avg: number },
+  { linkedToId: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('strength/fetchCountAndTotals', async ({ linkedToId }, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
+    if (!linkedToId || !userUnitHierarchyIds.length) {
+      return { count: 0, totals: {}, sum: 0, avg: 0 };
+    }
+    const filter = `filter[Type][_eq]=${linkedToId}&filter[Tanzeemi_Unit][_in]=${userUnitHierarchyIds.join(',')}`;
+    const url = `/items/Strength_Records?${filter}`;
+    const response = await directApiRequest<{ data: any[] }>(url, 'GET');
+    const records = response.data || [];
+    const count = records.length;
+    const totals: Record<number, number> = {};
+    let sum = 0;
+    records.forEach(record => {
+      const unit = record.Tanzeemi_Unit;
+      const newTotal = record.new_total;
+      if (unit != null && typeof newTotal === 'number') {
+        totals[unit] = newTotal; // latest new_total per unit (could be replaced with sum/avg logic)
+        sum += newTotal;
+      }
+    });
+    const avg = count > 0 ? sum / count : 0;
+    return { count, totals, sum, avg };
+  } catch (error: any) {
+    return rejectWithValue(error.message || 'Failed to fetch strength record count and totals');
+  }
+});
+
 // Slice
 const strengthSlice = createSlice({
   name: 'strength',
@@ -441,11 +481,17 @@ const strengthSlice = createSlice({
         state.recordsError = action.payload ?? 'Failed to fetch strength records';
       })
       
- 
-      
       // createStrengthRecord - no state changes needed as we refresh records after creation
       .addCase(createStrengthRecord.rejected, (state, action) => {
         state.recordsError = action.payload ?? 'Failed to create strength record';
+      })
+      
+      // fetchStrengthCountAndTotals
+      .addCase(fetchStrengthCountAndTotals.fulfilled, (state, action) => {
+        state.strengthCount = action.payload.count;
+        state.strengthTotals = action.payload.totals;
+        state.strengthSum = action.payload.sum;
+        state.strengthAvg = action.payload.avg;
       });
   },
 });
@@ -459,6 +505,10 @@ export const selectStrengthError = (state: RootState) => state.strength.error;
 export const selectStrengthRecordsLoading = (state: RootState) => state.strength.recordsLoading;
 export const selectStrengthRecordsError = (state: RootState) => state.strength.recordsError;
 export const selectUserUnitId = (state: RootState) => state.strength.userUnitId;
+export const selectStrengthCount = (state: RootState) => state.strength.strengthCount;
+export const selectStrengthTotals = (state: RootState) => state.strength.strengthTotals;
+export const selectStrengthSum = (state: RootState) => state.strength.strengthSum;
+export const selectStrengthAvg = (state: RootState) => state.strength.strengthAvg;
 
 // Memoized selectors
 export const selectStrengthByGender = createSelector(

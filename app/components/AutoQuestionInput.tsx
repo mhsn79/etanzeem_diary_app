@@ -12,6 +12,7 @@ import { AppDispatch } from '../store';
 import { selectUserUnitDetails, selectUserUnitHierarchyIds } from '../features/tanzeem/tanzeemSlice';
 import { fetchActivityCount, selectActivityCountStatus, selectActivityCountError, selectActivityCount } from '../features/activities/activitySlice';
 import { fetchPersonCount, selectPersonCountStatus, selectPersonCountError, selectPersonCount } from '../features/persons/personSlice';
+import { fetchStrengthCountAndTotals, selectStrengthCount, selectStrengthTotals, selectStrengthSum, selectStrengthAvg } from '../features/strength/strengthSlice';
 
 interface AutoQuestionInputProps {
   question: ReportQuestion;
@@ -55,7 +56,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return;
       }
 
-      let result: number;
+      let result: any;
 
       // Handle different linked_to_type cases
       if (question.linked_to_type === 'contacts') {
@@ -72,6 +73,29 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
           questionId: question.id
         })).unwrap();
         setCalculationSuccess('سرگرمیوں کی تعداد کامیابی سے حاصل ہو گئی');
+      } else if (question.linked_to_type === 'strength') {
+        // Fetch strength count and totals
+        result = await dispatch(fetchStrengthCountAndTotals({
+          linkedToId: question.linked_to_id ?? 0
+        })).unwrap();
+        let displayValue = '';
+        if (question.aggregate_func === 'sum') {
+          displayValue = String(result.sum);
+        } else if (question.aggregate_func === 'avg') {
+          displayValue = String(result.avg);
+        } else if (question.aggregate_func === 'count') {
+          displayValue = String(result.count);
+        } else {
+          displayValue = String(result.sum); // default to sum
+        }
+        setInputValue(displayValue);
+        setCalculationSuccess('اسٹرینتھ ریکارڈز کی معلومات کامیابی سے حاصل ہو گئیں');
+        if (onValueChange) {
+          onValueChange(displayValue);
+        }
+        setTimeout(() => setCalculationSuccess(null), 3000);
+        // Optionally, show per-unit totals in the UI as needed
+        return;
       } else {
         setCalculationError('نامعلوم linked_to_type');
         setIsCalculating(false);
