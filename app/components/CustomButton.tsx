@@ -55,9 +55,10 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     backgroundColor: "#008CFF",
-    padding: 12,
+    padding: 8,
     borderRadius: 8,
-    height: 48
+    height: 48,
+    marginBottom: 30,
   },
   buttonPressed: {
     backgroundColor: "#006CC5"

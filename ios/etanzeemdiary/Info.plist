@@ -54,7 +54,7 @@
       <!-- Allow plain‑HTTP traffic to the API host on port 8055 -->
       <key>NSExceptionDomains</key>
       <dict>
-        <key>139.59.232.231</key>
+        <key>admin.jiislamabad.org</key>
         <dict>
           <key>NSExceptionAllowsInsecureHTTPLoads</key>
           <true/>

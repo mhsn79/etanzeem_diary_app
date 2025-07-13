@@ -28,6 +28,7 @@ import {
 } from '../features/auth/authSlice';
 import { ImageBackground } from 'react-native';
 import { COLORS } from '../constants/theme';
+import { debugLog, debugBreakpoint } from '../utils/debug';
 
 /* ------------------------------------------------------------------ */
 /*                        FIELD-LEVEL VALIDATORS                      */
@@ -49,26 +50,41 @@ const validatePassword = (password: string): string | null => {
 /*                              SCREEN                                */
 /* ------------------------------------------------------------------ */
 export default function LoginScreen() {
+  debugLog('LoginScreen component rendered');
+  
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectAuthStatus);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const authError = useAppSelector(selectAuthError);
 
+  debugLog('Auth state:', { status, isAuthenticated, authError });
+
   /* Form state */
-  const [email, setEmail] = useState('sohail-abubaker@pixelpk.com');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState('uc39@jiislamabad.org');
+  const [password, setPassword] = useState('87654321');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
 
   /* Redirect when auth succeeds */
   useEffect(() => {
-    if (isAuthenticated) router.replace('/screens/Dashboard');
-  }, [isAuthenticated]);
+    debugLog('useEffect triggered - isAuthenticated:', isAuthenticated);
+    debugLog('Current auth status:', status);
+    if (isAuthenticated) {
+      debugLog('User authenticated, redirecting to Dashboard');
+      debugBreakpoint(); // Breakpoint here
+      router.replace('/screens/Dashboard');
+    }
+  }, [isAuthenticated, status]);
 
   /* Check for access denied error */
   useEffect(() => {
+    debugLog('Auth error changed:', authError);
+    if (authError) {
+      debugBreakpoint(); // Breakpoint on auth error
+      debugLog('Auth error detected:', authError);
+    }
     if (authError && authError.includes("don't have any access to the app")) {
       setShowAccessDeniedModal(true);
     }
@@ -82,19 +98,27 @@ export default function LoginScreen() {
 
   /* Submit */
   const handleLogin = () => {
+    debugLog('Login attempt with:', { email, password });
+    debugBreakpoint(); // Breakpoint here for login flow
+    
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
 
     setEmailError(eErr);
     setPasswordError(pErr);
 
-    if (eErr || pErr) return;
+    if (eErr || pErr) {
+      debugLog('Validation errors:', { eErr, pErr });
+      return;
+    }
 
+    debugLog('Dispatching loginAndFetchUserDetails');
+    debugBreakpoint(); // Breakpoint before API call
     dispatch(loginAndFetchUserDetails({ email, password }));
   };
 
   /* Dynamic title top value based on notch presence */
-  const titleTop = insets.top > 0 ? 65 : 45;
+  const titleTop = insets.top > 0 ? 45 : 25; // Reduced values to move title up
 
   /* ---------------------------------------------------------------- */
   /*                             RENDER                               */
@@ -203,7 +227,7 @@ const styles = StyleSheet.create({
   },
   pattern: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: 1.2, // Changed from 1 to 1.5 to make it shorter
   },
   overlay: {
     flex: 1,
@@ -214,6 +238,9 @@ const styles = StyleSheet.create({
   },
   logo: {
     position: 'absolute',
+    width: 120, // Added explicit width
+    height: 120, // Added explicit height
+    resizeMode: 'contain',
   },
   title: {
     position: 'absolute',
@@ -228,14 +255,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 60,
-    padding: 25,
+    // alignItems: 'center',
+    marginTop: -40,
+    // gap: 10, // Increased gap from 10 to 15
+    // paddingTop: 20, // Reduced from 60 to 40
+    padding: 20,
+    justifyContent: 'center', // Added to center content vertically
   },
   inputContainer: {
     width: '100%',
-    gap: 10,
+    gap: 5, // Reduced gap for tighter spacing
+    marginBottom: 5, // Added margin bottom for better separation
   },
   inputText: {
     fontSize: 16,
@@ -255,6 +285,7 @@ const styles = StyleSheet.create({
   resetPassText: {
     fontSize: 12,
     fontFamily: 'JameelNooriNastaleeq',
-    lineHeight:30
+    lineHeight:30,
+    marginBottom: 30,
   },
 });

@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Start Expo Development Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/expo",
+      "args": ["start"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "EXPO_DEBUG": "true",
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Attach to React Native",
+      "type": "node",
+      "request": "attach",
+      "port": 8081,
+      "address": "localhost",
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": ".",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+} 

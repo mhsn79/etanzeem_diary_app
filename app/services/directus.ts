@@ -5,7 +5,7 @@ import { getTokens, saveTokens } from './secureStorage';
 import { Platform } from 'react-native';
 
 // Get the API base URL from environment variables
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
 
 // Create a custom storage implementation that gets tokens from SecureStore with Redux fallback
 class SecureAuthStorage implements AuthenticationStorage {

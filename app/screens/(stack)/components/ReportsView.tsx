@@ -48,6 +48,73 @@ interface ReportsViewProps {
   extraScrollContentStyle?: object;
 }
 
+// Helper function to determine if a management period is currently open
+const isManagementPeriodOpen = (management: any): boolean => {
+  if (!management || !management.reporting_start_date || !management.reporting_end_date) {
+    console.log('[ReportsView] Invalid management data:', management);
+    return false;
+  }
+  
+  const now = new Date();
+  const startDate = new Date(management.reporting_start_date);
+  const endDate = new Date(management.reporting_end_date);
+  
+  // Add extended days to end date if available
+  if (management.extended_days && management.extended_days > 0) {
+    endDate.setDate(endDate.getDate() + management.extended_days);
+  }
+  
+  // Normalize dates to start of day for comparison (remove time component)
+  const nowNormalized = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startDateNormalized = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const endDateNormalized = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  
+  const isOpen = nowNormalized >= startDateNormalized && nowNormalized <= endDateNormalized;
+  
+  console.log('[ReportsView] Management period check:', {
+    managementId: management.id,
+    now: now.toISOString(),
+    nowNormalized: nowNormalized.toISOString(),
+    startDate: startDate.toISOString(),
+    startDateNormalized: startDateNormalized.toISOString(),
+    endDate: endDate.toISOString(),
+    endDateNormalized: endDateNormalized.toISOString(),
+    extendedDays: management.extended_days || 0,
+    isOpen,
+    rawDates: {
+      reporting_start_date: management.reporting_start_date,
+      reporting_end_date: management.reporting_end_date
+    }
+  });
+  
+  return isOpen;
+};
+
+// Helper function to find the currently open management period
+const findCurrentlyOpenManagement = (managements: any[]): any => {
+  if (!managements || managements.length === 0) {
+    return null;
+  }
+  
+  // Sort managements by start date (newest first)
+  const sortedManagements = [...managements].sort((a, b) => {
+    const dateA = new Date(a.reporting_start_date).getTime();
+    const dateB = new Date(b.reporting_start_date).getTime();
+    return dateB - dateA;
+  });
+  
+  // Find the first management period that is currently open
+  return sortedManagements.find(management => isManagementPeriodOpen(management)) || null;
+};
+
+// Helper function to find existing draft submission for a management period
+const findDraftSubmissionForManagement = (submissions: any[], mgmtId: number): any => {
+  return submissions.find(submission => 
+    submission.mgmt_id === mgmtId && 
+    (submission.status === 'draft' || submission.status === 'pending')
+  );
+};
+
 const ReportsView: React.FC<ReportsViewProps> = ({
   showHeader = false,
   title = "رپورٹ مینجمنٹ",
@@ -92,7 +159,101 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // QA module state
   const qaState = useSelector(selectQAState);
   const overallProgress = useSelector(selectOverallProgress);
-  
+
+  // Find currently open management and existing draft submission
+  const currentlyOpenManagement = useMemo(() => {
+    console.log('[ReportsView] Raw reportMgmtDetails:', JSON.stringify(reportMgmtDetails, null, 2));
+    
+    if (reportMgmtDetails.length === 0) {
+      console.log('[ReportsView] No report management details available');
+      return null;
+    }
+    
+    const allManagements = reportMgmtDetails.flatMap(report => report.managements);
+    console.log('[ReportsView] All managements:', JSON.stringify(allManagements, null, 2));
+    
+    // Test date parsing for each management
+    allManagements.forEach((management, index) => {
+      console.log(`[ReportsView] Testing management ${index}:`, {
+        id: management.id,
+        startDate: management.reporting_start_date,
+        endDate: management.reporting_end_date,
+        parsedStartDate: new Date(management.reporting_start_date).toISOString(),
+        parsedEndDate: new Date(management.reporting_end_date).toISOString(),
+        isStartDateValid: !isNaN(new Date(management.reporting_start_date).getTime()),
+        isEndDateValid: !isNaN(new Date(management.reporting_end_date).getTime())
+      });
+    });
+    
+    const openManagement = findCurrentlyOpenManagement(allManagements);
+    
+    console.log('[ReportsView] Management periods analysis:', {
+      totalManagements: allManagements.length,
+      openManagement: openManagement ? {
+        id: openManagement.id,
+        month: openManagement.month,
+        year: openManagement.year,
+        startDate: openManagement.reporting_start_date,
+        endDate: openManagement.reporting_end_date
+      } : null,
+      allManagements: allManagements.map(m => ({
+        id: m.id,
+        month: m.month,
+        year: m.year,
+        startDate: m.reporting_start_date,
+        endDate: m.reporting_end_date
+      }))
+    });
+    
+    return openManagement;
+  }, [reportMgmtDetails]);
+
+  const existingDraftSubmission = useMemo(() => {
+    if (!currentlyOpenManagement) return null;
+    const draft = findDraftSubmissionForManagement(reportSubmissions, currentlyOpenManagement.id);
+    
+    console.log('[ReportsView] Draft submission analysis:', {
+      currentManagementId: currentlyOpenManagement.id,
+      totalSubmissions: reportSubmissions.length,
+      draftSubmission: draft ? {
+        id: draft.id,
+        status: draft.status,
+        mgmt_id: draft.mgmt_id,
+        unit_id: draft.unit_id
+      } : null,
+      allSubmissions: reportSubmissions.map(s => ({
+        id: s.id,
+        status: s.status,
+        mgmt_id: s.mgmt_id,
+        unit_id: s.unit_id
+      }))
+    });
+    
+    return draft;
+  }, [reportSubmissions, currentlyOpenManagement]);
+
+  // Determine if we should show the current report section
+  const shouldShowCurrentReport = useMemo(() => {
+    const shouldShow = currentlyOpenManagement && 
+           reportMgmtDetails.length > 0 && 
+           reportMgmtDetails[0]?.template;
+    
+    console.log('[ReportsView] Should show current report:', {
+      shouldShow,
+      hasCurrentlyOpenManagement: !!currentlyOpenManagement,
+      hasReportMgmtDetails: reportMgmtDetails.length > 0,
+      hasTemplate: !!reportMgmtDetails[0]?.template
+    });
+    
+    // TEMPORARY: Force show for debugging if we have any management data
+    // Also show if we're in loading state to prevent "no active report" message
+    const forceShow = reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template;
+    const showDuringLoading = loading && reportMgmtDetails.length > 0;
+    console.log('[ReportsView] Force show for debugging:', forceShow, 'Show during loading:', showDuringLoading);
+    
+    return forceShow || shouldShow || showDuringLoading;
+  }, [currentlyOpenManagement, reportMgmtDetails, loading]);
+
   // Memoized filtered submissions
   const filteredSubmissions = useMemo(() => {
     // First filter by status based on selected tab
@@ -136,10 +297,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     // Ensure we have a fresh token before navigation
     ensureFreshTokenBeforeOperation()
       .then(() => {
+        // Use the currently open management period
+        const currentMgmt = currentlyOpenManagement || reportMgmtDetails[0]?.managements[0];
+        
+        if (!currentMgmt) {
+          console.warn('No management period available for report creation');
+          router.push(ROUTES.ALL_REPORTS);
+          return;
+        }
+        
         // Check if there's already a published report for this management period
-        const latestManagement = reportMgmtDetails[0]?.managements[0];
-        const hasPublishedReport = latestManagement && reportSubmissions.some(
-          submission => submission.mgmt_id === latestManagement.id && submission.status === 'published'
+        const hasPublishedReport = reportSubmissions.some(
+          submission => submission.mgmt_id === currentMgmt.id && submission.status === 'published'
         );
         
         if (hasPublishedReport) {
@@ -148,12 +317,36 @@ const ReportsView: React.FC<ReportsViewProps> = ({
           return;
         }
         
-        // If we have report management details with a template, pass the template ID
-        if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
-          console.log('Navigating to create report with template ID:', reportMgmtDetails[0].template.id);
+        // Check if there's already a draft submission for this management period
+        const existingDraft = existingDraftSubmission;
+        
+        if (existingDraft) {
+          // If there's already a draft, navigate to edit it
+          console.log('Navigating to edit existing draft submission:', existingDraft.id);
           router.push({
             pathname: ROUTES.CREATE_REPORT,
-            params: { templateId: reportMgmtDetails[0].template.id.toString() }
+            params: {
+              submissionId: existingDraft.id.toString(),
+              templateId: existingDraft.template_id.toString(),
+              managementId: existingDraft.mgmt_id.toString(),
+              unitId: existingDraft.unit_id.toString(),
+              status: existingDraft.status,
+              mode: 'edit'
+            }
+          });
+          return;
+        }
+        
+        // If we have report management details with a template, create a new submission
+        if (reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template?.id) {
+          console.log('Navigating to create new report with template ID:', reportMgmtDetails[0].template.id);
+          router.push({
+            pathname: ROUTES.CREATE_REPORT,
+            params: { 
+              templateId: reportMgmtDetails[0].template.id.toString(),
+              managementId: currentMgmt.id.toString(),
+              unitId: userUnitDetails?.id?.toString() || ''
+            }
           });
         } else {
           // If no template is available, just navigate without params
@@ -164,15 +357,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       .catch(error => {
         console.error('Error refreshing token before navigation:', error);
       });
-  }, [router, reportMgmtDetails, reportSubmissions, ensureFreshTokenBeforeOperation]);
+  }, [router, reportMgmtDetails, reportSubmissions, currentlyOpenManagement, existingDraftSubmission, userUnitDetails, ensureFreshTokenBeforeOperation]);
 
   // Combined function to fetch all necessary data with token refresh
   const fetchAllData = useCallback(async (forceQARefresh = false) => {
-    console.log('Refreshing data...6666666666',userUnitDetails);
+    console.log('[ReportsView] Refreshing data...', {
+      userUnitDetails: userUnitDetails ? {
+        id: userUnitDetails.id,
+        Name: userUnitDetails.Name,
+        Level_id: userUnitDetails.Level_id
+      } : null
+    });
     
     try {
       if (!userUnitDetails) {
-        console.error('User unit details not available');
+        console.error('[ReportsView] User unit details not available');
         return;
       }
       
@@ -180,23 +379,27 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       await ensureFreshTokenBeforeOperation();
       
       // Step 1: Fetch reports data
-      console.log('Fetching reports data...');
-      await dispatch(fetchReportsByUnitId(userUnitDetails.id));
-      await dispatch(fetchReportSubmissions());
-      console.log('Reports data fetched successfully');
+      console.log('[ReportsView] Fetching reports data...');
+      const reportsResult = await dispatch(fetchReportsByUnitId(userUnitDetails.id));
+      const submissionsResult = await dispatch(fetchReportSubmissions());
+      console.log('[ReportsView] Reports data fetched successfully:', {
+        reportsResult: reportsResult.payload,
+        submissionsResult: submissionsResult.payload
+      });
       
       // Step 2: Check if we need to initialize QA data
-      // Use the current reportMgmtDetails from props
-      const latestReportMgmt = reportMgmtDetails?.[0] || null;
-      console.log('Report management details:', latestReportMgmt,);
+      // Use the currently open management period
+      const currentReportMgmt = reportMgmtDetails?.[0] || null;
+      const currentManagement = currentlyOpenManagement || currentReportMgmt?.managements?.[0];
+      console.log('Report management details:', currentReportMgmt, 'Current management:', currentManagement);
       
-      if (!latestReportMgmt || !latestReportMgmt.template?.id || !latestReportMgmt.managements?.[0]) {
+      if (!currentReportMgmt || !currentReportMgmt.template?.id || !currentManagement) {
         console.log('No report management details available for QA initialization');
         return;
       }
       
-      const templateId = latestReportMgmt.template.id;
-      const latestManagement = latestReportMgmt.managements[0];
+      const templateId = currentReportMgmt.template.id;
+      const managementId = currentManagement.id;
       
       // Only initialize QA data if:
       // 1. We're forcing a refresh, OR
@@ -206,7 +409,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         forceQARefresh || 
         !qaInitializedRef.current || 
         lastTemplateIdRef.current !== templateId ||
-        lastMgmtIdRef.current !== latestManagement.id
+        lastMgmtIdRef.current !== managementId
       ) {
         console.log('Initializing QA data for template:', templateId);
         
@@ -214,13 +417,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
           await dispatch(initializeReportData({
             template_id: templateId,
             unit_id: userUnitDetails.id,
-            mgmt_id: latestManagement.id
+            mgmt_id: managementId
           }));
           
           // Update our refs to track that we've initialized QA data
           qaInitializedRef.current = true;
           lastTemplateIdRef.current = templateId;
-          lastMgmtIdRef.current = latestManagement.id;
+          lastMgmtIdRef.current = managementId;
           
           console.log('QA data initialized successfully');
         } catch (qaError) {
@@ -233,7 +436,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation, currentlyOpenManagement]);
 
   // Ensure we have a fresh token when the component mounts
   useEffect(() => {
@@ -388,12 +591,32 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     );
   }
 
-  const latestManagement = reportMgmtDetails[0]?.managements[0];
+  // Use the currently open management instead of just the first one
+  // If no currently open management, fall back to the most recent one
+  const currentManagement = currentlyOpenManagement || reportMgmtDetails[0]?.managements[0];
+  
+  console.log('[ReportsView] Current management selection:', {
+    currentlyOpenManagement: currentlyOpenManagement ? {
+      id: currentlyOpenManagement.id,
+      month: currentlyOpenManagement.month,
+      year: currentlyOpenManagement.year
+    } : null,
+    fallbackManagement: reportMgmtDetails[0]?.managements[0] ? {
+      id: reportMgmtDetails[0].managements[0].id,
+      month: reportMgmtDetails[0].managements[0].month,
+      year: reportMgmtDetails[0].managements[0].year
+    } : null,
+    selectedManagement: currentManagement ? {
+      id: currentManagement.id,
+      month: currentManagement.month,
+      year: currentManagement.year
+    } : null
+  });
   // Use the actual overall progress from QA module instead of mock data
   const completionPercentage = overallProgress || 0;
-  const daysRemaining = latestManagement
+  const daysRemaining = currentManagement
     ? Math.ceil(
-        (new Date(latestManagement.reporting_end_date).getTime() - new Date().getTime()) /
+        (new Date(currentManagement.reporting_end_date).getTime() - new Date().getTime()) /
           (1000 * 60 * 60 * 24)
       )
     : 0;
@@ -411,21 +634,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         <View style={styles.content}>
           <UrduText style={styles.subTitle}>موجودہ رپورٹ</UrduText>
           <TouchableOpacity
-            style={styles.reportSummaryContainer}
+            style={[
+              styles.reportSummaryContainer,
+              existingDraftSubmission && styles.activeReportContainer
+            ]}
             onPress={handleCreateReport}
             activeOpacity={0.8}
           >
-            {latestManagement && reportMgmtDetails[0]?.template && 
-              // Check if there's no published report for this management period
-              !reportSubmissions.some(submission => 
-                submission.mgmt_id === latestManagement.id && 
-                submission.status === 'published'
-              ) ? (
+            {shouldShowCurrentReport ? (
               <>
                 <UrduText style={styles.reportSummaryItemTitle}>
                   {`${reportMgmtDetails[0].template.report_name}۔ ماہ ${getUrduMonth(
-                    latestManagement.month
-                  )} ${latestManagement.year}ء`}
+                    (currentlyOpenManagement || reportMgmtDetails[0]?.managements[0])?.month
+                  )} ${(currentlyOpenManagement || reportMgmtDetails[0]?.managements[0])?.year}ء`}
                 </UrduText>
                 <View style={styles.reportSummaryItemValueContainer}>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -437,7 +658,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
                     <UrduText style={styles.reportSummaryItemValue}>
-                      {formatExpectedCompletion(latestManagement.reporting_end_date)}
+                      {formatExpectedCompletion((currentlyOpenManagement || reportMgmtDetails[0]?.managements[0])?.reporting_end_date)}
                     </UrduText>
                   </View>
                 </View>
@@ -445,7 +666,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                   <View style={styles.reportSummaryItemValueContainerItem}>
                     <UrduText style={styles.reportSummaryItemValue}>اسٹیٹس</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>
+                      {existingDraftSubmission ? 'زیرِ تکمیل' : 'نئی رپورٹ'}
+                    </UrduText>
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
                     <UrduText
@@ -458,6 +681,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                         ? `${daysRemaining} دن باقی ہیں`
                         : `${Math.abs(daysRemaining)} دن گزر چکے ہیں`}
                     </UrduText>
+                  </View>
+                </View>
+                <View style={styles.reportSummaryItemValueContainer}>
+                  <View style={styles.reportSummaryItemValueContainerItem}>
+                    <UrduText style={styles.reportSummaryItemValue}>پروگریس</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
                   </View>
                 </View>
                 <View style={styles.progressContainer}>
@@ -473,7 +703,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                   style={styles.noReportImage}
                   resizeMode="contain"
                 />
-                <UrduText style={styles.noReportText}>اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔</UrduText>
+                <UrduText style={styles.noReportText}>
+                  {loading ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔'}
+                </UrduText>
               </View>
             )}
           </TouchableOpacity>
@@ -758,6 +990,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     overflow: 'hidden',
+  },
+  activeReportContainer: {
+    borderWidth: 2,
+    borderColor: COLORS.tertiary,
+    backgroundColor: COLORS.lightGray,
   },
 });
 

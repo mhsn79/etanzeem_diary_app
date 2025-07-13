@@ -62,7 +62,7 @@
         "projectId": "c94ec490-9e85-465c-bc59-cc7825b5312a",
         "owner": "jiislamabad"
       },
-      "EXPO_PUBLIC_API_BASE_URL": "http://139.59.232.231:8055"
+      "EXPO_PUBLIC_API_BASE_URL": "https://admin.jiislamabad.org"
     },
     "assets": [
       "./assets/images/splash-icon.png"

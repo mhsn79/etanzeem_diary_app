@@ -173,7 +173,7 @@ export const fetchPersonByEmail = createAsyncThunk<
     console.log(`[Persons] Fetching person by email: ${normalizedEmail} (${Platform.OS})`);
     
     // Construct the URL with proper encoding and use a more robust approach
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://139.59.232.231:8055';
+    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
     const endpoint = '/items/Person';
     const filter = encodeURIComponent(`{"Email":{"_eq":"${normalizedEmail}"}}`);
     const fields = encodeURIComponent('*');
