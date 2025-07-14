@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, TextProps, StyleSheet } from 'react-native';
 import { useLanguage } from '../context/LanguageContext';
+import { TYPOGRAPHY } from '../constants/theme';
 
 interface UrduTextProps extends TextProps {
   children: React.ReactNode;
@@ -33,12 +34,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   urduText: {
-    fontFamily: 'JameelNooriNastaleeq',
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
     writingDirection: 'rtl',
     textAlign: 'right',
   },
   kasheedaText: {
-    fontFamily: 'noori-kasheed',
+    fontFamily: TYPOGRAPHY.fontFamily.kasheeda,
   }
 });
 

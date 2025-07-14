@@ -7,6 +7,7 @@ import { COLORS } from '@/app/constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   fetchPersonsByUnit, 
+  fetchPersonsByUnitId,
   selectAllPersons, 
   selectPersonsStatus, 
   selectPersonsError,
@@ -17,6 +18,11 @@ import {
 } from '@/app/features/persons/personSlice';
 import { Person } from '@/app/models/Person';
 import { AppDispatch } from '@/app/store';
+import { 
+  selectDashboardSelectedUnit,
+  selectDashboardSelectedUnitId,
+  selectUserUnitDetails
+} from '@/app/features/tanzeem/tanzeemSlice';
 import RukunCard from '@/app/components/RukunCard';
 import CustomButton from '@/app/components/CustomButton';
 import CustomTextInput from '@/app/components/CustomTextInput';
@@ -39,55 +45,81 @@ export default function Arkan() {
   const contactTypes = useSelector(selectContactTypes);
   const contactTypesStatus = useSelector(selectContactTypesStatus);
   const contactTypesError = useSelector(selectContactTypesError);
+  
+  // Get selected unit for dashboard
+  const selectedUnit = useSelector(selectDashboardSelectedUnit);
+  const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
+  const userUnit = useSelector(selectUserUnitDetails);
+  
+  // Use selected unit if available, otherwise fall back to user unit
+  const displayUnit = selectedUnit || userUnit;
+  const displayUnitId = selectedUnitId || userUnit?.id;
+  
+  // Debug log for unit selection
+  console.log('Arkan: Display unit:', {
+    selectedUnitId,
+    userUnitId: userUnit?.id,
+    displayUnitId,
+    displayUnitName: displayUnit?.Name
+  });
 
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTab, setSelectedTab] = useState(0);
+  const [selectedTab, setSelectedTab] = useState<number>(0);
 
   // Define tabs with badges in custom order
   const tabs = useMemo(() => {
-    const allCount = persons.length;
     const typeCounts = (contactTypes || []).reduce((acc, type) => {
       acc[type.id] = persons.filter(person => person.contact_type === type.id).length;
       return acc;
     }, {} as Record<number, number>);
 
-    // Define the desired order of contact types
-    const desiredOrder = ['umeedwar', 'rukun', 'karkun', 'others'];
+    // Define the desired order of contact types (rightmost to leftmost)
+    const desiredOrder = ['rukun', 'umeedwar', 'karkun', 'others'];
     
     // Create ordered contact types array
     const orderedContactTypes = desiredOrder
       .map(typeString => contactTypes?.find(type => type.type === typeString))
       .filter((type): type is NonNullable<typeof type> => Boolean(type)); // Remove undefined values with type guard
 
-    return [
-      { label: i18n.t('all'), value: 0, badge: allCount.toString() },
-      ...orderedContactTypes.map(type => ({
-        label: i18n.t(type.type) || type.type,
-        value: type.id,
-        badge: typeCounts[type.id]?.toString() || '0'
-      }))
-    ];
-  }, [persons, contactTypes, i18n]);
+    const tabs = orderedContactTypes.map(type => ({
+      label: i18n.t(type.type) || type.type,
+      value: type.id,
+      badge: typeCounts[type.id]?.toString() || '0'
+    }));
+
+    // Set initial tab to first available tab if current selection is invalid
+    if (tabs.length > 0 && (selectedTab === 0 || !tabs.find(tab => tab.value === selectedTab))) {
+      setSelectedTab(tabs[0].value);
+    }
+
+    return tabs;
+  }, [persons, contactTypes, i18n, selectedTab]);
 
   // Fetch persons and contact types on component mount
   useEffect(() => {
-    if (status === 'idle') {
-      dispatch(fetchPersonsByUnit());
-    }
     if (contactTypesStatus === 'idle') {
       dispatch(fetchContactTypes());
     }
-  }, [dispatch, status, contactTypesStatus]);
+  }, [dispatch, contactTypesStatus]);
+
+  // Fetch persons based on selected unit
+  useEffect(() => {
+    if (displayUnitId && typeof displayUnitId === 'number') {
+      console.log('Arkan: Fetching persons for unit ID:', displayUnitId);
+      dispatch(fetchPersonsByUnitId(displayUnitId));
+    }
+  }, [displayUnitId, dispatch]);
 
   // Filter persons based on search query and selected tab
   const filteredPersons = useMemo(() => {
     // First, filter by tab selection
     let tabFilteredPersons = persons;
     
-    if (selectedTab !== 0) {
+    // If a specific tab is selected, filter by that contact type
+    if (selectedTab !== 0 && tabs.find(tab => tab.value === selectedTab)) {
       tabFilteredPersons = persons.filter(person => person.contact_type === selectedTab);
     }
     
@@ -101,7 +133,7 @@ export default function Arkan() {
       const phoneMatch = person.Phone_Number?.includes(query);
       return nameMatch || addressMatch || phoneMatch;
     });
-  }, [persons, searchQuery, selectedTab]);
+  }, [persons, searchQuery, selectedTab, tabs]);
 
   // Update filtered data
   useEffect(() => {
@@ -117,16 +149,19 @@ export default function Arkan() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        dispatch(fetchPersonsByUnit()).unwrap(),
-        dispatch(fetchContactTypes()).unwrap()
-      ]);
+      const promises: Promise<any>[] = [dispatch(fetchContactTypes()).unwrap()];
+      
+      if (displayUnitId && typeof displayUnitId === 'number') {
+        promises.push(dispatch(fetchPersonsByUnitId(displayUnitId)).unwrap());
+      }
+      
+      await Promise.all(promises);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, displayUnitId]);
 
   // Handle adding a new person
   const handleAddNewRukun = useCallback(() => {
@@ -191,7 +226,9 @@ export default function Arkan() {
           <CustomButton
             text={i18n.t('try_again')}
             onPress={() => {
-              dispatch(fetchPersonsByUnit());
+              if (displayUnitId && typeof displayUnitId === 'number') {
+                dispatch(fetchPersonsByUnitId(displayUnitId));
+              }
               dispatch(fetchContactTypes());
             }}
             style={styles.retryButton}

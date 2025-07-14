@@ -94,7 +94,64 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
 // We no longer need the executeWithTokenRefresh function here
 // Token refresh is now handled centrally by the auth middleware and apiClient
 
-// Fetch persons by Tanzeemi Unit IDs
+// Fetch persons by specific Tanzeemi Unit ID
+export const fetchPersonsByUnitId = createAsyncThunk<
+  Person[],
+  number,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchByUnitId', async (unitId, { getState, dispatch, rejectWithValue }) => {
+  try {
+    // Check if user is authenticated before making API call
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      console.log(`[Persons] User not authenticated, skipping fetch persons by unit ID (${Platform.OS})`);
+      return rejectWithValue('User not authenticated');
+    }
+    
+    if (!unitId) {
+      console.log('No Tanzeemi Unit ID provided');
+      return [];
+    }
+
+    // Create a more explicit URLSearchParams object to ensure consistent behavior across platforms
+    const params = new URLSearchParams();
+    params.append('filter[Tanzeemi_Unit][_eq]', unitId.toString());
+    params.append('sort', 'id');
+    params.append('fields', '*');
+    
+    console.log(`[Persons] Fetching persons by unit ID (${Platform.OS}), Unit ID:`, unitId);
+
+    // Construct the URL with proper encoding
+    const url = `/items/Person`;
+    const queryString = params.toString();
+    
+    console.log(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
+    
+    // Use directApiRequest which uses fetch directly for more reliable results
+    const response = await directApiRequest<PersonResponse>(
+      `${url}?${queryString}`,
+      'GET'
+    );
+    
+    if (!response.data) throw new Error('Failed to fetch persons');
+    const transformedData = normalizePersonDataArray(response.data);
+
+    // Fetch unit details for each person
+    transformedData.forEach(person => {
+      const personUnitId = person.Tanzeemi_Unit || person.unit;
+      if (typeof personUnitId === 'number') {
+        dispatch(fetchUserTanzeemiUnit(personUnitId));
+      }
+    });
+
+    return transformedData;
+  } catch (error: any) {
+    console.error(`[Persons] Fetch persons by unit ID error: ${error.message} (${Platform.OS})`);
+    return rejectWithValue(error.message || 'Failed to fetch persons');
+  }
+});
+
+// Fetch persons by Tanzeemi Unit IDs (for backward compatibility)
 export const fetchPersonsByUnit = createAsyncThunk<
   Person[],
   void,
@@ -153,138 +210,8 @@ export const fetchPersonsByUnit = createAsyncThunk<
   }
 });
 
-// Fetch person by email
-export const fetchPersonByEmail = createAsyncThunk<
-  Person | null,
-  string,
-  { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('persons/fetchByEmail', async (email, { getState, dispatch, rejectWithValue }) => {
-  try {
-    // Check if user is authenticated before making API call
-    const authState = getState().auth;
-    if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping fetch person by email (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
-    }
-    
-    // Normalize the email to lowercase to ensure consistent handling across platforms
-    const normalizedEmail = email.trim().toLowerCase();
-    
-    console.log(`[Persons] Fetching person by email: ${normalizedEmail} (${Platform.OS})`);
-    
-    // Construct the URL with proper encoding and use a more robust approach
-    const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
-    const endpoint = '/items/Person';
-    const filter = encodeURIComponent(`{"Email":{"_eq":"${normalizedEmail}"}}`);
-    const fields = encodeURIComponent('*');
-    const fullUrl = `${baseUrl}${endpoint}?filter=${filter}&fields=${fields}`;
-    
-    console.log(`[Persons] Making request to: ${fullUrl} (${Platform.OS})`);
-    
-    try {
-      // First try with directApiRequest which uses fetch directly
-      const response = await directApiRequest<PersonResponse>(
-        `${endpoint}?filter=${filter}&fields=${fields}`,
-        'GET'
-      );
-      
-      // console.log(`[Persons] Fetching person response by email (${Platform.OS})`, response);
-
-      if (!response.data || response.data.length === 0) {
-        console.log(`[Persons] No person found with email ${normalizedEmail} (${Platform.OS})`);
-        return null;
-      }
-      
-      // Normalize the person data to ensure consistent field names
-      const person = normalizePersonData(response.data[0]);
-      
-      // If we have a person with a Tanzeemi Unit, fetch the unit details
-      if (person && (person.Tanzeemi_Unit || person.unit)) {
-        const unitId = person.Tanzeemi_Unit || person.unit;
-        if (typeof unitId === 'number') {
-          try {
-            // Fetch unit details but don't block the person data return
-            dispatch(fetchUserTanzeemiUnit(unitId));
-          } catch (unitError) {
-            console.error(`[Persons] Error fetching Tanzeemi Unit: ${unitError} (${Platform.OS})`);
-            // Continue even if unit fetch fails
-          }
-        }
-      }
-      
-      // Set userDetails in the state
-      if (person) {
-        dispatch(setUserDetails(person));
-      }
-      
-      return person;
-    } catch (apiError: any) {
-      console.warn(`[Persons] First attempt failed: ${apiError.message} (${Platform.OS})`);
-      
-      // If the first attempt fails, try a fallback approach with apiRequest
-      try {
-        console.log(`[Persons] Trying fallback approach... (${Platform.OS})`);
-        
-        const params = new URLSearchParams();
-        params.append('filter[Email][_eq]', normalizedEmail);
-        params.append('fields', '*');
-        
-        const response = await apiRequest<PersonResponse>(() => ({
-          path: `/items/Person?${params.toString()}`,
-          method: 'GET'
-        }));
-        
-        console.log(`[Persons] Fallback response: (${Platform.OS})`, response);
-        
-        if (!response.data || response.data.length === 0) {
-          console.log(`[Persons] No person found with email ${normalizedEmail} in fallback (${Platform.OS})`);
-          return null;
-        }
-        
-        // Normalize the person data to ensure consistent field names
-        const person = normalizePersonData(response.data[0]);
-        
-        // If we have a person with a Tanzeemi Unit, fetch the unit details
-        if (person && (person.Tanzeemi_Unit || person.unit)) {
-          const unitId = person.Tanzeemi_Unit || person.unit;
-          if (typeof unitId === 'number') {
-            dispatch(fetchUserTanzeemiUnit(unitId));
-          }
-        }
-        
-        // Set userDetails in the state
-        if (person) {
-          dispatch(setUserDetails(person));
-        }
-        
-        return person;
-      } catch (fallbackError: any) {
-        console.error(`[Persons] Fallback attempt also failed: ${fallbackError.message} (${Platform.OS})`);
-        
-        // Handle specific API errors
-        if (fallbackError.message?.includes('401') || fallbackError.message?.includes('Unauthorized')) {
-          throw new Error('Authentication error. Please log in again.');
-        }
-        if (fallbackError.message?.includes('403') || fallbackError.message?.includes('Forbidden')) {
-          throw new Error('You do not have permission to access this data.');
-        }
-        if (fallbackError.message?.includes('404') || fallbackError.message?.includes('Not Found')) {
-          console.log(`[Persons] Person with email ${normalizedEmail} not found (${Platform.OS})`);
-          return null;
-        }
-        if (fallbackError.message?.includes('500')) {
-          throw new Error('Server error. Please try again later.');
-        }
-        
-        // Rethrow other errors
-        throw fallbackError;
-      }
-    }
-  } catch (error: any) {
-    console.error(`[Persons] Fetch person by email error: ${error.message} (${Platform.OS})`);
-    return rejectWithValue(error.message || `Failed to fetch person with email ${email}`);
-  }
-});
+// Person data is fetched via Nazim_id from Tanzeemi_Unit in the login process
+// No need to fetch person by email since we follow the correct flow: user_id -> Tanzeemi_Unit -> Nazim_id -> Person
 
 // Create person
 export const createPerson = createAsyncThunk<
@@ -1251,9 +1178,30 @@ const personsSlice = createSlice({
       state.userDetailsStatus = 'idle';
       state.userDetailsError = null;
     },
+    // Add an action to set nazim details directly
+    setNazimDetails(state, action: PayloadAction<Person>) {
+      state.nazimDetails = action.payload;
+      state.nazimDetailsStatus = 'succeeded';
+      state.nazimDetailsError = null;
+      // Also add to the entities collection
+      personsAdapter.upsertOne(state, action.payload);
+    },
   },
   extraReducers: builder => {
     builder
+      // Fetch persons by unit ID
+      .addCase(fetchPersonsByUnitId.pending, state => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(fetchPersonsByUnitId.fulfilled, (state, action: PayloadAction<Person[]>) => {
+        state.status = 'succeeded';
+        personsAdapter.setAll(state, action.payload);
+      })
+      .addCase(fetchPersonsByUnitId.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload ?? 'Failed to fetch persons';
+      })
       // Fetch persons by unit
       .addCase(fetchPersonsByUnit.pending, state => {
         state.status = 'loading';
@@ -1267,28 +1215,8 @@ const personsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload ?? 'Failed to fetch persons';
       })
-      // Fetch person by email
-      .addCase(fetchPersonByEmail.pending, state => {
-        state.userDetailsStatus = 'loading';
-        state.userDetailsError = null;
-      })
-      .addCase(fetchPersonByEmail.fulfilled, (state, action: PayloadAction<Person | null>) => {
-        if (action.payload) {
-          state.userDetailsStatus = 'succeeded';
-          state.userDetails = action.payload;
-          personsAdapter.upsertOne(state, action.payload);
-        } else {
-          // If no person was found, set error state
-          state.userDetailsStatus = 'failed';
-          state.userDetailsError = 'User details not found';
-          state.userDetails = null;
-        }
-      })
-      .addCase(fetchPersonByEmail.rejected, (state, action) => {
-        state.userDetailsStatus = 'failed';
-        state.userDetailsError = action.payload ?? 'Failed to fetch person by email';
-        state.userDetails = null;
-      })
+      // Person data is fetched via Nazim_id from Tanzeemi_Unit in the login process
+      // No need for fetchPersonByEmail reducers since we follow the correct flow
       // Create person
       .addCase(createPerson.pending, state => {
         state.createStatus = 'loading';
@@ -1336,6 +1264,7 @@ const personsSlice = createSlice({
       .addCase(fetchNazimDetails.fulfilled, (state, action: PayloadAction<Person>) => {
         state.nazimDetailsStatus = 'succeeded';
         state.nazimDetails = action.payload;
+        state.userDetails = action.payload; // Also set userDetails since this is the person data
         personsAdapter.upsertOne(state, action.payload);
       })
       .addCase(fetchNazimDetails.rejected, (state, action) => {
@@ -1496,7 +1425,8 @@ export const {
   resetTransferStatus,
   resetRukunUpdateStatus,
   setUserDetails,
-  clearUserDetails
+  clearUserDetails,
+  setNazimDetails
 } = personsSlice.actions;
 
 // Selectors

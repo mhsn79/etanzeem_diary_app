@@ -3,13 +3,15 @@ import { RootState } from '../../store';
 import directus from '../../services/directus';
 import { clearActivities } from '../activities/activitySlice';
 import { AppDispatch } from '../../store';
-import { fetchPersonByEmail } from '../persons/personSlice';
+import { setUserDetails, setNazimDetails } from '../persons/personSlice';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { persistor } from '../../store';
 import { RESET_STATE } from '../../store/reducers';
 import { saveTokens, clearTokens } from '../../services/secureStorage';
 import { directApiRequest } from '../../services/apiClient';
+import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
+import { fetchNazimDetails } from '../persons/personSlice';
 
 // Helper function for making API requests during login when tokens are available but not in Redux store
 const loginApiRequest = async <T>(
@@ -257,7 +259,6 @@ export interface LoginCredentials {
 export interface AuthResponse {
   tokens: AuthTokens;
   user: User;
-  personData?: any; // Person data fetched by Nazim_id in login thunk
 }
 
 // Login thunk
@@ -445,39 +446,48 @@ export const login = createAsyncThunk<
 
       // Now fetch Tanzeemi_Unit using the user ID
       try {
+        console.log('[DEBUG] 🔍 Starting Tanzeemi_Unit fetch for user ID:', userId);
         const tanzeemiData = await loginApiRequest<{ data: any[] }>(
           `/items/Tanzeemi_Unit?filter[user_id][_eq]=${userId}&fields=*`,
           'GET',
           authResponse.access_token
         );
         
-        console.log('[DEBUG] Tanzeemi_Unit data:', tanzeemiData);
+        console.log('[DEBUG] ✅ Tanzeemi_Unit data:', tanzeemiData);
         
         if (tanzeemiData.data && tanzeemiData.data.length > 0) {
           const tanzeemiUnit = tanzeemiData.data[0];
           const nazimId = tanzeemiUnit.Nazim_id;
           
+          // Note: The person slice will handle fetching the tanzeemi unit when it fetches person data
+          console.log('[DEBUG] Found tanzeemi unit ID:', tanzeemiUnit.id);
+          
+          // Store Tanzeemi_Unit in tanzeem slice
+          console.log('[DEBUG] 🏪 Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
+          dispatch(setUserUnitDetails(tanzeemiUnit));
+          
           if (nazimId) {
-            console.log('[DEBUG] Found Nazim_id:', nazimId);
-            
-            // Fetch Person record using Nazim_id
+            console.log('[DEBUG] 🔍 Found Nazim_id:', nazimId);
+            // Fetch Person record using Nazim_id and store as user details
+            console.log('[DEBUG] 🏪 Fetching Nazim details for Nazim_id:', nazimId);
             try {
-              const personData = await loginApiRequest<{ data: any }>(
+              const nazimResponse = await loginApiRequest<{ data: any }>(
                 `/items/Person/${nazimId}?fields=*`,
                 'GET',
                 authResponse.access_token
               );
               
-              console.log('[DEBUG] Person data found:', personData);
-              
-              // Store the person data in the auth state for later use
-              // This is the correct person data fetched by Nazim_id
-              authResult.personData = personData.data;
-            } catch (personError: any) {
-              console.log('[DEBUG] No Person record found for Nazim_id:', nazimId, personError.message);
+              if (nazimResponse.data) {
+                console.log('[DEBUG] ✅ Nazim details fetched successfully:', nazimResponse.data);
+                // Set user details in person slice (this is the logged-in user's details)
+                dispatch(setUserDetails(nazimResponse.data));
+                // Also set as nazim details for consistency
+                dispatch(setNazimDetails(nazimResponse.data));
+              }
+            } catch (nazimError: any) {
+              console.log('[DEBUG] ❌ Failed to fetch Nazim details:', nazimError.message);
+              // Continue with login even if Nazim details can't be fetched
             }
-          } else {
-            console.log('[DEBUG] No Nazim_id found in Tanzeemi_Unit');
           }
         } else {
           console.log('[DEBUG] No Tanzeemi_Unit found for user:', userId);
@@ -977,13 +987,59 @@ export const initializeAuth = createAsyncThunk<
   boolean,
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('auth/initialize', async (_, { dispatch, rejectWithValue }) => {
+>('auth/initialize', async (_, { dispatch, getState, rejectWithValue }) => {
   try {
+    console.log('[DEBUG] 🔄 Starting auth initialization...');
+    
     // First check if we need to refresh the token
     await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
     
     // Then fetch the latest user data
-    await dispatch(fetchUserMe()).unwrap();
+    const userDetails = await dispatch(fetchUserMe()).unwrap();
+    
+    // Now fetch Tanzeemi_Unit and Person data using the user ID
+    const state = getState();
+    const userId = state.auth.user?.id;
+    
+    if (userId) {
+      console.log('[DEBUG] 🔍 Fetching Tanzeemi_Unit for user ID:', userId);
+      
+      try {
+        const accessToken = state.auth.tokens?.accessToken;
+        if (!accessToken) {
+          console.log('[DEBUG] ❌ No access token available for Tanzeemi_Unit fetch');
+          return true; // Continue without Tanzeemi_Unit data
+        }
+        
+        const tanzeemiData = await directApiRequest<{ data: any[] }>(
+          `/items/Tanzeemi_Unit?filter[user_id][_eq]=${userId}&fields=*`,
+          'GET'
+        );
+        
+        console.log('[DEBUG] ✅ Tanzeemi_Unit data:', tanzeemiData);
+        
+        if (tanzeemiData.data && tanzeemiData.data.length > 0) {
+          const tanzeemiUnit = tanzeemiData.data[0];
+          const nazimId = tanzeemiUnit.Nazim_id;
+          
+          console.log('[DEBUG] 🏪 Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
+          dispatch(setUserUnitDetails(tanzeemiUnit));
+          
+          if (nazimId) {
+            console.log('[DEBUG] 🔍 Found Nazim_id:', nazimId);
+            console.log('[DEBUG] 🏪 Dispatching fetchNazimDetails for Nazim_id:', nazimId);
+            await dispatch(fetchNazimDetails(nazimId));
+          }
+        } else {
+          console.log('[DEBUG] No Tanzeemi_Unit found for user:', userId);
+        }
+      } catch (tanzeemiError: any) {
+        console.log('[DEBUG] Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
+        // Continue without Tanzeemi_Unit data
+      }
+    } else {
+      console.log('[DEBUG] ❌ No user ID available for Tanzeemi_Unit fetch');
+    }
     
     return true;
   } catch (error: any) {
@@ -1029,7 +1085,7 @@ export const fetchUserMe = createAsyncThunk<
       '/users/me?fields=*,role.*,avatar.*',
       'GET'
     );
-    console.log('Fetched detailed user data:', userData.data);
+    // console.log('Fetched detailed user data:', userData.data);
     return userData.data as ExtendedUser;
   } catch (error: any) {
     console.error('Fetch user me error:', error);
@@ -1040,7 +1096,6 @@ export const fetchUserMe = createAsyncThunk<
 // Add this interface to store the complete login result
 export interface CompleteLoginResult {
   auth: AuthResponse;
-  personData?: any; // Person data fetched by Nazim_id in login thunk
   extendedUserDetails: ExtendedUser;
 }
 
@@ -1061,28 +1116,15 @@ export const loginAndFetchUserDetails = createAsyncThunk<
     // 4. Get Person by Nazim_id
     const authResult = await dispatch(login(credentials)).unwrap();
     
-    // The login thunk already fetches the person data by Nazim_id
+    // The login thunk already fetches the person data by Nazim_id and stores it in the person slice
     // We just need to get the latest user data from Directus for extended details
     const extendedUserDetails = await dispatch(fetchUserMe()).unwrap();
     
-    // The login thunk already fetched person data by Nazim_id (the correct way)
-    // Use the personData that was already fetched in the login process
-    let userDetails = authResult.personData || null;
-    
-    // If we don't have person data from the login process, try fallback
-    if (!userDetails) {
-      try {
-        userDetails = await dispatch(fetchPersonByEmail(credentials.email)).unwrap();
-        console.log('[DEBUG] Using fallback fetchPersonByEmail since no person data from login');
-      } catch (error) {
-        console.log('[DEBUG] Fallback fetchPersonByEmail failed, but login already fetched person data by Nazim_id');
-        // The login thunk already fetched person data by Nazim_id, so we can continue
-      }
-    }
+    // The login thunk already dispatched fetchNazimDetails, so the person data is in the person slice
+    // No need to return personData since it's already stored in the Redux state
     
     return { 
       auth: authResult,
-      userDetails,
       extendedUserDetails
     };
   } catch (error: any) {

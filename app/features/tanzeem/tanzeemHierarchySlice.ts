@@ -242,148 +242,9 @@ const fetchAndProcessSubordinateHierarchy = async (
  * Thunk to fetch the complete Tanzeemi hierarchy
  * ────────────────────────────────────────────────────────────────────────────────
  */
-export const fetchCompleteTanzeemiHierarchy = createAsyncThunk<
-  { hierarchyUnits: HierarchyUnit[], hierarchyIds: number[], userUnitId: number },
-  string, // User email
-  { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tanzeemHierarchy/fetchComplete', async (userEmail, { getState, dispatch, rejectWithValue }) => {
-  try {
-    console.log('Fetching complete tanzeemi hierarchy for user email:', userEmail);
-    
-    // Step 1: Fetch user details by email using the centralized API client
-    // Normalize the email to lowercase to ensure consistent handling
-    const normalizedEmail = userEmail.trim().toLowerCase();
-    
-    console.log('Fetching person by email:', normalizedEmail);
-    
-    // Construct the URL with proper encoding
-    const params = new URLSearchParams();
-    params.append('filter[Email][_eq]', normalizedEmail);
-    params.append('fields', '*');
-    
-    const personResponse = await apiClient<PersonResponse>(() => ({
-      path: `/items/Person?${params.toString()}`,
-      method: 'GET'
-    }));
-    
-    console.log('API Response for person by email:', personResponse);
-    
-    // Handle both possible response structures
-    let personData: any[];
-    if (Array.isArray(personResponse)) {
-      // Direct array response
-      personData = personResponse;
-    } else if (personResponse.data && Array.isArray(personResponse.data)) {
-      // Wrapped in data property
-      personData = personResponse.data;
-    } else {
-      throw new Error(`Invalid response structure for email ${normalizedEmail}`);
-    }
-    
-    if (!personData || personData.length === 0) {
-      throw new Error(`No person found with email ${normalizedEmail}`);
-    }
-    
-    const user = normalizePersonData(personData[0]);
-    
-    // Step 2: Extract the Tanzeemi_Unit ID from the user's record
-    const userUnitId = user.Tanzeemi_Unit || user.unit;
-    if (!userUnitId || typeof userUnitId !== 'number') {
-      return rejectWithValue(`User with email ${userEmail} has no Tanzeemi unit assigned`);
-    }
-    
-    console.log(`User ${user.Name || user.name} has Tanzeemi unit ID: ${userUnitId}`);
-    
-    // Step 3: Fetch the user's unit details
-    const unitResponse = await apiClient<SingleTanzeemiUnitResponse>(() => ({
-      path: `/items/Tanzeemi_Unit/${userUnitId}?fields=*`,
-      method: 'GET'
-    }));
-        
-    // Handle both possible response structures
-    let unitData: any;
-    if (unitResponse.data) {
-      // Wrapped in data property
-      unitData = unitResponse.data;
-    } else if ((unitResponse as any).id) {
-      // Direct unit object response
-      unitData = unitResponse;
-    } else {
-      throw new Error(`Tanzeemi unit with ID ${userUnitId} not found`);
-    }
-    
-    const userUnit = normalizeTanzeemiUnitData(unitData);
-    
-    // Create the user's unit with under_mine: false
-    const userHierarchyUnit: HierarchyUnit = {
-      ...userUnit,
-      under_mine: false
-    };
-    
-    // Step 4: Fetch the user's unit Nazim details if available
-    if (userUnit.Nazim_id) {
-      console.log(`User unit has Nazim_id: ${userUnit.Nazim_id}, fetching Nazim details...`);
-      dispatch(fetchNazimDetails(userUnit.Nazim_id));
-    }
-    
-    // Step 5: Fetch the user's unit Level details if available
-    if (userUnit.Level_id || userUnit.level_id) {
-      const levelId = userUnit.Level_id || userUnit.level_id;
-      if (typeof levelId === 'number') {
-        dispatch(fetchTanzeemLevelById(levelId));
-      }
-    }
-    
-    // Step 6: Recursively fetch all parent units (using parent_id)
-    const parentId = userUnit.Parent_id || userUnit.parent_id;
-    const { parentUnits } = await fetchAndProcessParentHierarchy(
-      parentId as number,
-      dispatch,
-      getState
-    );
-    
-    console.log(`Fetched ${parentUnits.length} parent units for user unit ${userUnitId}`);
-    
-    // Step 7: Recursively fetch all subordinate units (using zaili_unit_hierarchy)
-    const processedIds = new Set<number>([userUnitId]); // Mark user unit as processed
-    const subordinateUnits: HierarchyUnit[] = [];
-    
-    if (userUnit.zaili_unit_hierarchy && Array.isArray(userUnit.zaili_unit_hierarchy)) {
-      console.log(`Processing zaili_unit_hierarchy for user unit ${userUnitId}:`, userUnit.zaili_unit_hierarchy);
-      
-      const hierarchyIds = userUnit.zaili_unit_hierarchy as number[];
-      for (const childId of hierarchyIds) {
-        if (typeof childId === 'number' && !processedIds.has(childId)) {
-          const result = await fetchAndProcessSubordinateHierarchy(
-            childId,
-            dispatch,
-            getState,
-            processedIds
-          );
-          
-          subordinateUnits.push(...result.subordinateUnits);
-        }
-      }
-    }
-    
-    console.log(`Fetched ${subordinateUnits.length} subordinate units for user unit ${userUnitId}`);
-    
-    // Step 8: Combine all units and create a unique set of IDs
-    const allUnits: HierarchyUnit[] = [userHierarchyUnit, ...parentUnits, ...subordinateUnits];
-    const uniqueIds = [...new Set(allUnits.map(unit => unit.id))];
-    
-    console.log(`Complete hierarchy contains ${allUnits.length} units with ${uniqueIds.length} unique IDs`);
-    
-    return {
-      hierarchyUnits: allUnits,
-      hierarchyIds: uniqueIds,
-      userUnitId
-    };
-  } catch (error: any) {
-    console.error('Fetch complete tanzeemi hierarchy error:', error);
-    return rejectWithValue(error.message || 'Failed to fetch complete tanzeemi hierarchy');
-  }
-});
+// This function has been removed since we follow the correct flow:
+// login email -> user_id -> Tanzeemi_Unit -> Nazim_id -> Person
+// No need to fetch person by email
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -409,23 +270,8 @@ const tanzeemHierarchySlice = createSlice({
     },
   },
   extraReducers: builder => {
-    builder
-      .addCase(fetchCompleteTanzeemiHierarchy.pending, state => {
-        console.log('⏳ fetchCompleteTanzeemiHierarchy.pending');
-        state.status = 'loading';
-        state.error = null;
-      })
-      .addCase(fetchCompleteTanzeemiHierarchy.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.hierarchyUnits = action.payload.hierarchyUnits;
-        state.hierarchyIds = action.payload.hierarchyIds;
-        state.userUnitId = action.payload.userUnitId;
-      })
-      .addCase(fetchCompleteTanzeemiHierarchy.rejected, (state, action) => {
-        console.log('❌ fetchCompleteTanzeemiHierarchy.rejected - error:', action.payload);
-        state.status = 'failed';
-        state.error = action.payload || 'Failed to fetch hierarchy';
-      });
+    // No reducers needed since fetchCompleteTanzeemiHierarchy has been removed
+    // We follow the correct flow: login email -> user_id -> Tanzeemi_Unit -> Nazim_id -> Person
   },
 });
 

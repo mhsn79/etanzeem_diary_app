@@ -18,7 +18,7 @@ export const ENDPOINTS = {
   
   // Person endpoints
   PERSONS: '/items/Person',
-  PERSON_BY_EMAIL: '/items/Person',
+  // PERSON_BY_EMAIL removed - we follow the correct flow: user_id -> Tanzeemi_Unit -> Nazim_id -> Person
   
   // Activity endpoints
   ACTIVITIES: '/items/Activity',

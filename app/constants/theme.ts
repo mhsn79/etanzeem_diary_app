@@ -44,7 +44,7 @@ const COLORS = {
 const TYPOGRAPHY = {
   fontFamily: {
     regular: 'JameelNooriNastaleeq',
-    bold: 'JameelNooriNastaleeq',
+    bold: 'noori-kasheed',
     kasheeda: 'noori-kasheed',
   },
   fontSize: {

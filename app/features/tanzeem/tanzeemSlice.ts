@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
 import { fetchNazimDetails } from '../persons/personSlice';
-import { fetchCompleteTanzeemiHierarchy } from './tanzeemHierarchySlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
 
@@ -53,6 +52,10 @@ interface TanzeemExtraState {
   userTanzeemiLevelDetails: TanzeemLevel | null;
   userTanzeemiLevelStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   userTanzeemiLevelError: string | null;
+  // Store levels by their ID to support multiple levels
+  levelsById: Record<number, TanzeemLevel>;
+  // Dashboard selected unit (can only be userUnit or its children)
+  dashboardSelectedUnitId: number | null;
 }
 
 export type TanzeemState = ReturnType<typeof tanzeemAdapter.getInitialState<TanzeemExtraState>>;
@@ -73,6 +76,8 @@ const initialState: TanzeemState = tanzeemAdapter.getInitialState<TanzeemExtraSt
   userTanzeemiLevelDetails: null,
   userTanzeemiLevelStatus: 'idle',
   userTanzeemiLevelError: null,
+  levelsById: {},
+  dashboardSelectedUnitId: null,
 });
 
 /**
@@ -269,6 +274,36 @@ const fetchAndProcessHierarchy = async (
       // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
+    // Fetch parent unit if it exists
+    const parentId = unit.parent_id || unit.Parent_id;
+    if (parentId && typeof parentId === 'number' && !processedIds.has(parentId)) {
+      console.log(`Fetching parent unit with ID: ${parentId}`);
+      try {
+        const parentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
+          `/items/Tanzeemi_Unit/${parentId}?fields=*`,
+          'GET'
+        );
+        
+        if (parentResponse.data) {
+          const parentUnit = normalizeTanzeemiUnitData(parentResponse.data);
+          allUnits.push(parentUnit);
+          allHierarchyIds.push(parentId);
+          console.log(`Successfully fetched parent unit: ${parentUnit.Name}`);
+          
+          // If the parent unit has a level_id, fetch the level details
+          if (parentUnit.Level_id || parentUnit.level_id) {
+            const parentLevelId = parentUnit.Level_id || parentUnit.level_id;
+            if (typeof parentLevelId === 'number') {
+              console.log(`Fetching level details for parent unit: ${parentLevelId}`);
+              dispatch(fetchTanzeemLevelById(parentLevelId));
+            }
+          }
+        }
+      } catch (parentError) {
+        console.error(`Error fetching parent unit ${parentId}:`, parentError);
+      }
+    }
+    
     // Process zaili_unit_hierarchy if it exists and is an array
     if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
       console.log(`Processing zaili_unit_hierarchy for unit ${unitId}:`, unit.zaili_unit_hierarchy);
@@ -385,14 +420,9 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     // Add all units to the store at once
     dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
     
-    // Also populate the tanzeemHierarchy state for the new hierarchy system
-    const authState = getState().auth;
-    if (authState.user?.email) {
-      console.log('🔄 Dispatching fetchCompleteTanzeemiHierarchy for user:', authState.user.email);
-      dispatch(fetchCompleteTanzeemiHierarchy(authState.user.email));
-    } else {
-      console.log('❌ No user email found in auth state, cannot dispatch fetchCompleteTanzeemiHierarchy');
-    }
+    // Person data is already available from the login process via Nazim_id
+    // No need to fetch person by email since we follow the correct flow
+    console.log('✅ Person data already available from login process');
     
     // If the unit has a level_id, fetch the level details
     if (unit && (unit.Level_id || unit.level_id)) {
@@ -443,6 +473,43 @@ const tanzeemSlice = createSlice({
     addMultipleTanzeemiUnits(state, action: PayloadAction<TanzeemiUnit[]>) {
       tanzeemAdapter.upsertMany(state, action.payload);
     },
+    setUserUnitDetails(state, action: PayloadAction<TanzeemiUnit | null>) {
+      state.userUnitDetails = action.payload;
+    },
+    setDashboardSelectedUnit(state, action: PayloadAction<number | null>) {
+      const selectedUnitId = action.payload;
+      
+      // If no selection, reset to user unit
+      if (!selectedUnitId) {
+        state.dashboardSelectedUnitId = state.userUnitDetails?.id || null;
+        return;
+      }
+      
+      // Validate that selected unit is either user unit or its child
+      const userUnitId = state.userUnitDetails?.id;
+      if (!userUnitId) {
+        state.dashboardSelectedUnitId = null;
+        return;
+      }
+      
+      // Check if selected unit is the user unit itself (allowed)
+      if (selectedUnitId === userUnitId) {
+        state.dashboardSelectedUnitId = selectedUnitId;
+        return;
+      }
+      
+      // Check if selected unit is a child of user unit (allowed)
+      const allUnits = tanzeemAdapter.getSelectors().selectAll(state);
+      const selectedUnit = allUnits.find(unit => unit.id === selectedUnitId);
+      
+      if (selectedUnit && selectedUnit.Parent_id === userUnitId) {
+        state.dashboardSelectedUnitId = selectedUnitId;
+      } else {
+        // Invalid selection (parent or sibling), reset to user unit
+        console.warn('Invalid unit selection (parent/sibling), resetting to user unit');
+        state.dashboardSelectedUnitId = userUnitId;
+      }
+    }
   },
   extraReducers: builder => {
     builder
@@ -549,6 +616,8 @@ const tanzeemSlice = createSlice({
       .addCase(fetchTanzeemLevelById.fulfilled, (state, action: PayloadAction<TanzeemLevel>) => {
         state.userTanzeemiLevelStatus = 'succeeded';
         state.userTanzeemiLevelDetails = action.payload;
+        // Also store the level by its ID for multiple level support
+        state.levelsById[action.payload.id] = action.payload;
       })
       .addCase(fetchTanzeemLevelById.rejected, (state, action) => {
         state.userTanzeemiLevelStatus = 'failed';
@@ -564,6 +633,8 @@ export const {
   resetUserUnitStatus,
   addTanzeemiUnit,
   addMultipleTanzeemiUnits,
+  setUserUnitDetails,
+  setDashboardSelectedUnit,
 } = tanzeemSlice.actions;
 
 /**
@@ -604,6 +675,19 @@ export const selectUserUnitHierarchyIds = (state: RootState) => selectTanzeemSta
 export const selectUserTanzeemiLevelDetails = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelDetails;
 export const selectUserTanzeemiLevelStatus = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelStatus;
 export const selectUserTanzeemiLevelError = (state: RootState) => selectTanzeemState(state).userTanzeemiLevelError;
+
+// Dashboard selected unit selectors
+export const selectDashboardSelectedUnitId = (state: RootState) => selectTanzeemState(state).dashboardSelectedUnitId;
+export const selectDashboardSelectedUnit = createSelector(
+  [selectDashboardSelectedUnitId, state => state],
+  (unitId, state) => {
+    return unitId ? selectTanzeemiUnitById(state, unitId) : null;
+  }
+);
+
+// Level selectors
+export const selectLevelsById = (state: RootState) => selectTanzeemState(state).levelsById;
+export const selectLevelById = (levelId: number) => (state: RootState) => selectTanzeemState(state).levelsById[levelId];
 
 // Helper selector to get all units in the user's hierarchy
 // Memoized selector for user hierarchy units
@@ -657,6 +741,88 @@ export const selectParentUnit = (unitId: number) => {
       return selectTanzeemiUnitById(state, parentId);
     }
   );
+};
+
+// Helper selector to get parent unit with level information
+// This returns a formatted string with parent unit name and level, including grandparent if available
+// Using a memoized factory to prevent multiple selector instances
+const parentUnitWithLevelSelectors = new Map();
+
+export const selectParentUnitWithLevel = (unitId: number) => {
+  // Return existing selector if already created
+  if (parentUnitWithLevelSelectors.has(unitId)) {
+    return parentUnitWithLevelSelectors.get(unitId);
+  }
+  
+  // Create new selector
+  const selector = createSelector(
+    [state => selectTanzeemiUnitById(state, unitId), state => state],
+    (unit, state) => {
+      if (!unit || unit.id === -1) return '';
+      
+      const parentId = unit.Parent_id;
+      if (parentId === undefined || parentId === null) return '';
+      
+      const parentUnit = selectTanzeemiUnitById(state, parentId);
+      if (!parentUnit) return '';
+      
+      // Get the level information for the parent unit
+      const parentLevelId = parentUnit.Level_id;
+      let parentLevelName = '';
+
+
+      
+      if (parentLevelId && typeof parentLevelId === 'number') {
+        // Try to get level name from the levelsById storage
+        const tanzeemState = state.tanzeem;
+        if (tanzeemState && tanzeemState.levelsById) {
+          const levelDetails = tanzeemState.levelsById[parentLevelId];
+          if (levelDetails) {
+            parentLevelName = levelDetails.Name || '';
+          }
+        }
+      }
+      
+      // Format parent unit: "Level Name: Unit Name" or just "Unit Name" if no level
+      const parentFormatted = parentLevelName ? `${parentLevelName}: ${parentUnit.Name}` : parentUnit.Name || '';
+      
+      // Check if parent unit has a parent (grandparent)
+      const grandparentId = parentUnit.Parent_id;
+      if (grandparentId === undefined || grandparentId === null) {
+        return parentFormatted;
+      }
+      
+      const grandparentUnit = selectTanzeemiUnitById(state, grandparentId);
+      if (!grandparentUnit) {
+        return parentFormatted;
+      }
+      
+      // Get the level information for the grandparent unit
+      const grandparentLevelId = grandparentUnit.Level_id;
+      let grandparentLevelName = '';
+      
+      if (grandparentLevelId && typeof grandparentLevelId === 'number') {
+        // Try to get level name from the levelsById storage
+        const tanzeemState = state.tanzeem;
+        if (tanzeemState && tanzeemState.levelsById) {
+          const levelDetails = tanzeemState.levelsById[grandparentLevelId];
+          if (levelDetails) {
+            grandparentLevelName = levelDetails.Name || '';
+          }
+        }
+      }
+      
+      // Format grandparent unit: "Level Name: Unit Name" or just "Unit Name" if no level
+      const grandparentFormatted = grandparentLevelName ? `${grandparentLevelName}: ${grandparentUnit.Name}` : grandparentUnit.Name || '';
+      
+      // Return parent first, then append grandparent with comma separator: "Parent Level: Parent Name, Grandparent Level: Grandparent Name"
+      return `${parentFormatted}، ${grandparentFormatted}`;
+    }
+  );
+  
+  // Store the selector for reuse
+  parentUnitWithLevelSelectors.set(unitId, selector);
+  return selector;
 };
 
 // Helper selector to get child units of a specific unit

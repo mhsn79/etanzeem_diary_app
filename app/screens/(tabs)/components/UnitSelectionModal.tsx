@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
-import { View, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Modal, StyleSheet, Text } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { AntDesign } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -7,12 +7,14 @@ import UrduText from '@/app/components/UrduText';
 import Spacer from '@/app/components/Spacer';
 import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
 import DropdownSection from './DropdownSection';
-import { HierarchyUnit, Option } from './types';
+import { Option } from './types';
 import {
-  selectAllHierarchyUnits as selectAllCompleteHierarchyUnits,
-  selectHierarchyStatus,
-  fetchCompleteTanzeemiHierarchy,
-} from '@/app/features/tanzeem/tanzeemHierarchySlice';
+  selectUserUnitDetails,
+  selectAllTanzeemiUnits,
+  selectTanzeemiUnitById,
+  selectLevelsById,
+  setDashboardSelectedUnit,
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { selectUserDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store';
 import { logout } from '@/app/features/auth/authSlice';
@@ -27,198 +29,118 @@ interface UnitSelectionModalProps {
 const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitSelectionModalProps) => {
   const styles = getStyles(colorScheme);
   const dispatch = useDispatch<AppDispatch>();
-  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [selectedUC, setSelectedUC] = useState<string | null>(null);
-  const [districtOptions, setDistrictOptions] = useState<Option[]>([]);
-  const [zoneOptions, setZoneOptions] = useState<Option[]>([]);
-  const [ucOptions, setUCOptions] = useState<Option[]>([]);
-
-  const completeHierarchyUnits = useSelector(selectAllCompleteHierarchyUnits) as HierarchyUnit[];
+  
+  // Get current user unit and all units
+  const userUnit = useSelector(selectUserUnitDetails);
+  const allUnits = useSelector(selectAllTanzeemiUnits);
+  const levelsById = useSelector(selectLevelsById);
   const userDetails = useSelector(selectUserDetails);
-  const hierarchyStatus = useSelector(selectHierarchyStatus);
 
-  const removeSelfReferencingUnits = useCallback((units: HierarchyUnit[]) => {
-    return units.filter((unit) => unit.id !== unit.parent_id);
+  // State for selected unit
+  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const [selectableOptions, setSelectableOptions] = useState<Option[]>([]);
+
+  // Get parent unit of current user unit
+  const parentUnit = useMemo(() => {
+    if (!userUnit?.Parent_id) return null;
+    return allUnits.find(unit => unit.id === userUnit.Parent_id);
+  }, [userUnit, allUnits]);
+
+  // Get grandparent unit of current user unit
+  const grandparentUnit = useMemo(() => {
+    if (!parentUnit?.Parent_id) return null;
+    return allUnits.find(unit => unit.id === parentUnit.Parent_id);
+  }, [parentUnit, allUnits]);
+
+  // Get children units of current user unit
+  const childrenUnits = useMemo(() => {
+    if (!userUnit) return [];
+    return allUnits.filter(unit => unit.Parent_id === userUnit.id);
+  }, [userUnit, allUnits]);
+
+  // Check if user unit is a leaf (has no children)
+  const isUserUnitLeaf = useMemo(() => {
+    return childrenUnits.length === 0;
+  }, [childrenUnits]);
+
+  // Format unit display with level name
+  const formatUnitDisplay = useCallback((unit: any) => {
+    if (!unit) return '';
+    
+    const levelId = unit.Level_id;
+    let levelName = '';
+    
+    if (levelId && typeof levelId === 'number' && levelsById[levelId]) {
+      levelName = levelsById[levelId].Name || '';
+    }
+    
+    return levelName ? `${levelName}: ${unit.Name}` : unit.Name || '';
+  }, [levelsById]);
+
+  // Set up selectable options when user unit changes
+  useEffect(() => {
+    if (userUnit) {
+      const options = [];
+      
+      // Add user unit as first option (user can select their own unit)
+      options.push({
+        id: `user-${userUnit.id}`,
+        label: formatUnitDisplay(userUnit),
+        value: userUnit.id.toString(),
+      });
+      
+      // Add children units (user can select any of their children)
+      if (childrenUnits.length > 0) {
+        childrenUnits.forEach(unit => {
+          options.push({
+            id: `child-${unit.id}`,
+            label: formatUnitDisplay(unit),
+            value: unit.id.toString(),
+          });
+        });
+      }
+      
+      setSelectableOptions(options);
+      
+      // Set user unit as default selection if no current selection
+      if (!selectedUnit && options.length > 0) {
+        setSelectedUnit(options[0].value);
+      }
+    } else {
+      setSelectableOptions([]);
+      setSelectedUnit(null);
+    }
+  }, [userUnit, childrenUnits, formatUnitDisplay, selectedUnit]);
+
+  // Handle unit selection
+  const handleUnitSelection = useCallback((option: Option) => {
+    setSelectedUnit(option.value);
   }, []);
 
-  const handleSelection = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<string | null>>, resetSetters: Array<React.Dispatch<React.SetStateAction<string | null>>>, currentValue: string | null) =>
-      (option: Option) => {
-        try {
-          if (currentValue !== option.value) {
-            setter(option.value);
-            resetSetters.forEach((reset) => reset(null));
-            const selectedUnit = completeHierarchyUnits.find((unit) => unit.id.toString() === option.value);
-            if (selectedUnit) {
-              console.log(`Selected unit:`, {
-                name: selectedUnit.Name || selectedUnit.name,
-                level: selectedUnit.level,
-                parent_id: selectedUnit.parent_id,
-              });
-            }
-          }
-        } catch (error) {
-          console.error(`Error in selection:`, error);
-        }
-      },
-    [completeHierarchyUnits, selectedDistrict, selectedZone, selectedUC]
-  );
-
-  const handleDistrictSelection = useMemo(
-    () => handleSelection(setSelectedDistrict, [setSelectedZone, setSelectedUC], selectedDistrict),
-    [handleSelection, selectedDistrict]
-  );
-  
-  const handleZoneSelection = useMemo(
-    () => handleSelection(setSelectedZone, [setSelectedUC], selectedZone),
-    [handleSelection, selectedZone]
-  );
-  
-  const handleUCSelection = useMemo(
-    () => handleSelection(setSelectedUC, [], selectedUC),
-    [handleSelection, selectedUC]
-  );
-
-  useEffect(() => {
-    if (visible && userDetails?.email) {
-      dispatch(fetchCompleteTanzeemiHierarchy(userDetails.email))
-        .unwrap()
-        .then((result) => {
-          console.log('Hierarchy fetch succeeded:', result);
-        })
-        .catch((error) => {
-          console.error('Hierarchy fetch failed:', error);
-          if (String(error).includes('Authentication expired')) {
-            dispatch(logout()).then(() => router.replace('/screens/LoginScreen'));
-          }
-        });
+  // Handle confirmation
+  const handleConfirm = useCallback(() => {
+    if (selectedUnit) {
+      // Update the dashboard selected unit
+      dispatch(setDashboardSelectedUnit(parseInt(selectedUnit)));
+      console.log('Selected unit:', selectedUnit);
+    } else {
+      // If no unit selected, reset to user unit
+      dispatch(setDashboardSelectedUnit(userUnit?.id || null));
     }
-  }, [visible, dispatch, userDetails]);
+    onClose();
+  }, [selectedUnit, userUnit?.id, dispatch, onClose]);
 
-  useEffect(() => {
-    if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
-      try {
-        const districts = removeSelfReferencingUnits(completeHierarchyUnits.filter((unit) => unit.level === 1));
-        const districtOpts = districts.length
-          ? districts.map((unit) => ({
-              id: `district-${unit.id}`,
-              label: unit.Name || unit.name || 'Unknown District',
-              value: unit.id.toString(),
-            }))
-          : completeHierarchyUnits
-              .filter((unit) => unit.level === Math.min(...completeHierarchyUnits.map((u) => u.level)))
-              .map((unit) => ({
-                id: `district-${unit.id}`,
-                label: unit.Name || unit.name || 'Unknown Unit',
-                value: unit.id.toString(),
-              }));
-
-        setDistrictOptions(districtOpts);
-        if (districtOpts.length === 1 && !selectedDistrict) {
-          setSelectedDistrict(districtOpts[0].value);
-        }
-      } catch (error) {
-        console.error('Error processing hierarchy:', error);
-      }
-    }
-  }, [hierarchyStatus, completeHierarchyUnits, selectedDistrict, removeSelfReferencingUnits]);
-
-  useEffect(() => {
-    if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
-      try {
-        if (selectedDistrict) {
-          const filteredZones = removeSelfReferencingUnits(
-            completeHierarchyUnits.filter(
-              (unit) =>
-                unit.level === 2 &&
-                (unit.parent_id?.toString() === selectedDistrict ||
-                  (unit.zaili_unit_hierarchy?.some((id) => id.toString() === selectedDistrict) ?? false))
-            )
-          );
-          const zoneOpts = filteredZones.length
-            ? filteredZones.map((unit) => ({
-                id: `zone-${unit.id}`,
-                label: unit.Name || unit.name || 'Unknown Zone',
-                value: unit.id.toString(),
-              }))
-            : removeSelfReferencingUnits(completeHierarchyUnits.filter((unit) => unit.level === 2)).map((unit) => ({
-                id: `zone-${unit.id}`,
-                label: unit.Name || unit.name || 'Unknown Zone',
-                value: unit.id.toString(),
-              }));
-
-          setZoneOptions(zoneOpts);
-          if (zoneOpts.length === 1 && !selectedZone) {
-            setSelectedZone(zoneOpts[0].value);
-          } else if (selectedZone && !zoneOpts.some((opt) => opt.value === selectedZone)) {
-            setSelectedZone(null);
-          }
-        } else {
-          setZoneOptions(
-            removeSelfReferencingUnits(completeHierarchyUnits.filter((unit) => unit.level === 2)).map((unit) => ({
-              id: `zone-${unit.id}`,
-              label: unit.Name || unit.name || 'Unknown Zone',
-              value: unit.id.toString(),
-            }))
-          );
-          setSelectedZone(null);
-        }
-      } catch (error) {
-        console.error('Error processing zones:', error);
-      }
-    }
-  }, [hierarchyStatus, completeHierarchyUnits, selectedDistrict, selectedZone, removeSelfReferencingUnits]);
-
-  useEffect(() => {
-    if (hierarchyStatus === 'succeeded' && completeHierarchyUnits.length > 0) {
-      try {
-        if (selectedZone) {
-          const filteredUCs = removeSelfReferencingUnits(
-            completeHierarchyUnits.filter(
-              (unit) =>
-                (unit.level === 3 || unit.level === 4) &&
-                (unit.parent_id?.toString() === selectedZone ||
-                  (unit.zaili_unit_hierarchy?.some((id) => id.toString() === selectedZone) ?? false))
-            )
-          );
-          const ucOpts = filteredUCs.length
-            ? filteredUCs.map((unit) => ({
-                id: `uc-${unit.id}`,
-                label: unit.Name || unit.name || 'Unknown UC',
-                value: unit.id.toString(),
-              }))
-            : removeSelfReferencingUnits(completeHierarchyUnits.filter((unit) => unit.level === 3 || unit.level === 4)).map(
-                (unit) => ({
-                  id: `uc-${unit.id}`,
-                  label: unit.Name || unit.name || 'Unknown UC',
-                  value: unit.id.toString(),
-                })
-              );
-
-          setUCOptions(ucOpts);
-          if (ucOpts.length === 1 && !selectedUC) {
-            setSelectedUC(ucOpts[0].value);
-          } else if (selectedUC && !ucOpts.some((opt) => opt.value === selectedUC)) {
-            setSelectedUC(null);
-          }
-        } else {
-          setUCOptions(
-            removeSelfReferencingUnits(completeHierarchyUnits.filter((unit) => unit.level === 3 || unit.level === 4)).map(
-              (unit) => ({
-                id: `uc-${unit.id}`,
-                label: unit.Name || unit.name || 'Unknown UC',
-                value: unit.id.toString(),
-              })
-            )
-          );
-          setSelectedUC(null);
-        }
-      } catch (error) {
-        console.error('Error processing UCs:', error);
-      }
-    }
-  }, [hierarchyStatus, completeHierarchyUnits, selectedZone, selectedUC, removeSelfReferencingUnits]);
+  // Render fixed unit display (for parent, current, or grandparent)
+  const renderFixedUnit = useCallback((unit: any, label: string) => {
+    if (!unit) return null;
+    
+    return (
+      <View style={styles.fixedUnitContainer}>
+        <Text style={styles.fixedUnitLabel}>{label}</Text>
+        <Text style={styles.fixedUnitText}>{formatUnitDisplay(unit)}</Text>
+      </View>
+    );
+  }, [formatUnitDisplay, styles]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -232,42 +154,47 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
           </View>
 
           <View style={styles.modalBody}>
-            <DropdownSection
-              options={districtOptions}
-              selectedValue={selectedDistrict}
-              onSelect={handleDistrictSelection}
-              placeholder="ضلع منتخب کریں"
-              loading={hierarchyStatus === 'loading'}
-              colorScheme={colorScheme}
-            />
-
-            <DropdownSection
-              options={zoneOptions}
-              selectedValue={selectedZone}
-              onSelect={handleZoneSelection}
-              placeholder="زون منتخب کریں"
-              disabled={!selectedDistrict || zoneOptions.length === 0}
-              colorScheme={colorScheme}
-            />
-
-            <DropdownSection
-              options={ucOptions}
-              selectedValue={selectedUC}
-              onSelect={handleUCSelection}
-              placeholder="یونین کونسل منتخب کریں"
-              disabled={!selectedZone || ucOptions.length === 0}
-              colorScheme={colorScheme}
-            />
+            {isUserUnitLeaf ? (
+              // Scenario 2: User unit is leaf - show grandparent, parent, current (all fixed)
+              <>
+                {renderFixedUnit(grandparentUnit, "اوپر کی یونٹ")}
+                {renderFixedUnit(parentUnit, "درمیانی یونٹ")}
+                {renderFixedUnit(userUnit, "موجودہ یونٹ")}
+                
+                <View style={styles.infoContainer}>
+                  <UrduText style={styles.infoText}>
+                    آپ کی یونٹ لیف ہے، کوئی تبدیلی نہیں کی جا سکتی
+                  </UrduText>
+                </View>
+              </>
+            ) : (
+              // Scenario 1: User unit has children - show parent (fixed), current (selectable), children (selectable)
+              <>
+                {renderFixedUnit(parentUnit, "اوپر کی یونٹ")}
+                
+                <DropdownSection
+                  options={selectableOptions}
+                  selectedValue={selectedUnit}
+                  onSelect={handleUnitSelection}
+                  placeholder="یونٹ منتخب کریں"
+                  disabled={selectableOptions.length === 0}
+                  colorScheme={colorScheme}
+                />
+                
+                <View style={styles.infoContainer}>
+                  <UrduText style={styles.infoText}>
+                    آپ اپنی یونٹ یا اس کی نیچے کی یونٹس میں سے کوئی ایک منتخب کر سکتے ہیں
+                  </UrduText>
+                </View>
+              </>
+            )}
 
             <Spacer height={20} />
 
             <TouchableOpacity
-              style={[styles.confirmButtonStyle, !selectedUC && styles.disabledButton]}
-              disabled={!selectedUC}
-              onPress={() => {
-                // Handle confirmation
-                onClose();
-              }}
+              style={[styles.confirmButtonStyle, (isUserUnitLeaf || selectableOptions.length === 0) && styles.disabledButton]}
+              disabled={isUserUnitLeaf || selectableOptions.length === 0}
+              onPress={handleConfirm}
             >
               <UrduText style={styles.confirmTextStyle}>تصدیق کریں</UrduText>
             </TouchableOpacity>
@@ -315,12 +242,48 @@ const getStyles = (colorScheme: string | null | undefined) => {
       color: isDark ? COLORS.white : COLORS.primary,
       fontSize: 24,
       fontWeight: 'bold',
+      fontFamily: TYPOGRAPHY.fontFamily.bold,
     },
     closeButton: {
       padding: 5,
     },
     modalBody: {
       paddingVertical: SPACING.sm,
+    },
+    fixedUnitContainer: {
+      backgroundColor: isDark ? '#373842' : '#F5F5F5',
+      borderRadius: 8,
+      padding: 15,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: isDark ? '#4A4A4A' : '#E0E0E0',
+    },
+    fixedUnitLabel: {
+      color: isDark ? '#FFB30F' : '#666666',
+      fontSize: 12,
+      fontWeight: 'bold',
+      marginBottom: 5,
+      fontFamily: TYPOGRAPHY.fontFamily.bold,
+    },
+    fixedUnitText: {
+      color: isDark ? COLORS.white : COLORS.black,
+      fontSize: 16,
+      fontWeight: '500',
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
+    },
+    infoContainer: {
+      backgroundColor: isDark ? '#2A2A2A' : '#F0F8FF',
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 10,
+      borderLeftWidth: 4,
+      borderLeftColor: isDark ? '#FFB30F' : '#0BA241',
+    },
+    infoText: {
+      color: isDark ? '#FFB30F' : '#0BA241',
+      fontSize: 14,
+      textAlign: 'center',
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     confirmButtonStyle: {
       backgroundColor: COLORS.primary,
@@ -344,10 +307,12 @@ const getStyles = (colorScheme: string | null | undefined) => {
     confirmTextStyle: {
       color: COLORS.white,
       fontSize: 16,
+      fontFamily: TYPOGRAPHY.fontFamily.bold,
     },
     cancelTextStyle: {
       color: isDark ? COLORS.white : COLORS.black,
       fontSize: 16,
+      fontFamily: TYPOGRAPHY.fontFamily.bold,
     },
   });
 };

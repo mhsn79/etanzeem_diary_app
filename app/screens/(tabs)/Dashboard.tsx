@@ -29,17 +29,22 @@ import {
   selectUserUnitStatus,
   selectUserUnitError,
   selectUserTanzeemiLevelStatus,
+  fetchUserTanzeemiUnit,
+  selectDashboardSelectedUnit,
+  selectDashboardSelectedUnitId,
+  setDashboardSelectedUnit,
 } from '@/app/features/tanzeem/tanzeemSlice';
 import {
   selectAllHierarchyUnits,
-  selectSubordinateUnitsDisplayText
-} from '@/app/features/tanzeem/tanzeemHierarchySlice';
-import { selectNazimDetails } from '@/app/features/persons/personSlice';
+  selectParentUnitWithLevel
+} from '@/app/features/tanzeem/tanzeemSlice';
+import { selectUserDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store';
 import HeaderInfoItem from './components/HeaderInfoItem';
 import ScheduleCard from './components/ScheduleCard';
 import UnitSelectionModal from './components/UnitSelectionModal';
 import DashboardBox from './components/DashboardBox';
+import { debugLog } from '@/app/utils/debug';
 
 // TypeScript Interfaces
 interface Option {
@@ -82,16 +87,95 @@ const Dashboard = () => {
   const styles = getStyles(colorScheme);
   const isRtl = i18n.locale === 'ur';
   const userUnit = useSelector(selectUserUnitDetails);
-  const userUnitStatus = useSelector(selectUserUnitStatus);
-  const userUnitError = useSelector(selectUserUnitError);
+  const selectedUnit = useSelector(selectDashboardSelectedUnit);
+  const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
+  // const userUnitStatus = useSelector(selectUserUnitStatus);
+  // const userUnitError = useSelector(selectUserUnitError);
 
-  const subordinateUnitsDisplayText = useSelector(selectSubordinateUnitsDisplayText);
-  const nazimDetails = useSelector(selectNazimDetails);
+  // Use selected unit if available, otherwise fall back to user unit
+  const displayUnit = selectedUnit || userUnit;
+  const displayUnitId = selectedUnitId || userUnit?.id;
+
+  const parentUnitWithLevel = useSelector(selectParentUnitWithLevel(displayUnitId || -1));
+  // const nazimDetails = useSelector(selectNazimDetails);
+  const userDetails = useSelector(selectUserDetails);
+  
+  // Get display unit with level name
+  const displayUnitWithLevel = useSelector((state: any) => {
+    if (!displayUnit) return '';
+    
+    // Get the level information for the display unit
+    const levelId = displayUnit.Level_id;
+    let levelName = '';
+    
+    if (levelId && typeof levelId === 'number') {
+      // Try to get level name from the levelsById storage
+      const tanzeemState = state.tanzeem;
+      if (tanzeemState && tanzeemState.levelsById) {
+        const levelDetails = tanzeemState.levelsById[levelId];
+        if (levelDetails) {
+          levelName = levelDetails.Name || '';
+        }
+      }
+    }
+    
+    // Format: "Level Name: Unit Name" or just "Unit Name" if no level
+    return levelName ? `${levelName}: ${displayUnit.Name}` : displayUnit.Name || '';
+  });
+  const dispatch = useDispatch<AppDispatch>();
   const [showDialog, setShowDialog] = useState(false);
   const [showUnitSelectionModal, setShowUnitSelectionModal] = useState(false);
 
+  // Fetch user's tanzeemi unit when component mounts
+  useEffect(() => {
+    if (userDetails && (userDetails.Tanzeemi_Unit || userDetails.unit)) {
+      const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
+      if (typeof unitId === 'number') {
+        console.log('Dashboard: Fetching user tanzeemi unit with ID:', unitId);
+        dispatch(fetchUserTanzeemiUnit(unitId));
+      }
+    }
+  }, [userDetails?.id, userDetails?.Tanzeemi_Unit, userDetails?.unit, dispatch]);
 
- 
+
+
+  // Initialize dashboard selected unit to user unit when user unit is loaded
+  useEffect(() => {
+    if (userUnit && !selectedUnitId) {
+      console.log('Dashboard: Initializing selected unit to user unit:', userUnit.id);
+      dispatch(setDashboardSelectedUnit(userUnit.id));
+    }
+  }, [userUnit, selectedUnitId, dispatch]);
+
+  // Get parent unit for display unit
+  const parentUnit = useSelector((state: any) => {
+    if (!displayUnit || !displayUnit.Parent_id) return null;
+    return state.tanzeem.entities[displayUnit.Parent_id];
+  });
+
+  // Get grandparent unit for parent unit
+  const grandparentUnit = useSelector((state: any) => {
+    if (!parentUnit || !parentUnit.Parent_id) return null;
+    return state.tanzeem.entities[parentUnit.Parent_id];
+  });
+
+  // Fetch parent unit if not available when display unit changes
+  useEffect(() => {
+    if (displayUnit && displayUnit.Parent_id && !parentUnit) {
+      const parentId = displayUnit.Parent_id;
+      console.log('Dashboard: Fetching parent unit:', parentId);
+      dispatch(fetchUserTanzeemiUnit(parentId));
+    }
+  }, [displayUnit, parentUnit, dispatch]);
+
+  // Fetch grandparent unit if not available when parent unit changes
+  useEffect(() => {
+    if (parentUnit && parentUnit.Parent_id && !grandparentUnit) {
+      const grandparentId = parentUnit.Parent_id;
+      console.log('Dashboard: Fetching grandparent unit:', grandparentId);
+      dispatch(fetchUserTanzeemiUnit(grandparentId));
+    }
+  }, [parentUnit, grandparentUnit, dispatch]);
 
 
 
@@ -192,6 +276,14 @@ const Dashboard = () => {
     router.push('/screens/ActivityScreen');
   };
 
+  debugLog('Dashboard User Details:', userDetails);
+  // debugLog('Dashboard User Unit Status:', userUnitStatus);
+  // debugLog('Dashboard User Unit Error:', userUnitError);
+  // debugLog('Dashboard Nazim Details:', nazimDetails);
+  debugLog('Dashboard Parent Unit With Level:', parentUnitWithLevel);
+  debugLog('Dashboard Parent Unit:', parentUnit);
+  debugLog('Dashboard Grandparent Unit:', grandparentUnit);
+
   return (
     <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={Platform.OS === 'android'} />
@@ -202,7 +294,7 @@ const Dashboard = () => {
               <Image source={require('@/assets/images/icon.png')} style={styles.logo} />
               <View style={styles.headerInfoContainer}>
                 <HeaderInfoItem
-                  text={userUnit?.Name || ''}
+                  text={displayUnitWithLevel}
                   icon={LeftUpArrowWhite}
                   iconProps={{ style: styles.headerIcon }}
                   textStyle={styles.headerTitle}
@@ -211,13 +303,13 @@ const Dashboard = () => {
                   isLeftUpArrowWhite
                 />
                 <HeaderInfoItem
-                  text={subordinateUnitsDisplayText || i18n.t('zone')}
+                  text={typeof parentUnitWithLevel === 'string' ? parentUnitWithLevel : i18n.t('zone')}
                   icon={LocationIcon}
                   iconProps={{ style: styles.locationIcon }}
                   colorScheme={colorScheme}
                 />
                 <HeaderInfoItem
-                  text={nazimDetails?.Name || ''}
+                  text={"ناظم کا نام: " + userDetails?.Name || ''}
                   icon={UserIcon}
                   iconProps={{ style: styles.userIcon }}
                   onPress={() => router.push('/screens/ProfileView')}

@@ -1,16 +1,21 @@
 import { store } from '../store';
 import { 
-  refresh, 
   selectAccessToken, 
   isTokenExpiredOrExpiring, 
-  selectAuthState,
-  checkAndRefreshTokenIfNeeded,
-  logout,
-  setIsRefreshing
+  selectAuthState
 } from '../features/auth/authSlice';
 import directus from './directus';
 import { Platform } from 'react-native';
 import { getTokens, saveTokens } from './secureStorage';
+
+// Import auth functions dynamically to avoid circular dependency
+const getAuthFunctions = () => {
+  const { 
+    checkAndRefreshTokenIfNeeded, 
+    logout 
+  } = require('../features/auth/authSlice');
+  return { checkAndRefreshTokenIfNeeded, logout };
+};
 
 // Type for request options
 interface RequestOptions {
@@ -146,6 +151,7 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
         try {
           // Let the auth middleware handle the token refresh
           // This will queue our request if a refresh is already in progress
+          const { checkAndRefreshTokenIfNeeded } = getAuthFunctions();
           await checkAndRefreshTokenIfNeeded();
           
           // Get the new token after refresh
@@ -164,6 +170,7 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
           console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           
           // Log the user out - this will be handled by the auth middleware
+          const { logout } = getAuthFunctions();
           store.dispatch(logout('Authentication expired. Please log in again.'));
           
           throw new Error('Authentication expired. Please log in again.');
@@ -264,6 +271,7 @@ export const directApiRequest = async <T>(
         
         try {
           // Let the auth middleware handle the token refresh
+          const { checkAndRefreshTokenIfNeeded, logout } = getAuthFunctions();
           await checkAndRefreshTokenIfNeeded();
           
           // Get the new token after refresh
@@ -282,6 +290,7 @@ export const directApiRequest = async <T>(
           console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           
           // Log the user out - this will be handled by the auth middleware
+          const { logout } = getAuthFunctions();
           store.dispatch(logout('Authentication expired. Please log in again.'));
           
           throw new Error('Authentication expired. Please log in again.');
@@ -320,6 +329,7 @@ export const directApiRequest = async <T>(
 export const ensureFreshToken = async (): Promise<string> => {
   try {
     // Use the centralized token refresh mechanism
+    const { checkAndRefreshTokenIfNeeded, logout } = getAuthFunctions();
     await checkAndRefreshTokenIfNeeded();
     
     // Get the current state after potential refresh
@@ -335,6 +345,7 @@ export const ensureFreshToken = async (): Promise<string> => {
     console.error(`[API] Failed to ensure fresh token: ${error.message} (${Platform.OS})`);
     
     // Log the user out if token refresh failed
+    const { logout } = getAuthFunctions();
     store.dispatch(logout('Authentication expired. Please log in again.'));
     
     throw new Error('Authentication expired. Please log in again.');
@@ -362,12 +373,14 @@ export const validateTokensOnStartup = async (): Promise<void> => {
       
       try {
         // Try to refresh the tokens using the centralized mechanism
+        const { checkAndRefreshTokenIfNeeded, logout } = getAuthFunctions();
         await checkAndRefreshTokenIfNeeded();
         console.log(`[API] Tokens refreshed successfully on startup (${Platform.OS})`);
       } catch (error: any) {
         console.error(`[API] Failed to refresh tokens on startup: ${error.message} (${Platform.OS})`);
         
         // Clear tokens and log out
+        const { logout } = getAuthFunctions();
         store.dispatch(logout('Your session has expired. Please log in again.'));
       }
     } else {
