@@ -1,17 +1,15 @@
 import { createDirectus, rest, authentication, AuthenticationClient, AuthenticationData, AuthenticationStorage } from '@directus/sdk';
-import { store } from '../store';
-import { selectAccessToken, selectAuthState } from '../features/auth/authSlice';
 import { getTokens, saveTokens } from './secureStorage';
 import { Platform } from 'react-native';
 
 // Get the API base URL from environment variables
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
 
-// Create a custom storage implementation that gets tokens from SecureStore with Redux fallback
+// Create a custom storage implementation that gets tokens from SecureStore only
 class SecureAuthStorage implements AuthenticationStorage {
   async get(): Promise<AuthenticationData | null> {
     try {
-      // First try to get tokens from secure storage
+      // Get tokens from secure storage only
       const tokens = await getTokens();
       
       if (tokens && tokens.accessToken) {
@@ -23,26 +21,7 @@ class SecureAuthStorage implements AuthenticationStorage {
         };
       }
       
-      // Fallback to Redux if secure storage doesn't have tokens
-      const state = store.getState();
-      const auth = selectAuthState(state);
-      const token = auth.tokens?.accessToken;
-      
-      if (!token) return null;
-      
-      // Save to secure storage for next time
-      if (auth.tokens) {
-        saveTokens(auth.tokens).catch(err => 
-          console.error('Failed to save tokens to secure storage:', err)
-        );
-      }
-      
-      return {
-        access_token: token,
-        refresh_token: auth.tokens?.refreshToken || null,
-        expires: auth.tokens?.expiresAt ? auth.tokens.expiresAt - Date.now() : 900000,
-        expires_at: auth.tokens?.expiresAt || (Date.now() + 900000)
-      };
+      return null;
     } catch (error) {
       console.error('Error in SecureAuthStorage.get():', error);
       return null;
@@ -68,16 +47,9 @@ const directus = createDirectus(API_BASE_URL)
 // Export a helper function to get the current token
 export const getCurrentToken = async (): Promise<string | null> => {
   try {
-    // First try to get from secure storage
+    // Get from secure storage only
     const tokens = await getTokens();
-    if (tokens?.accessToken) {
-      return tokens.accessToken;
-    }
-    
-    // Fallback to Redux
-    const state = store.getState();
-    const token = selectAccessToken(state);
-    return token ?? null; // Convert undefined to null
+    return tokens?.accessToken || null;
   } catch (error) {
     console.error('Error getting current token:', error);
     return null;
@@ -85,8 +57,21 @@ export const getCurrentToken = async (): Promise<string | null> => {
 };
 
 // Export a helper function to get the current auth state
-export const getAuthState = () => {
-  return selectAuthState(store.getState());
+export const getAuthState = async () => {
+  try {
+    const tokens = await getTokens();
+    return {
+      tokens,
+      status: tokens ? 'succeeded' : 'idle',
+      error: null
+    };
+  } catch (error) {
+    return {
+      tokens: null,
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
 };
 
 export default directus;

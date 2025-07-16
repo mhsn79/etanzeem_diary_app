@@ -67,3 +67,6 @@ export interface CreatePersonPayload {
 export interface UpdatePersonPayload extends Partial<CreatePersonPayload> {
   id: number;
 }
+
+// Default export to satisfy Expo Router
+export default {};

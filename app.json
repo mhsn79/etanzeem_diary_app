@@ -30,15 +30,16 @@
     "plugins": [
       "expo-router",
       "expo-notifications", 
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 800,
-          "imageHight":500,
-          "resizeMode": "contain"
-        }
-      ],
+        [
+          "expo-splash-screen",
+          {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 1563,
+            "imageHeight": 3383,
+            "resizeMode": "contain",
+            "backgroundColor": "#008CFF"
+          }
+        ],
       [
         "expo-font",
         {
@@ -54,10 +55,10 @@
       "typedRoutes": true
     },
     "extra": {
-
       "router": {
         "origin": false
       },
+      "initialRouteName": "splash",
       "eas": {
         "projectId": "c94ec490-9e85-465c-bc59-cc7825b5312a",
         "owner": "jiislamabad"

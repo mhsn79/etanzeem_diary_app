@@ -233,3 +233,15 @@ export const getCalculationButtonText = (aggregateFunc: string | null): string =
       return 'حساب کریں';
   }
 };
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  normalizeEntities,
+  calculateSectionProgress,
+  calculateAverageSectionProgress,
+  calculateOverallProgress,
+  findAnswerForQuestion,
+  isQuestionAnswered,
+  calculateAutoValue,
+  isAutoQuestion,
+  getCalculationButtonText
+};

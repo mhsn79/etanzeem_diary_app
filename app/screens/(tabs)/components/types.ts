@@ -34,3 +34,6 @@ export interface IconProps {
   style?: any;
   name?: string;
 }
+
+// Default export to satisfy Expo Router
+export default {};

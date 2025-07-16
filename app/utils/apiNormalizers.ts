@@ -230,3 +230,16 @@ export function normalizeTanzeemiUnitData<T extends Record<string, any>>(data: T
 export function normalizeTanzeemiUnitDataArray<T extends Record<string, any>>(dataArray: T[]): (T & Partial<TanzeemiUnit>)[] {
   return normalizeDataArray<T, TanzeemiUnit>(dataArray, tanzeemiUnitFieldMappings);
 }
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  normalizeData,
+  normalizeDataArray,
+  normalizePersonData,
+  normalizePersonDataArray,
+  normalizeActivityData,
+  normalizeActivityDataArray,
+  normalizeActivityTypeData,
+  normalizeActivityTypeDataArray,
+  normalizeTanzeemiUnitData,
+  normalizeTanzeemiUnitDataArray
+};

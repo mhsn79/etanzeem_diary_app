@@ -22,3 +22,8 @@ export function formatDate(date: Date, formatStr: string = 'yyyy-MM-dd'): string
   // Return ISO string as fallback for unsupported formats
   return date.toISOString().split('T')[0];
 }
+
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  formatDate
+};

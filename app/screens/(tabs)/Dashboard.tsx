@@ -135,7 +135,7 @@ const Dashboard = () => {
         dispatch(fetchUserTanzeemiUnit(unitId));
       }
     }
-  }, [userDetails?.id, userDetails?.Tanzeemi_Unit, userDetails?.unit, dispatch]);
+  }, [userDetails?.id, userDetails?.Tanzeemi_Unit, userDetails?.unit]);
 
 
 
@@ -145,7 +145,7 @@ const Dashboard = () => {
       console.log('Dashboard: Initializing selected unit to user unit:', userUnit.id);
       dispatch(setDashboardSelectedUnit(userUnit.id));
     }
-  }, [userUnit, selectedUnitId, dispatch]);
+  }, [userUnit, selectedUnitId]);
 
   // Get parent unit for display unit
   const parentUnit = useSelector((state: any) => {
@@ -159,24 +159,8 @@ const Dashboard = () => {
     return state.tanzeem.entities[parentUnit.Parent_id];
   });
 
-  // Fetch parent unit if not available when display unit changes
-  useEffect(() => {
-    if (displayUnit && displayUnit.Parent_id && !parentUnit) {
-      const parentId = displayUnit.Parent_id;
-      console.log('Dashboard: Fetching parent unit:', parentId);
-      dispatch(fetchUserTanzeemiUnit(parentId));
-    }
-  }, [displayUnit, parentUnit, dispatch]);
-
-  // Fetch grandparent unit if not available when parent unit changes
-  useEffect(() => {
-    if (parentUnit && parentUnit.Parent_id && !grandparentUnit) {
-      const grandparentId = parentUnit.Parent_id;
-      console.log('Dashboard: Fetching grandparent unit:', grandparentId);
-      dispatch(fetchUserTanzeemiUnit(grandparentId));
-    }
-  }, [parentUnit, grandparentUnit, dispatch]);
-
+  // Note: Parent and grandparent units are already fetched by fetchAndProcessHierarchy
+  // No need for separate useEffect hooks to fetch them
 
 
   const durationItemNames: Option[] = [
@@ -276,7 +260,7 @@ const Dashboard = () => {
     router.push('/screens/ActivityScreen');
   };
 
-  debugLog('Dashboard User Details:', userDetails);
+  // debugLog('Dashboard User Details:', userDetails);
   // debugLog('Dashboard User Unit Status:', userUnitStatus);
   // debugLog('Dashboard User Unit Error:', userUnitError);
   // debugLog('Dashboard Nazim Details:', nazimDetails);

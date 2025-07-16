@@ -46,6 +46,8 @@ interface ReportsViewProps {
   title?: string;
   onBack?: () => void;
   extraScrollContentStyle?: object;
+  selectedUnit?: any;
+  selectedUnitId?: number;
 }
 
 // Helper function to determine if a management period is currently open
@@ -120,6 +122,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   title = "رپورٹ مینجمنٹ",
   onBack,
   extraScrollContentStyle = {},
+  selectedUnit,
+  selectedUnitId,
 }) => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -148,6 +152,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   
   // Ref to track the last management ID we initialized QA data for
   const lastMgmtIdRef = useRef<number | null>(null);
+  
+  // Ref to track if we've already fetched data for the current unit
+  const lastFetchedUnitIdRef = useRef<number | null>(null);
+  
+  // Ref to track the last fetch time to prevent rapid successive calls
+  const lastFetchTimeRef = useRef<number>(0);
 
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
@@ -160,116 +170,101 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   const qaState = useSelector(selectQAState);
   const overallProgress = useSelector(selectOverallProgress);
 
+  // Use selected unit if available, otherwise fall back to user unit
+  const displayUnit = selectedUnit || userUnitDetails;
+  const displayUnitId = selectedUnitId || userUnitDetails?.id;
+
+  // Debug log for unit selection (only log when unit changes)
+  useEffect(() => {
+    console.log('[ReportsView] Unit selection:', {
+      selectedUnitId,
+      userUnitId: userUnitDetails?.id,
+      displayUnitId,
+      displayUnitName: displayUnit?.Name
+    });
+  }, [selectedUnitId, userUnitDetails?.id, displayUnitId, displayUnit?.Name]);
+
   // Find currently open management and existing draft submission
   const currentlyOpenManagement = useMemo(() => {
-    console.log('[ReportsView] Raw reportMgmtDetails:', JSON.stringify(reportMgmtDetails, null, 2));
-    
     if (reportMgmtDetails.length === 0) {
-      console.log('[ReportsView] No report management details available');
       return null;
     }
     
     const allManagements = reportMgmtDetails.flatMap(report => report.managements);
-    console.log('[ReportsView] All managements:', JSON.stringify(allManagements, null, 2));
-    
-    // Test date parsing for each management
-    allManagements.forEach((management, index) => {
-      console.log(`[ReportsView] Testing management ${index}:`, {
-        id: management.id,
-        startDate: management.reporting_start_date,
-        endDate: management.reporting_end_date,
-        parsedStartDate: new Date(management.reporting_start_date).toISOString(),
-        parsedEndDate: new Date(management.reporting_end_date).toISOString(),
-        isStartDateValid: !isNaN(new Date(management.reporting_start_date).getTime()),
-        isEndDateValid: !isNaN(new Date(management.reporting_end_date).getTime())
-      });
-    });
-    
     const openManagement = findCurrentlyOpenManagement(allManagements);
     
-    console.log('[ReportsView] Management periods analysis:', {
-      totalManagements: allManagements.length,
-      openManagement: openManagement ? {
-        id: openManagement.id,
-        month: openManagement.month,
-        year: openManagement.year,
-        startDate: openManagement.reporting_start_date,
-        endDate: openManagement.reporting_end_date
-      } : null,
-      allManagements: allManagements.map(m => ({
-        id: m.id,
-        month: m.month,
-        year: m.year,
-        startDate: m.reporting_start_date,
-        endDate: m.reporting_end_date
-      }))
-    });
-    
     return openManagement;
-  }, [reportMgmtDetails]);
+  }, [reportMgmtDetails.length, reportMgmtDetails[0]?.managements?.length]);
 
-  const existingDraftSubmission = useMemo(() => {
-    if (!currentlyOpenManagement) return null;
-    const draft = findDraftSubmissionForManagement(reportSubmissions, currentlyOpenManagement.id);
+  // Find the latest submitted report for the selected unit
+  const latestSubmittedReport = useMemo(() => {
+    if (!displayUnitId) return null;
     
-    console.log('[ReportsView] Draft submission analysis:', {
-      currentManagementId: currentlyOpenManagement.id,
-      totalSubmissions: reportSubmissions.length,
-      draftSubmission: draft ? {
-        id: draft.id,
-        status: draft.status,
-        mgmt_id: draft.mgmt_id,
-        unit_id: draft.unit_id
-      } : null,
-      allSubmissions: reportSubmissions.map(s => ({
-        id: s.id,
-        status: s.status,
-        mgmt_id: s.mgmt_id,
-        unit_id: s.unit_id
-      }))
+    // Filter submissions for the selected unit and get the latest published one
+    const unitSubmissions = reportSubmissions.filter(submission => 
+      submission.unit_id === displayUnitId && submission.status === 'published'
+    );
+    
+    if (unitSubmissions.length === 0) return null;
+    
+    // Sort by date_created and get the latest
+    const sorted = unitSubmissions.sort((a, b) => {
+      const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
+      const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
+      return dateB - dateA;
     });
+    
+    return sorted[0];
+  }, [reportSubmissions.length, displayUnitId]);
+
+  // Find existing draft submission for the selected unit and current management
+  const existingDraftSubmission = useMemo(() => {
+    if (!currentlyOpenManagement || !displayUnitId) return null;
+    
+    const draft = reportSubmissions.find(submission => 
+      submission.unit_id === displayUnitId &&
+      submission.mgmt_id === currentlyOpenManagement.id && 
+      (submission.status === 'draft' || submission.status === 'pending')
+    );
     
     return draft;
-  }, [reportSubmissions, currentlyOpenManagement]);
+  }, [reportSubmissions.length, currentlyOpenManagement?.id, displayUnitId]);
 
   // Determine if we should show the current report section
   const shouldShowCurrentReport = useMemo(() => {
     const shouldShow = currentlyOpenManagement && 
            reportMgmtDetails.length > 0 && 
-           reportMgmtDetails[0]?.template;
+           reportMgmtDetails[0]?.template &&
+           displayUnitId;
     
-    console.log('[ReportsView] Should show current report:', {
-      shouldShow,
-      hasCurrentlyOpenManagement: !!currentlyOpenManagement,
-      hasReportMgmtDetails: reportMgmtDetails.length > 0,
-      hasTemplate: !!reportMgmtDetails[0]?.template
-    });
-    
-    // TEMPORARY: Force show for debugging if we have any management data
-    // Also show if we're in loading state to prevent "no active report" message
-    const forceShow = reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template;
-    const showDuringLoading = loading && reportMgmtDetails.length > 0;
-    console.log('[ReportsView] Force show for debugging:', forceShow, 'Show during loading:', showDuringLoading);
+    // Show if we have any management data and a selected unit
+    const forceShow = reportMgmtDetails.length > 0 && reportMgmtDetails[0]?.template && displayUnitId;
+    const showDuringLoading = loading && reportMgmtDetails.length > 0 && displayUnitId;
     
     return forceShow || shouldShow || showDuringLoading;
-  }, [currentlyOpenManagement, reportMgmtDetails, loading]);
+  }, [currentlyOpenManagement?.id, reportMgmtDetails.length, loading, displayUnitId]);
 
   // Memoized filtered submissions
   const filteredSubmissions = useMemo(() => {
-    // First filter by status based on selected tab
-    const filtered = reportSubmissions.filter((submission) =>
+    // First filter by unit (only show reports for the selected unit)
+    const unitFiltered = reportSubmissions.filter((submission) => 
+      submission.unit_id === displayUnitId
+    );
+    
+    // Then filter by status based on selected tab
+    const statusFiltered = unitFiltered.filter((submission) =>
       selectedTab === 0
         ? submission.status === 'published'
         : submission.status === 'draft' || submission.status === 'pending'
     );
     
     // Then sort by date_created in descending order (newest first)
-    return filtered.sort((a, b) => {
+    return statusFiltered.sort((a, b) => {
       const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
       const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
       return dateB - dateA; // Descending order (newest first)
     });
-  }, [reportSubmissions, selectedTab]);
+  }, [reportSubmissions.length, selectedTab, displayUnitId]);
 
   // Default back handler if none provided
   const defaultBackHandler = useCallback(() => {
@@ -306,13 +301,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({
           return;
         }
         
-        // Check if there's already a published report for this management period
+        // Check if there's already a published report for this management period and unit
         const hasPublishedReport = reportSubmissions.some(
-          submission => submission.mgmt_id === currentMgmt.id && submission.status === 'published'
+          submission => submission.mgmt_id === currentMgmt.id && 
+                       submission.status === 'published' && 
+                       submission.unit_id === displayUnitId
         );
         
         if (hasPublishedReport) {
-          // If report is already submitted, show a message or navigate to view submitted reports
+          // If report is already submitted for this unit, navigate to view submitted reports
           router.push(ROUTES.ALL_REPORTS);
           return;
         }
@@ -320,7 +317,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         // Check if there's already a draft submission for this management period
         const existingDraft = existingDraftSubmission;
         
-        if (existingDraft) {
+        if (existingDraft && existingDraft.id) {
           // If there's already a draft, navigate to edit it
           console.log('Navigating to edit existing draft submission:', existingDraft.id);
           router.push({
@@ -345,7 +342,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
             params: { 
               templateId: reportMgmtDetails[0].template.id.toString(),
               managementId: currentMgmt.id.toString(),
-              unitId: userUnitDetails?.id?.toString() || ''
+              unitId: displayUnit?.id?.toString() || ''
             }
           });
         } else {
@@ -357,138 +354,117 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       .catch(error => {
         console.error('Error refreshing token before navigation:', error);
       });
-  }, [router, reportMgmtDetails, reportSubmissions, currentlyOpenManagement, existingDraftSubmission, userUnitDetails, ensureFreshTokenBeforeOperation]);
+  }, [router, reportMgmtDetails, reportSubmissions, currentlyOpenManagement?.id, existingDraftSubmission?.id, displayUnit?.id, ensureFreshTokenBeforeOperation]);
 
   // Combined function to fetch all necessary data with token refresh
   const fetchAllData = useCallback(async (forceQARefresh = false) => {
-    console.log('[ReportsView] Refreshing data...', {
-      userUnitDetails: userUnitDetails ? {
-        id: userUnitDetails.id,
-        Name: userUnitDetails.Name,
-        Level_id: userUnitDetails.Level_id
-      } : null
-    });
-    
     try {
-      if (!userUnitDetails) {
-        console.error('[ReportsView] User unit details not available');
+      if (!displayUnit?.id) {
+        console.error('[ReportsView] Display unit details not available');
         return;
       }
+      
+      // Debounce: skip if called again within 2 seconds
+      const now = Date.now();
+      if (!forceQARefresh && lastFetchedUnitIdRef.current === displayUnit.id && now - lastFetchTimeRef.current < 2000) {
+        return;
+      }
+      
+      // Mark fetch
+      lastFetchedUnitIdRef.current = displayUnit.id;
+      lastFetchTimeRef.current = now;
       
       // First ensure we have a fresh token
       await ensureFreshTokenBeforeOperation();
       
       // Step 1: Fetch reports data
-      console.log('[ReportsView] Fetching reports data...');
-      const reportsResult = await dispatch(fetchReportsByUnitId(userUnitDetails.id));
+      const reportsResult = await dispatch(fetchReportsByUnitId(displayUnit.id));
       const submissionsResult = await dispatch(fetchReportSubmissions());
-      console.log('[ReportsView] Reports data fetched successfully:', {
-        reportsResult: reportsResult.payload,
-        submissionsResult: submissionsResult.payload
-      });
       
-      // Step 2: Check if we need to initialize QA data
-      // Use the currently open management period
-      const currentReportMgmt = reportMgmtDetails?.[0] || null;
-      const currentManagement = currentlyOpenManagement || currentReportMgmt?.managements?.[0];
-      console.log('Report management details:', currentReportMgmt, 'Current management:', currentManagement);
-      
-      if (!currentReportMgmt || !currentReportMgmt.template?.id || !currentManagement) {
-        console.log('No report management details available for QA initialization');
-        return;
-      }
-      
-      const templateId = currentReportMgmt.template.id;
-      const managementId = currentManagement.id;
-      
-      // Only initialize QA data if:
-      // 1. We're forcing a refresh, OR
-      // 2. We haven't initialized it yet, OR
-      // 3. The template or management ID has changed
-      if (
-        forceQARefresh || 
-        !qaInitializedRef.current || 
-        lastTemplateIdRef.current !== templateId ||
-        lastMgmtIdRef.current !== managementId
-      ) {
-        console.log('Initializing QA data for template:', templateId);
+              // Step 2: Check if we need to initialize QA data
+        // Use the currently open management period
+        const currentReportMgmt = reportMgmtDetails?.[0] || null;
+        const currentManagement = currentlyOpenManagement || currentReportMgmt?.managements?.[0];
         
-        try {
-          await dispatch(initializeReportData({
-            template_id: templateId,
-            unit_id: userUnitDetails.id,
-            mgmt_id: managementId
-          }));
-          
-          // Update our refs to track that we've initialized QA data
-          qaInitializedRef.current = true;
-          lastTemplateIdRef.current = templateId;
-          lastMgmtIdRef.current = managementId;
-          
-          console.log('QA data initialized successfully');
-        } catch (qaError) {
-          console.error('Error initializing QA data:', qaError);
-          // Don't rethrow - we want to continue even if QA initialization fails
+        if (!currentReportMgmt || !currentReportMgmt.template?.id || !currentManagement) {
+          return;
         }
-      } else {
-        console.log('Skipping QA data initialization - already initialized for this template/management');
-      }
+        
+        const templateId = currentReportMgmt.template.id;
+        const managementId = currentManagement.id;
+        
+        // Only initialize QA data if:
+        // 1. We're forcing a refresh, OR
+        // 2. We haven't initialized it yet, OR
+        // 3. The template or management ID has changed
+        if (
+          forceQARefresh || 
+          !qaInitializedRef.current || 
+          lastTemplateIdRef.current !== templateId ||
+          lastMgmtIdRef.current !== managementId
+        ) {
+          try {
+            await dispatch(initializeReportData({
+              template_id: templateId,
+              unit_id: displayUnit.id,
+              mgmt_id: managementId
+            }));
+            
+            // Update our refs to track that we've initialized QA data
+            qaInitializedRef.current = true;
+            lastTemplateIdRef.current = templateId;
+            lastMgmtIdRef.current = managementId;
+          } catch (qaError) {
+            console.error('Error initializing QA data:', qaError);
+            // Don't rethrow - we want to continue even if QA initialization fails
+          }
+        }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-  }, [userUnitDetails, dispatch, ensureFreshTokenBeforeOperation, currentlyOpenManagement]);
+  }, [displayUnit?.id, dispatch, ensureFreshTokenBeforeOperation, currentlyOpenManagement?.id]);
 
   // Ensure we have a fresh token when the component mounts
   useEffect(() => {
     refreshTokenIfNeeded();
   }, []);
 
-  // Fetch all data on initial mount and clean up on unmount
+  // Only trigger fetch on unit change or force
   useEffect(() => {
-    if (userUnitDetails) {
-      // On initial mount, force QA refresh
+    if (displayUnit?.id) {
+      if (lastFetchedUnitIdRef.current !== displayUnit.id) {
+        lastFetchedUnitIdRef.current = null;
+        lastFetchTimeRef.current = 0;
+      }
       fetchAllData(true);
     }
-    
-    // Clean up function to reset state when component unmounts
     return () => {
       highlightedSubmissionsRef.current.clear();
       setLatestSubmissionId(null);
       qaInitializedRef.current = false;
       lastTemplateIdRef.current = null;
       lastMgmtIdRef.current = null;
+      lastFetchedUnitIdRef.current = null;
+      lastFetchTimeRef.current = 0;
     };
-  }, [userUnitDetails, fetchAllData]);
+  }, [displayUnit?.id, fetchAllData]);
   
-  // Refresh data when screen comes into focus
+  // Only fetch on focus if not already fetched for this unit
   useFocusEffect(
     useCallback(() => {
-      console.log('ReportsView is focused, refreshing data...');
-      
-      // When screen comes into focus, mark that we should reset highlighted submissions
-      // This will allow us to highlight new submissions when coming back from CreateReportScreen
       shouldResetHighlightedRef.current = true;
-      
-      // When coming back from creating/editing a report, force QA refresh
-      const shouldForceQARefresh = true;
-      
-      // Refresh token and then fetch all data
-      refreshTokenIfNeeded()
-        .then(() => {
-          if (userUnitDetails) {
-            return fetchAllData(shouldForceQARefresh);
-          }
-        })
-        .catch(error => {
-          dispatch(logout());
-          console.error('Error refreshing token on focus:', error);
-        });
-      
+      if (displayUnit?.id && !loading && lastFetchedUnitIdRef.current !== displayUnit.id) {
+        refreshTokenIfNeeded()
+          .then(() => fetchAllData(false))
+          .catch(error => {
+            dispatch(logout());
+            console.error('Error refreshing token on focus:', error);
+          });
+      }
       return () => {
         // Cleanup function when screen loses focus (optional)
-        console.log('ReportsView lost focus');
       };
-    }, [userUnitDetails, fetchAllData, refreshTokenIfNeeded])
+    }, [displayUnit?.id, fetchAllData, refreshTokenIfNeeded, loading])
   );
   
   // Effect to highlight the latest submission when reportSubmissions changes
@@ -575,7 +551,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
             // Ensure we have a fresh token before retrying
             refreshTokenIfNeeded()
               .then(() => {
-                if (userUnitDetails) {
+                if (displayUnit) {
                   // Force QA refresh on retry
                   return fetchAllData(true);
                 }
@@ -653,7 +629,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>
-                      {userUnitDetails?.Name ?? 'نامعلوم'}
+                      {displayUnit?.Name ?? 'نامعلوم'}
                     </UrduText>
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -667,7 +643,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <UrduText style={styles.reportSummaryItemValue}>اسٹیٹس</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>
-                      {existingDraftSubmission ? 'زیرِ تکمیل' : 'نئی رپورٹ'}
+                      {existingDraftSubmission ? 'زیرِ تکمیل' : 
+                       latestSubmittedReport ? 'آخری جمع شدہ رپورٹ' : 'نئی رپورٹ'}
                     </UrduText>
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -714,8 +691,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         <View style={styles.reportSection}>
           <TabGroup
             tabs={[
-              { label: 'سابقہ / جمع شدہ رپورٹس', value: 0 },
-              { label: 'ڈیو/اوور ڈیو رپورٹ', value: 1 },
+              { label: 'جمع شدہ رپورٹس', value: 0 },
+              { label: 'ڈیو/اوور ڈیو رپورٹس', value: 1 },
             ]}
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}

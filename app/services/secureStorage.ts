@@ -113,3 +113,6 @@ export const clearTokens = async (): Promise<void> => {
     delete memoryCache[STORAGE_KEYS.EXPIRES_AT];
   }
 };
+
+// Default export to satisfy Expo Router
+export default {};

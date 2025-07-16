@@ -4,7 +4,7 @@ import { useAppDispatch } from '../src/hooks/useAppDispatch';
 import { selectIsAuthenticated, initializeAuth } from './features/auth/authSlice';
 import { useEffect } from 'react';
 
-export default function Index() {
+function IndexContent() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const dispatch = useAppDispatch();
 
@@ -16,7 +16,16 @@ export default function Index() {
     }
   }, [isAuthenticated, dispatch]);
 
-  return isAuthenticated
-    ? <Redirect href="/screens/Dashboard" />
-    : <Redirect href="/screens/LoginScreen" />;
+  // The AuthGuard in _layout.tsx will handle the navigation logic
+  // This component just needs to redirect based on authentication state
+  // Use a simple approach that doesn't conflict with AuthGuard
+  if (isAuthenticated) {
+    return <Redirect href="/screens/(tabs)/Dashboard" />;
+  } else {
+    return <Redirect href="/screens/LoginScreen" />;
+  }
+}
+
+export default function Index() {
+  return <IndexContent />;
 }

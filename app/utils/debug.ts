@@ -21,4 +21,12 @@ export const debugBreakpoint = () => {
   if (__DEV__) {
     debugger;
   }
+};
+
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  debugLog,
+  debugWarn,
+  debugError,
+  debugBreakpoint
 }; 

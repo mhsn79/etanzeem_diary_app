@@ -13,6 +13,16 @@ import { directApiRequest } from '../../services/apiClient';
 import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
 
+// Singleton variables for token refresh and logout management
+let refreshPromise: Promise<any> | null = null;
+let logoutInProgress = false;
+
+// Function to reset singleton variables (useful for testing or app restart)
+export const resetAuthSingletons = () => {
+  refreshPromise = null;
+  logoutInProgress = false;
+};
+
 // Helper function for making API requests during login when tokens are available but not in Redux store
 const loginApiRequest = async <T>(
   endpoint: string,
@@ -862,6 +872,14 @@ export const logout = createAsyncThunk(
     try {
       console.log(`[Auth] Starting logout process (${Platform.OS})`);
       
+      // Reset singleton variables
+      refreshPromise = null;
+      logoutInProgress = false;
+      
+      // Clean up background refresh
+      const { cleanupBackgroundRefresh } = await import('../../utils/authCleanup');
+      cleanupBackgroundRefresh();
+      
       // First clear tokens from secure storage
       try {
         await clearTokens();
@@ -925,6 +943,18 @@ export const logout = createAsyncThunk(
         console.error(`[Auth] Error setting error message: ${toastError} (${Platform.OS})`);
       }
       
+      // Navigate to login screen
+      try {
+        const { router } = await import('expo-router');
+        console.log(`[Auth] Navigating to login screen (${Platform.OS})`);
+        // Use setTimeout to ensure navigation happens after the current render cycle
+        setTimeout(() => {
+          router.replace('/screens/LoginScreen');
+        }, 100);
+      } catch (navigationError) {
+        console.error(`[Auth] Error navigating to login screen: ${navigationError} (${Platform.OS})`);
+      }
+      
       console.log(`[Auth] Logout complete (${Platform.OS})`);
       
       return true;
@@ -966,15 +996,39 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
   }
 
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
+    // If a refresh is already in progress, wait for it
+    if (refreshPromise) {
+      try {
+        await refreshPromise;
+        return;
+      } catch (error) {
+        // If the ongoing refresh failed, we'll handle it below
+        refreshPromise = null;
+      }
+    }
+
+    // Start a new refresh
     try {
       console.log('Token is expired or about to expire, refreshing in checkAndRefreshTokenIfNeeded');
-      await dispatch(refresh()).unwrap();
+      refreshPromise = dispatch(refresh()).unwrap();
+      await refreshPromise;
       console.log('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
     } catch (error) {
       console.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
-      // If refresh fails, we should log the user out completely
-      await dispatch(logout()).unwrap();
+      refreshPromise = null;
+      
+      // Prevent multiple logout calls
+      if (!logoutInProgress) {
+        logoutInProgress = true;
+        try {
+          await dispatch(logout('Authentication expired. Please log in again.')).unwrap();
+        } finally {
+          logoutInProgress = false;
+        }
+      }
       throw new Error('Authentication expired. Please log in again.');
+    } finally {
+      refreshPromise = null;
     }
   }
 });

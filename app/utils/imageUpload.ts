@@ -149,3 +149,13 @@ export const getImageUrl = (imageId: string): string => {
   if (!imageId) return '';
   return `${API_BASE_URL}/assets/${imageId}`;
 };
+
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  requestMediaPermissions,
+  pickImageFromCamera,
+  pickImageFromLibrary,
+  showImagePickerOptions,
+  uploadImage,
+  getImageUrl
+};

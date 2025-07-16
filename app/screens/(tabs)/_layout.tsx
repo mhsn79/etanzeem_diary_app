@@ -1,15 +1,17 @@
 import { Tabs } from "expo-router";
 import TabBar from "@/app/components/TabBar";
+import AuthGuard from "@/app/components/AuthGuard";
 
 export default function TabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-      }}
-      initialRouteName="Dashboard"
-      tabBar={(props) => <TabBar {...props} />}
-    >
+    <AuthGuard requireAuth={true}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+        }}
+        initialRouteName="Dashboard"
+        tabBar={(props) => <TabBar {...props} />}
+      >
       <Tabs.Screen
         name="Reports"
         options={{
@@ -29,12 +31,13 @@ export default function TabLayout() {
           tabBarLabel: "ارکان"
         }}
       />
-      <Tabs.Screen
-        name="Dashboard"
-        options={{
-          tabBarLabel: "ڈیش بورڈ"
-        }}
-      />
-    </Tabs>
+              <Tabs.Screen
+          name="Dashboard"
+          options={{
+            tabBarLabel: "ڈیش بورڈ"
+          }}
+        />
+      </Tabs>
+    </AuthGuard>
   );
 }

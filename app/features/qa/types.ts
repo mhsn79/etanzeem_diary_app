@@ -117,3 +117,6 @@ export interface QAState {
   submitStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   submitError: string | null;
 }
+
+// Default export to satisfy Expo Router
+export default {};

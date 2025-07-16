@@ -67,4 +67,7 @@ export const mmkvStorage: Storage = {
       throw error;
     }
   },
-}; 
+};
+
+// Default export to satisfy Expo Router
+export default {}; 

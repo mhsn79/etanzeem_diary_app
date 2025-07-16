@@ -5,3 +5,6 @@ export { default as DropdownSection } from './DropdownSection';
 export { default as ScheduleCard } from './ScheduleCard';
 export { default as UnitSelectionModal } from './UnitSelectionModal';
 export * from './types';
+
+// Default export to satisfy Expo Router
+export default {};

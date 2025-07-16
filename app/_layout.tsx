@@ -1,8 +1,8 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from "react";
+import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import React from 'react';
 import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
@@ -13,10 +13,13 @@ import { useLanguage } from "../app/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
-import { useNavigationState,getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { useNavigationState, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
 import { store, persistor } from '@/app/store';              // ← adjust paths if needed
 import { usePushNotifications } from "@/src/hooks/usePushNotifications";
+import AuthGuard from './components/AuthGuard';
+import { useTokenRefresh } from './utils/tokenRefresh';
+import DebugPanel from './components/DebugPanel';
 
 
 // Force RTL layout for the entire app
@@ -42,7 +45,7 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
   const currentRoute = state?.routes[state.index];
 
   // Helper function to recursively get nested routes
-  const getFullPath = (state: any) => {
+  const getFullPath = (state: any): string => {
     const route = state.routes[state.index];
     let fullPath = route.name;
 
@@ -117,40 +120,93 @@ export default function RootLayout() {
   const token = usePushNotifications();
   console.log('token',token);
   
+  // Debug panel state (only in development)
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  
 
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-    <LanguageProvider>
-      <Stack
-        screenOptions={{
-          header: (props) => <CustomHeader {...props} />,
-          headerStyle: {
-            backgroundColor: COLORS.primary,
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          animation: 'slide_from_right',
-          animationDuration: 200,
-        }}
-      >
-        <Stack.Screen name="splash" options={{ headerShown: false }} />
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="screens/(tabs)" 
-         options={({ route }) => {
-          // If no tab is focused yet, you’ll get undefined: default to TRUE.
-          const focused = getFocusedRouteNameFromRoute(route);
-          const hideForActivities = focused === "Activities";
-          return { headerShown: !hideForActivities };
-        }} />
-        <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
-      </Stack>
-    </LanguageProvider>
-    </PersistGate>
+        <LanguageProvider>
+          <AppContent 
+            showDebugPanel={showDebugPanel}
+            setShowDebugPanel={setShowDebugPanel}
+          />
+        </LanguageProvider>
+      </PersistGate>
     </Provider>
+  );
+}
+
+// Separate component to use Redux hooks after Provider is available
+function AppContent({ 
+  showDebugPanel, 
+  setShowDebugPanel 
+}: { 
+  showDebugPanel: boolean; 
+  setShowDebugPanel: (show: boolean) => void; 
+}) {
+  // Initialize automatic token refresh (now inside Provider)
+  useTokenRefresh();
+  
+  return (
+    <>
+      {/* Debug Panel (only in development) */}
+      {__DEV__ && (
+        <DebugPanel 
+          isVisible={showDebugPanel} 
+          onToggle={() => setShowDebugPanel(!showDebugPanel)} 
+        />
+      )}
+      
+      {/* Debug Toggle Button (only in development) */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 50,
+            right: 10,
+            width: 40,
+            height: 40,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            borderRadius: 20,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999,
+          }}
+          onPress={() => setShowDebugPanel(!showDebugPanel)}
+        >
+          <Text style={{ color: 'white', fontSize: 16 }}>🐛</Text>
+        </TouchableOpacity>
+      )}
+      
+      <Stack
+          screenOptions={{
+            header: (props) => <CustomHeader {...props} />,
+            headerStyle: {
+              backgroundColor: COLORS.primary,
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+            animation: 'slide_from_right',
+            animationDuration: 200,
+          }}
+        >
+          <Stack.Screen name="splash" options={{ headerShown: false, animation: 'none' }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
+          <Stack.Screen name="screens/(tabs)" 
+           options={({ route }) => {
+            // If no tab is focused yet, you'll get undefined: default to TRUE.
+            const focused = getFocusedRouteNameFromRoute(route);
+            const hideForActivities = focused === "Activities";
+            return { headerShown: !hideForActivities };
+          }} />
+          <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
+        </Stack>
+    </>
   );
 }
 

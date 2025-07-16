@@ -4,9 +4,7 @@
     <item name="android:editTextStyle">@style/ResetEditText</item>
     <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     <item name="colorPrimary">@color/colorPrimary</item>
-    <item name="android:statusBarColor">#ffffff</item>
-    <item name="android:datePickerDialogTheme">@style/Dialog.Theme</item>
-    <item name="android:timePickerDialogTheme">@style/Dialog.Theme</item>
+    <item name="android:statusBarColor">#008CFF</item>
   </style>
   <style name="ResetEditText" parent="@android:style/Widget.EditText">
     <item name="android:padding">0dp</item>
@@ -17,27 +15,5 @@
     <item name="windowSplashScreenBackground">@color/splashscreen_background</item>
     <item name="windowSplashScreenAnimatedIcon">@drawable/splashscreen_logo</item>
     <item name="postSplashScreenTheme">@style/AppTheme</item>
-  </style>
-  <style name="Dialog.Theme" parent="Theme.AppCompat.Light.Dialog">
-    <item name="colorAccent">#008CFF</item>
-    <item name="colorPrimary">#008CFF</item>
-    <item name="android:colorPrimary">#008CFF</item>
-    <item name="android:buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
-    <item name="android:buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
-  </style>
-  
-  <style name="PositiveButtonStyle" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
-    <item name="android:textColor">#FFFFFF</item>
-    <item name="android:background">@drawable/positive_button_background</item>
-    <item name="android:layout_marginEnd">8dp</item>
-    <item name="android:minWidth">64dp</item>
-  </style>
-  
-  <style name="NegativeButtonStyle" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
-    <item name="android:textColor">#FFFFFF</item>
-    <item name="android:background">@drawable/negative_button_background</item>
-    <item name="android:layout_marginStart">8dp</item>
-    <item name="android:layout_marginEnd">8dp</item>
-    <item name="android:minWidth">64dp</item>
   </style>
 </resources>

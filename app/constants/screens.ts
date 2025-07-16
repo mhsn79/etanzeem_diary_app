@@ -115,3 +115,12 @@ const title = SCREEN_TITLES[SCREENS.DASHBOARD];
 // or
 const title = getScreenTitle(SCREENS.DASHBOARD);
 */ 
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  SCREEN_GROUPS,
+  SCREENS,
+  SCREEN_PATHS,
+  SCREEN_TITLES,
+  getScreenPath,
+  getScreenTitle
+};

@@ -116,3 +116,13 @@ export const toUrduDigits = (value: number | string): string =>
     .split('')
     .map((d) => EN_TO_URDU_DIGITS_MAP[d] ?? d)
     .join('');
+
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  URDU_MONTHS,
+  getUrduMonth,
+  URDU_WEEKDAYS,
+  getUrduWeekday,
+  formatExpectedCompletion,
+  toUrduDigits
+};

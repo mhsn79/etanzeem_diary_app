@@ -20,4 +20,7 @@ export async function sendPushNotification(
       }),
     });
   }
+
+// Default export to satisfy Expo Router
+export default {};
   

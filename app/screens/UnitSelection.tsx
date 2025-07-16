@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, StatusBar } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, StatusBar, Text, TouchableOpacity, Alert } from 'react-native';
 import i18n from '../i18n';
 import CustomDropdown from '../components/CustomDropdown';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,13 +13,15 @@ import {
   selectSubordinateUnits,
   selectParentUnits,
   selectUserUnit,
-  selectHierarchyStatus,
-  fetchCompleteTanzeemiHierarchy
+  selectHierarchyStatus
 } from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../store';
 import { logout } from '@/app/features/auth/authSlice';
 import { selectUserDetails } from '../features/persons/personSlice';
+import { useAppDispatch } from '../../src/hooks/useAppDispatch';
+import { useAppSelector } from '../../src/hooks/useAppSelector';
+import { useAuthErrorHandler } from '../utils/useAuthErrorHandler';
 interface Option {
   id: string;
   label: string;
@@ -27,7 +29,7 @@ interface Option {
 }
 
 export default function UnitSelection() {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedUC, setSelectedUC] = useState<string | null>(null);
@@ -64,37 +66,17 @@ export default function UnitSelection() {
   const hierarchyStatus = useSelector(selectHierarchyStatus);
   
   const userDetails=useSelector(selectUserDetails);
+  const { authError } = useAuthErrorHandler();
 
-  // Fetch complete hierarchy on component mount
+  // Note: fetchCompleteTanzeemiHierarchy has been removed from the tanzeem hierarchy slice
+  // The correct flow is: login email -> user_id -> Tanzeemi_Unit -> Nazim_id -> Person
+  // This data should already be available through the auth initialization process
   useEffect(() => {
-    // Use a sample email for testing - replace with actual user email in production
-    const userEmail = userDetails?.email||'';// Example email from requirements
-    console.log('Fetching complete hierarchy for user:', userEmail);
-    
-    // Dispatch the action to fetch the complete hierarchy
-    dispatch(fetchCompleteTanzeemiHierarchy(userEmail))
-      .unwrap()
-      .then((result: { hierarchyUnits: any[]; hierarchyIds: number[]; userUnitId: number }) => {
-        console.log('Complete hierarchy fetch succeeded:', result);
-      })
-      .catch((error: unknown) => {
-        console.error('Complete hierarchy fetch failed:', error);
-        
-        // Check if the error is an authentication error
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('Authentication expired')) {
-          console.log('Authentication expired, redirecting to login...');
-          dispatch(logout())
-            .then(() => {
-              router.replace('/screens/LoginScreen');
-            })
-            .catch((err) => {
-              console.error('Error during logout:', err);
-              router.replace('/screens/LoginScreen');
-            });
-        }
-      });
-  }, [dispatch,userDetails]);
+    console.log('UnitSelection: Using existing hierarchy data from auth initialization');
+    console.log('User details:', userDetails);
+    console.log('Hierarchy status:', hierarchyStatus);
+    console.log('Complete hierarchy units:', completeHierarchyUnits.length);
+  }, [userDetails, hierarchyStatus, completeHierarchyUnits]);
   
   // Helper function to check for self-referencing units (parent_id === id)
   // Using useCallback to prevent recreation on each render

@@ -50,15 +50,11 @@ const validatePassword = (password: string): string | null => {
 /*                              SCREEN                                */
 /* ------------------------------------------------------------------ */
 export default function LoginScreen() {
-  debugLog('LoginScreen component rendered');
-  
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectAuthStatus);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const authError = useAppSelector(selectAuthError);
-
-  debugLog('Auth state:', { status, isAuthenticated, authError });
 
   /* Form state */
   const [email, setEmail] = useState('uc39@jiislamabad.org');
@@ -69,22 +65,16 @@ export default function LoginScreen() {
 
   /* Redirect when auth succeeds */
   useEffect(() => {
-    debugLog('useEffect triggered - isAuthenticated:', isAuthenticated);
-    debugLog('Current auth status:', status);
     if (isAuthenticated) {
-      debugLog('User authenticated, redirecting to Dashboard');
-      debugBreakpoint(); // Breakpoint here
-      router.replace('/screens/Dashboard');
+      // Use setTimeout to ensure safe navigation
+      setTimeout(() => {
+        router.replace('/screens/Dashboard');
+      }, 100);
     }
-  }, [isAuthenticated, status]);
+  }, [isAuthenticated]);
 
   /* Check for access denied error */
   useEffect(() => {
-    debugLog('Auth error changed:', authError);
-    if (authError) {
-      debugBreakpoint(); // Breakpoint on auth error
-      debugLog('Auth error detected:', authError);
-    }
     if (authError && authError.includes("don't have any access to the app")) {
       setShowAccessDeniedModal(true);
     }
@@ -98,9 +88,6 @@ export default function LoginScreen() {
 
   /* Submit */
   const handleLogin = () => {
-    debugLog('Login attempt with:', { email, password });
-    debugBreakpoint(); // Breakpoint here for login flow
-    
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
 
@@ -108,12 +95,9 @@ export default function LoginScreen() {
     setPasswordError(pErr);
 
     if (eErr || pErr) {
-      debugLog('Validation errors:', { eErr, pErr });
       return;
     }
 
-    debugLog('Dispatching loginAndFetchUserDetails');
-    debugBreakpoint(); // Breakpoint before API call
     dispatch(loginAndFetchUserDetails({ email, password }));
   };
 

@@ -60,3 +60,7 @@ export const COMMON_IMAGES = {
   profileBackground: require('../../assets/images/profile-background.png'),
   noReport: require('../../assets/images/no-report.png'),
 };
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  COMMON_IMAGES
+};

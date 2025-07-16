@@ -44,3 +44,6 @@ export {
   findAnswerForQuestion,
   isQuestionAnswered
 } from './utils';
+
+// Default export to satisfy Expo Router
+export default {};

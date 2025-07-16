@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store';
-import { selectAuthState } from '../auth/authSlice';
 import { fetchUserTanzeemiUnit } from '../tanzeem/tanzeemSlice';
 import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
 import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
@@ -102,8 +101,8 @@ export const fetchPersonsByUnitId = createAsyncThunk<
 >('persons/fetchByUnitId', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
     // Check if user is authenticated before making API call
-    const authState = getState().auth;
-    if (!authState.tokens?.accessToken) {
+    const auth = getState().auth;
+    if (!auth.tokens?.accessToken) {
       console.log(`[Persons] User not authenticated, skipping fetch persons by unit ID (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
@@ -336,7 +335,7 @@ export const updatePersonImage = createAsyncThunk<
 >('persons/updateImage', async ({ id, imageUri, onProgress }, { getState, dispatch, rejectWithValue }) => {
   try {
     // Get the current token for image upload
-    const auth = selectAuthState(getState());
+    const auth = getState().auth;
     const token = auth.tokens?.accessToken;
     if (!token) return rejectWithValue('No access token');
     

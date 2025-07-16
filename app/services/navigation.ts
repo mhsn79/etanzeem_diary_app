@@ -76,22 +76,5 @@ class NavigationService {
 // Export singleton instance
 export const navigationService = new NavigationService();
 
-// Example usage:
-/*
-import { navigationService } from '../services/navigation';
-import { SCREENS } from '../constants/screens';
-
-// Navigate to CreateReportScreen
-navigationService.navigate(SCREENS.CREATE_REPORT, { 
-  reportId: '123' 
-});
-
-// Reset and navigate to AllReportsScreen
-navigationService.resetAndNavigate(SCREENS.ALL_REPORTS);
-
-// Push CreateReportScreen onto stack
-navigationService.push(SCREENS.CREATE_REPORT);
-
-// Go back
-navigationService.goBack();
-*/ 
+// Default export to satisfy Expo Router
+export default {};

@@ -1,87 +1,123 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
+import { useAppDispatch } from '../../src/hooks/useAppDispatch';
+import { selectAuthState } from '../features/auth/authSlice';
+import { getBackgroundRefreshStatus, triggerBackgroundRefresh } from '../utils/tokenRefresh';
 import { COLORS } from '../constants/theme';
-import { debugLog } from '../utils/debug';
 
 interface DebugPanelProps {
-  visible?: boolean;
+  isVisible?: boolean;
   onToggle?: () => void;
 }
 
-export default function DebugPanel({ visible = false, onToggle }: DebugPanelProps) {
-  const [expanded, setExpanded] = useState(false);
-  
-  // Get various app states for debugging
-  const auth = useAppSelector(state => state.auth);
-  const activities = useAppSelector(state => state.activities);
-  const persons = useAppSelector(state => state.persons);
-  const reportsNew = useAppSelector(state => state.reportsNew);
-  const tanzeem = useAppSelector(state => state.tanzeem);
+export default function DebugPanel({ isVisible = false, onToggle }: DebugPanelProps) {
+  const [refreshStatus, setRefreshStatus] = useState<any>(null);
+  const auth = useAppSelector(selectAuthState);
+  const dispatch = useAppDispatch();
 
-  // Only show debug panel in development
-  if (!__DEV__ || !visible) return null;
+  // Update refresh status periodically
+  useEffect(() => {
+    if (!isVisible) return;
 
-  const debugInfo = {
-    auth: {
-      isAuthenticated: !!auth.tokens,
-      status: auth.status,
-      error: auth.error,
-      user: auth.user ? 'User loaded' : 'No user'
-    },
-    activities: {
-      count: activities.ids?.length || 0,
-      status: activities.status
-    },
-    persons: {
-      count: persons.ids?.length || 0,
-      status: persons.status
-    },
-    reports: {
-      count: Object.keys(reportsNew.reports).length,
-      status: reportsNew.loading ? 'loading' : 'idle',
-      submissions: reportsNew.reportSubmissions.length
-    },
-    tanzeem: {
-      count: tanzeem.ids?.length || 0,
-      status: tanzeem.status
-    }
+    const updateStatus = () => {
+      setRefreshStatus(getBackgroundRefreshStatus());
+    };
+
+    updateStatus();
+    const interval = setInterval(updateStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, [isVisible]);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  const formatTime = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+    return `${Math.round(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  };
+
+  const formatExpiry = (expiresAt: number) => {
+    const timeUntil = expiresAt - Date.now();
+    if (timeUntil <= 0) return 'Expired';
+    return formatTime(timeUntil);
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.header} 
-        onPress={() => setExpanded(!expanded)}
-      >
-        <Text style={styles.headerText}>🐛 Debug Panel</Text>
-        <Text style={styles.toggleText}>{expanded ? '▼' : '▶'}</Text>
-      </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.title}>Debug Panel</Text>
+        {onToggle && (
+          <TouchableOpacity onPress={onToggle} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
-      {expanded && (
-        <ScrollView style={styles.content}>
-          {Object.entries(debugInfo).map(([key, value]) => (
-            <View key={key} style={styles.section}>
-              <Text style={styles.sectionTitle}>{key.toUpperCase()}</Text>
-              {Object.entries(value).map(([subKey, subValue]) => (
-                <Text key={subKey} style={styles.debugText}>
-                  {subKey}: {String(subValue)}
-                </Text>
-              ))}
-            </View>
-          ))}
-          
+      <ScrollView style={styles.content}>
+        {/* Authentication Status */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Authentication</Text>
+          <Text style={styles.text}>
+            Status: {auth.status}
+          </Text>
+          <Text style={styles.text}>
+            Has Tokens: {auth.tokens ? 'Yes' : 'No'}
+          </Text>
+          {auth.tokens && (
+            <>
+              <Text style={styles.text}>
+                Access Token: {auth.tokens.accessToken.substring(0, 20)}...
+              </Text>
+              <Text style={styles.text}>
+                Refresh Token: {auth.tokens.refreshToken.substring(0, 20)}...
+              </Text>
+              <Text style={styles.text}>
+                Expires In: {formatExpiry(auth.tokens.expiresAt)}
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* Token Refresh Status */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Token Refresh</Text>
+          {refreshStatus && (
+            <>
+              <Text style={styles.text}>
+                Background Refresh: {refreshStatus.isActive ? 'Active' : 'Inactive'}
+              </Text>
+              <Text style={styles.text}>
+                Last Refresh: {refreshStatus.lastRefreshTime ? formatTime(Date.now() - refreshStatus.lastRefreshTime) : 'Never'}
+              </Text>
+              <Text style={styles.text}>
+                Time Since Last: {formatTime(refreshStatus.timeSinceLastRefresh)}
+              </Text>
+            </>
+          )}
           <TouchableOpacity 
             style={styles.button}
             onPress={() => {
-              debugLog('Current app state:', debugInfo);
-              debugLog('Full Redux state:', { auth, activities, persons, reportsNew, tanzeem });
+              if (auth.tokens) {
+                triggerBackgroundRefresh(dispatch, auth.tokens);
+              }
             }}
           >
-            <Text style={styles.buttonText}>Log State to Console</Text>
+            <Text style={styles.buttonText}>Trigger Refresh</Text>
           </TouchableOpacity>
-        </ScrollView>
-      )}
+        </View>
+
+        {/* Error Status */}
+        {auth.error && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Error</Text>
+            <Text style={[styles.text, styles.errorText]}>{auth.error}</Text>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -89,53 +125,64 @@ export default function DebugPanel({ visible = false, onToggle }: DebugPanelProp
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
+    top: 100,
     right: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    width: 300,
+    maxHeight: 400,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     borderRadius: 8,
-    maxWidth: 300,
+    padding: 10,
     zIndex: 1000,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  headerText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  toggleText: {
-    color: 'white',
-    fontSize: 12,
-  },
-  content: {
-    maxHeight: 400,
-    padding: 10,
-  },
-  section: {
     marginBottom: 10,
   },
+  title: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 15,
+  },
   sectionTitle: {
-    color: COLORS.primary,
-    fontSize: 12,
+    color: COLORS.orange,
+    fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  debugText: {
+  text: {
     color: 'white',
-    fontSize: 10,
+    fontSize: 12,
     marginBottom: 2,
+  },
+  errorText: {
+    color: '#ff6b6b',
   },
   button: {
     backgroundColor: COLORS.primary,
     padding: 8,
     borderRadius: 4,
-    marginTop: 10,
+    marginTop: 5,
   },
   buttonText: {
     color: 'white',

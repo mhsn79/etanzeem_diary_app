@@ -34,3 +34,6 @@ export interface TanzeemiUnitResponse {
 export interface SingleTanzeemiUnitResponse {
   data: TanzeemiUnit;
 }
+
+// Default export to satisfy Expo Router
+export default {};

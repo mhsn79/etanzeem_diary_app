@@ -56,3 +56,9 @@ router.push(getRoute(ROUTES.CREATE_REPORT, {
   mode: 'edit' 
 }));
 */ 
+// Default export to prevent Expo Router from treating this as a route
+export default {
+  ROUTE_GROUPS,
+  ROUTES,
+  getRoute
+};
