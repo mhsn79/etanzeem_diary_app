@@ -169,6 +169,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // QA module state
   const qaState = useSelector(selectQAState);
   const overallProgress = useSelector(selectOverallProgress);
+  
+  // Get tanzeem state for level information
+  const tanzeemState = useSelector((state: any) => state.tanzeem);
 
   // Use selected unit if available, otherwise fall back to user unit
   const displayUnit = selectedUnit || userUnitDetails;
@@ -254,8 +257,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     // Then filter by status based on selected tab
     const statusFiltered = unitFiltered.filter((submission) =>
       selectedTab === 0
-        ? submission.status === 'published'
-        : submission.status === 'draft' || submission.status === 'pending'
+        ? submission.status === 'draft' || submission.status === 'pending'
+        : submission.status === 'published'
     );
     
     // Then sort by date_created in descending order (newest first)
@@ -626,10 +629,29 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 </UrduText>
                 <View style={styles.reportSummaryItemValueContainer}>
                   <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                    {/* <UrduText style={styles.reportSummaryItemValue}>مقام</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText> */}
                     <UrduText style={styles.reportSummaryItemValue}>
-                      {displayUnit?.Name ?? 'نامعلوم'}
+                      {(() => {
+                        // Get the level information for the display unit
+                        const unitLevelId = displayUnit?.Level_id;
+                        let unitLevelName = '';
+                        
+                        if (unitLevelId && typeof unitLevelId === 'number') {
+                          // Try to get level name from the levelsById storage
+                          if (tanzeemState && tanzeemState.levelsById) {
+                            const levelDetails = tanzeemState.levelsById[unitLevelId];
+                            if (levelDetails) {
+                              unitLevelName = levelDetails.Name || '';
+                            }
+                          }
+                        }
+                        
+                        // Format unit name with level: "Level Name: Unit Name" or just "Unit Name" if no level
+                        return unitLevelName 
+                          ? `${unitLevelName}: ${displayUnit?.Name || 'نامعلوم'}`
+                          : displayUnit?.Name || 'نامعلوم';
+                      })()}
                     </UrduText>
                   </View>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -681,7 +703,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                   resizeMode="contain"
                 />
                 <UrduText style={styles.noReportText}>
-                  {loading ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔'}
+                  {loading ? 'ڈیٹا لوڈ ہو رہا ہے...' : 'اس وقت کوئی Pending رپورٹ موجود نہیں ہے۔'}
                 </UrduText>
               </View>
             )}
@@ -691,8 +713,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         <View style={styles.reportSection}>
           <TabGroup
             tabs={[
-              { label: 'جمع شدہ رپورٹس', value: 0 },
-              { label: 'ڈیو/اوور ڈیو رپورٹس', value: 1 },
+              { label: 'ڈیو/اوور ڈیو رپورٹس', value: 0 },
+              { label: 'سابقہ/جمع شدہ رپورٹس', value: 1 },
             ]}
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
@@ -723,6 +745,29 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 .flatMap((r) => r.managements)
                 .find((m) => m.id === submission.mgmt_id);
               
+              // Find the template for this submission
+              const template = reportMgmtDetails
+                .find((r) => r.template?.id === submission.template_id)?.template;
+              
+              // Get the level information for the unit
+              const unitLevelId = submission.unitDetails?.Level_id;
+              let unitLevelName = '';
+              
+              if (unitLevelId && typeof unitLevelId === 'number') {
+                // Try to get level name from the levelsById storage
+                if (tanzeemState && tanzeemState.levelsById) {
+                  const levelDetails = tanzeemState.levelsById[unitLevelId];
+                  if (levelDetails) {
+                    unitLevelName = levelDetails.Name || '';
+                  }
+                }
+              }
+              
+              // Format unit name with level: "Level Name: Unit Name" or just "Unit Name" if no level
+              const unitNameWithLevel = unitLevelName 
+                ? `${unitLevelName}: ${submission.unitDetails?.Name || 'نامعلوم'}`
+                : submission.unitDetails?.Name || 'نامعلوم';
+              
               // Check if this is the latest submission to highlight
               const isLatestSubmission = submission.id === latestSubmissionId;
               
@@ -739,10 +784,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({
             
               } : {};
 
-              // Create a title that includes the index for easier identification
-              const cardTitle = management
-                ? `[${index}] ماہانہ کارکردگی رپورٹ ۔ ماہ ${management.month}/20/${management.year}ء`
-                : `[${index}] رپورٹ ${submission.id}`;
+              // Create a dynamic title that matches the current report card format
+              const cardTitle = management && template
+                ? `${template.report_name}۔ ماہ ${getUrduMonth(management.month)} ${management.year}ء`
+                : management
+                ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${getUrduMonth(management.month)} ${management.year}ء`
+                : `رپورٹ ${submission.id}`;
 
               return (
                 <Animated.View 
@@ -756,7 +803,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     key={`submission-${submission.id}`}
                     title={cardTitle}
                     sumbitDateText={`جمع کروانے کی تاریخ – ${formattedDate}`}
-                    location={submission.unitDetails?.Name ?? 'نامعلوم'}
+                    location={unitNameWithLevel}
                     status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
                     onEdit={() => {

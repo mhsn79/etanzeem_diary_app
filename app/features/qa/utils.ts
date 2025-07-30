@@ -224,13 +224,19 @@ export const isAutoQuestion = (question: ReportQuestion): boolean => {
 export const getCalculationButtonText = (aggregateFunc: string | null): string => {
   switch (aggregateFunc) {
     case 'sum':
-      return 'مجموعہ ';
-    case 'count':
+      return 'کل ';
+    case 'total':
+      return 'کل';
+      case 'count':
       return 'تعداد';
     case 'avg':
       return 'اوسط';
+    case 'plus':
+      return 'اضافہ';
+    case 'minus':
+      return 'کمی';
     default:
-      return 'حساب کریں';
+      return 'تعداد';
   }
 };
 // Default export to prevent Expo Router from treating this as a route

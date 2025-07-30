@@ -12,8 +12,6 @@ export interface Person {
   sms?: string;
   email?: string;
   picture?: string | null;
-  created_at?: string;
-  updated_at?: string;
   
   // Additional API fields that might be present
   Name?: string;

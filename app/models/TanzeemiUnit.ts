@@ -7,8 +7,6 @@ export interface TanzeemiUnit {
   level_id?: number | null;
   zaili_unit_hierarchy?: any[] | null;
   status?: string;
-  created_at?: string;
-  updated_at?: string;
   
   // Additional API fields that might be present
   Name?: string;

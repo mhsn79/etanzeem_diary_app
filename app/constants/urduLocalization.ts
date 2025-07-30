@@ -63,7 +63,7 @@ export const formatExpectedCompletion = (
   isoDate: string | Date,
   {
     extendedDays = 0,           // اگر آپ کو تاریخ میں دن بڑھانے ہوں
-    label = 'متوقع تکمیل',      // جملے کی شروعات (ضرورت ہو تو بدل لیں)
+    label = 'آخری تاریخ',      // جملے کی شروعات (ضرورت ہو تو بدل لیں)
     useUrduDigits = false        // true کریں تو اعداد ۰۱۲… کی صورت میں آئیں گے
   }: {
     extendedDays?: number;

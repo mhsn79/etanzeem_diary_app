@@ -30,6 +30,13 @@ import {
   selectFetchActivityByIdError,
 } from '@/app/features/activities/activitySlice';
 import DateTimePicker from '@/app/components/DateTimePicker';
+import {
+  selectUserUnitDetails,
+  selectUserTanzeemiLevelDetails,
+  selectAllTanzeemiUnits,
+  selectChildUnits,
+  selectLevelsById,
+} from '@/app/features/tanzeem/tanzeemSlice';
 
 const ActivityScreen = () => {
   const navigation = useNavigation();
@@ -62,20 +69,6 @@ const ActivityScreen = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(isEditMode);
   
-  // Define location options
-  const locationOptions = [
-    { id: '1', label: 'پارٹی کا ہیڈ آفس، لاہور', value: '1' },
-    { id: '2', label: 'یونین کونسل 1', value: '2' },
-    { id: '3', label: 'یونین کونسل 2', value: '3' },
-    { id: '4', label: 'یونین کونسل 3', value: '4' },
-    { id: '5', label: 'یونین کونسل 4', value: '5' },
-    { id: '6', label: 'یونین کونسل 5', value: '6' },
-    { id: '7', label: 'یونین کونسل 6', value: '7' },
-    { id: '8', label: 'یونین کونسل 7', value: '8' },
-    { id: '9', label: 'یونین کونسل 8', value: '9' },
-    { id: '10', label: 'یونین کونسل 9', value: '10' },
-  ];
-
   // Redux selectors
   const activityTypes = useAppSelector(selectAllActivityTypes);
   const activityTypesStatus = useAppSelector(selectActivityTypesStatus);
@@ -86,6 +79,13 @@ const ActivityScreen = () => {
   const editActivityError = useAppSelector(selectEditActivityError);
   const fetchByIdStatus = useAppSelector(selectFetchActivityByIdStatus);
   const fetchByIdError = useAppSelector(selectFetchActivityByIdError);
+  
+  // Tanzeem selectors
+  const userUnitDetails = useAppSelector(selectUserUnitDetails);
+  const userTanzeemiLevelDetails = useAppSelector(selectUserTanzeemiLevelDetails);
+  const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
+  const childUnits = useAppSelector(selectChildUnits(userUnitDetails?.id || 0));
+  const levelsById = useAppSelector(selectLevelsById);
   
   // If in edit mode, get the activity from the store
   const activity = isEditMode && activityId ? useAppSelector(getActivityById(activityId)) : null;
@@ -160,19 +160,10 @@ const ActivityScreen = () => {
         setSelectedActivityDate(new Date(activity.activity_date_and_time));
       }
       
-      // Find the location option that matches the activity's location
-      const locationOption = locationOptions.find(option => 
-        option.label === activity.location
-      );
-      
-      console.log('Location options:', locationOptions);
-      console.log('Activity location:', activity.location);
-      console.log('Found location option:', locationOption);
-      
       // Set activity details
       setActivityDetails({
         activityType: activity.activity_type ? String(activity.activity_type) : '',
-        location: locationOption ? locationOption.value : '',
+        location: activity.location || '',
         locationLabel: activity.location || '',
         notes: activity.activity_details || '',
       });
@@ -182,7 +173,7 @@ const ActivityScreen = () => {
     }
   // Only include dependencies that won't change frequently to prevent infinite loops
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, activity?.id, locationOptions.length]);
+  }, [isEditMode, activity?.id]);
 
   // Handle activity creation/edit status changes
   useEffect(() => {
@@ -195,34 +186,129 @@ const ActivityScreen = () => {
     }
   }, [createActivityStatus, createActivityError, editActivityStatus, editActivityError, isSubmitting]);
 
-  // Map activity types from API to dropdown options
-  const activityTypeOptions = activityTypes.map((type) => ({
-    id: String(type.id),
-    label: type.Name,
-    value: String(type.id),
-  }));
+  // Filter activity types by current unit level and add "دیگر" option
+  const filteredActivityTypeOptions = React.useMemo(() => {
+    console.log('Activity types filtering:', {
+      totalActivityTypes: activityTypes.length,
+      userUnitLevelId: userUnitDetails?.level_id || userUnitDetails?.Level_id,
+      userUnitLevel: userUnitDetails?.level,
+      activityTypes: activityTypes.map(type => ({ id: type.id, name: type.Name }))
+    });
+    
+    // Since level_id doesn't exist in Activity_Type collection, show all activity types
+    console.log('Showing all activity types since level_id field is not available');
+    const options = activityTypes.map((type) => ({
+      id: String(type.id),
+      label: type.Name,
+      value: String(type.id),
+    }));
+    
+    // Add "دیگر" (Other) option at the end
+    options.push({
+      id: 'other',
+      label: 'دیگر',
+      value: 'other',
+    });
+    
+    console.log('Final activity type options:', options.length);
+    return options;
+  }, [activityTypes]);
+
+  // Create location options with current and child units
+  const locationOptions = React.useMemo(() => {
+    console.log('Location options creation:', {
+      userUnitDetails: userUnitDetails ? { id: userUnitDetails.id, name: userUnitDetails.Name, level_id: userUnitDetails.level_id || userUnitDetails.Level_id } : null,
+      childUnitsCount: childUnits?.length || 0,
+      childUnits: childUnits?.map(unit => ({ id: unit.id, name: unit.Name, level_id: unit.level_id || unit.Level_id })) || [],
+      userTanzeemiLevelDetails: userTanzeemiLevelDetails ? { id: userTanzeemiLevelDetails.id, name: userTanzeemiLevelDetails.Name } : null,
+      levelsById: Object.keys(levelsById).length,
+      availableLevelIds: Object.keys(levelsById)
+    });
+    
+    const options = [];
+    
+    // Add current unit
+    if (userUnitDetails) {
+      const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
+      const unitName = userUnitDetails.Name || userUnitDetails.name || '';
+      const label = levelName ? `${levelName}: ${unitName}` : unitName;
+      
+      options.push({
+        id: String(userUnitDetails.id),
+        label: label,
+        value: String(userUnitDetails.id),
+      });
+    }
+    
+    // Add child units with their respective level names
+    if (childUnits && childUnits.length > 0) {
+      childUnits.forEach(unit => {
+        // Get the level details for this specific child unit
+        const childLevelId = unit.level_id || unit.Level_id;
+        let childLevelName = '';
+        
+        if (childLevelId && levelsById[childLevelId]) {
+          childLevelName = levelsById[childLevelId].Name || '';
+        }
+        
+        const unitName = unit.Name || unit.name || '';
+        // If level name is not available, just show the unit name
+        const label = childLevelName ? `${childLevelName}: ${unitName}` : unitName;
+        
+        console.log(`Child unit ${unitName} (ID: ${unit.id}) - Level ID: ${childLevelId}, Level Name: "${childLevelName}", Final Label: "${label}"`);
+        
+        options.push({
+          id: String(unit.id),
+          label: label,
+          value: String(unit.id),
+        });
+      });
+    }
+    
+    console.log('Final location options:', options.length);
+    return options;
+  }, [userUnitDetails, childUnits, userTanzeemiLevelDetails, levelsById]);
+
+  // Auto-populate activity details when activity type changes
+  useEffect(() => {
+    if (activityDetails.activityType && activityDetails.activityType !== 'other') {
+      const selectedType = activityTypes.find(type => String(type.id) === activityDetails.activityType);
+      const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name;
+      
+      if (selectedType && levelName) {
+        const activityDetailsText = `${selectedType.Name} - ${levelName}`;
+        setActivityDetails(prev => ({
+          ...prev,
+          notes: activityDetailsText,
+        }));
+      }
+    }
+  }, [activityDetails.activityType, activityTypes, userTanzeemiLevelDetails]);
 
   const navigateBack = () => {
     navigation.goBack();
   };
 
   const handleDateTimeChange = (date: Date) => {
+    // Create a new Date object to avoid mutating the original
+    const newDate = new Date(date);
+    
     // Adjust the date based on mode
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     // Always set seconds and milliseconds to 0
-    date.setSeconds(0, 0);
+    newDate.setSeconds(0, 0);
     
-    if (mode === 'report' && date > new Date()) {
+    if (mode === 'report' && newDate > new Date()) {
       // For report mode, don't allow future dates
-      date.setHours(today.getHours(), 0, 0, 0);
-    } else if (mode === 'schedule' && isSameDay(date, today) && date.getHours() <= today.getHours()) {
+      newDate.setHours(today.getHours(), 0, 0, 0);
+    } else if (mode === 'schedule' && isSameDay(newDate, today) && newDate.getHours() <= today.getHours()) {
       // For schedule mode, ensure time is in the future if date is today
-      date.setHours(today.getHours() + 1, 0, 0, 0);
+      newDate.setHours(today.getHours() + 1, 0, 0, 0);
     }
     
-    setSelectedActivityDate(date);
+    setSelectedActivityDate(newDate);
   };
 
   const isSameDay = (d1: Date, d2: Date) =>
@@ -333,6 +419,7 @@ const ActivityScreen = () => {
       <ScrollView style={styles.container}>
         <View style={styles.content}>
           <DateTimePicker
+            key={`date-picker-${selectedActivityDate?.getTime() || 'initial'}`}
             label="تاریخ اور وقت"
             placeholder="تاریخ اور وقت منتخب کریں"
             mode="datetime"
@@ -345,35 +432,35 @@ const ActivityScreen = () => {
             useUrduText={true}
             confirmText="منتخب کریں"
             cancelText="منسوخ"
-            rightIcon={
-              <TouchableOpacity>
-                <Ionicons name="calendar" size={24} color={COLORS.primary} />
-              </TouchableOpacity>
-            }
             containerStyle={styles.datePickerContainer}
           />
-          <FormInput
-            inputTitle="سرگرمی کا نام"
-            value={activityDetails.notes}
-            onChange={updateActivityField('notes')}
-            placeholder="سرگرمی کا نام منتخب کریں"
-          />
+          
           <CustomDropdown
-            options={activityTypeOptions}
+            options={filteredActivityTypeOptions}
             onSelect={selectActivityType}
-            dropdownTitle="سرگرمی کی وضاحت"
-            placeholder="نئے امیدواروں کا انٹرویو، مہم کے منتظمین سے ملاقات"
+            dropdownTitle="سرگرمی کی قسم"
+            placeholder="سرگرمی کی قسم منتخب کریں"
             selectedValue={activityDetails.activityType}
             dropdownContainerStyle={styles.dropdownContainer}
             loading={activityTypesStatus === 'loading'}
           />
+          
           <CustomDropdown
             options={locationOptions}
             onSelect={selectLocation}
-            placeholder="جگہ"
             dropdownTitle="جگہ"
+            placeholder="جگہ منتخب کریں"
             selectedValue={activityDetails.location}
             dropdownContainerStyle={styles.dropdownContainer}
+          />
+          
+          <FormInput
+            inputTitle="سرگرمی کی تفصیلات"
+            value={activityDetails.notes}
+            onChange={updateActivityField('notes')}
+            placeholder="سرگرمی کی تفصیلات"
+            multiline={true}
+            numberOfLines={3}
           />
         </View>
       </ScrollView>

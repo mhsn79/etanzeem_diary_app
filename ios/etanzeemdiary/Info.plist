@@ -50,18 +50,6 @@
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
-
-      <!-- Allow plain‑HTTP traffic to the API host on port 8055 -->
-      <key>NSExceptionDomains</key>
-      <dict>
-        <key>admin.jiislamabad.org</key>
-        <dict>
-          <key>NSExceptionAllowsInsecureHTTPLoads</key>
-          <true/>
-          <key>NSIncludesSubdomains</key>
-          <true/>
-        </dict>
-      </dict>
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your camera</string>

@@ -109,11 +109,11 @@ export default function Activities() {
         })
       : 'غير متعين',
     attendance: activity.attendance != null ? activity.attendance.toString() : 'غير متعين',
-    dateCreated: activity.created_at
-      ? new Date(activity.created_at).toLocaleDateString('ur-PK')
+    dateCreated: activity.date_created
+      ? new Date(activity.date_created).toLocaleDateString('ur-PK')
       : 'غير متعين',
-    dateUpdated: activity.updated_at
-      ? new Date(activity.updated_at).toLocaleDateString('ur-PK')
+    dateUpdated: activity.date_updated
+      ? new Date(activity.date_updated).toLocaleDateString('ur-PK')
       : 'غير متعين',
     rawDateTime: activity.activity_date_and_time,
     user_created: activity.user_created,
@@ -253,7 +253,7 @@ export default function Activities() {
         <View style={styles.toastContainer}>
           <View style={styles.toast}>
             <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-            <Text style={styles.toastText}>سرگرمی کامیابی سے آرکائیو کر دی گئی ہے</Text>
+            <Text style={styles.toastText}>سرگرمی آرکائیو کر دی گئی ہے</Text>
           </View>
         </View>
       )}

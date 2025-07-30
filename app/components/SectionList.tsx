@@ -64,11 +64,13 @@ const Question = memo(({
   value, 
   submissionId,
   disabled,
+  currentUnitId,
 }: { 
   question: ReportQuestion; 
   value: any; 
   submissionId: number | null;
   disabled?: boolean;
+  currentUnitId?: number | null;
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   
@@ -83,6 +85,7 @@ const Question = memo(({
         value={value}
         submissionId={submissionId}
         disabled={disabled}
+        currentUnitId={currentUnitId}
         onValueChange={(newValue) => {
           if (!submissionId) return;
           dispatch(saveAnswer({
@@ -284,12 +287,12 @@ const Question = memo(({
   const getPlaceholder = useCallback(() => {
     switch (question.input_type) {
       case 'number':
-        return 'ایک نمبر درج کریں';
+        return 'نمبر کی صورت میں جواب دیں';
       case 'text':
         return 'تفصیلی جواب درج کریں';
       case 'string':
       default:
-        return 'اپنا جواب درج کریں';
+        return 'مختصر الفاظ میں جواب دیں';
     }
   }, [question.input_type]);
 
@@ -325,13 +328,15 @@ const AccordionSection = memo(({
   questions, 
   answers,
   submissionId,
-  disabled
+  disabled,
+  currentUnitId
 }: {
   section: ReportSection & { progress: number };
   questions: ReportQuestion[];
   answers: ReportAnswer[];
   submissionId: number | null;
   disabled?: boolean;
+  currentUnitId?: number | null;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -360,6 +365,7 @@ const AccordionSection = memo(({
           value={answerValue}
           submissionId={submissionId}
           disabled={disabled}
+          currentUnitId={currentUnitId}
         />
       );
     });
@@ -410,6 +416,7 @@ interface SectionListProps {
   answers: ReportAnswer[];
   onAnswerChange?: (questionId: number, value: any) => void;
   disabled?: boolean;
+  currentUnitId?: number | null; // Add current unit ID for filtering
 }
 
 // Main SectionList component
@@ -419,6 +426,7 @@ const SectionList: React.FC<SectionListProps> = ({
   answers,
   onAnswerChange,
   disabled = false,
+  currentUnitId,
 }) => {
   // Get the current submission ID from Redux
   const submissionId = useSelector(selectCurrentSubmissionId);
@@ -437,10 +445,11 @@ const SectionList: React.FC<SectionListProps> = ({
           answers={answers}
           submissionId={submissionId}
           disabled={disabled}
+          currentUnitId={currentUnitId}
         />
       );
     });
-  }, [sections, questions, answers, submissionId]);
+  }, [sections, questions, answers, submissionId, currentUnitId]);
 
   return (
     <View style={styles.container}>
@@ -452,8 +461,8 @@ const SectionList: React.FC<SectionListProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: SPACING.xl,
-    marginHorizontal:SPACING.md
+    paddingBottom: SPACING.lg,
+    marginHorizontal: SPACING.md
   },
   messageContainer: {
     paddingHorizontal: SPACING.sm,
@@ -467,12 +476,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sectionContainer: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     ...SHADOWS.medium,
   },
   sectionHeader: {
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs,
     backgroundColor: COLORS.lightPrimary,
     borderRadius: BORDER_RADIUS.sm,
   },
@@ -483,10 +492,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: TYPOGRAPHY.fontSize.md,
     textAlign: 'left',
     fontWeight: '600',
     color: COLORS.primary,
@@ -511,7 +520,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: BORDER_RADIUS.md,
   },
   questionItem: {
-    padding: SPACING.sm,
+    padding: SPACING.xs,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,

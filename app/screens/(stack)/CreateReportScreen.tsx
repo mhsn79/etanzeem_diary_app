@@ -24,7 +24,7 @@ import {
   selectSubmitError,
   selectCurrentSubmissionId
 } from '@/app/features/qa/qaSlice';
-import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectManagementReportsList } from '@/app/features/reports/reportsSlice_new';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
@@ -79,10 +79,11 @@ const CreateReportScreen = () => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
   // Selectors
-  const sectionsWithProgress = useSelector(selectSectionsWithProgress);
+  const sectionsWithProgress = useSelector((state) => selectSectionsWithProgress(state, templateId || undefined));
   const questionsArray = useSelector(selectQuestionsArray);
   const storedAnswers = useSelector(selectAnswers);
   const userUnitDetails = useSelector(selectUserUnitDetails);
+  const userTanzeemiLevelDetails = useSelector(selectUserTanzeemiLevelDetails);
   const latestReportMgmt = useSelector(selectManagementReportsList);
   const status = useSelector(selectStatus);
   const error = useSelector(selectError);
@@ -93,7 +94,15 @@ const CreateReportScreen = () => {
   const currentSubmissionId = useSelector(selectCurrentSubmissionId);
 
   // Memoized values
-  const unitName = useMemo(() => userUnitDetails?.Name || '', [userUnitDetails?.Name]);
+  const unitName = useMemo(() => {
+    if (!userUnitDetails?.Name) return '';
+    
+    // Get level name if available
+    const levelName = userTanzeemiLevelDetails?.Name || '';
+    
+    // Format: "Level Name: Unit Name" or just "Unit Name" if no level
+    return levelName ? `${levelName}: ${userUnitDetails.Name}` : userUnitDetails.Name;
+  }, [userUnitDetails?.Name, userTanzeemiLevelDetails?.Name]);
   const reportingPeriod = useMemo(() => {
     return latestReportMgmt[0]?.managements[0]
       ? `${getUrduMonth(latestReportMgmt[0]?.managements[0]?.month)} ${latestReportMgmt[0]?.managements[0].year}`
@@ -359,12 +368,14 @@ const CreateReportScreen = () => {
               value={unitName}
               editable={false}
               onChange={() => {}}
+              layout="one-line"
             />
             <FormInput
               inputTitle="رپورٹنگ ماہ و سال"
               value={reportingPeriod}
               editable={false}
               onChange={() => {}}
+              layout="one-line"
             />
           </View>
           
@@ -374,6 +385,7 @@ const CreateReportScreen = () => {
             answers={Object.values(storedAnswers.byId)}
             onAnswerChange={handleAnswerChange}
             disabled={isViewMode}
+            currentUnitId={unitId}
           />
         </ScrollView>
 
@@ -390,7 +402,7 @@ const CreateReportScreen = () => {
               viewStyle={{
                 backgroundColor: COLORS.primary,
                 flex: 1,
-                marginHorizontal: SPACING.md,
+                marginHorizontal: SPACING.sm,
               }}
               textStyle={{
                 color: COLORS.white,
@@ -474,16 +486,18 @@ const styles = StyleSheet.create({
 
   },
   headerInfoContainer: {
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.sm,
     marginHorizontal: SPACING.md,
+    flexDirection: 'column',
+    gap: SPACING.sm,
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: SPACING.lg,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    padding: SPACING.md,
+    padding: SPACING.sm,
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,

@@ -595,6 +595,44 @@ export default function Workforce() {
     return 13;
   }, []);
 
+  // Get category labels from strength types
+  const getCategoryLabel = useCallback((category: string) => {
+    if (!strengthTypes.length) {
+      // Fallback to hardcoded labels if no strength types available
+      switch (category) {
+        case 'workforce':
+          return 'قوت کی تفصیلات';
+        case 'place':
+          return 'مقامات کی تفصیلات';
+        case 'magazine':
+          return 'رسائل کی تفصیلات';
+        default:
+          return category;
+      }
+    }
+    
+    // Find strength types for this category
+    const categoryTypes = strengthTypes.filter(type => type.Category === category);
+    
+    if (categoryTypes.length === 0) {
+      // Fallback to hardcoded labels if no types found for this category
+      switch (category) {
+        case 'workforce':
+          return 'قوت کی تفصیلات';
+        case 'place':
+          return 'مقامات کی تفصیلات';
+        case 'magazine':
+          return 'رسائل کی تفصیلات';
+        default:
+          return category;
+      }
+    }
+    
+    // Use the Name_Plural from the first type in this category
+    const firstType = categoryTypes[0];
+    return `${firstType.Name_Plural} کی تفصیلات`;
+  }, [strengthTypes]);
+
   // Calculate annual target (placeholder for actual calculation)
   const annualTarget = useMemo(() => {
     // This would be fetched from API or calculated
@@ -758,10 +796,7 @@ export default function Workforce() {
                   <>
                     {/* Category Heading */}
                     <UrduText style={styles.blueHeading}>
-                      {category === 'workforce' ? 'قوت کی تفصیلات' : 
-                      category === 'place' ? 'مقامات کی تفصیلات' : 
-                      category === 'magazine' ? 'رسائل کی تفصیلات' : 
-                      category}
+                      {getCategoryLabel(category)}
                     </UrduText>
                     
                     {/* All Types Combined (regardless of gender) */}

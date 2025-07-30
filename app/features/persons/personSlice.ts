@@ -11,6 +11,8 @@ import apiRequest, { directApiRequest } from '../../services/apiClient';
 interface ContactType {
   id: number;
   type: string;
+  label_singular?: string;
+  label_plural?: string;
 }
 
 // Entity adapter for persons
@@ -455,7 +457,7 @@ export const fetchContactTypes = createAsyncThunk<
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ContactType[] }>(
-      '/items/contact_type',
+      '/items/contact_type?fields=id,type,label_singular,label_plural',
       'GET'
     );
     

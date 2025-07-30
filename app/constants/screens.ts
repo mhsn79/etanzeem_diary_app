@@ -78,7 +78,7 @@ export const SCREEN_TITLES = {
   [SCREENS.INCOME]: 'آمدنی',
   [SCREENS.MEETINGS]: 'اجلاسات',
   [SCREENS.UNIT_SELECTION]: 'تنظیمی ہیئت',
-  [SCREENS.WORKFORCE]: 'افرادی قوت',
+  [SCREENS.WORKFORCE]: 'تنظیمی قوت',
   [SCREENS.RUKUN_VIEW]: 'ارکان',
   [SCREENS.RUKUN_ADD_EDIT]: 'رکن شامل کریں',
   [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں',

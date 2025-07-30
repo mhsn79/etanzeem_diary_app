@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   Platform,
-  Pressable,
+  I18nManager,
 } from 'react-native';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import {
   COLORS,
   TYPOGRAPHY,
@@ -58,7 +58,7 @@ interface DateTimePickerProps {
 }
 
 /**
- * A reusable DateTimePicker component with a modern design
+ * A reusable DateTimePicker component with standard date picker functionality
  * 
  * @example
  * ```tsx
@@ -70,7 +70,7 @@ interface DateTimePickerProps {
  * />
  * ```
  */
-const DateTimePicker: React.FC<DateTimePickerProps> = ({
+const DateTimePickerComponent: React.FC<DateTimePickerProps> = ({
   initialDate,
   onDateChange,
   label,
@@ -91,23 +91,31 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   // State for selected date and modal visibility
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-  
-  // Handle showing the date picker
+
+  // Sync selectedDate with initialDate prop
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
+
   const showDatePicker = () => {
     if (!disabled) {
       setDatePickerVisible(true);
     }
   };
 
-  // Handle hiding the date picker
   const hideDatePicker = () => {
     setDatePickerVisible(false);
   };
 
-  // Handle date confirmation
   const handleConfirm = (date: Date) => {
     setSelectedDate(date);
     onDateChange(date);
+    hideDatePicker();
+  };
+
+  const handleCancel = () => {
     hideDatePicker();
   };
 
@@ -187,68 +195,45 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           disabled && styles.disabledButton,
         ]}
         disabled={disabled}
-        accessibilityLabel={label || placeholder}
-        accessibilityHint="Tap to open date and time picker"
-        accessibilityRole="button"
       >
-        {rightIcon || (
-          <Ionicons
-            name={getIcon()}
-            size={20}
-            color={disabled ? COLORS.disabled : COLORS.error}
+        <View style={styles.buttonContent}>
+          <Ionicons 
+            name={getIcon() as any} 
+            size={20} 
+            color={disabled ? COLORS.textSecondary : COLORS.primary} 
+            style={styles.leftIcon}
           />
-        )}
-        <TextComponent
-          style={[
+          <TextComponent style={[
             styles.buttonText,
-            !selectedDate && styles.placeholderText,
             textStyle,
             disabled && styles.disabledText,
-          ]}
-          numberOfLines={1}
-        >
-          {formatDate(selectedDate)}
-        </TextComponent>
+          ]}>
+            {formatDate(selectedDate)}
+          </TextComponent>
+        </View>
+        {rightIcon && (
+          <View style={styles.rightIconContainer}>
+            {rightIcon}
+          </View>
+        )}
       </TouchableOpacity>
 
-      {error && <TextComponent style={styles.errorText}>{error}</TextComponent>}
+      {error && (
+        <TextComponent style={styles.errorText}>{error}</TextComponent>
+      )}
 
+      {/* Date Time Picker Modal */}
       <DateTimePickerModal
         isVisible={isDatePickerVisible}
-        mode={mode === 'datetime' ? 'datetime' : (mode as 'date' | 'time')}
+        mode={mode}
         onConfirm={handleConfirm}
-        onCancel={hideDatePicker}
+        onCancel={handleCancel}
         date={selectedDate || new Date()}
         minimumDate={minimumDate}
         maximumDate={maximumDate}
-        confirmTextIOS={useUrduText ? 'تصدیق کریں' : confirmText}
-        cancelTextIOS={useUrduText ? 'منسوخ کریں' : cancelText}
-        customConfirmButtonIOS={
-          useUrduText
-            ? ({ onPress }) => (
-                <Pressable style={styles.confirmButton} onPress={onPress}>
-                  <UrduText style={styles.confirmButtonText}>تصدیق کریں</UrduText>
-                </Pressable>
-              )
-            : undefined
-        }
-        customCancelButtonIOS={
-          useUrduText
-            ? ({ onPress }) => (
-                <Pressable style={styles.cancelButton} onPress={onPress}>
-                  <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
-                </Pressable>
-              )
-            : undefined
-        }
-        // Android specific props
-        timePickerModeAndroid="spinner"
-        isDarkModeEnabled={false}
-        locale={useUrduText ? 'ur-PK' : undefined}
-        is24Hour={true}
-        // Android button styling
-        positiveButton={{ label: useUrduText ? 'منتخب کریں' : confirmText, textColor: COLORS.white }}
-        negativeButton={{ label: useUrduText ? 'منسوخ کریں' : cancelText, textColor: COLORS.white }}
+        confirmTextIOS={confirmText}
+        cancelTextIOS={cancelText}
+        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
       />
     </View>
   );
@@ -257,83 +242,56 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
-    width: '100%',
   },
   label: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    marginBottom: SPACING.xs,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
     color: COLORS.textPrimary,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
+    marginBottom: SPACING.xs,
     textAlign: 'left',
+    width: '100%',
   },
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING.md,
-    height: SIZES.input.height,
+    paddingVertical: SPACING.sm,
     ...SHADOWS.small,
-  },
-  buttonText: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    textAlign: 'left',
-  },
-  placeholderText: {
-    color: COLORS.textSecondary,
   },
   disabledButton: {
     backgroundColor: COLORS.lightGray,
-    borderColor: COLORS.disabled,
+    borderColor: COLORS.lightGray,
+  },
+  buttonContent: {
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  buttonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'left',
   },
   disabledText: {
-    color: COLORS.disabled,
+    color: COLORS.textSecondary,
+  },
+  rightIconContainer: {
+    marginLeft: SPACING.sm,
+    flexShrink: 0,
   },
   errorText: {
     color: COLORS.error,
     fontSize: TYPOGRAPHY.fontSize.sm,
     marginTop: SPACING.xs,
+    textAlign: 'right',
   },
-  confirmButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    marginHorizontal: SPACING.sm,
-    marginBottom: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.medium,
-  },
-  confirmButtonText: {
-    color: COLORS.white,
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    textAlign: 'center',
-  },
-  cancelButton: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.error,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    marginHorizontal: SPACING.sm,
-    marginBottom: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.medium,
-  },
-  cancelButtonText: {
-    color: COLORS.error,
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontFamily: TYPOGRAPHY.fontFamily.bold,
-    textAlign: 'center',
+  leftIcon: {
+    marginRight: SPACING.sm,
+    flexShrink: 0,
   },
 });
 
-export default DateTimePicker;
+export default DateTimePickerComponent;

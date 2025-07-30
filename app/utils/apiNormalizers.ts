@@ -110,9 +110,7 @@ const personFieldMappings: FieldMappings = {
   'Father_Name': 'parent',
   'Date_of_birth': 'dob',
   'CNIC': 'cnic',
-  'Tanzeemi_Unit': 'unit',
-  'date_created': 'created_at',
-  'date_updated': 'updated_at'
+  'Tanzeemi_Unit': 'unit'
 };
 
 // Person-specific special cases
@@ -149,8 +147,6 @@ export function normalizePersonDataArray<T extends Record<string, any>>(dataArra
 
 // Activity-specific field mappings
 const activityFieldMappings: FieldMappings = {
-  'date_created': 'created_at',
-  'date_updated': 'updated_at',
   'location': 'location_name',
   'details': 'activity_details',
   'date_time': 'activity_date_and_time'
@@ -176,8 +172,6 @@ export function normalizeActivityDataArray<T extends Record<string, any>>(dataAr
 
 // ActivityType-specific field mappings
 const activityTypeFieldMappings: FieldMappings = {
-  'date_created': 'created_at',
-  'date_updated': 'updated_at',
   'title': 'Name',
   'description': 'Description'
 };
@@ -208,9 +202,7 @@ const tanzeemiUnitFieldMappings: FieldMappings = {
   'Level': 'level',
   'Level_id': 'level_id',
   'zaili_unit_hierarchy': 'zaili_unit_hierarchy',
-  'Status': 'status',
-  'date_created': 'created_at',
-  'date_updated': 'updated_at'
+  'Status': 'status'
 };
 
 /**

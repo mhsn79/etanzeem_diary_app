@@ -119,18 +119,24 @@ export const fetchStrengthTypes = createAsyncThunk<
       return [];
     }
     
-    // Get the unit level from the user's unit details or use a default
-    const unitID = userUnitDetails?.id || userUnitDetails?.id;
+    // // Get the unit level from the user's unit details
+    // const unitLevelId = userUnitDetails?.level_id || userUnitDetails?.Level_id;
+    
+    // // If we don't have the unit level, return an empty array
+    // if (!unitLevelId) {
+    //   console.warn('No unit level available, cannot fetch strength types');
+    //   return [];
+    // }
     
     // Filter to include only types where Reporting_Unit_Level matches the user's unit level
     const params = {
       filter: { 
-        Reporting_Unit_Level: { _eq: unitID  } // Default to level 6 if not available
+        // Reporting_Unit_Level: { _eq: unitLevelId }
       },
       sort: ['Category', 'id'] // Sort by Category first, then by ID
     };
 
-    console.log(`[STRENGTH_DEBUG] Fetching strength types for unit level: ${unitID }`);
+    console.log(`[STRENGTH_DEBUG] Fetching ALL strength types (not filtered by unit level)`);
     console.log(`[STRENGTH_DEBUG] Request params:`, JSON.stringify(params, null, 2));
 
     // The centralized API client handles token refresh automatically

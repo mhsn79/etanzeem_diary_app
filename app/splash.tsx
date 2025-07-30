@@ -3,7 +3,11 @@ import { View, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAppSelector } from '../src/hooks/useAppSelector';
-import { selectIsAuthenticated } from './features/auth/authSlice';
+import { useAppDispatch } from '../src/hooks/useAppDispatch';
+import { selectIsAuthenticated, initializeAuth } from './features/auth/authSlice';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,39 +31,54 @@ const getImageDimensions = () => {
 
 export default function SplashScreenComponent() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
-    // Hide the native splash screen immediately
-    SplashScreen.hideAsync();
+    const prepare = async () => {
+      try {
+        // Initialize auth and fetch user data when app starts
+        if (isAuthenticated) {
+          console.log('[DEBUG] 🔄 Initializing auth and fetching user data...');
+          dispatch(initializeAuth());
+        }
 
-    // Animate in
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
+        // Animate in
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]).start();
 
-    // Navigate after delay
-    const timer = setTimeout(() => {
-      if (isAuthenticated) {
-        router.replace('/screens/(tabs)/Dashboard');
-      } else {
-        router.replace('/screens/LoginScreen');
+        // Hide the native splash screen after animation starts
+        await SplashScreen.hideAsync();
+
+        // Navigate after delay
+        const timer = setTimeout(() => {
+          if (isAuthenticated) {
+            router.replace('/screens/(tabs)/Dashboard');
+          } else {
+            router.replace('/screens/LoginScreen');
+          }
+        }, 2000);
+
+        return () => clearTimeout(timer);
+      } catch (e) {
+        console.warn('Error preparing splash screen:', e);
       }
-    }, 2000);
+    };
 
-    return () => clearTimeout(timer);
-  }, [router, isAuthenticated, fadeAnim, scaleAnim]);
+    prepare();
+  }, [router, isAuthenticated, fadeAnim, scaleAnim, dispatch]);
 
   const imageDimensions = getImageDimensions();
 
@@ -92,12 +111,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#008CFF',
     justifyContent: 'center',
     alignItems: 'center',
+    // Ensure no clipping or masking
+    overflow: 'visible',
   },
   imageContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    // Remove any border radius or circular clipping
+    borderRadius: 0,
+    overflow: 'visible',
+    // Ensure no background that might interfere
+    backgroundColor: 'transparent',
   },
   image: {
     // Dimensions will be set dynamically
+    // Remove any border radius or circular clipping
+    borderRadius: 0,
+    // Ensure no background
+    backgroundColor: 'transparent',
   },
 }); 

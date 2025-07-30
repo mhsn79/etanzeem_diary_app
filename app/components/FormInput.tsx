@@ -23,6 +23,7 @@ export interface FormInputProps {
   numberOfLines?: number;
   helpText?: string;
   loading?: boolean;
+  layout?: 'one-line' | 'two-line';
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -45,56 +46,116 @@ const FormInput: React.FC<FormInputProps> = ({
   numberOfLines,
   helpText,
   loading = false,
+  layout = 'two-line',
 }) => {
   return (
     <View style={styles.container}>
-      <View style={styles.titleContainer}>
-        {mainTitle && <UrduText style={styles.mainTitle}>{mainTitle}</UrduText>}
-        <View style={styles.titleRow}>
-          {required && <Text style={styles.requiredStar}>*</Text>}
-          <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
+      {mainTitle && <UrduText style={styles.mainTitle}>{mainTitle}</UrduText>}
+      
+      {layout === 'one-line' ? (
+        // One-line layout: label and input on same line
+        <View style={[
+          styles.inputContainer,
+          styles.oneLineContainer,
+          error ? styles.inputError : null
+        ]}>
+          <View style={styles.labelContainer}>
+            {required && <Text style={styles.requiredStar}>*</Text>}
+            <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
+          </View>
+          <View style={styles.inputWrapper}>
+            {leftIcon && (
+              <View style={styles.leftIconContainer}>
+                {leftIcon}
+              </View>
+            )}
+            <TextInput
+              style={[
+                styles.input,
+                styles.oneLineInput,
+                { textAlign: direction === 'rtl' ? 'right' : 'left' },
+                disabled ? styles.disabledInput : null,
+                leftIcon ? styles.inputWithLeftIcon : null,
+                rightIcon ? styles.inputWithRightIcon : null,
+              ]}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              placeholder={placeholder}
+              placeholderTextColor={COLORS.textSecondary}
+              keyboardType={keyboardType}
+              maxLength={maxLength}
+              textAlignVertical="center"
+              editable={editable && !disabled && !loading}
+              multiline={multiline}
+              numberOfLines={numberOfLines || (multiline ? 3 : 1)}
+            />
+            {rightIcon && (
+              <View style={styles.iconContainer}>
+                {rightIcon}
+              </View>
+            )}
+            {loading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-      <View style={[
-        styles.inputContainer,
-        error ? styles.inputError : null
-      ]}>
-        {leftIcon && (
-          <View style={styles.leftIconContainer}>
-            {leftIcon}
+      ) : (
+        // Two-line layout: label above, input below
+        <>
+          <View style={styles.titleContainer}>
+            <View style={styles.titleRow}>
+              {required && <Text style={styles.requiredStar}>*</Text>}
+              <UrduText style={styles.inputTitle}>{inputTitle}</UrduText>
+            </View>
           </View>
-        )}
-        <TextInput
-          style={[
-            styles.input,
-            { textAlign: direction === 'rtl' ? 'right' : 'left' },
-            disabled ? styles.disabledInput : null,
-            leftIcon ? styles.inputWithLeftIcon : null,
-            rightIcon ? styles.inputWithRightIcon : null,
-          ]}
-          value={value}
-          onChangeText={onChange}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          placeholderTextColor={COLORS.textSecondary}
-          keyboardType={keyboardType}
-          maxLength={maxLength}
-          textAlignVertical="center"
-          editable={editable && !disabled && !loading}
-          multiline={multiline}
-          numberOfLines={numberOfLines || (multiline ? 3 : 1)}
-        />
-        {rightIcon && (
-          <View style={styles.iconContainer}>
-            {rightIcon}
+          <View style={[
+            styles.inputContainer,
+            styles.twoLineContainer,
+            error ? styles.inputError : null
+          ]}>
+            {leftIcon && (
+              <View style={styles.leftIconContainer}>
+                {leftIcon}
+              </View>
+            )}
+            <TextInput
+              style={[
+                styles.input,
+                styles.twoLineInput,
+                { textAlign: direction === 'rtl' ? 'right' : 'left' },
+                disabled ? styles.disabledInput : null,
+                leftIcon ? styles.inputWithLeftIcon : null,
+                rightIcon ? styles.inputWithRightIcon : null,
+              ]}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              placeholder={placeholder}
+              placeholderTextColor={COLORS.textSecondary}
+              keyboardType={keyboardType}
+              maxLength={maxLength}
+              textAlignVertical="center"
+              editable={editable && !disabled && !loading}
+              multiline={multiline}
+              numberOfLines={numberOfLines || (multiline ? 3 : 1)}
+            />
+            {rightIcon && (
+              <View style={styles.iconContainer}>
+                {rightIcon}
+              </View>
+            )}
+            {loading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            )}
           </View>
-        )}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          </View>
-        )}
-      </View>
+        </>
+      )}
+      
       {error && <Text style={styles.errorText}>{error}</Text>}
       {helpText && <UrduText style={styles.helpText}>{helpText}</UrduText>}
     </View>
@@ -103,7 +164,7 @@ const FormInput: React.FC<FormInputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   loadingContainer: {
     position: 'absolute',
@@ -111,18 +172,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
   },
-  titleContainer: {
-    marginBottom: SPACING.sm,
-    lineHeight: 40,
-    width: '100%',
-    alignItems: 'flex-end',
-  },
-  titleRow: {
-    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    width: '100%',
-  },
+
   mainTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: '600',
@@ -136,19 +186,83 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
     textAlign: 'right',
+    fontWeight: '500',
   },
   requiredStar: {
     color: COLORS.error || 'red',
-    marginRight: 4,
+    marginRight: 2,
     marginLeft: 2,
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: TYPOGRAPHY.fontSize.sm,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
     ...SHADOWS.small,
+  },
+  // One-line layout styles
+  oneLineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    ...SHADOWS.small,
+  },
+  oneLineInput: {
+    flex: 1,
+    height: 35,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
+    paddingHorizontal: SPACING.sm,
+    color: COLORS.black,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xs,
+  },
+  // Two-line layout styles
+  twoLineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.sm,
+    ...SHADOWS.small,
+  },
+  twoLineInput: {
+    flex: 1,
+    height: 45,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: '600',
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
+    paddingHorizontal: SPACING.sm,
+    color: COLORS.black,
+  },
+  titleContainer: {
+    marginBottom: SPACING.xs,
+    lineHeight: 40,
+    width: '100%',
+    alignItems: 'flex-end',
+  },
+  titleRow: {
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: '100%',
+  },
+  labelContainer: {
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+    alignItems: 'center',
+    minWidth: 80,
+    marginRight: SPACING.sm,
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   inputError: {
     borderWidth: 1,
@@ -156,12 +270,14 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 55,
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    height: 35,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.sm,
     color: COLORS.black,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xs,
   },
   inputWithLeftIcon: {
     paddingLeft: SPACING.sm,

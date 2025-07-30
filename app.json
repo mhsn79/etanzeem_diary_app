@@ -9,9 +9,19 @@
     "scheme": "etanzeemdiary",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#008CFF"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jiislamabad.etanzeemdiaryapp"
+      "bundleIdentifier": "com.jiislamabad.etanzeemdiaryapp",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#008CFF"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,8 +29,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.jiislamabad.etanzeemdiaryapp",
-      "googleServicesFile": "./google-services.json"
-
+      "googleServicesFile": "./google-services.json",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#008CFF"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -29,17 +43,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications", 
-        [
-          "expo-splash-screen",
-          {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 1563,
-            "imageHeight": 3383,
-            "resizeMode": "contain",
-            "backgroundColor": "#008CFF"
-          }
-        ],
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#008CFF"
+        }
+      ],
       [
         "expo-font",
         {

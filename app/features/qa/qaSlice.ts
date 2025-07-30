@@ -788,14 +788,33 @@ export const selectOverallProgress = createSelector(
 );
 
 // Create a selector to transform sections into the expected format for SectionList
+// This selector now filters by template_id and sorts by sort field, then by id
 export const selectSectionsWithProgress = createSelector(
-  [selectSections, selectProgress],
-  (sections, progress) => {
+  [selectSections, selectProgress, (_, templateId?: number) => templateId],
+  (sections, progress, templateId) => {
     if (!sections.allIds || !sections.byId) return [];
     
-    return sections.allIds.map(id => {
-      const section = sections.byId[id];
-      const sectionProgress = progress[id] || { percentage: 0 };
+    // Filter sections by template_id if provided
+    let filteredSections = sections.allIds
+      .map(id => sections.byId[id])
+      .filter(section => section && (!templateId || section.template_id === templateId));
+    
+    // Sort sections by sort field first, then by id
+    filteredSections.sort((a, b) => {
+      // First sort by sort field (null values go to the end)
+      const sortA = a.sort ?? Number.MAX_SAFE_INTEGER;
+      const sortB = b.sort ?? Number.MAX_SAFE_INTEGER;
+      
+      if (sortA !== sortB) {
+        return sortA - sortB;
+      }
+      
+      // If sort values are equal, sort by id
+      return a.id - b.id;
+    });
+    
+    return filteredSections.map(section => {
+      const sectionProgress = progress[section.id] || { percentage: 0 };
       
       return {
         ...section,
@@ -806,12 +825,30 @@ export const selectSectionsWithProgress = createSelector(
 );
 
 // Create a selector to transform normalized questions into an array for SectionList
+// This selector now sorts questions by sort field first, then by id
 export const selectQuestionsArray = createSelector(
   [selectQuestions],
   (questions) => {
     if (!questions.allIds || !questions.byId) return [];
     
-    return questions.allIds.map(id => questions.byId[id]);
+    // Get all questions and sort them
+    const allQuestions = questions.allIds.map(id => questions.byId[id]);
+    
+    // Sort questions by sort field first, then by id
+    allQuestions.sort((a, b) => {
+      // First sort by sort field (null values go to the end)
+      const sortA = a.sort ?? Number.MAX_SAFE_INTEGER;
+      const sortB = b.sort ?? Number.MAX_SAFE_INTEGER;
+      
+      if (sortA !== sortB) {
+        return sortA - sortB;
+      }
+      
+      // If sort values are equal, sort by id
+      return a.id - b.id;
+    });
+    
+    return allQuestions;
   }
 );
 

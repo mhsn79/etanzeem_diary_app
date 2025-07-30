@@ -6,10 +6,7 @@ import  { directApiRequest } from '../../services/apiClient';
 export interface ActivityType {
   id: number;
   Name: string;
-  Description?: string;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
+  Name_plural?: string;
   [key: string]: any; // Allow for additional fields
 }
 
@@ -50,7 +47,7 @@ export const fetchActivityTypes = createAsyncThunk<
   try {
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ActivityType[] }>(
-      '/items/Activity_Type?fields=*',
+      '/items/Activity_Type?fields=id,Name,Name_plural',
       'GET'
     );
     
