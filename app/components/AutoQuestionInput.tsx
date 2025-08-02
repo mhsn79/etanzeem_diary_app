@@ -154,7 +154,10 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Get current submission details
   const currentSubmissionId = useAppSelector(selectCurrentSubmissionId);
+  
+
   const reportSubmissions = useAppSelector(selectReportSubmissions);
+  const reportMgmtDetails = useAppSelector(selectManagementReportsList);
   
   // Get current reporting month and year from the current submission's management
   const getCurrentReportingPeriod = useCallback(() => {
@@ -162,8 +165,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     const currentSubmission = reportSubmissions.find((sub: any) => sub.id === currentSubmissionId);
     
     if (currentSubmission) {
-      // Find the management details for this submission
-      const managementDetails = latestReportMgmt.find(report => 
+      // Find the management details for this submission in state
+      const managementDetails = reportMgmtDetails.find(report => 
         report.managements.some(mgmt => mgmt.id === currentSubmission.mgmt_id)
       );
       
@@ -184,7 +187,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       month: now.getMonth() + 1,
       year: now.getFullYear()
     };
-  }, [latestReportMgmt, currentSubmissionId, reportSubmissions]);
+  }, [reportMgmtDetails, currentSubmissionId, reportSubmissions]);
 
   // Fetch contacts for popup
   const fetchContactsForPopup = useCallback(async () => {
@@ -909,7 +912,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
             onValueChange(text);
           }
         }}
-        placeholder={hasAutoCalculateCapability ? "آٹو کیلکولیٹ کریں یا دستی داخل کریں" : "دستی داخل کریں"}
+        placeholder={hasAutoCalculateCapability ? "آٹو کیلکولیٹ کریں یا جواب یہاں لکھیں" : "جواب یہاں لکھیں"}
         keyboardType="numeric"
         editable={isEditable}
         disabled={disabled}

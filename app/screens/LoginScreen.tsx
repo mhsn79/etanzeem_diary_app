@@ -57,8 +57,8 @@ export default function LoginScreen() {
   const authError = useAppSelector(selectAuthError);
 
   /* Form state */
-  const [email, setEmail] = useState('uc39@jiislamabad.org');
-  const [password, setPassword] = useState('87654321');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);

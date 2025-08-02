@@ -287,12 +287,12 @@ const Question = memo(({
   const getPlaceholder = useCallback(() => {
     switch (question.input_type) {
       case 'number':
-        return 'نمبر کی صورت میں جواب دیں';
+        return 'نمبر کی صورت میں جواب لکھیں';
       case 'text':
-        return 'تفصیلی جواب درج کریں';
+        return 'تفصیلی جواب لکھیں';
       case 'string':
       default:
-        return 'مختصر الفاظ میں جواب دیں';
+        return 'الفاظ میں جواب لکھیں';
     }
   }, [question.input_type]);
 

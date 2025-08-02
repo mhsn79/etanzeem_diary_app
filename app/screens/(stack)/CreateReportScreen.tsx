@@ -34,7 +34,7 @@ import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
 import ScreenLayout from '@/app/components/ScreenLayout';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
-import { ensureFreshToken } from '@/app/services/apiClient';
+import { ensureFreshToken, directApiRequest } from '@/app/services/apiClient';
 import { setError } from '@/app/features/auth/authSlice';
 
 const CreateReportScreen = () => {
@@ -55,17 +55,7 @@ const CreateReportScreen = () => {
     return name;
   };
 
-  // Log all received parameters for debugging
-  console.log('[CreateReportScreen] Received parameters:', {
-    templateId: params.templateId,
-    submissionId: params.submissionId,
-    managementId: params.managementId,
-    unitId: params.unitId,
-    status: params.status,
-    mode: params.mode,
-    hasSubmissionData: !!params.submissionData,
-    submissionDataLength: params.submissionData ? params.submissionData.toString().length : 0
-  });
+
   
   const templateId = params.templateId ? Number(params.templateId) : null;
   const submissionId = params.submissionId ? Number(params.submissionId) : null;
@@ -75,22 +65,16 @@ const CreateReportScreen = () => {
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
   
-  // Log parsed parameters
-  console.log('[CreateReportScreen] Parsed parameters:', {
-    templateId,
-    submissionId,
-    managementId,
-    unitId,
-    mode,
-    isViewMode,
-    isEditMode
-  });
+
   // Use our token refresh hook
   const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
   
   // Dialog states
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  
+  // State to store fetched management details for historical submissions
+  const [fetchedManagementDetails, setFetchedManagementDetails] = useState<any>(null);
   
   // Animation ref for button press
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -125,11 +109,80 @@ const CreateReportScreen = () => {
     // Format: "Level Name: Unit Name" or just "Unit Name" if no level
     return levelName ? `${levelName}: ${formatUnitName(userUnitDetails)}` : formatUnitName(userUnitDetails);
   }, [userUnitDetails?.Name, userTanzeemiLevelDetails?.Name]);
+  // Function to fetch management details if not available in state
+  const fetchManagementDetails = useCallback(async (mgmtId: number) => {
+    try {
+      console.log('[CreateReportScreen] Fetching management details for mgmt_id:', mgmtId);
+      const response = await directApiRequest<{ data: any }>(
+        `/items/reports_mgmt/${mgmtId}`,
+        'GET'
+      );
+      
+      if (response?.data) {
+        console.log('[CreateReportScreen] Successfully fetched management details:', response.data);
+        setFetchedManagementDetails(response.data);
+        return response.data;
+      }
+    } catch (error) {
+      console.error('[CreateReportScreen] Error fetching management details:', error);
+    }
+    return null;
+  }, []);
+
+  // Effect to clear fetched management details when submission changes
+  useEffect(() => {
+    setFetchedManagementDetails(null);
+  }, [submissionId]);
+
   const reportingPeriod = useMemo(() => {
-    return latestReportMgmt[0]?.managements[0]
+    // If we have a specific managementId (from submission), use that management's period
+    if (managementId) {
+      // First check if we have fetched management details for this submission
+      if (fetchedManagementDetails && fetchedManagementDetails.id === managementId) {
+        console.log('[CreateReportScreen] Using fetched management period:', {
+          managementId,
+          month: fetchedManagementDetails.month,
+          year: fetchedManagementDetails.year,
+          period: `${getUrduMonth(fetchedManagementDetails.month)} ${fetchedManagementDetails.year}`
+        });
+        return `${getUrduMonth(fetchedManagementDetails.month)} ${fetchedManagementDetails.year}`;
+      }
+      
+      // Then check if we have it in the current state
+      const management = latestReportMgmt.find(report => 
+        report.managements.some(mgmt => mgmt.id === managementId)
+      )?.managements.find(mgmt => mgmt.id === managementId);
+      
+      if (management) {
+        console.log('[CreateReportScreen] Using specific management period:', {
+          managementId,
+          month: management.month,
+          year: management.year,
+          period: `${getUrduMonth(management.month)} ${management.year}`
+        });
+        return `${getUrduMonth(management.month)} ${management.year}`;
+      } else {
+        console.log('[CreateReportScreen] Management not found for ID:', managementId);
+        // If management not found in state, trigger an async fetch
+        if (managementId && !fetchedManagementDetails) {
+          fetchManagementDetails(managementId);
+        }
+      }
+    }
+    
+    // Fallback to latest management period
+    const fallbackPeriod = latestReportMgmt[0]?.managements[0]
       ? `${getUrduMonth(latestReportMgmt[0]?.managements[0]?.month)} ${latestReportMgmt[0]?.managements[0].year}`
       : '';
-  }, [latestReportMgmt]);
+    
+    console.log('[CreateReportScreen] Using fallback period:', {
+      managementId,
+      fallbackPeriod,
+      latestMgmt: latestReportMgmt[0]?.managements[0]
+    });
+    
+    return fallbackPeriod;
+  }, [latestReportMgmt, managementId, fetchedManagementDetails, fetchManagementDetails]);
 
   // Force token refresh on screen focus
   useFocusEffect(
@@ -147,24 +200,10 @@ const CreateReportScreen = () => {
 
   // Ensure we have a fresh token before initializing report data
   useEffect(() => {
-    console.log('[CreateReportScreen] Checking conditions for report initialization:', {
-      templateId,
-      submissionId,
-      managementId,
-      unitId,
-      userUnitId: userUnitDetails?.id,
-      latestMgmtId: latestReportMgmt[0]?.managements[0]?.id,
-      mode
-    });
-    
     // If we're in edit or view mode and have a submissionId, we need to load existing data
     if ((isEditMode || isViewMode) && submissionId) {
-      console.log('[CreateReportScreen] In edit/view mode with submissionId:', submissionId);
-      
       // Always initialize with the existing submission ID to get fresh data
       if (templateId && unitId && managementId && submissionId) {
-        console.log('[CreateReportScreen] Initializing with existing submission ID:', submissionId);
-        
         const initParams = {
           template_id: templateId,
           unit_id: unitId,
@@ -178,7 +217,6 @@ const CreateReportScreen = () => {
             // Clear previous answers to ensure clean state
             dispatch(clearAnswers());
             // Then initialize the report data with the existing submission ID
-            console.log('[CreateReportScreen] Dispatching initializeReportData with existing submission');
             return dispatch(initializeReportData(initParams)).unwrap();
           })
           .then((result) => {
@@ -206,12 +244,6 @@ const CreateReportScreen = () => {
     
     // For new report creation
     if (templateId && userUnitDetails?.id && latestReportMgmt[0]?.managements[0]?.id) {
-      console.log('[CreateReportScreen] Initializing new report with params:', {
-        template_id: templateId,
-        unit_id: userUnitDetails.id,
-        mgmt_id: latestReportMgmt[0]?.managements[0]?.id
-      });
-      
       const initParams = {
         template_id: templateId,
         unit_id: userUnitDetails.id,
@@ -224,17 +256,16 @@ const CreateReportScreen = () => {
           // Clear previous answers to ensure clean state
           dispatch(clearAnswers());
           // Then initialize the report data
-          console.log('[CreateReportScreen] Dispatching initializeReportData');
-          return dispatch(initializeReportData(initParams)).unwrap();
-        })
-        .then((result) => {
-          console.log('[CreateReportScreen] Report data initialized successfully:', {
-            submissionId: result.submission.id,
-            sectionsCount: result.sections.length,
-            questionsCount: result.questions.length,
-            answersCount: result.answers.length
-          });
-        })
+                  return dispatch(initializeReportData(initParams)).unwrap();
+      })
+      .then((result) => {
+        console.log('[CreateReportScreen] Report data initialized successfully:', {
+          submissionId: result.submission.id,
+          sectionsCount: result.sections.length,
+          questionsCount: result.questions.length,
+          answersCount: result.answers.length
+        });
+      })
         .catch((error) => {
           console.error('[CreateReportScreen] Error initializing report data:', error);
         });

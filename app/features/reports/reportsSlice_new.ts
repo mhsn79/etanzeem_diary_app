@@ -218,43 +218,39 @@ export const fetchReportsByUnitId = createAsyncThunk<
       return rejectWithValue('User unit details not available');
     }
 
-    // Get the level ID from user unit details
-    const levelId = userUnitDetails.level_id;
-    
-    // Use the provided unitId for template fetch
-    const idToUse = unitId;
-
-    // Fetch report templates for the unit level
+    // Fetch ALL report templates (no level filtering)
     const templateResponse = await apiRequest<ReportTemplate[]>(() => ({
       path: '/items/report_templates',
       method: 'GET',
-      params: { filter: { unit_level_id: { _eq: levelId } } }
+      params: {} // No filter to get all templates
     }));
 
     const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
 
     if (!templates || templates.length === 0) {
-      console.warn('[reportsSlice] No templates found for unit level ID:', levelId);
-      return rejectWithValue('No templates found for this unit level');
+      console.warn('[reportsSlice] No templates found');
+      return rejectWithValue('No templates found');
     }
 
-    // Use the first template
-    const template = templates[0];
+    // Process all templates and their managements
+    const result: ReportData[] = [];
+    
+    for (const template of templates) {
+      // Fetch report managements for each template
+      const managementResponse = await apiRequest<ReportManagement[]>(() => ({
+        path: '/items/reports_mgmt',
+        method: 'GET',
+        params: { filter: { report_template_id: { _eq: template.id } } }
+      }));
 
-    // Fetch report managements for the template
-    const managementResponse = await apiRequest<ReportManagement[]>(() => ({
-      path: '/items/reports_mgmt',
-      method: 'GET',
-      params: { filter: { report_template_id: { _eq: template.id } } }
-    }));
+      const managements = normalizeResponse<ReportManagement[]>(managementResponse, 'Managements');
 
-    const managements = normalizeResponse<ReportManagement[]>(managementResponse, 'Managements');
-
-    // Combine template and managements into the expected format
-    const result: ReportData[] = [{
-      template,
-      managements: managements || []
-    }];
+      // Add template and its managements to result
+      result.push({
+        template,
+        managements: managements || []
+      });
+    }
 
     return result;
   } catch (error: any) {
