@@ -19,8 +19,7 @@ import { store, persistor } from '@/app/store';              // ← adjust paths
 import { usePushNotifications } from "@/src/hooks/usePushNotifications";
 import AuthGuard from './components/AuthGuard';
 import { useTokenRefresh } from './utils/tokenRefresh';
-import DebugPanel from './components/DebugPanel';
-
+// import DebugPanel from './components/DebugPanel';
 
 // Force RTL layout for the entire app
 I18nManager.allowRTL(true);
@@ -152,15 +151,15 @@ function AppContent({
   return (
     <>
       {/* Debug Panel (only in development) */}
-      {__DEV__ && (
+      {/* {__DEV__ && (
         <DebugPanel 
           isVisible={showDebugPanel} 
           onToggle={() => setShowDebugPanel(!showDebugPanel)} 
         />
-      )}
+      )} */}
       
       {/* Debug Toggle Button (only in development) */}
-      {__DEV__ && (
+      {/* {__DEV__ && (
         <TouchableOpacity
           style={{
             position: 'absolute',
@@ -178,7 +177,7 @@ function AppContent({
         >
           <Text style={{ color: 'white', fontSize: 16 }}>🐛</Text>
         </TouchableOpacity>
-      )}
+      )} */}
       
       <Stack
           screenOptions={{

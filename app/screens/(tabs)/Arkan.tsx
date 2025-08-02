@@ -63,8 +63,9 @@ export default function Arkan() {
 
   // Define tabs with badges in custom order
   const tabs = useMemo(() => {
+    const activePersons = persons.filter(person => person.status !== 'archived');
     const typeCounts = (contactTypes || []).reduce((acc, type) => {
-      acc[type.id] = persons.filter(person => person.contact_type === type.id).length;
+      acc[type.id] = activePersons.filter(person => person.contact_type === type.id).length;
       return acc;
     }, {} as Record<number, number>);
 
@@ -107,12 +108,15 @@ export default function Arkan() {
 
   // Filter persons based on search query and selected tab
   const filteredPersons = useMemo(() => {
-    // First, filter by tab selection
-    let tabFilteredPersons = persons;
+    // First, exclude archived persons
+    const activePersons = persons.filter(person => person.status !== 'archived');
+    
+    // Then filter by tab selection
+    let tabFilteredPersons = activePersons;
     
     // If a specific tab is selected, filter by that contact type
     if (selectedTab !== 0 && tabs.find(tab => tab.value === selectedTab)) {
-      tabFilteredPersons = persons.filter(person => person.contact_type === selectedTab);
+      tabFilteredPersons = activePersons.filter(person => person.contact_type === selectedTab);
     }
     
     // Then apply search query filter if needed
