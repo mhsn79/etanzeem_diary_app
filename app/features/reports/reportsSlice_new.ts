@@ -98,7 +98,7 @@ export const fetchReportSubmissions = createAsyncThunk<
   ReportSubmission[],
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportSubmissions', async (_, { getState, dispatch, rejectWithValue }) => {
+>('reports/fetchReportSubmissions', async (_, { getState, rejectWithValue }) => {
   try {
     const { tanzeem } = getState();
     const tanzeemiUnitIds = tanzeem?.ids ?? [];
@@ -130,72 +130,136 @@ export const fetchReportSubmissions = createAsyncThunk<
   }
 });
 
+export const createReportSubmission = createAsyncThunk<
+  ReportSubmission,
+  { template_id: number; unit_id: number; mgmt_id: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('reports/createReportSubmission', async (params, { getState, rejectWithValue }) => {
+  try {
+    // Validate required fields
+    if (!params.template_id || !params.unit_id || !params.mgmt_id) {
+      return rejectWithValue('Missing required fields for submission creation');
+    }
+
+    // Check if a submission already exists for this combination (local state)
+    const existingSubmissions = getState().reportsNew.reportSubmissions;
+    const existingSubmission = existingSubmissions.find(submission =>
+      submission.template_id === params.template_id &&
+      submission.unit_id === params.unit_id &&
+      submission.mgmt_id === params.mgmt_id
+    );
+
+    if (existingSubmission) {
+      return existingSubmission;
+    }
+
+    // Also check server for existing submissions
+    const serverFilter = {
+      _and: [
+        { template_id: { _eq: params.template_id } },
+        { unit_id: { _eq: params.unit_id } },
+        { mgmt_id: { _eq: params.mgmt_id } }
+      ]
+    };
+
+    try {
+      const serverResponse = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
+        path: '/items/reports_submissions',
+        method: 'GET',
+        params: { filter: serverFilter }
+      }));
+
+      const serverSubmissions = normalizeResponse<ReportSubmission[]>(serverResponse, 'Server Submissions');
+
+      if (serverSubmissions && serverSubmissions.length > 0) {
+        return serverSubmissions[0];
+      }
+    } catch (serverError) {
+      console.warn('[reportsSlice] Error checking server for existing submissions:', serverError);
+      // Continue with creation even if server check fails
+    }
+
+    const submissionData = {
+      template_id: params.template_id,
+      unit_id: params.unit_id,
+      mgmt_id: params.mgmt_id,
+      status: 'draft',
+    };
+
+    // The centralized API client handles token refresh automatically
+    const response = await apiRequest<ReportSubmission>(() => ({
+      path: '/items/reports_submissions',
+      method: 'POST',
+      body: JSON.stringify(submissionData),
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    return response;
+  } catch (error: any) {
+    console.error('Error in createReportSubmission:', error);
+    return rejectWithValue(error.message || 'Failed to create report submission');
+  }
+});
+
 export const fetchReportsByUnitId = createAsyncThunk<
   ReportData[],
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportsByUnitId', async (unitId, { dispatch, rejectWithValue, getState }) => {
+>('reports/fetchReportsByUnitId', async (unitId, { getState, rejectWithValue }) => {
   try {
-    console.log('[reportsSlice] fetchReportsByUnitId called with unitId:', unitId);
-    
-    if (!unitId || isNaN(unitId) || unitId <= 0) {
+    if (!unitId || typeof unitId !== 'number') {
       console.error('[reportsSlice] Invalid unit ID provided:', unitId);
       return rejectWithValue('Invalid unit ID provided');
     }
 
-    // Get the user's unit details from the state to check if we're using the right ID
-    const state = getState();
-    const userUnitDetails = state.tanzeem?.userUnitDetails;
-    console.log('[reportsSlice] User unit details from state:', JSON.stringify(userUnitDetails));
-    
-    // Check if we should use Level_id instead of the unit ID
-    const levelId = userUnitDetails?.Level_id || userUnitDetails?.level_id;
-    console.log('[reportsSlice] User unit level ID:', levelId);
-    
-    // Determine which ID to use for fetching templates
-    const idToUse = levelId || unitId;
-    console.log('[reportsSlice] Using ID for template fetch:', idToUse);
-
-    // The centralized API client handles token refresh automatically
-    console.log('[reportsSlice] Fetching report templates for unit level ID:', idToUse);
-    const templateResponse = await apiRequest<ReportTemplate[] | { data: ReportTemplate[] }>(() => ({
-      path: '/items/report_templates',
-      method: 'GET',
-      params: { filter: { unit_level_id: { _eq: idToUse } } },
-    }));
-    
-    console.log('[reportsSlice] Template response:', JSON.stringify(templateResponse));
-
-    const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
-    console.log('[reportsSlice] Normalized templates:', JSON.stringify(templates));
-    
-    if (!templates.length) {
-      console.warn('[reportsSlice] No templates found for unit level ID:', idToUse);
-      return [];
+    // Get user unit details from state
+    const userUnitDetails = getState().tanzeem.userUnitDetails;
+    if (!userUnitDetails) {
+      return rejectWithValue('User unit details not available');
     }
 
-    const template = templates[0];
-    console.log('[reportsSlice] Using template:', JSON.stringify(template));
+    // Get the level ID from user unit details
+    const levelId = userUnitDetails.level_id;
     
-    console.log('[reportsSlice] Fetching report managements for template ID:', template.id);
-    const managementResponse = await apiRequest<ReportManagement[] | { data: ReportManagement[] }>(() => ({
+    // Use the provided unitId for template fetch
+    const idToUse = unitId;
+
+    // Fetch report templates for the unit level
+    const templateResponse = await apiRequest<ReportTemplate[]>(() => ({
+      path: '/items/report_templates',
+      method: 'GET',
+      params: { filter: { unit_level_id: { _eq: levelId } } }
+    }));
+
+    const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
+
+    if (!templates || templates.length === 0) {
+      console.warn('[reportsSlice] No templates found for unit level ID:', levelId);
+      return rejectWithValue('No templates found for this unit level');
+    }
+
+    // Use the first template
+    const template = templates[0];
+
+    // Fetch report managements for the template
+    const managementResponse = await apiRequest<ReportManagement[]>(() => ({
       path: '/items/reports_mgmt',
       method: 'GET',
-      params: { filter: { report_template_id: { _eq: template.id } }, sort: 'id' },
+      params: { filter: { report_template_id: { _eq: template.id } } }
     }));
-    
-    console.log('[reportsSlice] Management response:', JSON.stringify(managementResponse));
 
     const managements = normalizeResponse<ReportManagement[]>(managementResponse, 'Managements');
-    console.log('[reportsSlice] Normalized managements:', JSON.stringify(managements));
-    
-    const result = [{ template, managements }];
-    console.log('[reportsSlice] Final result:', JSON.stringify(result));
-    
+
+    // Combine template and managements into the expected format
+    const result: ReportData[] = [{
+      template,
+      managements: managements || []
+    }];
+
     return result;
   } catch (error: any) {
     console.error('[reportsSlice] Error in fetchReportsByUnitId:', error);
-    return rejectWithValue(error.message || 'Failed to fetch reports');
+    return rejectWithValue(error.message || 'Failed to fetch reports data');
   }
 });
 
@@ -218,12 +282,10 @@ const reportsNewSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchReportsByUnitId.pending, (state) => {
-        console.log('[reportsSlice] fetchReportsByUnitId.pending');
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchReportsByUnitId.fulfilled, (state, action) => {
-        console.log('[reportsSlice] fetchReportsByUnitId.fulfilled with payload:', JSON.stringify(action.payload));
         state.loading = false;
         
         // Check if payload is empty array
@@ -247,7 +309,6 @@ const reportsNewSlice = createSlice({
           {} as Record<number, ReportData>
         );
         
-        console.log('[reportsSlice] Updated reports state:', JSON.stringify(newReports));
         state.reports = newReports;
       })
       .addCase(fetchReportsByUnitId.rejected, (state, action) => {
@@ -266,6 +327,21 @@ const reportsNewSlice = createSlice({
       .addCase(fetchReportSubmissions.rejected, (state, action) => {
         state.reportSubmissionsLoading = false;
         state.reportSubmissionsError = action.payload as string | null ?? 'Failed to fetch report submissions';
+      })
+      .addCase(createReportSubmission.pending, (state) => {
+        // No loading state needed for creation as it's handled by the component
+      })
+      .addCase(createReportSubmission.fulfilled, (state, action) => {
+        // Add the new submission to the list
+        const newSubmission = {
+          ...action.payload,
+          unitDetails: null, // Will be populated when submissions are refetched
+        };
+        state.reportSubmissions = [newSubmission, ...state.reportSubmissions];
+      })
+      .addCase(createReportSubmission.rejected, (state, action) => {
+        // Error is handled by the component
+        console.error('[reportsSlice] createReportSubmission.rejected with error:', action.payload);
       });
   },
 });

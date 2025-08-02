@@ -29,6 +29,8 @@ import {
   selectDeleteActivityStatus,
   selectDeleteActivityError,
 } from '@/app/features/activities/activitySlice';
+import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById, selectChildUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/app/utils/formatUnitName';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 // Reusable component to wrap content with consistent status bar and background
@@ -73,6 +75,21 @@ export default function Activities() {
   const deleteStatus = useAppSelector(selectDeleteActivityStatus);
   const deleteError = useAppSelector(selectDeleteActivityError);
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
+  const [showCompletionSuccessToast, setShowCompletionSuccessToast] = useState(false);
+  
+  // Tanzeem selectors for location conversion and filtering
+  const userUnitDetails = useAppSelector(selectUserUnitDetails);
+  const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
+  const levelsById = useAppSelector(selectLevelsById);
+  
+  // Memoize child units to prevent infinite re-renders
+  const childUnits = useMemo(() => {
+    if (!userUnitDetails?.id) return [];
+    return allTanzeemiUnits.filter(unit => {
+      const parentId = unit.parent_id || unit.Parent_id;
+      return parentId === userUnitDetails.id;
+    });
+  }, [userUnitDetails?.id, allTanzeemiUnits]);
 
   const onRefresh = useCallback(() => {
     console.log('Pull-to-refresh triggered');
@@ -96,38 +113,122 @@ export default function Activities() {
     []
   );
 
-  const formatActivityData = (activity:any) => ({
-    id: activity.id.toString(),
-    title: activity.activity_details || 'غير متعين',
-    details: activity.title || 'غير متعين',
-    location: activity.location || activity.location_coordinates || 'غير متعين',
-    status: activity.status || 'غير متعين',
-    dateTime: activity.activity_date_and_time
-      ? new Date(activity.activity_date_and_time).toLocaleString('ur-PK', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        })
-      : 'غير متعين',
-    attendance: activity.attendance != null ? activity.attendance.toString() : 'غير متعين',
-    dateCreated: activity.date_created
-      ? new Date(activity.date_created).toLocaleDateString('ur-PK')
-      : 'غير متعين',
-    dateUpdated: activity.date_updated
-      ? new Date(activity.date_updated).toLocaleDateString('ur-PK')
-      : 'غير متعين',
-    rawDateTime: activity.activity_date_and_time,
-    user_created: activity.user_created,
-  });
+  // Helper function to convert location ID to unit name
+  const getLocationName = (locationId: string | number) => {
+    if (!locationId || locationId === 'custom' || locationId === 'غير متعين') {
+      return 'غير متعين';
+    }
+    
+    // Convert to string for comparison
+    const id = String(locationId);
+    
+    // First check if it's the user's current unit
+    if (userUnitDetails && String(userUnitDetails.id) === id) {
+      const levelId = userUnitDetails.level_id || userUnitDetails.Level_id;
+      const levelName = levelId && levelsById[levelId] ? levelsById[levelId].Name || '' : '';
+      const unitName = formatUnitName(userUnitDetails);
+      return levelName ? `${levelName}: ${unitName}` : unitName;
+    }
+    
+    // Check in all tanzeemi units
+    const unit = allTanzeemiUnits.find(u => String(u.id) === id);
+    if (unit) {
+      const levelId = unit.level_id || unit.Level_id;
+      const levelName = levelId && levelsById[levelId] ? levelsById[levelId].Name || '' : '';
+      const unitName = formatUnitName(unit);
+      return levelName ? `${levelName}: ${unitName}` : unitName;
+    }
+    
+    // If not found, return the original ID
+    return String(locationId);
+  };
+
+  const formatActivityData = (activity:any) => {
+    const activityDate = activity.activity_date_and_time ? new Date(activity.activity_date_and_time) : null;
+    const isPast = Boolean(activityDate && activityDate < currentDate);
+    const isDraft = activity.status === 'draft';
+    const shouldBeGreyedOut = Boolean(isPast && isDraft);
+    
+    return {
+      id: activity.id.toString(),
+      title: activity.activity_details || 'غير متعين',
+      details: activity.title || 'غير متعين',
+      location: getLocationName(activity.location) || getLocationName(activity.location_coordinates) || 'غير متعين',
+      status: activity.status || 'غير متعين',
+      dateTime: activityDate
+        ? activityDate.toLocaleString('ur-PK', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          })
+        : 'غير متعين',
+      attendance: activity.attendance != null ? activity.attendance.toString() : 'غير متعين',
+      dateCreated: activity.date_created
+        ? new Date(activity.date_created).toLocaleDateString('ur-PK')
+        : 'غير متعين',
+      dateUpdated: activity.date_updated
+        ? new Date(activity.date_updated).toLocaleDateString('ur-PK')
+        : 'غير متعين',
+      rawDateTime: activity.activity_date_and_time,
+      user_created: activity.user_created,
+      shouldBeGreyedOut,
+      isPast,
+      isDraft,
+    };
+  };
 
   const currentDate = new Date();
   const formattedActivities = useMemo(() => {
-    const allFormatted = activities.map(formatActivityData);
-    return allFormatted.filter((activity) =>
+    // Filter activities to only include those from current user's unit and child units
+    const allowedUnitIds = new Set<number>();
+    
+    // Add current user's unit
+    if (userUnitDetails?.id) {
+      allowedUnitIds.add(userUnitDetails.id);
+    }
+    
+    // Add child units
+    if (childUnits) {
+      childUnits.forEach(unit => {
+        allowedUnitIds.add(unit.id);
+      });
+    }
+    
+    // Filter activities by tanzeemi unit - only show activities from current unit and child units
+    const filteredByUnit = activities.filter(activity => {
+      const activityTanzeemiUnit = activity.tanzeemi_unit;
+      
+      // Only include activities that have a tanzeemi_unit assigned
+      if (!activityTanzeemiUnit) {
+        return false; // Exclude activities without tanzeemi unit
+      }
+      
+      const unitId = parseInt(String(activityTanzeemiUnit));
+      return allowedUnitIds.has(unitId);
+    });
+    
+    const allFormatted = filteredByUnit.map(formatActivityData);
+    const filtered = allFormatted.filter((activity) =>
       selectedTab === 0
         ? activity.rawDateTime && new Date(activity.rawDateTime) >= currentDate
         : activity.rawDateTime && new Date(activity.rawDateTime) < currentDate
     );
-  }, [activities, selectedTab]);
+    
+    // Sort activities by datetime
+    return filtered.sort((a, b) => {
+      if (!a.rawDateTime && !b.rawDateTime) return 0;
+      if (!a.rawDateTime) return 1; // Activities without datetime go to the end
+      if (!b.rawDateTime) return -1;
+      
+      const dateA = new Date(a.rawDateTime);
+      const dateB = new Date(b.rawDateTime);
+      
+      // For scheduled tab (future activities): sort by ascending date (earliest first)
+      // For reported tab (past activities): sort by descending date (most recent first)
+      return selectedTab === 0 
+        ? dateA.getTime() - dateB.getTime() 
+        : dateB.getTime() - dateA.getTime();
+    });
+  }, [activities, selectedTab, userUnitDetails, childUnits]);
 
   const handleAdd = useCallback(() => setShowDialog(true), []);
   const handleReportActivity = useCallback(() => {
@@ -150,6 +251,16 @@ export default function Activities() {
     // Hide toast after 3 seconds
     setTimeout(() => {
       setShowDeleteSuccessToast(false);
+    }, 3000);
+    // Refresh the activities list
+    dispatch(fetchActivities());
+  }, [dispatch]);
+
+  const handleCompletionSuccess = useCallback(() => {
+    setShowCompletionSuccessToast(true);
+    // Hide toast after 3 seconds
+    setTimeout(() => {
+      setShowCompletionSuccessToast(false);
     }, 3000);
     // Refresh the activities list
     dispatch(fetchActivities());
@@ -194,14 +305,19 @@ export default function Activities() {
               location={item.location}
               status={item.status}
               dateTime={item.dateTime}
+              rawDateTime={item.rawDateTime}
               attendance={item.attendance}
               dateCreated={item.dateCreated}
               dateUpdated={item.dateUpdated}
               user_created={item.user_created}
+              shouldBeGreyedOut={item.shouldBeGreyedOut}
+              isPast={item.isPast}
+              isDraft={item.isDraft}
               handleLeft={() => {}}
               handleMiddle={() => {}}
               handleRight={() => {}}
               onDeleteSuccess={handleDeleteSuccess}
+              onCompletionSuccess={handleCompletionSuccess}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -254,6 +370,16 @@ export default function Activities() {
           <View style={styles.toast}>
             <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
             <Text style={styles.toastText}>سرگرمی آرکائیو کر دی گئی ہے</Text>
+          </View>
+        </View>
+      )}
+      
+      {/* Success Toast for Completion */}
+      {showCompletionSuccessToast && (
+        <View style={styles.toastContainer}>
+          <View style={styles.toast}>
+            <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+            <Text style={styles.toastText}>سرگرمی محفوظ کر دی گئی ہے</Text>
           </View>
         </View>
       )}

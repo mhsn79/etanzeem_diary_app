@@ -82,7 +82,7 @@ export const SCREEN_TITLES = {
   [SCREENS.RUKUN_VIEW]: 'ارکان',
   [SCREENS.RUKUN_ADD_EDIT]: 'رکن شامل کریں',
   [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں',
-  [SCREENS.RUKAN_DETAILS]: 'رکن کی تفصیلات'
+  [SCREENS.RUKAN_DETAILS]: 'رکن کی تفصیل'
 
 } as const;
 

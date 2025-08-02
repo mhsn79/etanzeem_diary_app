@@ -14,6 +14,8 @@ interface Unit {
   level: number;
   parent_id?: number;
   zaili_unit_hierarchy?: number[];
+  Description?: string;
+  description?: string;
 }
 
 interface HierarchicalUnitSelectorProps {
@@ -33,45 +35,68 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
   theme,
   loading,
 }) => {
-  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [selectedUC, setSelectedUC] = useState<string | null>(null);
+  // Helper function to format unit name with description
+  const formatUnitName = (unit: any) => {
+    const name = unit.Name || unit.name || '';
+    const description = unit.Description || unit.description || '';
+    
+    // If description exists and is different from name, append it
+    if (description && description !== name) {
+      return `${name} (${description})`;
+    }
+    
+    return name;
+  };
 
-  // Filter units by level
-  const districts = hierarchyUnits.filter(unit => unit.level === 1);
-  const zones = hierarchyUnits.filter(unit => unit.level === 2 && (!selectedDistrict || unit.parent_id?.toString() === selectedDistrict));
-  const ucs = hierarchyUnits.filter(unit => (unit.level === 3 || unit.level === 4) && (!selectedZone || unit.parent_id?.toString() === selectedZone));
+  // State for selected units at each level
+  const [selectedDistrict, setSelectedDistrict] = useState<Unit | null>(null);
+  const [selectedZone, setSelectedZone] = useState<Unit | null>(null);
+  const [selectedUC, setSelectedUC] = useState<Unit | null>(null);
 
   // Auto-select single options
   useEffect(() => {
-    if (districts.length === 1 && !selectedDistrict) {
-      setSelectedDistrict(districts[0].id.toString());
+    if (hierarchyUnits.length > 0) {
+      const district = hierarchyUnits.find(unit => unit.level === 1);
+      if (district && !selectedDistrict) {
+        setSelectedDistrict(district);
+      }
+      const zone = hierarchyUnits.find(unit => unit.level === 2 && selectedDistrict?.id === unit.parent_id);
+      if (zone && !selectedZone && selectedDistrict) {
+        setSelectedZone(zone);
+      }
+      const uc = hierarchyUnits.find(unit => unit.level === 3 && selectedZone?.id === unit.parent_id);
+      if (uc && !selectedUC && selectedZone) {
+        setSelectedUC(uc);
+      }
     }
-    if (zones.length === 1 && !selectedZone && selectedDistrict) {
-      setSelectedZone(zones[0].id.toString());
-    }
-    if (ucs.length === 1 && !selectedUC && selectedZone) {
-      setSelectedUC(ucs[0].id.toString());
-    }
-  }, [districts, zones, ucs, selectedDistrict, selectedZone, selectedUC]);
+  }, [hierarchyUnits, selectedDistrict, selectedZone, selectedUC]);
 
+  // Handle unit selection
   const handleSelection = (unit: Unit, level: number) => {
-    const value = unit.id.toString();
-    if (level === 1) {
-      setSelectedDistrict(value);
-      setSelectedZone(null);
-      setSelectedUC(null);
-    } else if (level === 2) {
-      setSelectedZone(value);
-      setSelectedUC(null);
-    } else {
-      setSelectedUC(value);
-      onSelect(unit);
+    switch (level) {
+      case 1:
+        setSelectedDistrict(unit);
+        setSelectedZone(null);
+        setSelectedUC(null);
+        break;
+      case 2:
+        setSelectedZone(unit);
+        setSelectedUC(null);
+        break;
+      case 3:
+        setSelectedUC(unit);
+        onSelect(unit);
+        break;
     }
   };
 
+  // Render unit card
   const renderUnitCard = (unit: Unit, level: number) => {
-    const isSelected = unit.id.toString() === (level === 1 ? selectedDistrict : level === 2 ? selectedZone : selectedUC);
+    const isSelected = 
+      (level === 1 && selectedDistrict?.id === unit.id) ||
+      (level === 2 && selectedZone?.id === unit.id) ||
+      (level === 3 && selectedUC?.id === unit.id);
+
     return (
       <TouchableOpacity
         key={unit.id}
@@ -80,7 +105,7 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
       >
         <LocationIcon style={styles.cardIcon} />
         <UrduText style={[styles.cardLabel, { color: theme.text }]}>
-          {unit.Name || unit.name || `Level ${unit.level} Unit`}
+          {formatUnitName(unit) || `Level ${unit.level} Unit`}
         </UrduText>
         {isSelected && <AntDesign name="check" size={20} color={theme.primary} />}
       </TouchableOpacity>
@@ -98,7 +123,7 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
           parentUnits.map(unit => (
             <View key={`parent-${unit.id}`} style={styles.parentUnit}>
               <UrduText style={[styles.parentUnitText, { color: theme.text }]}>
-                {unit.Name || unit.name} ({i18n.t('level')} {unit.level})
+                {formatUnitName(unit)} ({i18n.t('level')} {unit.level})
               </UrduText>
             </View>
           ))
@@ -113,7 +138,7 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
         {loading ? (
           <ActivityIndicator size="large" color={theme.primary} />
         ) : (
-          districts.map(unit => renderUnitCard(unit, 1))
+          hierarchyUnits.filter(unit => unit.level === 1).map(unit => renderUnitCard(unit, 1))
         )}
       </View>
 
@@ -124,7 +149,7 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
           {loading ? (
             <ActivityIndicator size="large" color={theme.primary} />
           ) : (
-            zones.map(unit => renderUnitCard(unit, 2))
+            hierarchyUnits.filter(unit => unit.level === 2 && unit.parent_id === selectedDistrict.id).map(unit => renderUnitCard(unit, 2))
           )}
         </View>
       )}
@@ -136,7 +161,7 @@ const HierarchicalUnitSelector: React.FC<HierarchicalUnitSelectorProps> = ({
           {loading ? (
             <ActivityIndicator size="large" color={theme.primary} />
           ) : (
-            ucs.map(unit => renderUnitCard(unit, 3))
+            hierarchyUnits.filter(unit => unit.level === 3 && unit.parent_id === selectedZone.id).map(unit => renderUnitCard(unit, 3))
           )}
         </View>
       )}

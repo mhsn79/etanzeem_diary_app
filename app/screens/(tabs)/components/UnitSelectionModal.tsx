@@ -18,6 +18,7 @@ import {
 import { selectUserDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store';
 import { logout } from '@/app/features/auth/authSlice';
+import { useAppSelector } from '@/src/hooks/useAppSelector';
 
 interface UnitSelectionModalProps {
   visible: boolean;
@@ -33,7 +34,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
   // Get current user unit and all units
   const userUnit = useSelector(selectUserUnitDetails);
   const allUnits = useSelector(selectAllTanzeemiUnits);
-  const levelsById = useSelector(selectLevelsById);
+  const levelsById = useAppSelector(selectLevelsById);
   const userDetails = useSelector(selectUserDetails);
 
   // State for selected unit
@@ -63,6 +64,19 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
     return childrenUnits.length === 0;
   }, [childrenUnits]);
 
+  // Helper function to format unit name with description
+  const formatUnitName = (unit: any) => {
+    const name = unit.Name || unit.name || '';
+    const description = unit.Description || unit.description || '';
+    
+    // If description exists and is different from name, append it
+    if (description && description !== name) {
+      return `${name} (${description})`;
+    }
+    
+    return name;
+  };
+
   // Format unit display with level name
   const formatUnitDisplay = useCallback((unit: any) => {
     if (!unit) return '';
@@ -74,7 +88,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
       levelName = levelsById[levelId].Name || '';
     }
     
-    return levelName ? `${levelName}: ${unit.Name}` : unit.Name || '';
+    return levelName ? `${levelName}: ${formatUnitName(unit)}` : formatUnitName(unit) || '';
   }, [levelsById]);
 
   // Set up selectable options when user unit changes

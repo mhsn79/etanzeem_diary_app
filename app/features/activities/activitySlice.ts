@@ -280,7 +280,6 @@ export const fetchActivities = createAsyncThunk<
       'GET'
     );
     
-    
     if (!response.data) throw new Error('Failed to fetch activities');
     return response.data;
   } catch (error: any) {
@@ -295,9 +294,9 @@ export const fetchActivities = createAsyncThunk<
  * ────────────────────────────────────────────────────────────────────────────────*/
 export const fetchActivityCount = createAsyncThunk<
   number,
-  { linkedToId: number; questionId: number },
+  { linkedToId: number; questionId: number; reportingPeriod?: { month: number; year: number } },
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('activities/fetchCount', async ({ linkedToId, questionId }, { rejectWithValue, getState }) => {
+>('activities/fetchCount', async ({ linkedToId, questionId, reportingPeriod }, { rejectWithValue, getState }) => {
   try {
     console.log(`[ACTIVITY_COUNT] 🚀 Starting activity count fetch for question ${questionId}`);
     console.log(`[ACTIVITY_COUNT] 🔗 Using linked_to_id:`, linkedToId);
@@ -348,14 +347,14 @@ export const fetchActivityCount = createAsyncThunk<
       return 0;
     }
     
-    // Step 2: Get activities count using the validated activity_type, for current month/year and published status
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const activityFilter = `filter[activity_type][_eq]=${linkedToId}&filter[report_month][_eq]=${currentMonth}&filter[report_year][_eq]=${currentYear}&filter[status][_eq]=published`;
+    // Step 2: Get activities count using the validated activity_type, for reporting period and published status
+    const month = reportingPeriod?.month || (new Date().getMonth() + 1);
+    const year = reportingPeriod?.year || new Date().getFullYear();
+    const activityFilter = `filter[activity_type][_eq]=${linkedToId}&filter[report_month][_eq]=${month}&filter[report_year][_eq]=${year}&filter[status][_eq]=published`;
     const activityQuery = `/items/Activities?${activityFilter}`;
     
     console.log(`[ACTIVITY_COUNT] 🔍 Step 2 - Activity Query: ${activityQuery}`);
+    console.log(`[ACTIVITY_COUNT] 📅 Using reporting period: month=${month}, year=${year}`);
     
     const activityResponse = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
       activityQuery,
@@ -517,5 +516,28 @@ export const selectActivityCount = (state: RootState) => selectActivitiesState(s
 // Custom selector to get an activity by ID (using our own implementation)
 export const getActivityById = (id: string | number) => 
   (state: RootState) => selectActivityEntities(state)[typeof id === 'string' ? parseInt(id) : id];
+
+// Selector to get scheduled activities for the next 72 hours (3 days)
+export const selectScheduledActivitiesNext72Hours = (state: RootState) => {
+  const allActivities = selectAllActivities(state);
+  const now = new Date();
+  const threeDaysFromNow = new Date(now.getTime() + (72 * 60 * 60 * 1000)); // 72 hours from now
+  
+  return allActivities.filter(activity => {
+    // Include both published and draft activities (but not archived)
+    if (activity.status === 'archived') {
+      return false;
+    }
+    
+    // Parse the activity date
+    const activityDate = new Date(activity.activity_date_and_time);
+    
+    // Check if the activity is today or in the future and within the next 72 hours
+    const isTodayOrFuture = activityDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+    const isWithin72Hours = activityDate <= threeDaysFromNow;
+    
+    return isTodayOrFuture && isWithin72Hours;
+  });
+};
 
 export default activitiesSlice.reducer;

@@ -125,7 +125,7 @@ export default function StackLayout() {
             headerShown: true,
             header: ({ navigation }) => (
               <Header 
-                title="رکن کی تفصیلات"
+                title="رکن کی تفصیل"
                 onBack={navigationService.goBack}
                 showBack={true}
               />
@@ -153,7 +153,7 @@ export default function StackLayout() {
             headerShown: true,
             header: ({ navigation }) => (
               <Header 
-                title="رکن کی تفصیلات"
+                title="رکن کی تفصیل"
                 onBack={navigationService.goBack}
                 showBack={true}
               />
@@ -194,14 +194,7 @@ export default function StackLayout() {
         <Stack.Screen 
           name={SCREENS.ACTIVITY_SCREEN}
           options={{ 
-            headerShown: true,
-            header: ({ navigation }) => (
-              <Header 
-                title="سرگرمی"
-                onBack={navigationService.goBack}
-                showBack={true}
-              />
-            )
+            headerShown: false,
           }} 
         />
 

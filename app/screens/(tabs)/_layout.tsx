@@ -12,29 +12,29 @@ export default function TabLayout() {
         initialRouteName="Dashboard"
         tabBar={(props) => <TabBar {...props} />}
       >
-      <Tabs.Screen
-        name="Reports"
-        options={{
-          tabBarLabel: "رپورٹس"
-        }}
-      />
-      <Tabs.Screen
-        name="Activities"
-        options={{
-          tabBarLabel: "سرگرمیاں",
-          headerShown: false
-        }}
-      />
-      <Tabs.Screen
-        name="Arkan"
-        options={{
-          tabBarLabel: "ارکان"
-        }}
-      />
-              <Tabs.Screen
+        <Tabs.Screen
           name="Dashboard"
           options={{
             tabBarLabel: "ڈیش بورڈ"
+          }}
+        />
+        <Tabs.Screen
+          name="Arkan"
+          options={{
+            tabBarLabel: "ارکان"
+          }}
+        />
+        <Tabs.Screen
+          name="Activities"
+          options={{
+            tabBarLabel: "سرگرمیاں",
+            headerShown: false
+          }}
+        />
+        <Tabs.Screen
+          name="Reports"
+          options={{
+            tabBarLabel: "رپورٹس"
           }}
         />
       </Tabs>

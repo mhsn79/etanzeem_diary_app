@@ -209,10 +209,19 @@ const getStaticAvgValue = (linkedToType: string | null, linkedToId: number | nul
  * Check if a question is auto-calculated
  */
 export const isAutoQuestion = (question: ReportQuestion): boolean => {
-  const isAuto = question.category === 'auto' && question.aggregate_func !== null;
+  // A question is considered "auto" if it has linked_to attributes (for auto-calculation)
+  // OR if it's explicitly marked as auto category
+  const hasLinkedAttributes = Boolean(question.linked_to_type && question.linked_to_id);
+  const isAutoCategory = question.category === 'auto' && question.aggregate_func !== null;
+  const isAuto = hasLinkedAttributes || isAutoCategory;
+  
   console.log(`[AUTO_CHECK] Question ${question.id} auto check:`, {
     category: question.category,
     aggregate_func: question.aggregate_func,
+    linked_to_type: question.linked_to_type,
+    linked_to_id: question.linked_to_id,
+    hasLinkedAttributes,
+    isAutoCategory,
     isAuto
   });
   return isAuto;

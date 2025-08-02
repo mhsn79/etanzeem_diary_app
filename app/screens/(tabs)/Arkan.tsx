@@ -55,14 +55,6 @@ export default function Arkan() {
   const displayUnit = selectedUnit || userUnit;
   const displayUnitId = selectedUnitId || userUnit?.id;
   
-  // Debug log for unit selection
-  console.log('Arkan: Display unit:', {
-    selectedUnitId,
-    userUnitId: userUnit?.id,
-    displayUnitId,
-    displayUnitName: displayUnit?.Name
-  });
-
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
   const [refreshing, setRefreshing] = useState(false);

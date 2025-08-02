@@ -19,7 +19,10 @@ const ScheduleCard = memo(({ scheduleLength=0, formattedDate, onPress, colorSche
     <View style={styles.scheduleCard}>
       <TouchableOpacity onPress={onPress} style={styles.scheduleItemContainer}>
         <UrduText style={styles.scheduleText}>
-          {scheduleLength > 0 ? 'آج آپ کے شیڈول میں'+ scheduleLength+ ' سرگرمیاں ہیں۔' : 'آج آپ کے شیڈول میں کوئی سرگرمی نہیں ہے۔'}
+          {scheduleLength > 0 
+            ? `اگلے 3 دنوں میں ${scheduleLength} ${scheduleLength === 1 ? 'سرگرمی' : 'سرگرمیاں'} شیڈولڈ ${scheduleLength === 1 ? 'ہے' : 'ہیں'}۔` 
+            : 'اگلے 3 دنوں میں کوئی سرگرمی شیڈولڈ نہیں ہے۔'
+          }
         </UrduText>
         <UrduText style={styles.scheduleText}>{formattedDate}</UrduText>
       </TouchableOpacity>

@@ -83,7 +83,8 @@ const normalizeEntities = <T extends { id: number } | { id?: number }>(entities:
 const calculateSectionProgress = (
   sectionId: number,
   questions: NormalizedEntities<ReportQuestion>,
-  answers: NormalizedEntities<ReportAnswer>
+  answers: NormalizedEntities<ReportAnswer>,
+  currentSubmissionId: number | null
 ): SectionProgress => {
   if (!questions.byId) {
     return { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
@@ -97,13 +98,14 @@ const calculateSectionProgress = (
   // Count total questions
   const totalQuestions = sectionQuestions.length;
   
-  // Count answered questions
+  // Count answered questions - only consider answers for the current submission
   const answeredQuestions = sectionQuestions.filter(question => {
-    if (!answers.byId) return false;
+    if (!answers.byId || !currentSubmissionId) return false;
     
     return Object.values(answers.byId).some(answer => 
       answer && 
       answer.question_id === question.id && 
+      answer.submission_id === currentSubmissionId &&
       (answer.string_value !== null || answer.number_value !== null)
     );
   }).length;
@@ -135,7 +137,8 @@ const updateAllSectionsProgress = (
       progress[sectionId] = calculateSectionProgress(
         sectionId,
         state.questions,
-        state.answers
+        state.answers,
+        state.currentSubmissionId
       );
     }
   });
@@ -153,12 +156,10 @@ const updateAllSectionsProgress = (
  */
 export const initializeReportData = createAsyncThunk<
   { submission: ReportSubmission; sections: ReportSection[]; questions: ReportQuestion[]; answers: ReportAnswer[] },
-  FetchReportDataParams,
+  { template_id: number; unit_id: number; mgmt_id: number; submission_id?: number },
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/initializeReportData', async (params, { dispatch, rejectWithValue }) => {
   try {
-    console.log('Initializing report data with params:', params);
-    
     // Validate required fields
     if (!params.template_id || !params.unit_id || !params.mgmt_id) {
       return rejectWithValue('Missing required fields for report initialization');
@@ -178,19 +179,14 @@ export const initializeReportData = createAsyncThunk<
     
     // Step 1: If a specific submission_id was provided, fetch that submission directly
     if (params.submission_id) {
-      console.log(`Fetching specific submission with ID: ${params.submission_id}`);
-      
       try {
         const submissionResponse = await directApiRequest<{ data: ReportSubmission }>(
           `/items/reports_submissions/${params.submission_id}`,
           'GET'
         );
         
-        console.log('Specific submission response:', submissionResponse);
-        
         if (submissionResponse?.data) {
           submission = submissionResponse.data;
-          console.log('Found specific submission:', submission);
         } else {
           console.error(`Submission with ID ${params.submission_id} not found`);
           return rejectWithValue(`Submission with ID ${params.submission_id} not found`);
@@ -200,31 +196,25 @@ export const initializeReportData = createAsyncThunk<
         return rejectWithValue(`Error fetching submission with ID ${params.submission_id}`);
       }
     } else {
-      // Step 1b: Check for existing draft submission if no specific ID was provided
+      // Step 1b: Check for existing submission if no specific ID was provided
       const filter = {
         _and: [
           { template_id: { _eq: params.template_id } },
           { unit_id: { _eq: params.unit_id } },
-          { mgmt_id: { _eq: params.mgmt_id } },
-          { status: { _eq: 'draft' } }
+          { mgmt_id: { _eq: params.mgmt_id } }
         ]
       };
       
-      console.log('Checking for existing draft submission');
       const existingSubmissionsResponse = await directApiRequest<{ data: ReportSubmission[] }>(
         '/items/reports_submissions',
         'GET',
         { filter }
       );
       
-      console.log('Existing submissions response:', existingSubmissionsResponse);
-      
       // Step 2: Use existing submission or create a new one
       if (existingSubmissionsResponse?.data && existingSubmissionsResponse.data.length > 0) {
         submission = existingSubmissionsResponse.data[0];
-        console.log('Found existing draft submission:', submission);
       } else {
-        console.log('No existing draft submission found. Creating new one.');
         const submissionData = {
           template_id: params.template_id,
           unit_id: params.unit_id,
@@ -243,40 +233,34 @@ export const initializeReportData = createAsyncThunk<
           console.error('New submission created but missing ID:', submission);
           return rejectWithValue('Created submission is missing an ID');
         }
-        
-        console.log('Created new draft submission:', submission);
       }
     }
     
     // Step 3: Fetch sections for the template
-    console.log('Fetching sections for template ID:', params.template_id);
     const sectionsFilter = { template_id: { _eq: params.template_id } };
     const sectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
       '/items/report_sections',
       'GET',
       { filter: sectionsFilter, sort: 'sort' }
     );
-    console.log('Successfully fetched Report Sections:',sectionsResponse);
     
     // Handle both response formats: direct array or {data: array}
-    let sections: ReportSection[];
+    let sections: ReportSection[] = [];
     if (Array.isArray(sectionsResponse)) {
       sections = sectionsResponse;
-    } else if (sectionsResponse && 'data' in sectionsResponse && Array.isArray(sectionsResponse.data)) {
+    } else if (sectionsResponse?.data && Array.isArray(sectionsResponse.data)) {
       sections = sectionsResponse.data;
     } else {
       console.error('Invalid response format for Report Sections:', sectionsResponse);
       return rejectWithValue('Invalid response format for Report Sections');
     }
     
-    console.log('Successfully fetched Report Sections:', sections.length);
-    
     // Step 4: Fetch all questions for the template in a single batch
-    console.log('Fetching all questions for template sections');
     const sectionIds = sections.map(section => section.id);
     
     if (sectionIds.length === 0) {
-      return rejectWithValue('No sections found for this template');
+      console.error('No sections found for template:', params.template_id);
+      return rejectWithValue('No sections found for template');
     }
     
     const questionsFilter = { section_id: { _in: sectionIds } };
@@ -285,25 +269,21 @@ export const initializeReportData = createAsyncThunk<
       'GET',
       { filter: questionsFilter, sort: 'sort' }
     );
-    console.log('quest ionsResponse --------------------->>>>',questionsResponse);
     
     // Handle both response formats: direct array or {data: array}
-    let questions: ReportQuestion[];
+    let questions: ReportQuestion[] = [];
     if (Array.isArray(questionsResponse)) {
       questions = questionsResponse;
-    } else if (questionsResponse && 'data' in questionsResponse && Array.isArray(questionsResponse.data)) {
+    } else if (questionsResponse?.data && Array.isArray(questionsResponse.data)) {
       questions = questionsResponse.data;
     } else {
       console.error('Invalid response format for Report Questions:', questionsResponse);
       return rejectWithValue('Invalid response format for Report Questions');
     }
     
-    console.log('Successfully fetched Report Questions:', questions.length);
-    
     // Step 5: Fetch answers for the submission if it exists
     let answers: ReportAnswer[] = [];
     if (submission.id) {
-      console.log('Fetching answers for submission ID:', submission.id);
       const answersFilter = { submission_id: { _eq: submission.id } };
       
       try {
@@ -312,27 +292,21 @@ export const initializeReportData = createAsyncThunk<
           'GET',
           { filter: answersFilter }
         );
-        console.log('Fetched answers for submission:', answersResponse);
         
         // Handle both response formats: direct array or {data: array}
         if (Array.isArray(answersResponse)) {
           answers = answersResponse;
-        } else if (answersResponse && 'data' in answersResponse && Array.isArray(answersResponse.data)) {
+        } else if (answersResponse?.data && Array.isArray(answersResponse.data)) {
           answers = answersResponse.data;
-        } else {
-          console.error('Invalid response format for Report Answers:', answersResponse);
-          // Don't reject, just log error and continue with empty answers
-          answers = [];
         }
-        
-        console.log('Successfully fetched Report Answers:', answers.length);
       } catch (error) {
         console.error('Error fetching answers:', error);
-        // Don't reject, just log error and continue with empty answers
+        // Don't fail the entire operation if answers fetch fails
         answers = [];
       }
     }
     
+    // Return all the fetched data
     return {
       submission,
       sections,
@@ -341,18 +315,7 @@ export const initializeReportData = createAsyncThunk<
     };
   } catch (error: any) {
     console.error('Error in initializeReportData:', error);
-    
-    // Check if it's an authentication error
-    if (error.message?.includes('Authentication expired') || 
-        error.message?.includes('Token expired') ||
-        error.message?.includes('401')) {
-      // Dispatch logout action if it's an auth error
-      dispatch(logout());
-    }
-    
-    return rejectWithValue(
-      error.message || 'Failed to initialize report data'
-    );
+    return rejectWithValue(error.message || 'Failed to initialize report data');
   }
 });
 
@@ -585,6 +548,12 @@ const qaSlice = createSlice({
       state.currentSubmissionId = action.payload;
     },
     
+    // Clear answers for fresh loading
+    clearAnswers: (state) => {
+      state.answers = initialAnswersState;
+      state.progress = {};
+    },
+    
     // Reset state
     resetState: (state) => {
       state.sections = initialSectionsState;
@@ -611,6 +580,9 @@ const qaSlice = createSlice({
     builder
       .addCase(initializeReportData.pending, (state) => {
         state.status = 'loading';
+        // Clear previous answers to ensure we load fresh data for the new submission
+        state.answers = initialAnswersState;
+        state.progress = {};
       })
       .addCase(initializeReportData.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -720,7 +692,7 @@ const qaSlice = createSlice({
 /* ------------------------------------------------------------------ */
 
 // Export actions
-export const { setCurrentSubmissionId, resetState, updateProgress } = qaSlice.actions;
+export const { setCurrentSubmissionId, resetState, updateProgress, clearAnswers } = qaSlice.actions;
 
 // Add a clearSubmissions function for logout
 export const clearSubmissions = () => resetState();
@@ -771,10 +743,69 @@ export const selectAnswersByQuestionId = createSelector(
   }
 );
 
+export const selectAnswersBySubmissionId = createSelector(
+  [selectAnswers, (_, submissionId: number) => submissionId],
+  (answers, submissionId) => {
+    if (!answers.allIds || !answers.byId) return [];
+    return answers.allIds
+      .map(id => answers.byId[id])
+      .filter(answer => answer && answer.submission_id === submissionId);
+  }
+);
+
+export const selectAnswersByQuestionIdAndSubmissionId = createSelector(
+  [selectAnswers, (_, questionId: number, submissionId: number) => ({ questionId, submissionId })],
+  (answers, { questionId, submissionId }) => {
+    if (!answers.allIds || !answers.byId) return [];
+    return answers.allIds
+      .map(id => answers.byId[id])
+      .filter(answer => answer && answer.question_id === questionId && answer.submission_id === submissionId);
+  }
+);
+
 export const selectProgressBySection = createSelector(
   [selectProgress, (_, sectionId: number) => sectionId],
   (progress, sectionId) => {
     return progress[sectionId] || { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
+  }
+);
+
+export const selectProgressBySectionAndSubmission = createSelector(
+  [selectSections, selectQuestions, selectAnswers, selectCurrentSubmissionId, (_, sectionId: number) => sectionId],
+  (sections, questions, answers, currentSubmissionId, sectionId) => {
+    if (!currentSubmissionId) {
+      return { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
+    }
+    
+    return calculateSectionProgress(sectionId, questions, answers, currentSubmissionId);
+  }
+);
+
+/**
+ * Selector to get the overall progress percentage for a specific submission ID
+ */
+export const selectOverallProgressForSubmission = createSelector(
+  [selectSections, selectQuestions, selectAnswers, (_, submissionId: number | null) => submissionId],
+  (sections, questions, answers, submissionId) => {
+    if (!submissionId || !sections.allIds || !sections.byId) {
+      return 0;
+    }
+    
+    // Calculate progress for each section based on the specific submission
+    const progress: { [sectionId: number]: SectionProgress } = {};
+    
+    sections.allIds.forEach(sectionId => {
+      if (sectionId !== undefined) {
+        progress[sectionId] = calculateSectionProgress(
+          sectionId,
+          questions,
+          answers,
+          submissionId
+        );
+      }
+    });
+    
+    return calculateAverageSectionProgress(progress);
   }
 );
 
@@ -783,15 +814,35 @@ export const selectProgressBySection = createSelector(
  * Uses the calculateAverageSectionProgress utility function for calculation
  */
 export const selectOverallProgress = createSelector(
-  [selectProgress],
-  (progress) => calculateAverageSectionProgress(progress)
+  [selectSections, selectQuestions, selectAnswers, selectCurrentSubmissionId],
+  (sections, questions, answers, currentSubmissionId) => {
+    if (!currentSubmissionId || !sections.allIds || !sections.byId) {
+      return 0;
+    }
+    
+    // Calculate progress for each section based on current submission
+    const progress: { [sectionId: number]: SectionProgress } = {};
+    
+    sections.allIds.forEach(sectionId => {
+      if (sectionId !== undefined) {
+        progress[sectionId] = calculateSectionProgress(
+          sectionId,
+          questions,
+          answers,
+          currentSubmissionId
+        );
+      }
+    });
+    
+    return calculateAverageSectionProgress(progress);
+  }
 );
 
 // Create a selector to transform sections into the expected format for SectionList
 // This selector now filters by template_id and sorts by sort field, then by id
 export const selectSectionsWithProgress = createSelector(
-  [selectSections, selectProgress, (_, templateId?: number) => templateId],
-  (sections, progress, templateId) => {
+  [selectSections, selectQuestions, selectAnswers, selectCurrentSubmissionId, (_, templateId?: number) => templateId],
+  (sections, questions, answers, currentSubmissionId, templateId) => {
     if (!sections.allIds || !sections.byId) return [];
     
     // Filter sections by template_id if provided
@@ -814,7 +865,9 @@ export const selectSectionsWithProgress = createSelector(
     });
     
     return filteredSections.map(section => {
-      const sectionProgress = progress[section.id] || { percentage: 0 };
+      const sectionProgress = currentSubmissionId 
+        ? calculateSectionProgress(section.id, questions, answers, currentSubmissionId)
+        : { percentage: 0 };
       
       return {
         ...section,

@@ -11,8 +11,10 @@ import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/them
 import { AppDispatch } from '@/app/store';
 import { 
   initializeReportData, 
-  saveAnswer, 
-  submitReport,
+  selectOverallProgress, 
+  selectQAState,
+  clearAnswers,
+  selectAnswersBySubmissionId,
   selectSectionsWithProgress,
   selectQuestionsArray,
   selectAnswers,
@@ -22,7 +24,9 @@ import {
   selectSaveError,
   selectSubmitStatus,
   selectSubmitError,
-  selectCurrentSubmissionId
+  selectCurrentSubmissionId,
+  saveAnswer,
+  submitReport
 } from '@/app/features/qa/qaSlice';
 import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectManagementReportsList } from '@/app/features/reports/reportsSlice_new';
@@ -38,6 +42,19 @@ const CreateReportScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
   const params = useLocalSearchParams();
   
+  // Helper function to format unit name with description
+  const formatUnitName = (unit: any) => {
+    const name = unit.Name || unit.name || '';
+    const description = unit.Description || unit.description || '';
+    
+    // If description exists and is different from name, append it
+    if (description && description !== name) {
+      return `${name} (${description})`;
+    }
+    
+    return name;
+  };
+
   // Log all received parameters for debugging
   console.log('[CreateReportScreen] Received parameters:', {
     templateId: params.templateId,
@@ -93,6 +110,11 @@ const CreateReportScreen = () => {
   const submitError = useSelector(selectSubmitError);
   const currentSubmissionId = useSelector(selectCurrentSubmissionId);
 
+  // Get submission-specific answers
+  const submissionAnswers = useSelector((state) => 
+    currentSubmissionId ? selectAnswersBySubmissionId(state, currentSubmissionId) : []
+  );
+
   // Memoized values
   const unitName = useMemo(() => {
     if (!userUnitDetails?.Name) return '';
@@ -101,7 +123,7 @@ const CreateReportScreen = () => {
     const levelName = userTanzeemiLevelDetails?.Name || '';
     
     // Format: "Level Name: Unit Name" or just "Unit Name" if no level
-    return levelName ? `${levelName}: ${userUnitDetails.Name}` : userUnitDetails.Name;
+    return levelName ? `${levelName}: ${formatUnitName(userUnitDetails)}` : formatUnitName(userUnitDetails);
   }, [userUnitDetails?.Name, userTanzeemiLevelDetails?.Name]);
   const reportingPeriod = useMemo(() => {
     return latestReportMgmt[0]?.managements[0]
@@ -112,6 +134,9 @@ const CreateReportScreen = () => {
   // Force token refresh on screen focus
   useFocusEffect(
     React.useCallback(() => {
+      // Clear answers when screen comes into focus to ensure clean state
+      dispatch(clearAnswers());
+      
       ensureFreshToken()
         .catch((error) => {
           dispatch(setError('Your session has expired. Please log in again.'));
@@ -136,62 +161,44 @@ const CreateReportScreen = () => {
     if ((isEditMode || isViewMode) && submissionId) {
       console.log('[CreateReportScreen] In edit/view mode with submissionId:', submissionId);
       
-      // Check if we have submission data passed as a parameter
-      if (params.submissionData) {
-        try {
-          console.log('[CreateReportScreen] Parsing submission data from params');
-          const submissionData = JSON.parse(params.submissionData.toString());
-          console.log('[CreateReportScreen] Successfully parsed submission data:', {
-            dataType: typeof submissionData,
-            hasData: !!submissionData,
-            keys: submissionData ? Object.keys(submissionData) : []
-          });
-          
-          // TODO: Process the submission data to populate the form
-          
-        } catch (error) {
-          console.error('[CreateReportScreen] Error parsing submission data:', error);
-        }
-      } else {
-        console.log('[CreateReportScreen] No submission data provided in params, need to fetch it');
+      // Always initialize with the existing submission ID to get fresh data
+      if (templateId && unitId && managementId && submissionId) {
+        console.log('[CreateReportScreen] Initializing with existing submission ID:', submissionId);
         
-        // If no submission data was passed, we need to initialize with the existing submissionId
-        if (templateId && unitId && managementId && submissionId) {
-          console.log('[CreateReportScreen] Initializing with existing submission ID:', submissionId);
-          
-          const initParams = {
-            template_id: templateId,
-            unit_id: unitId,
-            mgmt_id: managementId,
-            submission_id: submissionId
-          };
-          
-          // First ensure we have a fresh token
-          ensureFreshTokenBeforeOperation()
-            .then(() => {
-              // Then initialize the report data with the existing submission ID
-              console.log('[CreateReportScreen] Dispatching initializeReportData with existing submission');
-              return dispatch(initializeReportData(initParams)).unwrap();
-            })
-            .then((result) => {
-              console.log('[CreateReportScreen] Existing report data loaded successfully:', {
-                submissionId: result.submission.id,
-                sectionsCount: result.sections.length,
-                questionsCount: result.questions.length,
-                answersCount: result.answers.length
-              });
-            })
-            .catch((error) => {
-              console.error('[CreateReportScreen] Error loading existing report data:', error);
+        const initParams = {
+          template_id: templateId,
+          unit_id: unitId,
+          mgmt_id: managementId,
+          submission_id: submissionId
+        };
+        
+        // First ensure we have a fresh token
+        ensureFreshTokenBeforeOperation()
+          .then(() => {
+            // Clear previous answers to ensure clean state
+            dispatch(clearAnswers());
+            // Then initialize the report data with the existing submission ID
+            console.log('[CreateReportScreen] Dispatching initializeReportData with existing submission');
+            return dispatch(initializeReportData(initParams)).unwrap();
+          })
+          .then((result) => {
+            console.log('[CreateReportScreen] Existing report data loaded successfully:', {
+              submissionId: result.submission.id,
+              sectionsCount: result.sections.length,
+              questionsCount: result.questions.length,
+              answersCount: result.answers.length
             });
-        } else {
-          console.error('[CreateReportScreen] Missing required parameters for loading existing submission:', {
-            templateId,
-            unitId,
-            managementId,
-            submissionId
+          })
+          .catch((error) => {
+            console.error('[CreateReportScreen] Error loading existing report data:', error);
           });
-        }
+      } else {
+        console.error('[CreateReportScreen] Missing required parameters for loading existing submission:', {
+          templateId,
+          unitId,
+          managementId,
+          submissionId
+        });
       }
       
       return;
@@ -214,6 +221,8 @@ const CreateReportScreen = () => {
       // First ensure we have a fresh token
       ensureFreshTokenBeforeOperation()
         .then(() => {
+          // Clear previous answers to ensure clean state
+          dispatch(clearAnswers());
           // Then initialize the report data
           console.log('[CreateReportScreen] Dispatching initializeReportData');
           return dispatch(initializeReportData(initParams)).unwrap();
@@ -266,7 +275,7 @@ const CreateReportScreen = () => {
         console.error('Error saving answer:', error);
         console.error('جواب محفوظ کرنے میں خرابی');
       });
-  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation, templateId, unitId, managementId]);
 
   // Handle report submission
   const handleSubmit = useCallback(() => {
@@ -321,7 +330,7 @@ const CreateReportScreen = () => {
         console.error('Error submitting report:', error);
         console.error('رپورٹ جمع کروانے میں خرابی');
       });
-  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation, templateId, unitId, managementId]);
 
   // Show loading state
   if (status === 'loading') {
@@ -382,7 +391,7 @@ const CreateReportScreen = () => {
           <SectionList
             sections={sectionsWithProgress}
             questions={questionsArray}
-            answers={Object.values(storedAnswers.byId)}
+            answers={submissionAnswers}
             onAnswerChange={handleAnswerChange}
             disabled={isViewMode}
             currentUnitId={unitId}

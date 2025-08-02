@@ -100,8 +100,6 @@ export const fetchTanzeemiUnits = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchAll', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching tanzeemi units...');
-
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
       '/items/Tanzeemi_Unit?fields=*',
@@ -131,7 +129,6 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchById', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching tanzeemi unit by ID:', unitId);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SingleTanzeemiUnitResponse>(
@@ -139,7 +136,6 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
       'GET'
     );
     
-    console.log('API Response for tanzeemi unit:', response);
     if (!response.data) throw new Error(`Tanzeemi unit with ID ${unitId} not found`);
     
     // Transform the API response to match our expected format
@@ -147,7 +143,6 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
     
     // If the unit has a Nazim_id, fetch the Nazim details
     if (transformedUnit.Nazim_id) {
-      console.log(`Unit has Nazim_id: ${transformedUnit.Nazim_id}, fetching Nazim details...`);
       // dispatch(fetchNazimDetails(transformedUnit.Nazim_id));
     }
     
@@ -169,7 +164,6 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchByLevel', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching tanzeemi units by level ID:', levelId);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
@@ -177,7 +171,6 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
       'GET'
     );
     
-    console.log(`API Response for tanzeemi units with level ID ${levelId}:`, response);
     if (!response.data) throw new Error(`Failed to fetch tanzeemi units with level ID ${levelId}`);
     
     // Transform the API response to match our expected format
@@ -200,7 +193,6 @@ export const fetchUnitHierarchy = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchHierarchy', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching tanzeemi unit hierarchy');
     
     // First, fetch all units
     const units = await dispatch(fetchTanzeemiUnits()).unwrap();
@@ -258,7 +250,6 @@ const fetchAndProcessHierarchy = async (
     );
     
     if (!response.data) {
-      console.log(`Tanzeemi unit with ID ${unitId} not found`);
       return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
     }
     
@@ -277,7 +268,6 @@ const fetchAndProcessHierarchy = async (
     // Fetch parent unit if it exists
     const parentId = unit.parent_id || unit.Parent_id;
     if (parentId && typeof parentId === 'number' && !processedIds.has(parentId)) {
-      console.log(`Fetching parent unit with ID: ${parentId}`);
       try {
         const parentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
           `/items/Tanzeemi_Unit/${parentId}?fields=*`,
@@ -288,13 +278,11 @@ const fetchAndProcessHierarchy = async (
           const parentUnit = normalizeTanzeemiUnitData(parentResponse.data);
           allUnits.push(parentUnit);
           allHierarchyIds.push(parentId);
-          console.log(`Successfully fetched parent unit: ${parentUnit.Name}`);
           
           // If the parent unit has a level_id, fetch the level details
           if (parentUnit.Level_id || parentUnit.level_id) {
             const parentLevelId = parentUnit.Level_id || parentUnit.level_id;
             if (typeof parentLevelId === 'number') {
-              // console.log(`Fetching level details for parent unit: ${parentLevelId}`);
               dispatch(fetchTanzeemLevelById(parentLevelId));
             }
           }
@@ -302,7 +290,6 @@ const fetchAndProcessHierarchy = async (
           // Recursively fetch grandparent unit if it exists
           const grandparentId = parentUnit.parent_id || parentUnit.Parent_id;
           if (grandparentId && typeof grandparentId === 'number' && !processedIds.has(grandparentId)) {
-            console.log(`Fetching grandparent unit with ID: ${grandparentId}`);
             try {
               const grandparentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
                 `/items/Tanzeemi_Unit/${grandparentId}?fields=*`,
@@ -313,13 +300,11 @@ const fetchAndProcessHierarchy = async (
                 const grandparentUnit = normalizeTanzeemiUnitData(grandparentResponse.data);
                 allUnits.push(grandparentUnit);
                 allHierarchyIds.push(grandparentId);
-                console.log(`Successfully fetched grandparent unit: ${grandparentUnit.Name}`);
                 
                 // If the grandparent unit has a level_id, fetch the level details
                 if (grandparentUnit.Level_id || grandparentUnit.level_id) {
                   const grandparentLevelId = grandparentUnit.Level_id || grandparentUnit.level_id;
                   if (typeof grandparentLevelId === 'number') {
-                    // console.log(`Fetching level details for grandparent unit: ${grandparentLevelId}`);
                     dispatch(fetchTanzeemLevelById(grandparentLevelId));
                   }
                 }
@@ -336,11 +321,6 @@ const fetchAndProcessHierarchy = async (
     
     // Process zaili_unit_hierarchy if it exists and is an array
     if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
-      // Only log if there are actually items to process
-      if (unit.zaili_unit_hierarchy.length > 0) {
-        // console.log(`Processing zaili_unit_hierarchy for unit ${unitId}:`, unit.zaili_unit_hierarchy);
-      }
-      
       // Add all hierarchy IDs to our tracking array
       const hierarchyIds = unit.zaili_unit_hierarchy as number[];
       allHierarchyIds.push(...hierarchyIds);
@@ -381,7 +361,6 @@ export const fetchTanzeemLevelById = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchLevelById', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
-    // console.log('Fetching tanzeem level by ID:', levelId);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemLevelResponse>(
@@ -409,7 +388,6 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchAllLevels', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    // console.log('Fetching all tanzeem levels');
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemLevelsResponse>(
@@ -417,7 +395,6 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
       'GET'
     );
     
-    // console.log('API Response for all tanzeem levels:', response);
     if (!response.data) throw new Error('Failed to fetch tanzeem levels');
     
     return response.data;
@@ -433,41 +410,40 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchUserUnit', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Fetching user tanzeemi unit by ID:', unitId);
     
     if (!unitId) {
-      console.log('No tanzeemi unit ID provided');
       return { unit: null, hierarchyIds: [], hierarchyUnits: [] };
     }
     
     // Fetch the unit and process its hierarchy using the centralized API client
     const { unit, allIds, hierarchyUnits } = await fetchAndProcessHierarchy(unitId, dispatch, getState);
-    // console.log('unit------------------->>', unit);
-    // console.log('==================this hierarchyUnits which are under mine==============>>>',hierarchyUnits.length);
     
     // Remove duplicates from the hierarchy IDs
     const uniqueHierarchyIds = [...new Set([...allIds, unitId])];
-    console.log(`Completed hierarchy processing for unit ${unitId}. Found ${uniqueHierarchyIds.length} unique hierarchy IDs and ${hierarchyUnits.length} units`);
     
     // Add all units to the store at once
-    dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
+    if (hierarchyUnits.length > 0) {
+      dispatch(addMultipleTanzeemiUnits(hierarchyUnits));
+    }
+    
+    // Add the main unit to the store if it exists
+    if (unit) {
+      dispatch(addTanzeemiUnit(unit));
+    }
     
     // Person data is already available from the login process via Nazim_id
     // No need to fetch person by email since we follow the correct flow
-    // console.log('✅ Person data already available from login process');
     
     // If the unit has a level_id, fetch the level details
     if (unit && (unit.Level_id || unit.level_id)) {
       const levelId = unit.Level_id || unit.level_id;
       if (typeof levelId === 'number') {
-        // Dispatch the action to fetch the tanzeem level
         dispatch(fetchTanzeemLevelById(levelId));
       }
     }
     
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit && unit.Nazim_id) {
-      console.log(`User unit has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
       // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
@@ -582,7 +558,6 @@ const tanzeemSlice = createSlice({
       })
       .addCase(fetchTanzeemiUnitsByLevel.fulfilled, (state, action: PayloadAction<{ units: TanzeemiUnit[], levelId: number }>) => {
         state.status = 'succeeded';
-        console.log(`Setting tanzeemi units for level ${action.payload.levelId}:`, action.payload.units);
         
         // Add units to the entity adapter
         tanzeemAdapter.upsertMany(state, action.payload.units);

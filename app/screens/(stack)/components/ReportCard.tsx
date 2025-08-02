@@ -13,6 +13,10 @@ interface ReportCardProps {
   onView?: () => void;
   showEdit?: boolean;
   sumbitDateText: string;
+  submissionId?: number; // Add submission ID for debug mode
+  managementId?: number; // Add management ID for debug mode
+  templateId?: number; // Add template ID for debug mode
+  progress?: number; // Add progress for the submission
 }
 
 const ReportCard: React.FC<ReportCardProps> = ({
@@ -24,6 +28,10 @@ const ReportCard: React.FC<ReportCardProps> = ({
   onEdit,
   onView,
   showEdit = true,
+  submissionId,
+  managementId,
+  templateId,
+  progress,
 }) => {
   return (
     <TouchableOpacity onPress={onView} activeOpacity={0.7}>
@@ -46,6 +54,24 @@ const ReportCard: React.FC<ReportCardProps> = ({
             <UrduText style={[styles.statusValue, { color: statusColor }]}>{status}</UrduText>
           </View>
         </View>
+        {/* Progress bar */}
+        {progress !== undefined && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${progress}%` }]} />
+            </View>
+            <UrduText style={styles.progressText}>{progress}% مکمل</UrduText>
+          </View>
+        )}
+        {/* Debug mode: Show submission ID */}
+        {(submissionId || managementId || templateId) && (
+          <View style={styles.debugContainer}>
+            {submissionId && <UrduText style={styles.debugText}>ID: {submissionId}</UrduText>}
+            {managementId && <UrduText style={styles.debugText}>Mgmt: {managementId}</UrduText>}
+            {templateId && <UrduText style={styles.debugText}>Template: {templateId}</UrduText>}
+            {progress !== undefined && <UrduText style={styles.debugText}>Progress: {progress}% {progress === 0 ? '(No answers)' : ''}</UrduText>}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -108,6 +134,41 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
     writingDirection: 'rtl',
+  },
+  debugContainer: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.xs,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.textSecondary,
+  },
+  debugText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    writingDirection: 'rtl',
+  },
+  progressContainer: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.xs,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.textSecondary,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: COLORS.textSecondary,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginTop: SPACING.xs,
   },
 });
 

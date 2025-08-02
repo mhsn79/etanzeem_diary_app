@@ -21,15 +21,28 @@ interface FilterModalProps {
 }
 
 const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilter, onResetFilter }) => {
-    const [selectedTime, setSelectedTime] = useState<string>('');
-    const [startDate, setStartDate] = useState<Date>(new Date());
-    const [endDate, setEndDate] = useState<Date>(new Date());
-    const [showDatePickerModal, setShowDatePickerModal] = useState(false);
-    const [currentDatePicker, setCurrentDatePicker] = useState<'start' | 'end' | null>(null);
-    const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
-    const [androidDateType, setAndroidDateType] = useState<'start' | 'end' | null>(null);
+    const [selectedTime, setSelectedTime] = useState('all');
+    const [startDate, setStartDate] = useState(new Date());
+    const [endDate, setEndDate] = useState(new Date());
     const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
-    
+    const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+    const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
+    const [currentDatePicker, setCurrentDatePicker] = useState<'start' | 'end' | null>(null);
+    const [androidDateType, setAndroidDateType] = useState<'start' | 'end' | null>(null);
+
+    // Helper function to format unit name with description
+    const formatUnitName = (unit: any) => {
+        const name = unit.name || unit.Name || '';
+        const description = unit.description || unit.Description || '';
+        
+        // If description exists and is different from name, append it
+        if (description && description !== name) {
+            return `${name} (${description})`;
+        }
+        
+        return name;
+    };
+
     const allHierarchyUnits = useSelector(selectAllHierarchyUnits);
 
     const handleReset = () => {
@@ -128,7 +141,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, onApplyFilt
                      selectedUnitId === unit.id && styles.selectedAreaOptionText,
                  ]}
              >
-                 {unit.name}
+                 {formatUnitName(unit)}
              </UrduText>
          </TouchableOpacity>
      ))}

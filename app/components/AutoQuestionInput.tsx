@@ -29,7 +29,8 @@ import { saveAnswer } from '../features/qa/qaSlice';
 import { calculateAutoValue, getCalculationButtonText } from '../features/qa/utils';
 import { AppDispatch } from '../store';
 import { selectUserUnitDetails, selectUserUnitHierarchyIds } from '../features/tanzeem/tanzeemSlice';
-import { selectManagementReportsList } from '../features/reports/reportsSlice_new';
+import { selectManagementReportsList, selectReportSubmissions } from '../features/reports/reportsSlice_new';
+import { selectCurrentSubmissionId } from '../features/qa/qaSlice';
 
 interface AutoQuestionInputProps {
   question: ReportQuestion;
@@ -50,6 +51,20 @@ interface Person {
   contact_type?: number;
   date_created?: string;
   Rukinat_Date?: string;
+}
+
+interface Activity {
+  id: number;
+  activity_type: number;
+  activity_date_and_time: string;
+  location: string;
+  activity_details?: string;
+  activity_summary?: string;
+  attendance?: number;
+  status: string;
+  report_month?: number;
+  report_year?: number;
+  tanzeemi_unit: number;
 }
 
 interface StrengthRecord {
@@ -91,6 +106,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactsError, setContactsError] = useState<string | null>(null);
 
+  // Popup state for activities
+  const [showActivitiesPopup, setShowActivitiesPopup] = useState(false);
+  const [activitiesList, setActivitiesList] = useState<Activity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
+
   // Popup state for strength records
   const [showStrengthPopup, setShowStrengthPopup] = useState(false);
   const [strengthRecordsList, setStrengthRecordsList] = useState<StrengthRecord[]>([]);
@@ -131,22 +152,39 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     setInputValue(String(value || ''));
   }, [value]);
 
-  // Get current reporting month and year
+  // Get current submission details
+  const currentSubmissionId = useAppSelector(selectCurrentSubmissionId);
+  const reportSubmissions = useAppSelector(selectReportSubmissions);
+  
+  // Get current reporting month and year from the current submission's management
   const getCurrentReportingPeriod = useCallback(() => {
-    const currentManagement = latestReportMgmt[0]?.managements[0];
-    if (currentManagement) {
-      return {
-        month: currentManagement.month,
-        year: currentManagement.year
-      };
+    // Find the current submission
+    const currentSubmission = reportSubmissions.find((sub: any) => sub.id === currentSubmissionId);
+    
+    if (currentSubmission) {
+      // Find the management details for this submission
+      const managementDetails = latestReportMgmt.find(report => 
+        report.managements.some(mgmt => mgmt.id === currentSubmission.mgmt_id)
+      );
+      
+      if (managementDetails) {
+        const management = managementDetails.managements.find(mgmt => mgmt.id === currentSubmission.mgmt_id);
+        if (management) {
+          return {
+            month: management.month,
+            year: management.year
+          };
+        }
+      }
     }
+    
     // Fallback to current date
     const now = new Date();
     return {
       month: now.getMonth() + 1,
       year: now.getFullYear()
     };
-  }, [latestReportMgmt]);
+  }, [latestReportMgmt, currentSubmissionId, reportSubmissions]);
 
   // Fetch contacts for popup
   const fetchContactsForPopup = useCallback(async () => {
@@ -207,7 +245,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         const unitIdToUse = currentUnitId || userUnitDetails?.id;
         dateFilter = {
           _and: [
-            { status: { _eq: 'archived' } },
+            { status: { _neq: 'archived' } },
             { Tanzeemi_Unit: { _eq: unitIdToUse } }
           ]
         };
@@ -268,6 +306,78 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       setContactsLoading(false);
     }
   }, [question.linked_to_id, question.aggregate_func, getCurrentReportingPeriod, userUnitDetails?.id, currentUnitId]);
+
+  // Fetch activities for popup
+  const fetchActivitiesForPopup = useCallback(async () => {
+    if (!question.linked_to_id) {
+      setActivitiesError('linked_to_id میسر نہیں ہے');
+      return;
+    }
+
+    setActivitiesLoading(true);
+    setActivitiesError(null);
+
+    try {
+      const reportingPeriod = getCurrentReportingPeriod();
+      const unitIdToUse = currentUnitId || userUnitDetails?.id;
+      
+      // Build filter for activities
+      const filter = {
+        _and: [
+          { activity_type: { _eq: question.linked_to_id } },
+          { tanzeemi_unit: { _eq: unitIdToUse } },
+          { report_month: { _eq: reportingPeriod.month } },
+          { report_year: { _eq: reportingPeriod.year } }
+        ]
+      };
+
+      console.log('[AutoQuestionInput] Fetching activities with filter:', JSON.stringify(filter, null, 2));
+      console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
+      console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
+      console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
+      
+      // Build the query string manually to ensure proper encoding
+      const params = new URLSearchParams();
+      
+      // Add filter as JSON string
+      params.append('filter', JSON.stringify(filter));
+      
+      // Add fields
+      params.append('fields', 'id,activity_type,activity_date_and_time,location,activity_details,activity_summary,attendance,status,report_month,report_year');
+      
+      // Add limit to get all results
+      params.append('limit', '-1');
+      
+      const queryString = params.toString();
+      const url = `/items/Activities?${queryString}`;
+      
+      console.log('[AutoQuestionInput] API URL:', url);
+      
+      const response = await directApiRequest<{ data: Activity[] }>(
+        url,
+        'GET'
+      );
+
+      console.log('[AutoQuestionInput] API response:', {
+        dataLength: response.data?.length || 0,
+        firstFewItems: response.data?.slice(0, 3) || [],
+        fullResponse: response
+      });
+
+      if (response.data) {
+        console.log('[AutoQuestionInput] Setting activities list with', response.data.length, 'items');
+        setActivitiesList(response.data);
+      } else {
+        console.log('[AutoQuestionInput] No data in response, setting empty list');
+        setActivitiesList([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching activities:', error);
+      setActivitiesError(`${getActivityTypeLabel()} حاصل کرنے میں ناکامی`);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  }, [question.linked_to_id, getCurrentReportingPeriod, currentUnitId, userUnitDetails?.id]);
 
   // Fetch strength records for popup
   const fetchStrengthRecordsForPopup = useCallback(async () => {
@@ -352,6 +462,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     fetchContactsForPopup();
   }, [fetchContactsForPopup]);
 
+  // Handle popup open for activities
+  const handleActivitiesPopupOpen = useCallback(() => {
+    setShowActivitiesPopup(true);
+    fetchActivitiesForPopup();
+  }, [fetchActivitiesForPopup]);
+
   // Handle popup open for strength records
   const handleStrengthPopupOpen = useCallback(() => {
     setShowStrengthPopup(true);
@@ -361,10 +477,13 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   // Handle popup close
   const handlePopupClose = useCallback(() => {
     setShowContactsPopup(false);
+    setShowActivitiesPopup(false);
     setShowStrengthPopup(false);
     setContactsList([]);
+    setActivitiesList([]);
     setStrengthRecordsList([]);
     setContactsError(null);
+    setActivitiesError(null);
     setStrengthError(null);
   }, []);
 
@@ -412,6 +531,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       return;
     }
 
+    // For activities, show popup instead of direct calculation
+    if (question.linked_to_type === 'activity') {
+      handleActivitiesPopupOpen();
+      return;
+    }
+
     // For strength, show popup for plus/minus functions, or fetch latest record for total/sum/count
     if (question.linked_to_type === 'strength') {
       if (question.aggregate_func === 'plus' || question.aggregate_func === 'minus') {
@@ -433,14 +558,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       let result: any;
 
       // Handle different linked_to_type cases
-      if (question.linked_to_type === 'activity') {
-        // Fetch activity count based on activity_type
-        result = await dispatch(fetchActivityCount({
-          linkedToId: question.linked_to_id ?? 0,
-          questionId: question.id
-        })).unwrap();
-        setCalculationSuccess(`${getActivityTypeLabel()} کی تعداد کامیابی سے حاصل ہو گئی`);
-      } else if (question.linked_to_type === 'strength') {
+      if (question.linked_to_type === 'strength') {
         // For total, sum, or count functions, fetch the latest record and use new_total
         if (question.aggregate_func === 'total' || question.aggregate_func === 'sum' || question.aggregate_func === 'count') {
           const latestRecord = await fetchLatestStrengthRecord();
@@ -602,10 +720,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     strength: 'قوت',
   };
 
-  // Get the appropriate label for linked_to_type if category is auto
-  const typeLabel = question.category === 'auto' && question.linked_to_type
-    ? getTypeLabel()
-    : '';
+
 
   // Handle OK button in contacts popup
   const handleContactsPopupOK = useCallback(() => {
@@ -618,6 +733,19 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     setCalculationSuccess(`کل ${count} ${getTypeLabel()}`);
     setTimeout(() => setCalculationSuccess(null), 3000);
   }, [contactsList.length, onValueChange, getTypeLabel]);
+
+  // Handle OK button in activities popup
+  const handleActivitiesPopupOK = useCallback(() => {
+    // Count only published activities
+    const publishedCount = activitiesList.filter(activity => activity.status === 'published').length;
+    setInputValue(String(publishedCount));
+    if (onValueChange) {
+      onValueChange(publishedCount);
+    }
+    setShowActivitiesPopup(false);
+    setCalculationSuccess(`کل ${publishedCount} ${getTypeLabel()}`);
+    setTimeout(() => setCalculationSuccess(null), 3000);
+  }, [activitiesList, onValueChange, getTypeLabel]);
 
   // Handle OK button in strength popup
   const handleStrengthPopupOK = useCallback(() => {
@@ -634,6 +762,14 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     setCalculationSuccess(`کل ${totalValue} ${getTypeLabel()}`);
     setTimeout(() => setCalculationSuccess(null), 3000);
   }, [strengthRecordsList, onValueChange, getTypeLabel]);
+
+  // Check if this question has auto-calculate capability
+  const hasAutoCalculateCapability = Boolean(question.linked_to_type && question.linked_to_id);
+  
+  // Get the appropriate label for linked_to_type if question has auto-calculate capability
+  const typeLabel = hasAutoCalculateCapability
+    ? getTypeLabel()
+    : '';
 
   // Right icon triggers handleFetchCount
   const rightIcon = (
@@ -666,6 +802,20 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     </TouchableOpacity>
   );
 
+  // Debug logging
+  console.log('[AutoQuestionInput] Auto-calculate check:', {
+    questionId: question.id,
+    linked_to_type: question.linked_to_type,
+    linked_to_id: question.linked_to_id,
+    category: question.category,
+    hasAutoCalculateCapability,
+    isEditable: question.category === 'manual',
+    rightIconExists: !!rightIcon,
+    buttonText,
+    typeLabel,
+    questionId33: question.id === 33 ? 'THIS IS QUESTION 33' : 'not 33'
+  });
+
   // Render contact item for popup
   const renderContactItem = ({ item }: { item: Person }) => {
     console.log('[AutoQuestionInput] Rendering contact item:', item);
@@ -680,6 +830,39 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       <View style={styles.contactItem}>
         <UrduText style={styles.contactName}>{personName}</UrduText>
         <Text style={styles.contactPhone}>{personPhone}</Text>
+      </View>
+    );
+  };
+
+  // Render activity item for popup
+  const renderActivityItem = ({ item }: { item: Activity }) => {
+    console.log('[AutoQuestionInput] Rendering activity item:', item);
+    
+    const activityDate = item.activity_date_and_time 
+      ? new Date(item.activity_date_and_time).toLocaleDateString('ur-PK')
+      : 'تاریخ دستیاب نہیں';
+    const activityStatus = item.status === 'published' ? 'جمع شدہ' : 
+                          item.status === 'draft' ? 'ڈرافٹ' : 
+                          item.status === 'archived' ? 'محفوظ شدہ' : item.status;
+    
+    // Get activity type name
+    const activityType = activityTypes.find(type => type.id === item.activity_type);
+    const activityTypeName = activityType?.name || item.activity_details;
+    
+    return (
+      <View style={styles.activityItem}>
+        <View style={styles.activityItemLeft}>
+          <UrduText style={styles.activityTypeName}>{activityTypeName}</UrduText>
+        </View>
+        <View style={styles.activityItemRight}>
+          <UrduText style={styles.activityDate}>{activityDate}</UrduText>
+          <UrduText style={[
+            styles.activityStatus, 
+            { color: item.status === 'published' ? COLORS.success : COLORS.error }
+          ]}>
+            {activityStatus}
+          </UrduText>
+        </View>
       </View>
     );
   };
@@ -712,18 +895,28 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     );
   };
 
+  // Determine if input should be editable based on category only
+  const isEditable = question.category === 'manual';
+  
   return (
     <View style={styles.container}>
       <FormInput
         inputTitle={question.question_text}
         value={inputValue}
-        onChange={() => {}} // No-op since this is read-only
-        placeholder="آٹو کیلکولیٹ کریں --->"
+        onChange={(text) => {
+          setInputValue(text);
+          if (onValueChange) {
+            onValueChange(text);
+          }
+        }}
+        placeholder={hasAutoCalculateCapability ? "آٹو کیلکولیٹ کریں یا دستی داخل کریں" : "دستی داخل کریں"}
         keyboardType="numeric"
-        editable={false}
+        editable={isEditable}
         disabled={disabled}
         loading={isCalculating}
-        rightIcon={rightIcon}
+        rightIcon={hasAutoCalculateCapability ? rightIcon : undefined}
+        // Debug: Force show button for testing
+        // rightIcon={rightIcon}
       />
 
       {/* Error message */}
@@ -819,6 +1012,90 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                     onPress={handleContactsPopupOK}
                   >
                     <UrduText style={styles.okButtonText}>ٹھیک ہے ({contactsList.length})</UrduText>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Activities Popup Modal */}
+      <Modal
+        visible={showActivitiesPopup}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handlePopupClose}
+        onShow={() => {
+          console.log('[AutoQuestionInput] Activities Modal opened, activitiesList:', {
+            length: activitiesList.length,
+            firstFew: activitiesList.slice(0, 3),
+            hasData: activitiesList.length > 0
+          });
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <UrduText style={styles.modalTitle}>
+                {`${getActivityTypeLabel()} کی سرگرمیاں`}
+              </UrduText>
+              <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {activitiesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
+              </View>
+            ) : activitiesError ? (
+              <View style={styles.errorContainer}>
+                <UrduText style={styles.errorText}>{activitiesError}</UrduText>
+              </View>
+            ) : (
+              <>
+                <View style={styles.listHeader}>
+                  <UrduText style={styles.listHeaderText}>
+                    کل {activitiesList.length} سرگرمی (جمع شدہ: {activitiesList.filter(a => a.status === 'published').length})
+                  </UrduText>
+                </View>
+                
+                <FlatList
+                  data={activitiesList}
+                  renderItem={renderActivityItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.contactsList}
+                  contentContainerStyle={styles.contactsListContent}
+                  showsVerticalScrollIndicator={true}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <UrduText style={styles.emptyText}>کوئی سرگرمی نہیں ملی ({activitiesList.length})</UrduText>
+                    </View>
+                  }
+                  onLayout={() => console.log('[AutoQuestionInput] Activities FlatList onLayout, data length:', activitiesList.length)}
+                  onContentSizeChange={() => console.log('[AutoQuestionInput] Activities FlatList onContentSizeChange, data length:', activitiesList.length)}
+                  getItemLayout={(data, index) => ({
+                    length: 60, // Height of each activity item
+                    offset: 60 * index,
+                    index,
+                  })}
+                />
+
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handlePopupClose}
+                  >
+                    <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.okButton}
+                    onPress={handleActivitiesPopupOK}
+                  >
+                    <UrduText style={styles.okButtonText}>ٹھیک ہے ({activitiesList.filter(a => a.status === 'published').length})</UrduText>
                   </TouchableOpacity>
                 </View>
               </>
@@ -927,8 +1204,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.sm,
-    minWidth: 80,
-    maxWidth: 120,
+    minWidth: 100,
+    maxWidth: 150,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1154,6 +1431,50 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+  },
+  // Activity item styles
+  activityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+    minHeight: 60,
+  },
+  activityItemLeft: {
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  activityTypeName: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textAlign: 'left',
+  },
+  activityDate: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  activityStatus: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
+    marginTop: SPACING.xs,
+  },
+  activityItemRight: {
+    alignItems: 'flex-end',
+    flex: 1,
+    marginLeft: SPACING.md,
+    gap: SPACING.xs,
+  },
+  activityLocation: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textAlign: 'right',
   },
 });
 

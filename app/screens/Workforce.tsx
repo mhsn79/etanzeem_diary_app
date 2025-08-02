@@ -601,11 +601,11 @@ export default function Workforce() {
       // Fallback to hardcoded labels if no strength types available
       switch (category) {
         case 'workforce':
-          return 'قوت کی تفصیلات';
+          return 'قوت کی تفصیل';
         case 'place':
-          return 'مقامات کی تفصیلات';
+          return 'مقامات کی تفصیل';
         case 'magazine':
-          return 'رسائل کی تفصیلات';
+          return 'رسائل کی تفصیل';
         default:
           return category;
       }
@@ -618,11 +618,11 @@ export default function Workforce() {
       // Fallback to hardcoded labels if no types found for this category
       switch (category) {
         case 'workforce':
-          return 'قوت کی تفصیلات';
+          return 'قوت کی تفصیل';
         case 'place':
-          return 'مقامات کی تفصیلات';
+          return 'مقامات کی تفصیل';
         case 'magazine':
-          return 'رسائل کی تفصیلات';
+          return 'رسائل کی تفصیل';
         default:
           return category;
       }
@@ -630,7 +630,7 @@ export default function Workforce() {
     
     // Use the Name_Plural from the first type in this category
     const firstType = categoryTypes[0];
-    return `${firstType.Name_Plural} کی تفصیلات`;
+    return `${firstType.Name_Plural} کی تفصیل`;
   }, [strengthTypes]);
 
   // Calculate annual target (placeholder for actual calculation)

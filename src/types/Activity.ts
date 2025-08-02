@@ -5,8 +5,8 @@ export interface Activity {
     activity_date_and_time: string; // ISO string
     location_coordinates: string | null; // lat,lng
     activity_details: string | null;
-    created_at: string;
-    updated_at: string;
+    date_created: string;
+    date_updated: string;
     user_created: string;
     user_updated: string | null;
     report_month: number;

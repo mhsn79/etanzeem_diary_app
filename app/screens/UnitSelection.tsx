@@ -30,14 +30,27 @@ interface Option {
 
 export default function UnitSelection() {
   const dispatch = useAppDispatch();
-  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [selectedUC, setSelectedUC] = useState<string | null>(null);
-  
-  // Options for dropdowns
+
+  // Helper function to format unit name with description
+  const formatUnitName = (unit: any) => {
+    const name = unit.Name || unit.name || '';
+    const description = unit.Description || unit.description || '';
+    
+    // If description exists and is different from name, append it
+    if (description && description !== name) {
+      return `${name} (${description})`;
+    }
+    
+    return name;
+  };
+
+  // State for dropdown options and selections
   const [districtOptions, setDistrictOptions] = useState<Option[]>([]);
   const [zoneOptions, setZoneOptions] = useState<Option[]>([]);
   const [ucOptions, setUCOptions] = useState<Option[]>([]);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [selectedUC, setSelectedUC] = useState<string | null>(null);
   
   // Handle selection for each dropdown
   const handleDistrictSelection = (option: Option) => {
@@ -121,7 +134,7 @@ export default function UnitSelection() {
         // Map districts to dropdown options
         const districtOpts = districts.map(unit => ({
           id: `district-${unit.id}`, // Ensure unique ID with prefix
-          label: unit.Name || unit.name || 'Unknown District',
+          label: formatUnitName(unit) || 'Unknown District',
           value: unit.id.toString()
         }));
         setDistrictOptions(districtOpts);
@@ -142,7 +155,7 @@ export default function UnitSelection() {
       // Map zones to dropdown options
       const zoneOpts = zones.map(unit => ({
         id: `zone-${unit.id}`, // Ensure unique ID with prefix
-        label: unit.Name || unit.name || 'Unknown Zone',
+        label: formatUnitName(unit) || 'Unknown Zone',
         value: unit.id.toString()
       }));
       setZoneOptions(zoneOpts);
@@ -167,7 +180,7 @@ export default function UnitSelection() {
       // Combine circles and UCs for the third dropdown
       const ucOpts = [...circles, ...ucs].map(unit => ({
         id: `uc-${unit.id}`, // Ensure unique ID with prefix
-        label: unit.Name || unit.name || 'Unknown UC',
+        label: formatUnitName(unit) || 'Unknown UC',
         value: unit.id.toString()
       }));
       setUCOptions(ucOpts);
@@ -194,7 +207,7 @@ export default function UnitSelection() {
         
         const zoneOpts = filteredZones.map(unit => ({
           id: `zone-${unit.id}`, // Ensure unique ID with prefix
-          label: unit.Name || unit.name || 'Unknown Zone',
+          label: formatUnitName(unit) || 'Unknown Zone',
           value: unit.id.toString()
         }));
         
@@ -218,7 +231,7 @@ export default function UnitSelection() {
         
         const ucOpts = filteredUCs.map(unit => ({
           id: `uc-${unit.id}`, // Ensure unique ID with prefix
-          label: unit.Name || unit.name || 'Unknown UC',
+          label: formatUnitName(unit) || 'Unknown UC',
           value: unit.id.toString()
         }));
         

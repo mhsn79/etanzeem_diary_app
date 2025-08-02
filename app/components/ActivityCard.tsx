@@ -6,8 +6,9 @@ import ActivityActionButton from './ActivityActionButton';
 import { COLORS, SIZES, SPACING, TYPOGRAPHY } from '../constants/theme';
 import { Feather, FontAwesome, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
 import Dialog from './Dialog';
+import ActivityCompletionDialog from './ActivityCompletionDialog';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
-import { deleteActivity, selectDeleteActivityStatus } from '../features/activities/activitySlice';
+import { deleteActivity, selectDeleteActivityStatus, editActivity } from '../features/activities/activitySlice';
 import { selectUser as selectCurrentUser } from '../features/auth/authSlice';
 
 interface ActivityCardProps {
@@ -17,14 +18,19 @@ interface ActivityCardProps {
   location: string;
   status: string;
   dateTime: string;
+  rawDateTime?: string;
   attendance: string;
   dateCreated: string;
   dateUpdated: string;
   user_created?: string;
+  shouldBeGreyedOut?: boolean;
+  isPast?: boolean;
+  isDraft?: boolean;
   handleRight: () => void;
   handleMiddle: () => void;
   handleLeft: () => void;
   onDeleteSuccess?: () => void;
+  onCompletionSuccess?: () => void;
 }
 
 const ActivityCard: React.FC<ActivityCardProps> = ({
@@ -34,14 +40,19 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   location,
   status,
   dateTime,
+  rawDateTime,
   attendance,
   dateCreated,
   dateUpdated,
   user_created,
+  shouldBeGreyedOut = false,
+  isPast = false,
+  isDraft = false,
   handleLeft,
   handleMiddle,
   handleRight,
   onDeleteSuccess,
+  onCompletionSuccess,
 }) => {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -49,6 +60,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   const currentUser = useAppSelector(selectCurrentUser);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   
   // Check if the current user is the creator of this activity
   const isCreator = useMemo(() => {
@@ -84,37 +97,87 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
         Alert.alert('خرابی', error || 'سرگرمی کو آرکائیو کرنے میں ناکامی');
       });
   };
-  return (
-    <View style={styles.cardContainer}>
-      <View style={styles.titleContainer}>
-        <View>
-        <UrduText style={styles.title}>{title}</UrduText>
-        <UrduText style={styles.title}>{details}</UrduText>
 
+  const handleCardPress = () => {
+    if (shouldBeGreyedOut && isPast && isDraft) {
+      setShowCompletionDialog(true);
+    }
+  };
+
+  const handleActivityCompletion = (data: { attendance: string; reportingMonth: string; reportingYear: string }) => {
+    setIsCompleting(true);
+    
+    // Update activity to published status with attendance and reporting details
+    const updateData = {
+      id: Number(id),
+      activityData: {
+        status: 'published',
+        attendance: parseInt(data.attendance),
+        report_month: parseInt(data.reportingMonth),
+        report_year: parseInt(data.reportingYear),
+      }
+    };
+
+    dispatch(editActivity(updateData))
+      .unwrap()
+      .then(() => {
+        setIsCompleting(false);
+        setShowCompletionDialog(false);
+        if (onCompletionSuccess) {
+          onCompletionSuccess(); // Refresh the list
+        }
+      })
+      .catch((error) => {
+        setIsCompleting(false);
+        setShowCompletionDialog(false);
+        Alert.alert('خرابی', error || 'سرگرمی کو اپڈیٹ کرنے میں ناکامی');
+      });
+  };
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.cardContainer,
+        shouldBeGreyedOut && styles.greyedOutCard
+      ]}
+      onPress={handleCardPress}
+      activeOpacity={shouldBeGreyedOut ? 0.7 : 1}
+    >
+      <View style={styles.titleContainer}>
+        <View style={styles.titleDetailsContainer}>
+          <UrduText style={[
+            styles.title,
+            shouldBeGreyedOut && styles.greyedOutText
+          ]}>{title}</UrduText>
+          <UrduText style={[
+            styles.detail,
+            shouldBeGreyedOut && styles.greyedOutText
+          ]}>تاریخ وقت: {dateTime}</UrduText>
+          <UrduText style={[
+            styles.detail,
+            shouldBeGreyedOut && styles.greyedOutText
+          ]}>مقام: {location}</UrduText>
         </View>
-        <View style={styles.iconContainer}>
-          {isCreator && (
-            <TouchableOpacity style={styles.icon} onPress={handleDelete}>
-              <Feather name="archive" size={SIZES.icon.sSmall} color={COLORS.warning} />
-            </TouchableOpacity>
-          )}
-          {isCreator && (
-            <TouchableOpacity 
-              style={styles.icon} 
-              onPress={() => router.push({
-                pathname: '/screens/(stack)/ActivityScreen',
-                params: { mode: 'edit', id: id }
-              })}
-            >
-              <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
-            </TouchableOpacity>
-          )}
+        {/* Edit button in top-right corner */}
+        {isCreator && (
+          <TouchableOpacity 
+            style={styles.editIcon} 
+            onPress={() => router.push({
+              pathname: '/screens/(stack)/ActivityScreen',
+              params: { mode: 'edit', id: id }
+            })}
+          >
+            <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
+          </TouchableOpacity>
+        )}
+      </View>
+      {/* Delete button in bottom-right corner */}
+      {isCreator && (
+        <View style={styles.deleteButtonContainer}>
+          <TouchableOpacity style={styles.deleteIcon} onPress={handleDelete}>
+            <Feather name="archive" size={SIZES.icon.sSmall} color={COLORS.white} />
+          </TouchableOpacity>
         </View>
-      </View>
-      <View style={styles.detailsContainer}>
-        <UrduText style={styles.detail}>تاریخ وقت: {dateTime}</UrduText>
-        <UrduText style={styles.detail}>مقام: {location}</UrduText>
-      </View>
+      )}
     
       {/* <View style={styles.buttonContainer}>
         <ActivityActionButton text="ایس ایم ایس" onPress={handleRight} iconComponent={<SimpleLineIcons name="envelope" size={20} color="black" />} />
@@ -134,7 +197,16 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
         showWarningIcon={true}
         loading={isDeleting}
       />
-    </View>
+
+      {/* Activity Completion Dialog */}
+      <ActivityCompletionDialog
+        visible={showCompletionDialog}
+        onClose={() => setShowCompletionDialog(false)}
+        onConfirm={handleActivityCompletion}
+        activityDate={rawDateTime || dateTime}
+        loading={isCompleting}
+      />
+    </TouchableOpacity>
   );
 };
 
@@ -153,8 +225,14 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
+  titleDetailsContainer: {
+    flex: 1,
+    marginRight: SPACING.sm,
+    alignItems: 'flex-start',
+  },
+
   iconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -167,6 +245,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: SPACING.xs,
+  },
+  editIcon: {
+    width: SPACING.lg,
+    height: SPACING.lg,
+    borderRadius: SPACING.lg / 2,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonContainer: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+  },
+  deleteIcon: {
+    width: SPACING.lg,
+    height: SPACING.lg,
+    borderRadius: SPACING.lg / 2,
+    backgroundColor: COLORS.error,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize.lg,
@@ -186,6 +285,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   detail: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
   },
   chairmenText: {
   },
@@ -193,6 +295,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: SPACING.md,
+  },
+  greyedOutCard: {
+    opacity: 0.4,
+    backgroundColor: '#E5E5E5',
+  },
+  greyedOutText: {
+    color: '#999999',
   },
 });
 

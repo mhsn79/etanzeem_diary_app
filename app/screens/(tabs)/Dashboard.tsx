@@ -34,6 +34,7 @@ import {
   selectDashboardSelectedUnitId,
   setDashboardSelectedUnit,
 } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectScheduledActivitiesNext72Hours, fetchActivities } from '@/app/features/activities/activitySlice';
 import {
   selectAllHierarchyUnits,
   selectParentUnitWithLevel
@@ -45,6 +46,7 @@ import ScheduleCard from './components/ScheduleCard';
 import UnitSelectionModal from './components/UnitSelectionModal';
 import DashboardBox from './components/DashboardBox';
 import { debugLog } from '@/app/utils/debug';
+import { formatUnitName } from '@/app/utils/formatUnitName';
 
 // TypeScript Interfaces
 interface Option {
@@ -100,6 +102,11 @@ const Dashboard = () => {
   // const nazimDetails = useSelector(selectNazimDetails);
   const userDetails = useSelector(selectUserDetails);
   
+  // Get scheduled activities for the next 72 hours
+  const scheduledActivities = useSelector(selectScheduledActivitiesNext72Hours);
+  
+
+  
   // Get display unit with level name
   const displayUnitWithLevel = useSelector((state: any) => {
     if (!displayUnit) return '';
@@ -120,7 +127,7 @@ const Dashboard = () => {
     }
     
     // Format: "Level Name: Unit Name" or just "Unit Name" if no level
-    return levelName ? `${levelName}: ${displayUnit.Name}` : displayUnit.Name || '';
+    return levelName ? `${levelName}: ${formatUnitName(displayUnit)}` : formatUnitName(displayUnit) || '';
   });
   const dispatch = useDispatch<AppDispatch>();
   const [showDialog, setShowDialog] = useState(false);
@@ -146,6 +153,12 @@ const Dashboard = () => {
       dispatch(setDashboardSelectedUnit(userUnit.id));
     }
   }, [userUnit, selectedUnitId]);
+
+  // Fetch activities when component mounts
+  useEffect(() => {
+    console.log('Dashboard: Fetching activities');
+    dispatch(fetchActivities());
+  }, []);
 
   // Get parent unit for display unit
   const parentUnit = useSelector((state: any) => {
@@ -244,11 +257,17 @@ const Dashboard = () => {
     },
   ];
 
-  const formattedDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
+  // Format date range for next 72 hours
+  const now = new Date();
+  const threeDaysFromNow = new Date(now.getTime() + (72 * 60 * 60 * 1000));
+  
+  const formattedDate = `${now.toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
-  });
+  })} - ${threeDaysFromNow.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })}`;
 
   const handleAddNew = () => setShowDialog(true);
   const handleMeetingSchedule = () => {
@@ -264,9 +283,9 @@ const Dashboard = () => {
   // debugLog('Dashboard User Unit Status:', userUnitStatus);
   // debugLog('Dashboard User Unit Error:', userUnitError);
   // debugLog('Dashboard Nazim Details:', nazimDetails);
-  debugLog('Dashboard Parent Unit With Level:', parentUnitWithLevel);
-  debugLog('Dashboard Parent Unit:', parentUnit);
-  debugLog('Dashboard Grandparent Unit:', grandparentUnit);
+  // debugLog('Dashboard Parent Unit With Level:', parentUnitWithLevel);
+  // debugLog('Dashboard Parent Unit:', parentUnit);
+  // debugLog('Dashboard Grandparent Unit:', grandparentUnit);
 
   return (
     <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>
@@ -302,7 +321,7 @@ const Dashboard = () => {
               </View>
             </View>
             <ScheduleCard
-              scheduleLength={4}
+              scheduleLength={scheduledActivities.length}
               formattedDate={formattedDate}
               onPress={() => router.push('/screens/Activities')}
               colorScheme={colorScheme}
