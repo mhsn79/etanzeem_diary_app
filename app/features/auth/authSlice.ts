@@ -89,96 +89,6 @@ const loginApiRequest = async <T>(
   }
 };
 
-// Fallback authentication function that bypasses Directus SDK
-const fallbackAuth = async (email: string, password: string) => {
-  console.log('[DEBUG] 🔄 Trying fallback authentication...');
-  
-  const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
-  const url = `${baseUrl}/auth/login`;
-  
-  console.log('[DEBUG] 🔗 Fallback auth URL:', url);
-  console.log('[DEBUG] 📧 Email:', email);
-  console.log('[DEBUG] 🔑 Password length:', password.length);
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'E-Tanzeem-App/1.0'
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        mode: 'json'
-      })
-    });
-    
-    console.log('[DEBUG] 📥 Fallback response status:', response.status);
-    console.log('[DEBUG] 📥 Fallback response headers:', Object.fromEntries(response.headers.entries()));
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[DEBUG] ❌ Fallback auth failed with status:', response.status, errorText);
-      throw new Error(errorText || `Authentication failed with status ${response.status}`);
-    }
-    
-    const authData = await response.json();
-    console.log('[DEBUG] ✅ Fallback authentication successful');
-    console.log('[DEBUG] 📝 Auth data keys:', Object.keys(authData));
-    
-    return authData;
-  } catch (error: any) {
-    console.error('[DEBUG] ❌ Fallback auth network error:', error);
-    console.error('[DEBUG] ❌ Error name:', error.name);
-    console.error('[DEBUG] ❌ Error message:', error.message);
-    console.error('[DEBUG] ❌ Error stack:', error.stack);
-    throw error;
-  }
-};
-
-// Alternative fallback authentication using FormData
-const fallbackAuthFormData = async (email: string, password: string) => {
-  console.log('[DEBUG] 🔄 Trying FormData fallback authentication...');
-  
-  const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
-  const url = `${baseUrl}/auth/login`;
-  
-  console.log('[DEBUG] 🔗 FormData auth URL:', url);
-  
-  try {
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('password', password);
-    formData.append('mode', 'json');
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'E-Tanzeem-App/1.0'
-      },
-      body: formData
-    });
-    
-    console.log('[DEBUG] 📥 FormData response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[DEBUG] ❌ FormData auth failed with status:', response.status, errorText);
-      throw new Error(errorText || `FormData authentication failed with status ${response.status}`);
-    }
-    
-    const authData = await response.json();
-    console.log('[DEBUG] ✅ FormData authentication successful');
-    
-    return authData;
-  } catch (error: any) {
-    console.error('[DEBUG] ❌ FormData auth network error:', error.message);
-    throw error;
-  }
-};
 
 // Utility function to check if a token is expired or about to expire
 export const isTokenExpiredOrExpiring = (expiresAt: number | undefined): boolean => {
@@ -324,35 +234,11 @@ export const login = createAsyncThunk<
       // Continue anyway, as the issue might be specific to the auth endpoint
     }
     
-    // Try Directus SDK first, then fallback to manual authentication
-    let authResponse;
-    try {
-      // Authenticate with Directus SDK
-      authResponse = await directus.login(credentials.email, credentials.password, {
-        mode: 'json',
-      });
-      console.log('[DEBUG] ✅ Directus SDK authentication successful');
-    } catch (sdkError: any) {
-      console.error('[DEBUG] ❌ Directus SDK authentication failed:', sdkError.message);
-      console.log('[DEBUG] 🔄 Trying fallback authentication...');
-      
-      // Try JSON fallback authentication
-      try {
-        authResponse = await fallbackAuth(credentials.email, credentials.password);
-        console.log('[DEBUG] ✅ JSON fallback authentication successful');
-      } catch (jsonError: any) {
-        console.error('[DEBUG] ❌ JSON fallback authentication failed:', jsonError.message);
-        
-        // Try FormData fallback authentication
-        try {
-          authResponse = await fallbackAuthFormData(credentials.email, credentials.password);
-          console.log('[DEBUG] ✅ FormData fallback authentication successful');
-        } catch (formDataError: any) {
-          console.error('[DEBUG] ❌ FormData fallback authentication also failed:', formDataError.message);
-          throw sdkError; // Re-throw the original SDK error
-        }
-      }
-    }
+    // Authenticate with Directus SDK only
+    const authResponse = await directus.login(credentials.email, credentials.password, {
+      mode: 'json',
+    });
+    console.log('[DEBUG] ✅ Directus SDK authentication successful');
 
     console.log('[DEBUG] ✅ Directus authentication successful');
     console.log('[DEBUG] 📝 Auth response keys:', Object.keys(authResponse));
@@ -527,7 +413,25 @@ export const login = createAsyncThunk<
     }
   } catch (error: any) {
     console.log('[DEBUG] 🔥 OUTER CATCH BLOCK - Error in Directus authentication:', error);
-    const errorMessage = error?.response?.data?.message || error?.message || 'Authentication failed';
+    const directusErrors =
+      error?.errors ||
+      error?.response?.data?.errors ||
+      error?.response?.errors ||
+      [];
+    const hasInvalidCredentials =
+      (Array.isArray(directusErrors) && directusErrors.some((err: any) => err?.extensions?.code === 'INVALID_CREDENTIALS')) ||
+      error?.message?.includes('Invalid user credentials') ||
+      JSON.stringify(directusErrors).includes('INVALID_CREDENTIALS');
+
+    if (hasInvalidCredentials) {
+      console.log('[DEBUG] 🔥 Final error message: INVALID_CREDENTIALS');
+      return rejectWithValue('INVALID_CREDENTIALS');
+    }
+
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Authentication failed';
     console.log('[DEBUG] 🔥 Final error message:', errorMessage);
     return rejectWithValue(errorMessage);
   }

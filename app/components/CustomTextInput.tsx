@@ -54,10 +54,8 @@ const styles = StyleSheet.create({
   },
   focused: {
     borderColor: "#008CFF",
-    borderWidth: 2, // Slightly thicker border for better visual feedback
   },
   error: {
     borderColor: "#EA5455",
-    borderWidth: 2, // Consistent border width
   }
 });

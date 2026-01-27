@@ -67,6 +67,7 @@ export default function LoginScreen() {
   const [passwordEmptyOnBlur, setPasswordEmptyOnBlur] = useState(false);
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   /* Redirect when auth succeeds */
   useEffect(() => {
@@ -85,6 +86,21 @@ export default function LoginScreen() {
     }
   }, [authError]);
 
+  useEffect(() => {
+    if (!authError) return;
+    // Handle invalid credentials with a field-level + form error and allow retry
+    if (authError.includes('INVALID_CREDENTIALS') || authError.includes('Invalid user credentials')) {
+      setPasswordError(i18n.t('invalid_credentials'));
+      setFormError(i18n.t('invalid_credentials'));
+      setLoginInProgress(false);
+      return;
+    }
+
+    // Other auth errors should be shown as a form-level message
+    setFormError(authError);
+    setLoginInProgress(false);
+  }, [authError]);
+
   /* Handle modal close */
   const handleCloseModal = () => {
     setShowAccessDeniedModal(false);
@@ -93,6 +109,7 @@ export default function LoginScreen() {
 
   /* Submit */
   const handleLogin = () => {
+    setFormError(null);
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
 
@@ -125,18 +142,18 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="always"
+        <ScrollView
+          contentContainerStyle={[styles.scrollContainer, styles.scrollContainerPadding]}
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-        <StatusBar hidden />
-        <View style={styles.background}>
+          <StatusBar hidden />
+          <View style={styles.background}>
           {/* Logo & Banner */}
           <View style={styles.logoContainer}>
             <ImageBackground
@@ -171,6 +188,12 @@ export default function LoginScreen() {
                   if (emailError) {
                     setEmailError(null);
                   }
+                  if (formError) {
+                    setFormError(null);
+                  }
+                  if (authError) {
+                    dispatch(clearError());
+                  }
                 }}
                 onBlur={() => {
                   // Highlight with red outline if empty on blur
@@ -204,6 +227,12 @@ export default function LoginScreen() {
                   if (passwordError) {
                     setPasswordError(null);
                   }
+                  if (formError) {
+                    setFormError(null);
+                  }
+                  if (authError) {
+                    dispatch(clearError());
+                  }
                 }}
                 onBlur={() => {
                   // Highlight with red outline if empty on blur
@@ -227,6 +256,9 @@ export default function LoginScreen() {
               <Text style={styles.resetPassText}>{i18n.t('reset_your_password')}</Text>
             </Pressable>
 
+            {/* Form error */}
+            {formError && <Text style={styles.errText}>{formError}</Text>}
+
             {/* Submit */}
             <View style={styles.buttonContainer}>
               {showLoading ? (
@@ -240,7 +272,7 @@ export default function LoginScreen() {
               )}
             </View>
           </View>
-        </View>
+          </View>
         </ScrollView>
       </TouchableWithoutFeedback>
       
@@ -262,16 +294,20 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
   },
+  scrollContainerPadding: {
+    paddingBottom: 24,
+  },
   background: {
     flex: 1,
   },
   logoContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    height: 260,
   },
   pattern: {
     width: '100%',
-    aspectRatio: 1.2, // Changed from 1 to 1.5 to make it shorter
+    height: '100%',
   },
   overlay: {
     flex: 1,
@@ -295,19 +331,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loginContainer: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: COLORS.lightGray,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    marginTop: -40,
     padding: 20,
     justifyContent: 'center',
-    minHeight: 400, // Add minimum height to prevent layout shifts
+    minHeight: 420,
   },
   inputContainer: {
     width: '100%',
-    marginBottom: 15, // Increased margin for better spacing
-    minHeight: 80, // Add minimum height to prevent layout shifts
+    marginBottom: 12,
+    minHeight: 96,
   },
   inputText: {
     fontSize: 16,
@@ -320,6 +355,7 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontSize: 16,
     fontFamily: 'JameelNooriNastaleeq',
+    minHeight: 20,
   },
   resetPass: {
     alignSelf: 'flex-end',
