@@ -1,4 +1,6 @@
 import React, { useLayoutEffect, useMemo, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import {
   StyleSheet,
   View,
@@ -102,8 +104,15 @@ export default function Activities() {
 
   useLayoutEffect(() => {    
       dispatch(fetchActivities());
-
   }, [dispatch]);
+
+  // Refetch activities when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[Activities] Screen focused, fetching activities');
+      dispatch(fetchActivities());
+    }, [dispatch])
+  );
 
   const tabs = useMemo(
     () => [
@@ -177,24 +186,31 @@ export default function Activities() {
   };
 
   const currentDate = new Date();
-  const formattedActivities = useMemo(() => {
-    // Filter activities to only include those from current user's unit and child units
-    const allowedUnitIds = new Set<number>();
+  const threeDaysFromNow = new Date();
+  threeDaysFromNow.setDate(currentDate.getDate() + 3);
+  
+  // Memoize allowed unit IDs to prevent recalculation
+  const allowedUnitIds = useMemo(() => {
+    const ids = new Set<number>();
     
     // Add current user's unit
     if (userUnitDetails?.id) {
-      allowedUnitIds.add(userUnitDetails.id);
+      ids.add(userUnitDetails.id);
     }
     
     // Add child units
     if (childUnits) {
       childUnits.forEach(unit => {
-        allowedUnitIds.add(unit.id);
+        ids.add(unit.id);
       });
     }
     
-    // Filter activities by tanzeemi unit - only show activities from current unit and child units
-    const filteredByUnit = activities.filter(activity => {
+    return ids;
+  }, [userUnitDetails?.id, childUnits]);
+
+  // Memoize filtered activities by unit
+  const filteredByUnit = useMemo(() => {
+    return activities.filter(activity => {
       const activityTanzeemiUnit = activity.tanzeemi_unit;
       
       // Only include activities that have a tanzeemi_unit assigned
@@ -205,7 +221,10 @@ export default function Activities() {
       const unitId = parseInt(String(activityTanzeemiUnit));
       return allowedUnitIds.has(unitId);
     });
-    
+  }, [activities, allowedUnitIds]);
+
+  // Memoize formatted activities
+  const formattedActivities = useMemo(() => {
     const allFormatted = filteredByUnit.map(formatActivityData);
     const filtered = allFormatted.filter((activity) =>
       selectedTab === 0
@@ -214,7 +233,7 @@ export default function Activities() {
     );
     
     // Sort activities by datetime
-    return filtered.sort((a, b) => {
+    const sortedActivities = filtered.sort((a, b) => {
       if (!a.rawDateTime && !b.rawDateTime) return 0;
       if (!a.rawDateTime) return 1; // Activities without datetime go to the end
       if (!b.rawDateTime) return -1;
@@ -228,7 +247,56 @@ export default function Activities() {
         ? dateA.getTime() - dateB.getTime() 
         : dateB.getTime() - dateA.getTime();
     });
-  }, [activities, selectedTab, userUnitDetails, childUnits]);
+
+    // For scheduled tab (future activities), add separators
+    if (selectedTab === 0) {
+      const result: Array<{ type: 'separator' | 'activity', data: any }> = [];
+      
+      const nextThreeDaysActivities: any[] = [];
+      const futureActivities: any[] = [];
+      
+      sortedActivities.forEach(activity => {
+        if (activity.rawDateTime) {
+          const activityDate = new Date(activity.rawDateTime);
+          if (activityDate <= threeDaysFromNow) {
+            nextThreeDaysActivities.push(activity);
+          } else {
+            futureActivities.push(activity);
+          }
+        } else {
+          // Activities without datetime go to future
+          futureActivities.push(activity);
+        }
+      });
+      
+      // Add next 3 days separator if there are activities
+      if (nextThreeDaysActivities.length > 0) {
+        result.push({
+          type: 'separator',
+          data: { title: 'اگلے تین دن میں', id: 'next-three-days' }
+        });
+        nextThreeDaysActivities.forEach(activity => {
+          result.push({ type: 'activity', data: activity });
+        });
+      }
+      
+      // Add future activities separator if there are activities
+      if (futureActivities.length > 0) {
+        result.push({
+          type: 'separator',
+          data: { title: 'آنے والی سرگرمیاں', id: 'future-activities' }
+        });
+        futureActivities.forEach(activity => {
+          result.push({ type: 'activity', data: activity });
+        });
+      }
+      
+      return result;
+    }
+    
+    // For reported tab, return activities as is
+    return sortedActivities.map(activity => ({ type: 'activity' as const, data: activity }));
+  }, [filteredByUnit, selectedTab, currentDate, threeDaysFromNow]);
 
   const handleAdd = useCallback(() => setShowDialog(true), []);
   const handleReportActivity = useCallback(() => {
@@ -269,57 +337,76 @@ export default function Activities() {
   // Loading state
   if (status === 'loading' && !refreshing) {
     return (
-      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      </ScreenWrapper>
+      <ErrorBoundary>
+        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        </ScreenWrapper>
+      </ErrorBoundary>
     );
   }
 
   // Error state
   if (status === 'failed') {
     return (
-      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error || 'سرگرمیاں لوڈ کرنے میں ناکامی'}</Text>
-        </View>
-      </ScreenWrapper>
+      <ErrorBoundary>
+        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
+          <View style={styles.center}>
+            <Text style={styles.errorText}>{error || 'سرگرمیاں لوڈ کرنے میں ناکامی'}</Text>
+          </View>
+        </ScreenWrapper>
+      </ErrorBoundary>
     );
   }
 
   // Main content
   return (
-    <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
+    <ErrorBoundary>
+      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
       <View style={styles.container}>
         <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
         <FlatList
           data={formattedActivities}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ActivityCard
-              key={item.id}
-              id={item.id}
-              title={item.title}
-              details={item.details}
-              location={item.location}
-              status={item.status}
-              dateTime={item.dateTime}
-              rawDateTime={item.rawDateTime}
-              attendance={item.attendance}
-              dateCreated={item.dateCreated}
-              dateUpdated={item.dateUpdated}
-              user_created={item.user_created}
-              shouldBeGreyedOut={item.shouldBeGreyedOut}
-              isPast={item.isPast}
-              isDraft={item.isDraft}
-              handleLeft={() => {}}
-              handleMiddle={() => {}}
-              handleRight={() => {}}
-              onDeleteSuccess={handleDeleteSuccess}
-              onCompletionSuccess={handleCompletionSuccess}
-            />
-          )}
+          keyExtractor={(item) => item.type === 'separator' ? `separator-${item.data.id}` : `activity-${item.data.id}`}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={5}
+          renderItem={({ item }) => {
+            if (item.type === 'separator') {
+              return (
+                <View style={styles.separatorContainer}>
+                  <Text style={styles.separatorText}>{item.data.title}</Text>
+                </View>
+              );
+            }
+            
+            return (
+              <ActivityCard
+                key={item.data.id}
+                id={item.data.id}
+                title={item.data.title}
+                details={item.data.details}
+                location={item.data.location}
+                status={item.data.status}
+                dateTime={item.data.dateTime}
+                rawDateTime={item.data.rawDateTime}
+                attendance={item.data.attendance}
+                dateCreated={item.data.dateCreated}
+                dateUpdated={item.data.dateUpdated}
+                user_created={item.data.user_created}
+                shouldBeGreyedOut={item.data.shouldBeGreyedOut}
+                isPast={item.data.isPast}
+                isDraft={item.data.isDraft}
+                handleLeft={() => {}}
+                handleMiddle={() => {}}
+                handleRight={() => {}}
+                onDeleteSuccess={handleDeleteSuccess}
+                onCompletionSuccess={handleCompletionSuccess}
+              />
+            );
+          }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={formattedActivities.length === 0 ? styles.center : styles.listContent}
           ListEmptyComponent={
@@ -333,7 +420,7 @@ export default function Activities() {
               onRefresh={onRefresh}
               colors={[COLORS.primary]}
               tintColor={COLORS.primary}
-              title="تازہ کاری ہو رہی ہے..."
+              title="دوبارہ لوڈ ہو رہا ہے..."
               titleColor={COLORS.primary}
             />
           }
@@ -384,6 +471,7 @@ export default function Activities() {
         </View>
       )}
     </ScreenWrapper>
+    </ErrorBoundary>
   );
 }
 
@@ -486,5 +574,23 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontSize: 14,
     fontWeight: '500',
+  },
+  separatorContainer: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.lightGray,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    alignItems: 'flex-start', // Align content to the right
+    justifyContent: 'center',
+  },
+  separatorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    textAlignVertical: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

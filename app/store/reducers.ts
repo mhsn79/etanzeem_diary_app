@@ -1,5 +1,6 @@
 import { combineReducers, AnyAction } from '@reduxjs/toolkit';
 import authReducer from '../features/auth/authSlice'; // Import the auth slice
+import { RESET_STATE } from './_resetState';
 import activitiesReducer from '../features/activities/activitySlice';
 import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
 import personsReducer from '../features/persons/personSlice';
@@ -8,9 +9,6 @@ import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
 import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
 import strengthReducer from '../features/strength/strengthSlice';
-
-// Define a reset action type
-export const RESET_STATE = 'RESET_STATE';
 
 // Combine reducers
 const appReducer = combineReducers({

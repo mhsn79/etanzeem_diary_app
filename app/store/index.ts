@@ -4,9 +4,8 @@ import { mmkvStorage, STORAGE_KEYS } from './mmkvStorage';
 import rootReducer from './reducers';
 import directus from '../services/directus';
 import authMiddleware from './middleware/authMiddleware';
-
-// Define the RootState type explicitly
-export type RootState = ReturnType<typeof rootReducer>;
+import { RootState } from './types';
+import { setStore, setPersistor } from './storeAccess';
 
 // Enhanced persist configuration with proper typing
 const persistConfig: PersistConfig<RootState> = {
@@ -59,8 +58,12 @@ const store = configureStore({
 // Create persistor
 const persistor = persistStore(store);
 
-// Define AppDispatch type
-export type AppDispatch = typeof store.dispatch;
+// Provide store/persistor reference to shared accessors
+setStore(store);
+setPersistor(persistor);
+
+// Import AppDispatch type
+import { AppDispatch } from './types';
 
 // Export store and persistor
 export { store, persistor };

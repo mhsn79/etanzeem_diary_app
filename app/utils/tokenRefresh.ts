@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch } from '../store';
+import { AppDispatch } from '../store/types';
 import { selectAuthState, isTokenExpiredOrExpiring, checkAndRefreshTokenIfNeeded, logout } from '../features/auth/authSlice';
 import { ensureFreshToken } from '../services/apiClient';
 import { Platform, AppState, AppStateStatus } from 'react-native';
@@ -14,9 +14,10 @@ import {
   stopBackgroundRefresh 
 } from './authCleanup';
 
-const REFRESH_COOLDOWN = 30000; // 30 seconds cooldown between refresh attempts
-const BACKGROUND_CHECK_INTERVAL = 60000; // Check every minute
-const TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutes before expiry
+const REFRESH_COOLDOWN = 120000; // 2 minutes cooldown between refresh attempts
+const BACKGROUND_CHECK_INTERVAL = 120000; // Check every 2 minutes
+const TOKEN_EXPIRY_BUFFER = 2 * 60 * 1000; // 2 minutes before expiry
+const MAX_REFRESH_ATTEMPTS = 3; // Maximum refresh attempts before giving up
 
 /**
  * Utility function to calculate time until token expires
@@ -44,6 +45,16 @@ const performBackgroundRefresh = async (dispatch: AppDispatch, tokens: any) => {
     return;
   }
 
+  // Check if we've exceeded max refresh attempts
+  const lastRefreshTime = getLastRefreshTime();
+  const timeSinceLastRefresh = Date.now() - lastRefreshTime;
+  
+  // If we've tried too many times recently, skip this refresh attempt
+  if (timeSinceLastRefresh < REFRESH_COOLDOWN * MAX_REFRESH_ATTEMPTS) {
+    console.log('[TokenRefresh] ⏭️ Skipping background refresh - too many recent attempts');
+    return;
+  }
+
   try {
     console.log('[TokenRefresh] 🔄 Performing background token refresh...');
     setLastRefreshTime(Date.now());
@@ -52,6 +63,7 @@ const performBackgroundRefresh = async (dispatch: AppDispatch, tokens: any) => {
   } catch (error) {
     console.error('[TokenRefresh] ❌ Background token refresh failed:', error);
     // Don't logout on background refresh failure, let the next API call handle it
+    // Just log the error and continue - the user will be prompted to login on next API call
   }
 };
 
@@ -75,6 +87,11 @@ const startBackgroundRefresh = (dispatch: AppDispatch, tokens: any) => {
       performBackgroundRefresh(dispatch, tokens);
     }
   }, BACKGROUND_CHECK_INTERVAL);
+  
+  // Also check immediately if token needs refresh
+  if (shouldRefreshToken(tokens.expiresAt)) {
+    performBackgroundRefresh(dispatch, tokens);
+  }
   
   setBackgroundRefreshTimer(newTimer);
   console.log('[TokenRefresh] 🕐 Background refresh timer started');
@@ -102,10 +119,13 @@ export const useTokenRefresh = () => {
         return true;
       }
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[TokenRefresh] Failed to refresh token:', error);
-      // The logout function will handle navigation to login screen
-      await dispatch(logout('Authentication expired. Please log in again.')).unwrap();
+      // Only logout if it's a critical auth error, otherwise let the next API call handle it
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('expired') || errorMessage.includes('invalid') || errorMessage.includes('401')) {
+        await dispatch(logout('Authentication expired. Please log in again.')).unwrap();
+      }
       return false;
     }
   }, [auth.tokens, dispatch]);

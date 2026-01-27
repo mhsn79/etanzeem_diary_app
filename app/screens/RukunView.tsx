@@ -25,7 +25,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
 import {
   fetchPersonById,
-  updatePersonImage,
   selectPersonById,
   selectPersonsStatus,
   selectPersonsError,
@@ -38,7 +37,7 @@ import { getImageUrl } from '@/app/utils/imageUpload';
 
 import { COLORS, SPACING } from '@/app/constants/theme';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
-import { RootState, AppDispatch } from '@/app/store';
+import { RootState, AppDispatch } from '@/app/store/types';
 
 import i18n from '../i18n';
 
@@ -88,35 +87,9 @@ export default function RukunView() {
   // Use the passed contact type label or fallback to default
   const displayContactTypeLabel = contactTypeLabel || 'رکن';
   
-  // Handle image upload
-  const handleImageUpload = async (imageUri: string) => {
-    try {
-      setIsUploading(true);
-      
-      // Dispatch the updatePersonImage action
-      await dispatch(updatePersonImage({
-        id: rukun.id,
-        imageUri,
-        onProgress: (progress) => {
-          setUploadProgress(progress);
-        }
-      })).unwrap();
-      
-      // Show success message
-      Alert.alert(
-        i18n.t('success'),
-        i18n.t('image_updated_successfully')
-      );
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert(
-        i18n.t('error'),
-        typeof error === 'string' ? error : i18n.t('image_upload_failed')
-      );
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-    }
+  // Image upload disabled per requirements
+  const handleImageUpload = async (_imageUri: string) => {
+    Alert.alert(i18n.t('info'), i18n.t('feature_not_available'));
   };
 
   // Handle pull to refresh
@@ -277,11 +250,10 @@ export default function RukunView() {
           showEditIcon={!isDetailedContactType}
           onEditPress={handleEditDetails}
           showSettings={false}
-          showCamera={true}
-          onCameraPress={handleImageUpload}
-          personId={rukun.id}
-          isUploading={isUploading}
-        />
+                     showCamera={false}
+           personId={rukun.id}
+           isUploading={false}
+         />
 
         {/* Content */}
         <ScrollView

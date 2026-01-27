@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { ImageStyle, StyleSheet, TextInput, TextInputProps, TextStyle, ViewStyle } from "react-native";
 import { ImageSource } from "react-native-vector-icons/Icon";
 
@@ -14,16 +14,22 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
 
   const [focused, setFocused] = useState(false);
 
+  const handleFocus = useCallback(() => setFocused(true), []);
+  const handleBlur = useCallback(() => setFocused(false), []);
+
+  // Memoize the style to prevent unnecessary re-renders
+  const inputStyle = useMemo(() => [
+    styles.inputField,
+    focused && styles.focused,
+    error && styles.error
+  ], [focused, error]);
+
   return (
     <TextInput
-      style={[
-        styles.inputField,
-        focused && styles.focused,
-        error && styles.error
-      ]}
+      style={inputStyle}
       autoCapitalize="none"
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       {...rest}>
     </TextInput>
   );
@@ -41,12 +47,17 @@ const styles = StyleSheet.create({
     padding: 12,
     height: 56,
     textAlign: "right",
-    writingDirection: "rtl"
+    writingDirection: "rtl",
+    // Add these to prevent layout shifts
+    minHeight: 56,
+    maxHeight: 56,
   },
   focused: {
-    borderColor: "#008CFF"
+    borderColor: "#008CFF",
+    borderWidth: 2, // Slightly thicker border for better visual feedback
   },
   error: {
-    borderColor: "#EA5455"
+    borderColor: "#EA5455",
+    borderWidth: 2, // Consistent border width
   }
 });

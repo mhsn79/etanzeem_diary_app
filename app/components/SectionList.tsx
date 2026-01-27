@@ -87,13 +87,29 @@ const Question = memo(({
         disabled={disabled}
         currentUnitId={currentUnitId}
         onValueChange={(newValue) => {
-          if (!submissionId) return;
-          dispatch(saveAnswer({
+          console.log('[SectionList] AutoQuestionInput onValueChange called:', {
+            newValue,
+            newValueType: typeof newValue,
+            questionId: question.id,
+            submissionId,
+            questionInputType: question.input_type
+          });
+          
+          if (!submissionId) {
+            console.error('[SectionList] No submissionId available for saving answer');
+            return;
+          }
+          
+          const answerData = {
             submission_id: submissionId,
             question_id: question.id,
             string_value: question.input_type === 'number' ? null : String(newValue),
             number_value: question.input_type === 'number' ? Number(newValue) : null,
-          }));
+          };
+          
+          console.log('[SectionList] Dispatching saveAnswer with data:', answerData);
+          
+          dispatch(saveAnswer(answerData));
         }}
       />
     );
@@ -417,6 +433,7 @@ interface SectionListProps {
   onAnswerChange?: (questionId: number, value: any) => void;
   disabled?: boolean;
   currentUnitId?: number | null; // Add current unit ID for filtering
+  submissionId?: number | null; // Add submission ID for AutoQuestionInput
 }
 
 // Main SectionList component
@@ -427,9 +444,21 @@ const SectionList: React.FC<SectionListProps> = ({
   onAnswerChange,
   disabled = false,
   currentUnitId,
+  submissionId,
 }) => {
-  // Get the current submission ID from Redux
-  const submissionId = useSelector(selectCurrentSubmissionId);
+  // Use the submissionId prop if provided, otherwise get from Redux
+  const reduxSubmissionId = useSelector(selectCurrentSubmissionId);
+  const finalSubmissionId = submissionId || reduxSubmissionId;
+  
+  // // Debug submissionId
+  // useEffect(() => {
+  //   console.log('[SectionList] submissionId debug:', {
+  //     submissionId,
+  //     reduxSubmissionId,
+  //     finalSubmissionId,
+  //     hasSubmissionId: !!finalSubmissionId
+  //   });
+  // }, [submissionId, reduxSubmissionId, finalSubmissionId]);
 
   // Memoize the section components to avoid unnecessary re-renders
   const sectionComponents = useMemo(() => {
@@ -443,13 +472,13 @@ const SectionList: React.FC<SectionListProps> = ({
           section={section}
           questions={sectionQuestions}
           answers={answers}
-          submissionId={submissionId}
+          submissionId={finalSubmissionId}
           disabled={disabled}
           currentUnitId={currentUnitId}
         />
       );
     });
-  }, [sections, questions, answers, submissionId, currentUnitId]);
+  }, [sections, questions, answers, finalSubmissionId, currentUnitId]);
 
   return (
     <View style={styles.container}>

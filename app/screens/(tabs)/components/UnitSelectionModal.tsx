@@ -177,7 +177,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
                 
                 <View style={styles.infoContainer}>
                   <UrduText style={styles.infoText}>
-                    آپ کی یونٹ لیف ہے، کوئی تبدیلی نہیں کی جا سکتی
+                    آپ کی کوئی ذیلی یونٹ رجسٹرڈ نہیں ہے، کوئی تبدیلی نہیں کی جا سکتی
                   </UrduText>
                 </View>
               </>

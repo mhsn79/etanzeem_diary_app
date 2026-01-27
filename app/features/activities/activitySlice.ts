@@ -1,8 +1,9 @@
-import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
+import { RootState, AppDispatch } from '../../store/types';
 import { Activity } from '@/src/types/Activity';
 import apiClient, { directApiRequest } from '../../services/apiClient';
 import { Platform } from 'react-native';
+import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ interface ActivitiesExtraState {
   activityCountStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   activityCountError: string | null;
   activityCount: number | null;
+  lastFetchTime: number;
 }
 
 export type ActivitiesState = ReturnType<typeof activitiesAdapter.getInitialState<ActivitiesExtraState>>;
@@ -47,6 +49,7 @@ const initialState: ActivitiesState = activitiesAdapter.getInitialState<Activiti
   activityCountStatus: 'idle',
   activityCountError: null,
   activityCount: null,
+  lastFetchTime: 0,
 });
 
 // The centralized API client handles token refresh automatically
@@ -263,7 +266,7 @@ export const fetchActivities = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('activities/fetch', async (_, { rejectWithValue, getState }) => {
   try {
-    console.log('Fetching activities:', Platform.OS);
+    console.log('[Activities] Fetching activities:', Platform.OS);
     
     // Get the current user ID from auth state
     const state = getState();
@@ -271,6 +274,23 @@ export const fetchActivities = createAsyncThunk<
     
     if (!userId) {
       return rejectWithValue('User not authenticated. Please log in again.');
+    }
+    
+    // Check if we already have activities and they're recent (within 30 seconds)
+    const currentActivities = state.activities?.ids?.length || 0;
+    const lastFetchTime = state.activities?.lastFetchTime || 0;
+    const now = Date.now();
+    
+    // If we have activities and they were fetched recently, skip the fetch
+    // BUT only if lastFetchTime is not 0 (which indicates a unit change)
+    if (currentActivities > 0 && lastFetchTime > 0 && (now - lastFetchTime) < 30000) {
+      console.log('[Activities] Activities already loaded recently, skipping fetch');
+      return state.activities?.entities ? Object.values(state.activities.entities).filter(Boolean) as Activity[] : [];
+    }
+    
+    // If lastFetchTime is 0, it means activities were cleared due to unit change
+    if (lastFetchTime === 0) {
+      console.log('[Activities] Activities cleared due to unit change, fetching fresh data');
     }
     
     // Use directApiRequest which uses fetch directly for more reliable results
@@ -409,7 +429,9 @@ const activitiesSlice = createSlice({
       })
       .addCase(fetchActivities.fulfilled, (state, action: PayloadAction<Activity[]>) => {
         state.status = 'succeeded';
+        state.lastFetchTime = Date.now();
         activitiesAdapter.setAll(state, action.payload);
+        console.log('[Activities] Activities loaded successfully:', action.payload.length, 'activities');
       })
       .addCase(fetchActivities.rejected, (state, action) => {
         state.status = 'failed';
@@ -475,6 +497,15 @@ const activitiesSlice = createSlice({
       .addCase(fetchActivityCount.rejected, (state, action) => {
         state.activityCountStatus = 'failed';
         state.activityCountError = action.payload ?? 'Failed to fetch activity count';
+      })
+      // Clear activities when user unit changes to prevent UI crashes
+      .addCase(setUserUnitDetails, (state) => {
+        console.log('[Activities] Clearing activities due to user unit change');
+        activitiesAdapter.removeAll(state);
+        state.status = 'idle';
+        state.error = null;
+        state.lastFetchTime = 0; // Reset fetch time to force fresh fetch
+        console.log('[Activities] Activities cleared, status reset to idle');
       });
   },
 });
@@ -518,26 +549,28 @@ export const getActivityById = (id: string | number) =>
   (state: RootState) => selectActivityEntities(state)[typeof id === 'string' ? parseInt(id) : id];
 
 // Selector to get scheduled activities for the next 72 hours (3 days)
-export const selectScheduledActivitiesNext72Hours = (state: RootState) => {
-  const allActivities = selectAllActivities(state);
-  const now = new Date();
-  const threeDaysFromNow = new Date(now.getTime() + (72 * 60 * 60 * 1000)); // 72 hours from now
-  
-  return allActivities.filter(activity => {
-    // Include both published and draft activities (but not archived)
-    if (activity.status === 'archived') {
-      return false;
-    }
+export const selectScheduledActivitiesNext72Hours = createSelector(
+  [selectAllActivities],
+  (allActivities: Activity[]) => {
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + (72 * 60 * 60 * 1000)); // 72 hours from now
     
-    // Parse the activity date
-    const activityDate = new Date(activity.activity_date_and_time);
-    
-    // Check if the activity is today or in the future and within the next 72 hours
-    const isTodayOrFuture = activityDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
-    const isWithin72Hours = activityDate <= threeDaysFromNow;
-    
-    return isTodayOrFuture && isWithin72Hours;
-  });
-};
+    return allActivities.filter((activity: Activity) => {
+      // Include both published and draft activities (but not archived)
+      if (activity.status === 'archived') {
+        return false;
+      }
+      
+      // Parse the activity date
+      const activityDate = new Date(activity.activity_date_and_time);
+      
+      // Check if the activity is today or in the future and within the next 72 hours
+      const isTodayOrFuture = activityDate >= new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+      const isWithin72Hours = activityDate <= threeDaysFromNow;
+      
+      return isTodayOrFuture && isWithin72Hours;
+    });
+  }
+);
 
 export default activitiesSlice.reducer;

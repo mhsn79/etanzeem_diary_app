@@ -1,5 +1,5 @@
-import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View, Image, GestureResponderEvent } from 'react-native';
+import React, { useState } from 'react';
+import { Linking, StyleSheet, Text, TouchableOpacity, View, Image, GestureResponderEvent, Animated } from 'react-native';
 import UrduText from './UrduText';
 import { RukunData } from '../models/RukunData';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +21,9 @@ interface RukunCardProps {
 }
 
 const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [animation] = useState(new Animated.Value(0));
+
   // Helper function to determine if edit icon should be hidden
   const shouldHideEditIcon = (): boolean => {
     if (!contactTypes || !item.contact_type) return false;
@@ -30,6 +33,17 @@ const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }
     
     // Hide edit icon for umeedwar and rukun contact types
     return contactType.type === 'umeedwar' || contactType.type === 'rukun';
+  };
+
+  const toggleExpanded = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+    
+    Animated.timing(animation, {
+      toValue: isExpanded ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
   };
 
   const handleCall = (e: GestureResponderEvent) => {
@@ -93,40 +107,72 @@ const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }
             <UrduText style={styles.detail}>{item.address || 'No address'}</UrduText>
           </View>
         </View>
-        {!shouldHideEditIcon() && (
-          <TouchableOpacity 
-            style={styles.viewIcon} 
-            onPress={handleEditDetails}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.actionButtons}>
+          {!shouldHideEditIcon() && (
+            <TouchableOpacity 
+              style={styles.viewIcon} 
+              onPress={handleEditDetails}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Feather name="edit" size={SIZES.icon.sSmall} color={COLORS.black} />
+            </TouchableOpacity>
+          )}
+          {(item.phone || item.whatsApp || item.sms) && (
+            <TouchableOpacity 
+              style={[styles.expandButton, isExpanded && styles.expandButtonActive]} 
+              onPress={toggleExpanded}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Feather 
+                name={isExpanded ? "chevron-up" : "chevron-down"} 
+                size={SIZES.icon.sSmall} 
+                color={COLORS.primary} 
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-      <View style={styles.divider} />
-      <View style={styles.buttonContainer}>
-        {item.phone && (
-          <ContactActionButton
-            onPress={handleCall}
-            text="کال کریں"
-            iconType="phone"
-          />
-        )}
-        {item.whatsApp && (
-          <ContactActionButton
-            onPress={handleWhatsApp}
-            text="واٹس ایپ"
-            iconType="whatsapp"
-          />
-        )}
-        {item.sms && (
-          <ContactActionButton
-            onPress={handleSMS}
-            text="ایس ایم ایس"
-            iconType="sms"
-          />
-        )}
-      </View>
+      
+      {/* Expandable contact buttons */}
+      {(item.phone || item.whatsApp || item.sms) && (
+        <Animated.View 
+          style={[
+            styles.expandableContainer,
+            {
+              maxHeight: animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 100], // Adjust height as needed
+              }),
+              opacity: animation,
+            }
+          ]}
+        >
+          <View style={styles.divider} />
+          <View style={styles.buttonContainer}>
+            {item.phone && (
+              <ContactActionButton
+                onPress={handleCall}
+                text="کال کریں"
+                iconType="phone"
+              />
+            )}
+            {item.whatsApp && (
+              <ContactActionButton
+                onPress={handleWhatsApp}
+                text="واٹس ایپ"
+                iconType="whatsapp"
+              />
+            )}
+            {item.sms && (
+              <ContactActionButton
+                onPress={handleSMS}
+                text="ایس ایم ایس"
+                iconType="sms"
+              />
+            )}
+          </View>
+        </Animated.View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -188,6 +234,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: SPACING.sm,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: SPACING.xs,
+  },
+  expandButton: {
+    width: SPACING.lg,
+    height: SPACING.lg,
+    borderRadius: SPACING.lg / 2,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+  },
+  expandButtonActive: {
+    backgroundColor: COLORS.lightPrimary,
+    borderColor: COLORS.lightPrimary,
+  },
+  expandableContainer: {
+    overflow: 'hidden',
   },
 });
 

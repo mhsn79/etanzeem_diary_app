@@ -118,21 +118,21 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const [strengthLoading, setStrengthLoading] = useState(false);
   const [strengthError, setStrengthError] = useState<string | null>(null);
 
-  // Debug contactsList changes
-  useEffect(() => {
-    console.log('[AutoQuestionInput] contactsList changed:', {
-      length: contactsList.length,
-      firstFew: contactsList.slice(0, 3)
-    });
-  }, [contactsList]);
+  // // Debug contactsList changes
+  // useEffect(() => {
+  //   console.log('[AutoQuestionInput] contactsList changed:', {
+  //     length: contactsList.length,
+  //     firstFew: contactsList.slice(0, 3)
+  //   });
+  // }, [contactsList]);
 
-  // Debug strengthRecordsList changes
-  useEffect(() => {
-    console.log('[AutoQuestionInput] strengthRecordsList changed:', {
-      length: strengthRecordsList.length,
-      firstFew: strengthRecordsList.slice(0, 3)
-    });
-  }, [strengthRecordsList]);
+  // // Debug strengthRecordsList changes
+  // useEffect(() => {
+  //   console.log('[AutoQuestionInput] strengthRecordsList changed:', {
+  //     length: strengthRecordsList.length,
+  //     firstFew: strengthRecordsList.slice(0, 3)
+  //   });
+  // }, [strengthRecordsList]);
 
   // Fetch contact types, activity types, and strength types on component mount
   useEffect(() => {
@@ -261,11 +261,11 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         ]
       };
 
-      console.log('[AutoQuestionInput] Fetching contacts with filter:', JSON.stringify(filter, null, 2));
-      console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
-      console.log('[AutoQuestionInput] Aggregate function:', question.aggregate_func);
+      // console.log('[AutoQuestionInput] Fetching contacts with filter:', JSON.stringify(filter, null, 2));
+      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
+      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
+      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
+      // console.log('[AutoQuestionInput] Aggregate function:', question.aggregate_func);
       
       // Build the query string manually to ensure proper encoding
       const params = new URLSearchParams();
@@ -282,24 +282,24 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       const queryString = params.toString();
       const url = `/items/Person?${queryString}`;
       
-      console.log('[AutoQuestionInput] API URL:', url);
+      // console.log('[AutoQuestionInput] API URL:', url);
       
       const response = await directApiRequest<{ data: Person[] }>(
         url,
         'GET'
       );
 
-      console.log('[AutoQuestionInput] API response:', {
-        dataLength: response.data?.length || 0,
-        firstFewItems: response.data?.slice(0, 3) || [],
-        fullResponse: response
-      });
+      // console.log('[AutoQuestionInput] API response:', {
+      //   dataLength: response.data?.length || 0,
+      //   firstFewItems: response.data?.slice(0, 3) || [],
+      //   fullResponse: response
+      // });
 
       if (response.data) {
-        console.log('[AutoQuestionInput] Setting contacts list with', response.data.length, 'items');
+        // console.log('[AutoQuestionInput] Setting contacts list with', response.data.length, 'items');
         setContactsList(response.data);
       } else {
-        console.log('[AutoQuestionInput] No data in response, setting empty list');
+        // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setContactsList([]);
       }
     } catch (error: any) {
@@ -334,10 +334,10 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         ]
       };
 
-      console.log('[AutoQuestionInput] Fetching activities with filter:', JSON.stringify(filter, null, 2));
-      console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
+      // console.log('[AutoQuestionInput] Fetching activities with filter:', JSON.stringify(filter, null, 2));
+      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
+      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
+      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
       
       // Build the query string manually to ensure proper encoding
       const params = new URLSearchParams();
@@ -354,24 +354,24 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       const queryString = params.toString();
       const url = `/items/Activities?${queryString}`;
       
-      console.log('[AutoQuestionInput] API URL:', url);
+      // console.log('[AutoQuestionInput] API URL:', url);
       
       const response = await directApiRequest<{ data: Activity[] }>(
         url,
         'GET'
       );
 
-      console.log('[AutoQuestionInput] API response:', {
-        dataLength: response.data?.length || 0,
-        firstFewItems: response.data?.slice(0, 3) || [],
-        fullResponse: response
-      });
+      // console.log('[AutoQuestionInput] API response:', {
+      //   dataLength: response.data?.length || 0,
+      //   firstFewItems: response.data?.slice(0, 3) || [],
+      //   fullResponse: response
+      // });
 
       if (response.data) {
-        console.log('[AutoQuestionInput] Setting activities list with', response.data.length, 'items');
+        // console.log('[AutoQuestionInput] Setting activities list with', response.data.length, 'items');
         setActivitiesList(response.data);
       } else {
-        console.log('[AutoQuestionInput] No data in response, setting empty list');
+        // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setActivitiesList([]);
       }
     } catch (error: any) {
@@ -411,10 +411,10 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         ]
       };
 
-      console.log('[AutoQuestionInput] Fetching strength records with filter:', JSON.stringify(filter, null, 2));
-      console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
+      // console.log('[AutoQuestionInput] Fetching strength records with filter:', JSON.stringify(filter, null, 2));
+      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
+      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
+      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
       
       // Build the query string manually to ensure proper encoding
       const params = new URLSearchParams();
@@ -431,24 +431,24 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       const queryString = params.toString();
       const url = `/items/Strength_Records?${queryString}`;
       
-      console.log('[AutoQuestionInput] API URL:', url);
+      // console.log('[AutoQuestionInput] API URL:', url);
       
       const response = await directApiRequest<{ data: StrengthRecord[] }>(
         url,
         'GET'
       );
 
-      console.log('[AutoQuestionInput] API response:', {
-        dataLength: response.data?.length || 0,
-        firstFewItems: response.data?.slice(0, 3) || [],
-        fullResponse: response
-      });
+      // console.log('[AutoQuestionInput] API response:', {
+      //   dataLength: response.data?.length || 0,
+      //   firstFewItems: response.data?.slice(0, 3) || [],
+      //   fullResponse: response
+      // });
 
       if (response.data) {
-        console.log('[AutoQuestionInput] Setting strength records list with', response.data.length, 'items');
+        // console.log('[AutoQuestionInput] Setting strength records list with', response.data.length, 'items');
         setStrengthRecordsList(response.data);
       } else {
-        console.log('[AutoQuestionInput] No data in response, setting empty list');
+        // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setStrengthRecordsList([]);
       }
     } catch (error: any) {
@@ -591,6 +591,34 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
           setTimeout(() => setCalculationSuccess(null), 3000);
           return;
         }
+      } else if (question.linked_to_type === 'contacts') {
+        // For contacts, fetch data first then calculate
+        await fetchContactsForPopup();
+        const contactsCount = contactsList.length;
+        if (question.aggregate_func === 'total' || question.aggregate_func === 'count') {
+          result = contactsCount;
+          setCalculationSuccess(`${getContactTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        } else if (question.aggregate_func === 'sum') {
+          result = contactsCount;
+          setCalculationSuccess(`${getContactTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        } else {
+          result = 0;
+          setCalculationSuccess(`${getContactTypeLabel()} کے لیے کوئی ریکارڈ نہیں ملا`);
+        }
+      } else if (question.linked_to_type === 'activity') {
+        // For activities, fetch data first then calculate
+        await fetchActivitiesForPopup();
+        const activitiesCount = activitiesList.length;
+        if (question.aggregate_func === 'total' || question.aggregate_func === 'count') {
+          result = activitiesCount;
+          setCalculationSuccess(`${getActivityTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        } else if (question.aggregate_func === 'sum') {
+          result = activitiesCount;
+          setCalculationSuccess(`${getActivityTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        } else {
+          result = 0;
+          setCalculationSuccess(`${getActivityTypeLabel()} کے لیے کوئی ریکارڈ نہیں ملا`);
+        }
       } else {
         setCalculationError('نامعلوم linked_to_type');
         setIsCalculating(false);
@@ -599,6 +627,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
       setInputValue(String(result));
       if (onValueChange) {
+        // console.log('[AutoQuestionInput] Calling onValueChange with result:', {
+        //   result,
+        //   resultType: typeof result,
+        //   questionId: question.id,
+        //   submissionId
+        // });
         onValueChange(result);
       }
       setTimeout(() => setCalculationSuccess(null), 3000);
@@ -607,7 +641,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     } finally {
       setIsCalculating(false);
     }
-  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleStrengthPopupOpen, fetchLatestStrengthRecord]);
+  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleStrengthPopupOpen, fetchLatestStrengthRecord, fetchContactsForPopup, fetchActivitiesForPopup, contactsList, activitiesList]);
 
   // Get button text based on aggregate function
   const buttonText = getCalculationButtonText(question.aggregate_func || null);
@@ -806,28 +840,28 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   );
 
   // Debug logging
-  console.log('[AutoQuestionInput] Auto-calculate check:', {
-    questionId: question.id,
-    linked_to_type: question.linked_to_type,
-    linked_to_id: question.linked_to_id,
-    category: question.category,
-    hasAutoCalculateCapability,
-    isEditable: question.category === 'manual',
-    rightIconExists: !!rightIcon,
-    buttonText,
-    typeLabel,
-    questionId33: question.id === 33 ? 'THIS IS QUESTION 33' : 'not 33'
-  });
+  // console.log('[AutoQuestionInput] Auto-calculate check:', {
+  //   questionId: question.id,
+  //   linked_to_type: question.linked_to_type,
+  //   linked_to_id: question.linked_to_id,
+  //   category: question.category,
+  //   hasAutoCalculateCapability,
+  //   isEditable: question.category === 'manual',
+  //   rightIconExists: !!rightIcon,
+  //   buttonText,
+  //   typeLabel,
+  //   questionId33: question.id === 33 ? 'THIS IS QUESTION 33' : 'not 33'
+  // });
 
   // Render contact item for popup
   const renderContactItem = ({ item }: { item: Person }) => {
-    console.log('[AutoQuestionInput] Rendering contact item:', item);
+    // console.log('[AutoQuestionInput] Rendering contact item:', item);
     
     // Use only the fields that exist in the API
     const personName = item.Name || 'نام نہیں ملا';
     const personPhone = item.Phone_Number || 'فون نمبر نہیں ملا';
     
-    console.log('[AutoQuestionInput] Person name:', personName, 'Phone:', personPhone);
+    // console.log('[AutoQuestionInput] Person name:', personName, 'Phone:', personPhone);
     
     return (
       <View style={styles.contactItem}>
@@ -839,7 +873,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Render activity item for popup
   const renderActivityItem = ({ item }: { item: Activity }) => {
-    console.log('[AutoQuestionInput] Rendering activity item:', item);
+    // console.log('[AutoQuestionInput] Rendering activity item:', item);
     
     const activityDate = item.activity_date_and_time 
       ? new Date(item.activity_date_and_time).toLocaleDateString('ur-PK')
@@ -872,7 +906,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Render strength record item for popup
   const renderStrengthRecordItem = ({ item }: { item: StrengthRecord }) => {
-    console.log('[AutoQuestionInput] Rendering strength record item:', item);
+    // console.log('[AutoQuestionInput] Rendering strength record item:', item);
     
     const changeTypeText = item.change_type === 'plus' ? 'اضافہ' : 'کمی';
     const changeTypeColor = item.change_type === 'plus' ? COLORS.success : COLORS.error;
@@ -943,11 +977,11 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         animationType="slide"
         onRequestClose={handlePopupClose}
         onShow={() => {
-          console.log('[AutoQuestionInput] Modal opened, contactsList:', {
-            length: contactsList.length,
-            firstFew: contactsList.slice(0, 3),
-            hasData: contactsList.length > 0
-          });
+          // console.log('[AutoQuestionInput] Modal opened, contactsList:', {
+          //   length: contactsList.length,
+          //   firstFew: contactsList.slice(0, 3),
+          //   hasData: contactsList.length > 0
+          // });
         }}
       >
         <View style={styles.modalOverlay}>
@@ -992,8 +1026,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                       <UrduText style={styles.emptyText}>کوئی {getContactTypeLabel()} نہیں ملے ({contactsList.length})</UrduText>
                     </View>
                   }
-                  onLayout={() => console.log('[AutoQuestionInput] FlatList onLayout, data length:', contactsList.length)}
-                  onContentSizeChange={() => console.log('[AutoQuestionInput] FlatList onContentSizeChange, data length:', contactsList.length)}
+                  // onLayout={() => console.log('[AutoQuestionInput] FlatList onLayout, data length:', contactsList.length)}
+                  // onContentSizeChange={() => console.log('[AutoQuestionInput] FlatList onContentSizeChange, data length:', contactsList.length)}
                   getItemLayout={(data, index) => ({
                     length: 50, // Height of each compact item
                     offset: 50 * index,
@@ -1030,11 +1064,11 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         animationType="slide"
         onRequestClose={handlePopupClose}
         onShow={() => {
-          console.log('[AutoQuestionInput] Activities Modal opened, activitiesList:', {
-            length: activitiesList.length,
-            firstFew: activitiesList.slice(0, 3),
-            hasData: activitiesList.length > 0
-          });
+          // console.log('[AutoQuestionInput] Activities Modal opened, activitiesList:', {
+          //   length: activitiesList.length,
+          //   firstFew: activitiesList.slice(0, 3),
+          //   hasData: activitiesList.length > 0
+          // });
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1077,8 +1111,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                       <UrduText style={styles.emptyText}>کوئی سرگرمی نہیں ملی ({activitiesList.length})</UrduText>
                     </View>
                   }
-                  onLayout={() => console.log('[AutoQuestionInput] Activities FlatList onLayout, data length:', activitiesList.length)}
-                  onContentSizeChange={() => console.log('[AutoQuestionInput] Activities FlatList onContentSizeChange, data length:', activitiesList.length)}
+                  // onLayout={() => console.log('[AutoQuestionInput] Activities FlatList onLayout, data length:', activitiesList.length)}
+                  // onContentSizeChange={() => console.log('[AutoQuestionInput] Activities FlatList onContentSizeChange, data length:', activitiesList.length)}
                   getItemLayout={(data, index) => ({
                     length: 60, // Height of each activity item
                     offset: 60 * index,
@@ -1114,11 +1148,11 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         animationType="slide"
         onRequestClose={handlePopupClose}
         onShow={() => {
-          console.log('[AutoQuestionInput] Strength Modal opened, strengthRecordsList:', {
-            length: strengthRecordsList.length,
-            firstFew: strengthRecordsList.slice(0, 3),
-            hasData: strengthRecordsList.length > 0
-          });
+          // console.log('[AutoQuestionInput] Strength Modal opened, strengthRecordsList:', {
+          //   length: strengthRecordsList.length,
+          //   firstFew: strengthRecordsList.slice(0, 3),
+          //   hasData: strengthRecordsList.length > 0
+          // });
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1163,8 +1197,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                       <UrduText style={styles.emptyText}>کوئی {getStrengthTypeSingularLabel()} ریکارڈ نہیں ملا ({strengthRecordsList.length})</UrduText>
                     </View>
                   }
-                  onLayout={() => console.log('[AutoQuestionInput] Strength FlatList onLayout, data length:', strengthRecordsList.length)}
-                  onContentSizeChange={() => console.log('[AutoQuestionInput] Strength FlatList onContentSizeChange, data length:', strengthRecordsList.length)}
+                  // onLayout={() => console.log('[AutoQuestionInput] Strength FlatList onLayout, data length:', strengthRecordsList.length)}
+                  // onContentSizeChange={() => console.log('[AutoQuestionInput] Strength FlatList onContentSizeChange, data length:', strengthRecordsList.length)}
                   getItemLayout={(data, index) => ({
                     length: 60, // Height of each strength record item
                     offset: 60 * index,
@@ -1336,7 +1370,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'right',
     flex: 1,
-    direction: 'rtl',
+    writingDirection: 'rtl',
 
   },
   contactName: {
@@ -1346,7 +1380,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     flex: 1,
     marginLeft: SPACING.sm,
-    direction: 'rtl',
+    writingDirection: 'rtl',
   },
   emptyContainer: {
     padding: SPACING.xl,

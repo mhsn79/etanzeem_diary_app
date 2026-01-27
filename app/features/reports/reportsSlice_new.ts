@@ -4,7 +4,7 @@ import {
   PayloadAction,
   createSelector,
 } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import apiRequest from '../../services/apiClient';
 import { TanzeemiUnit } from '../../models/TanzeemiUnit';
 
@@ -130,76 +130,7 @@ export const fetchReportSubmissions = createAsyncThunk<
   }
 });
 
-export const createReportSubmission = createAsyncThunk<
-  ReportSubmission,
-  { template_id: number; unit_id: number; mgmt_id: number },
-  { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/createReportSubmission', async (params, { getState, rejectWithValue }) => {
-  try {
-    // Validate required fields
-    if (!params.template_id || !params.unit_id || !params.mgmt_id) {
-      return rejectWithValue('Missing required fields for submission creation');
-    }
 
-    // Check if a submission already exists for this combination (local state)
-    const existingSubmissions = getState().reportsNew.reportSubmissions;
-    const existingSubmission = existingSubmissions.find(submission =>
-      submission.template_id === params.template_id &&
-      submission.unit_id === params.unit_id &&
-      submission.mgmt_id === params.mgmt_id
-    );
-
-    if (existingSubmission) {
-      return existingSubmission;
-    }
-
-    // Also check server for existing submissions
-    const serverFilter = {
-      _and: [
-        { template_id: { _eq: params.template_id } },
-        { unit_id: { _eq: params.unit_id } },
-        { mgmt_id: { _eq: params.mgmt_id } }
-      ]
-    };
-
-    try {
-      const serverResponse = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
-        path: '/items/reports_submissions',
-        method: 'GET',
-        params: { filter: serverFilter }
-      }));
-
-      const serverSubmissions = normalizeResponse<ReportSubmission[]>(serverResponse, 'Server Submissions');
-
-      if (serverSubmissions && serverSubmissions.length > 0) {
-        return serverSubmissions[0];
-      }
-    } catch (serverError) {
-      console.warn('[reportsSlice] Error checking server for existing submissions:', serverError);
-      // Continue with creation even if server check fails
-    }
-
-    const submissionData = {
-      template_id: params.template_id,
-      unit_id: params.unit_id,
-      mgmt_id: params.mgmt_id,
-      status: 'draft',
-    };
-
-    // The centralized API client handles token refresh automatically
-    const response = await apiRequest<ReportSubmission>(() => ({
-      path: '/items/reports_submissions',
-      method: 'POST',
-      body: JSON.stringify(submissionData),
-      headers: { 'Content-Type': 'application/json' },
-    }));
-
-    return response;
-  } catch (error: any) {
-    console.error('Error in createReportSubmission:', error);
-    return rejectWithValue(error.message || 'Failed to create report submission');
-  }
-});
 
 export const fetchReportsByUnitId = createAsyncThunk<
   ReportData[],
@@ -207,6 +138,8 @@ export const fetchReportsByUnitId = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('reports/fetchReportsByUnitId', async (unitId, { getState, rejectWithValue }) => {
   try {
+    console.log('[reportsSlice] Starting fetchReportsByUnitId for unitId:', unitId);
+    
     if (!unitId || typeof unitId !== 'number') {
       console.error('[reportsSlice] Invalid unit ID provided:', unitId);
       return rejectWithValue('Invalid unit ID provided');
@@ -252,6 +185,7 @@ export const fetchReportsByUnitId = createAsyncThunk<
       });
     }
 
+    console.log('[reportsSlice] fetchReportsByUnitId completed successfully with', result.length, 'templates');
     return result;
   } catch (error: any) {
     console.error('[reportsSlice] Error in fetchReportsByUnitId:', error);
@@ -278,10 +212,12 @@ const reportsNewSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchReportsByUnitId.pending, (state) => {
+        console.log('[reportsSlice] fetchReportsByUnitId.pending - setting loading to true');
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchReportsByUnitId.fulfilled, (state, action) => {
+        console.log('[reportsSlice] fetchReportsByUnitId.fulfilled - setting loading to false, payload length:', action.payload.length);
         state.loading = false;
         
         // Check if payload is empty array
@@ -309,6 +245,7 @@ const reportsNewSlice = createSlice({
       })
       .addCase(fetchReportsByUnitId.rejected, (state, action) => {
         console.error('[reportsSlice] fetchReportsByUnitId.rejected with error:', action.payload);
+        console.log('[reportsSlice] fetchReportsByUnitId.rejected - setting loading to false');
         state.loading = false;
         state.error = action.payload ?? 'Failed to fetch reports';
       })
@@ -324,21 +261,7 @@ const reportsNewSlice = createSlice({
         state.reportSubmissionsLoading = false;
         state.reportSubmissionsError = action.payload as string | null ?? 'Failed to fetch report submissions';
       })
-      .addCase(createReportSubmission.pending, (state) => {
-        // No loading state needed for creation as it's handled by the component
-      })
-      .addCase(createReportSubmission.fulfilled, (state, action) => {
-        // Add the new submission to the list
-        const newSubmission = {
-          ...action.payload,
-          unitDetails: null, // Will be populated when submissions are refetched
-        };
-        state.reportSubmissions = [newSubmission, ...state.reportSubmissions];
-      })
-      .addCase(createReportSubmission.rejected, (state, action) => {
-        // Error is handled by the component
-        console.error('[reportsSlice] createReportSubmission.rejected with error:', action.payload);
-      });
+
   },
 });
 

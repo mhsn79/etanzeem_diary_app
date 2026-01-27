@@ -154,9 +154,10 @@ const Dashboard = () => {
     }
   }, [userUnit, selectedUnitId]);
 
-  // Fetch activities when component mounts
+  // Fetch activities when component mounts (only if not already loaded)
   useEffect(() => {
     console.log('Dashboard: Fetching activities');
+    // Only fetch if activities haven't been loaded recently
     dispatch(fetchActivities());
   }, []);
 

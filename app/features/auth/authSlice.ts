@@ -1,26 +1,19 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { RootState } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import directus from '../../services/directus';
 import { clearActivities } from '../activities/activitySlice';
-import { AppDispatch } from '../../store';
 import { setUserDetails, setNazimDetails } from '../persons/personSlice';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
-import { persistor } from '../../store';
-import { RESET_STATE } from '../../store/reducers';
+import { RESET_STATE } from '../../store/_resetState';
 import { saveTokens, clearTokens } from '../../services/secureStorage';
+import { getPersistor } from '../../store/storeAccess';
 import { directApiRequest } from '../../services/apiClient';
 import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
 
-// Singleton variables for token refresh and logout management
-let refreshPromise: Promise<any> | null = null;
-let logoutInProgress = false;
-
 // Function to reset singleton variables (useful for testing or app restart)
 export const resetAuthSingletons = () => {
-  refreshPromise = null;
-  logoutInProgress = false;
 };
 
 // Helper function for making API requests during login when tokens are available but not in Redux store
@@ -250,6 +243,8 @@ export interface AuthState {
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
   isRefreshing: boolean;
+  lastUserFetchAt: number | null;
+  lastUnitFetchAt: number | null;
 }
 
 const initialState: AuthState = {
@@ -259,7 +254,12 @@ const initialState: AuthState = {
   status: 'idle',
   error: null,
   isRefreshing: false,
+  lastUserFetchAt: null,
+  lastUnitFetchAt: null,
 };
+
+const USER_FETCH_TTL_MS = 5 * 60 * 1000;
+const UNIT_FETCH_TTL_MS = 5 * 60 * 1000;
 
 export interface LoginCredentials {
   email: string;
@@ -655,7 +655,8 @@ export const updateUserAvatar = createAsyncThunk<
 
     // Check token expiration and refresh if needed
     if (isTokenExpiredOrExpiring(state.auth.tokens?.expiresAt)) {
-      await dispatch(refresh()).unwrap();
+      const { refreshOnce } = require('../../services/refreshOrchestrator');
+      await refreshOnce('updateUserAvatar');
       // Get updated token after refresh
       const updatedState = getState();
       if (!updatedState.auth.tokens?.accessToken) {
@@ -748,6 +749,8 @@ const authSlice = createSlice({
       state.status = 'idle';
       state.error = null;
       state.isRefreshing = false;
+      state.lastUserFetchAt = null;
+      state.lastUnitFetchAt = null;
       
       // Logout from Directus
       directus.logout();
@@ -762,6 +765,10 @@ const authSlice = createSlice({
     },
     setIsRefreshing: (state, action: PayloadAction<boolean>) => {
       state.isRefreshing = action.payload;
+    }
+    ,
+    setLastUnitFetchAt: (state, action: PayloadAction<number | null>) => {
+      state.lastUnitFetchAt = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -844,6 +851,7 @@ const authSlice = createSlice({
           role_name: action.payload.role?.name || action.payload.role_name,
           avatar_id: action.payload.avatar?.id || action.payload.avatar_id
         };
+        state.lastUserFetchAt = Date.now();
         
         state.error = null;
       })
@@ -854,7 +862,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout: logoutAction, clearError, setError, setIsRefreshing } = authSlice.actions;
+export const { logout: logoutAction, clearError, setError, setIsRefreshing, setLastUnitFetchAt } = authSlice.actions;
 
 /**
  * Enhanced complete logout thunk that:
@@ -873,8 +881,6 @@ export const logout = createAsyncThunk(
       console.log(`[Auth] Starting logout process (${Platform.OS})`);
       
       // Reset singleton variables
-      refreshPromise = null;
-      logoutInProgress = false;
       
       // Clean up background refresh
       const { cleanupBackgroundRefresh } = await import('../../utils/authCleanup');
@@ -922,25 +928,25 @@ export const logout = createAsyncThunk(
       
       try {
         // Finally, purge the persisted Redux data
-        await persistor.purge();
+        await getPersistor().purge();
         console.log(`[Auth] Persisted data purged (${Platform.OS})`);
       } catch (purgeError) {
         // If purge fails, log the error but continue with logout
         console.error(`[Auth] Error purging persisted data: ${purgeError} (${Platform.OS})`);
       }
       
-      // Set error message to show in our custom Toast component
-      try {
-        const logoutMessage = message || 'Session expired. Please log in again.';
-        // We'll use our custom Toast component which reads from the auth.error state
-        dispatch(authSlice.actions.setError(logoutMessage));
-        
-        // Clear the error after a delay to hide the toast
-        setTimeout(() => {
-          dispatch(authSlice.actions.clearError());
-        }, 4000);
-      } catch (toastError) {
-        console.error(`[Auth] Error setting error message: ${toastError} (${Platform.OS})`);
+      // Set error message to show in our custom Toast component only when provided
+      if (message) {
+        try {
+          dispatch(authSlice.actions.setError(message));
+          
+          // Clear the error after a delay to hide the toast
+          setTimeout(() => {
+            dispatch(authSlice.actions.clearError());
+          }, 4000);
+        } catch (toastError) {
+          console.error(`[Auth] Error setting error message: ${toastError} (${Platform.OS})`);
+        }
       }
       
       // Navigate to login screen
@@ -996,39 +1002,14 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
   }
 
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
-    // If a refresh is already in progress, wait for it
-    if (refreshPromise) {
-      try {
-        await refreshPromise;
-        return;
-      } catch (error) {
-        // If the ongoing refresh failed, we'll handle it below
-        refreshPromise = null;
-      }
-    }
-
-    // Start a new refresh
     try {
       console.log('Token is expired or about to expire, refreshing in checkAndRefreshTokenIfNeeded');
-      refreshPromise = dispatch(refresh()).unwrap();
-      await refreshPromise;
+      const { refreshOnce } = require('../../services/refreshOrchestrator');
+      await refreshOnce('checkAndRefreshTokenIfNeeded');
       console.log('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
-      refreshPromise = null;
-      
-      // Prevent multiple logout calls
-      if (!logoutInProgress) {
-        logoutInProgress = true;
-        try {
-          await dispatch(logout('Authentication expired. Please log in again.')).unwrap();
-        } finally {
-          logoutInProgress = false;
-        }
-      }
       throw new Error('Authentication expired. Please log in again.');
-    } finally {
-      refreshPromise = null;
     }
   }
 });
@@ -1048,18 +1029,37 @@ export const initializeAuth = createAsyncThunk<
     // First check if we need to refresh the token
     await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
     
-    // Then fetch the latest user data
-    const userDetails = await dispatch(fetchUserMe()).unwrap();
+    const state = getState();
+    const now = Date.now();
+    const shouldFetchUser =
+      !state.auth.userDetails ||
+      !state.auth.lastUserFetchAt ||
+      now - state.auth.lastUserFetchAt > USER_FETCH_TTL_MS;
+    
+    if (shouldFetchUser) {
+      // Then fetch the latest user data
+      await dispatch(fetchUserMe()).unwrap();
+    }
     
     // Now fetch Tanzeemi_Unit and Person data using the user ID
-    const state = getState();
-    const userId = state.auth.user?.id;
+    const stateAfterUser = getState();
+    const userId = stateAfterUser.auth.user?.id;
     
     if (userId) {
+      const shouldFetchUnit =
+        !stateAfterUser.tanzeem?.userUnitDetails ||
+        !stateAfterUser.auth.lastUnitFetchAt ||
+        now - stateAfterUser.auth.lastUnitFetchAt > UNIT_FETCH_TTL_MS;
+      
+      if (!shouldFetchUnit) {
+        console.log('[DEBUG] ✅ Skipping Tanzeemi_Unit fetch (cached)');
+        return true;
+      }
+      
       console.log('[DEBUG] 🔍 Fetching Tanzeemi_Unit for user ID:', userId);
       
       try {
-        const accessToken = state.auth.tokens?.accessToken;
+        const accessToken = stateAfterUser.auth.tokens?.accessToken;
         if (!accessToken) {
           console.log('[DEBUG] ❌ No access token available for Tanzeemi_Unit fetch');
           return true; // Continue without Tanzeemi_Unit data
@@ -1078,6 +1078,7 @@ export const initializeAuth = createAsyncThunk<
           
           console.log('[DEBUG] 🏪 Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
+          dispatch(setLastUnitFetchAt(Date.now()));
           
           if (nazimId) {
             console.log('[DEBUG] 🔍 Found Nazim_id:', nazimId);
@@ -1118,19 +1119,6 @@ export const fetchUserMe = createAsyncThunk<
     
     if (!accessToken) {
       return rejectWithValue('No access token available');
-    }
-    
-    // Check if token needs refresh
-    if (isTokenExpiredOrExpiring(state.auth.tokens?.expiresAt)) {
-      await dispatch(refresh()).unwrap();
-    }
-    
-    // Get updated token after potential refresh
-    const updatedState = getState();
-    const updatedToken = updatedState.auth.tokens?.accessToken;
-    
-    if (!updatedToken) {
-      return rejectWithValue('Failed to get valid token');
     }
     
     // Fetch user data from Directus with expanded fields

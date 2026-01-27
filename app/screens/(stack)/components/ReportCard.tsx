@@ -64,14 +64,12 @@ const ReportCard: React.FC<ReportCardProps> = ({
           </View>
         )}
         {/* Debug mode: Show submission ID */}
-        {/* {(submissionId || managementId || templateId) && (
-          <View style={styles.debugContainer}>
-            {submissionId && <UrduText style={styles.debugText}>ID: {submissionId}</UrduText>}
-            {managementId && <UrduText style={styles.debugText}>Mgmt: {managementId}</UrduText>}
-            {templateId && <UrduText style={styles.debugText}>Template: {templateId}</UrduText>}
-            {progress !== undefined && <UrduText style={styles.debugText}>Progress: {progress}% {progress === 0 ? '(No answers)' : ''}</UrduText>}
-          </View>
-        )} */}
+        <View style={styles.debugContainer}>
+          {submissionId && <UrduText style={styles.debugText}>ID: {submissionId}</UrduText>}
+          {managementId && <UrduText style={styles.debugText}>Mgmt: {managementId}</UrduText>}
+          {templateId && <UrduText style={styles.debugText}>Template: {templateId}</UrduText>}
+          {progress !== undefined && <UrduText style={styles.debugText}>Progress: {progress}% {progress === 0 ? '(No answers)' : ''}</UrduText>}
+        </View>
       </View>
     </TouchableOpacity>
   );

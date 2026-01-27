@@ -89,9 +89,6 @@ export default function ProfileEdit() {
               source={require('@/assets/images/avatar.png')}
               style={styles.logo}
             />
-            <Pressable onPress={handlePictureUpdate} style={styles.editIconContainer}>
-              <FontAwesome5 name="camera" size={16} color={COLORS.white} />
-            </Pressable>
           </View>
           
           <View style={styles.nameContainer}>

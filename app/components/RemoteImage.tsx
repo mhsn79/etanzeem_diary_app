@@ -5,26 +5,21 @@ import {
   StyleSheet,
   ViewStyle,
   StyleProp,
+  Image,
+  ImageStyle,
+  ImageResizeMode,
+  ImageSourcePropType,
 } from 'react-native';
-import FastImage, { ImageStyle as FastImageStyle } from 'react-native-fast-image';
 import { COLORS } from '../constants/theme';
-
-// Import FastImage types
-type FastImageSource = {
-  uri: string;
-  headers?: { [key: string]: string };
-  priority?: typeof FastImage.priority[keyof typeof FastImage.priority];
-  cache?: typeof FastImage.cacheControl[keyof typeof FastImage.cacheControl];
-};
 
 // Define our component props
 interface RemoteImageProps {
-  source: FastImageSource | number;
-  fallbackSource: number;
+  source: ImageSourcePropType;
+  fallbackSource: ImageSourcePropType;
   showLoadingIndicator?: boolean;
-  style?: StyleProp<FastImageStyle>;
+  style?: StyleProp<ImageStyle>;
   containerStyle?: StyleProp<ViewStyle>;
-  resizeMode?: typeof FastImage.resizeMode[keyof typeof FastImage.resizeMode];
+  resizeMode?: ImageResizeMode;
   onLoad?: () => void;
   onError?: () => void;
   onLoadStart?: () => void;
@@ -38,7 +33,7 @@ const RemoteImage: React.FC<RemoteImageProps> = ({
   style,
   containerStyle,
   showLoadingIndicator = true,
-  resizeMode = FastImage.resizeMode.cover,
+  resizeMode = 'cover',
   onLoad,
   onError,
   onLoadStart,
@@ -47,13 +42,15 @@ const RemoteImage: React.FC<RemoteImageProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [imageSource, setImageSource] = useState<FastImageSource | number>(source);
+  const [imageSource, setImageSource] = useState<ImageSourcePropType>(source);
 
   // Check if the source is a remote URI
-  const isRemoteImage = typeof source === 'object' && 
-                        source !== null && 
-                        'uri' in source && 
-                        typeof source.uri === 'string';
+  const isRemoteImage =
+    source !== null &&
+    typeof source === 'object' &&
+    !Array.isArray(source) &&
+    'uri' in source &&
+    typeof (source as { uri?: string }).uri === 'string';
 
   useEffect(() => {
     // Reset states when source changes
@@ -62,16 +59,14 @@ const RemoteImage: React.FC<RemoteImageProps> = ({
     setImageSource(source);
   }, [source, isRemoteImage]);
 
-  // Preload images using FastImage's preload method
+  // Prefetch remote images to improve perceived load time
   useEffect(() => {
     if (isRemoteImage) {
-      const uri = (source as FastImageSource).uri;
-      
-      // Log the attempt
-      console.log('Attempting to preload image:', uri);
-      
-      // Use FastImage.preload to preload the image
-      FastImage.preload([source as FastImageSource]);
+      const uri = (source as { uri: string }).uri;
+      console.log('Attempting to prefetch image:', uri);
+      Image.prefetch(uri).catch((error) => {
+        console.warn('Image prefetch failed:', error);
+      });
     }
   }, [source, isRemoteImage]);
 
@@ -94,7 +89,7 @@ const RemoteImage: React.FC<RemoteImageProps> = ({
   };
 
   const handleError = () => {
-    console.error('Failed to load image:', isRemoteImage ? (source as FastImageSource).uri : 'local image');
+    console.error('Failed to load image:', isRemoteImage ? (source as { uri: string }).uri : 'local image');
     setHasError(true);
     setIsLoading(false);
     onError?.();
@@ -108,7 +103,7 @@ const RemoteImage: React.FC<RemoteImageProps> = ({
         </View>
       )}
       
-      <FastImage
+      <Image
         source={hasError ? fallbackSource : imageSource}
         style={style}
         resizeMode={resizeMode}

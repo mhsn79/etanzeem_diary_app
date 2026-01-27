@@ -14,8 +14,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
 import { logout } from '@/app/features/auth/authSlice';
-import { AppDispatch } from '@/app/store';
-import { fetchPersonByEmail } from '@/app/features/persons/personSlice';
+import { AppDispatch } from '@/app/store/types';
 
 // Import components
 import CustomButton from '@/app/components/CustomButton';
@@ -38,6 +37,8 @@ import {
   selectUserTanzeemiLevelDetails,
   selectUserTanzeemiLevelStatus,
   selectUserTanzeemiLevelError,
+  selectUserUnitDetails,
+  selectLevelsById,
   fetchUserTanzeemiUnit
 } from '@/app/features/tanzeem/tanzeemSlice';
 
@@ -74,6 +75,10 @@ export default function ProfileView() {
   const tanzeemLevelStatus = useSelector(selectUserTanzeemiLevelStatus);
   const tanzeemLevelError = useSelector(selectUserTanzeemiLevelError);
   
+  // Get user unit details and levels from Redux store
+  const userUnitDetails = useSelector(selectUserUnitDetails);
+  const levelsById = useSelector(selectLevelsById);
+  
   // Local state
   const [refreshing, setRefreshing] = useState(false);
 
@@ -93,6 +98,32 @@ export default function ProfileView() {
   const displayData = useMemo(() => {
     if (!userDetails) return {};
 
+    // Format unit with level, name, and description
+    let formattedUnit = '';
+    if (userUnitDetails) {
+      const unitName = userUnitDetails.Name || '';
+      const unitDescription = userUnitDetails.Description || '';
+      const unitLevelId = userUnitDetails.Level_id;
+      
+      // Get level name if available
+      let unitLevelName = '';
+      if (unitLevelId && levelsById[unitLevelId]) {
+        unitLevelName = levelsById[unitLevelId].Name || '';
+      }
+      
+      // Build formatted unit string: "Level Name: Unit Name - Unit Description"
+      if (unitLevelName && unitName) {
+        formattedUnit = `${unitLevelName}: ${unitName}`;
+      } else if (unitName) {
+        formattedUnit = unitName;
+      }
+      
+      // Append description if available
+      if (unitDescription && unitDescription.trim()) {
+        formattedUnit += formattedUnit ? ` - ${unitDescription}` : unitDescription;
+      }
+    }
+
     return {
       id: userDetails.id,
       name: userDetails.Name || userDetails.name,
@@ -103,28 +134,23 @@ export default function ProfileView() {
       parent: userDetails.Father_Name || userDetails.parent,
       dob: formatDate(userDetails.Date_of_birth || userDetails.dob),
       cnic: userDetails.CNIC || userDetails.cnic,
-      unit: userDetails.Tanzeemi_Unit?.toString() || userDetails.unit?.toString(),
+      unit: formattedUnit || (userDetails.Tanzeemi_Unit?.toString() || userDetails.unit?.toString()),
       status: userDetails.status,
       email: userDetails.Email || userDetails.email,
       role: userDetails.role,
     };
-  }, [userDetails]);
+  }, [userDetails, userUnitDetails, levelsById]);
 
   // Refresh user details
   const refreshUserDetails = async () => {
     if (userDetails?.email || userDetails?.Email) {
       setRefreshing(true);
       try {
-        const email = userDetails.email || userDetails.Email;
-        if (email) {
-          await dispatch(fetchPersonByEmail(email)).unwrap();
-          
-          // If user has a Tanzeemi unit, fetch it (which will also fetch the Tanzeem level)
-          if (userDetails.Tanzeemi_Unit || userDetails.unit) {
-            const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
-            if (typeof unitId === 'number') {
-              await dispatch(fetchUserTanzeemiUnit(unitId)).unwrap();
-            }
+        // If user has a Tanzeemi unit, fetch it (which will also fetch the Tanzeem level)
+        if (userDetails.Tanzeemi_Unit || userDetails.unit) {
+          const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
+          if (typeof unitId === 'number') {
+            await dispatch(fetchUserTanzeemiUnit(unitId)).unwrap();
           }
         }
       } catch (error) {
@@ -199,21 +225,22 @@ export default function ProfileView() {
         <UrduText style={styles.personName}>{displayData.name || ''}</UrduText>
         <UrduText style={styles.personSub}>{displayData.parent || ''}</UrduText>
 
-        {displayData.name && StaticField(i18n.t('name'), displayData.name)}
-        {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)}
-        {displayData.dob && StaticField(i18n.t('dob'), displayData.dob)}
-        {displayData.cnic && StaticField(i18n.t('cnic'), displayData.cnic)}
+        {/* {displayData.name && StaticField(i18n.t('name'), displayData.name)} */}
+        {/* {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)} */}
+        {/* {displayData.dob && StaticField(i18n.t('dob'), displayData.dob)} */}
+        {/* {displayData.cnic && StaticField(i18n.t('cnic'), displayData.cnic)} */}
         {displayData.unit && StaticField(i18n.t('unit'), displayData.unit)}
-        {tanzeemLevelDetails && StaticField(i18n.t('tanzeem_level'), tanzeemLevelDetails.Name)}
+        {/* {tanzeemLevelDetails && StaticField(i18n.t('tanzeem_level'), tanzeemLevelDetails.Name)}
         {tanzeemLevelDetails && StaticField(i18n.t('nazim_label'), tanzeemLevelDetails.Nazim_Label)}
         {displayData.status && StaticField(i18n.t('status'), i18n.t(displayData.status))}
-        {displayData.role && StaticField(i18n.t('role'), displayData.role as string)}
+        {displayData.role && StaticField(i18n.t('role'), displayData.role as string)} */}
         {displayData.phone && StaticField(i18n.t('phone_number'), displayData.phone)}
         {displayData.whatsApp && StaticField(i18n.t('whatsapp_number'), displayData.whatsApp)}
         {displayData.email && StaticField(i18n.t('email'), displayData.email)}
+        {displayData.address && StaticField(i18n.t('address'), displayData.address)}
         
         {/* Additional fields from Person collection */}
-        {userDetails?.Rukn_No && StaticField(i18n.t('rukn_no'), userDetails.Rukn_No.toString())}
+        {/* {userDetails?.Rukn_No && StaticField(i18n.t('rukn_no'), userDetails.Rukn_No.toString())}
         {userDetails?.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(userDetails.Rukinat_Date))}
         {userDetails?.Profession && StaticField(i18n.t('profession'), userDetails.Profession)}
         {userDetails?.Education && StaticField(i18n.t('education'), userDetails.Education)}
@@ -221,9 +248,9 @@ export default function ProfileView() {
           userDetails.Gender === 'm' ? i18n.t('male') : 
           userDetails.Gender === 'f' ? i18n.t('female') : 
           userDetails.Gender
-        )}
+        )} */}
 
-        <CustomDropdown
+        {/* <CustomDropdown
           dropdownTitle={i18n.t('language')}
           placeholder={i18n.t('language')}
           onSelect={() => {}}
@@ -231,7 +258,7 @@ export default function ProfileView() {
             { id: 'ur', label: 'اردو', value: 'ur' },
             { id: 'en', label: 'English', value: 'en' },
           ]}
-        />
+        /> */}
 
         <View style={styles.logoutContainer}>
           <CustomButton

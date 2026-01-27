@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,6 +10,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -61,7 +63,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [emailEmptyOnBlur, setEmailEmptyOnBlur] = useState(false);
+  const [passwordEmptyOnBlur, setPasswordEmptyOnBlur] = useState(false);
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
+  const [loginInProgress, setLoginInProgress] = useState(false);
 
   /* Redirect when auth succeeds */
   useEffect(() => {
@@ -98,21 +103,38 @@ export default function LoginScreen() {
       return;
     }
 
+    setLoginInProgress(true);
     dispatch(loginAndFetchUserDetails({ email, password }));
   };
 
   /* Dynamic title top value based on notch presence */
-  const titleTop = insets.top > 0 ? 45 : 25; // Reduced values to move title up
+  const titleTop = insets.top > 0 ? 45 : 25;
 
   /* ---------------------------------------------------------------- */
   /*                             RENDER                               */
   /* ---------------------------------------------------------------- */
+  useEffect(() => {
+    if (status !== 'loading') {
+      setLoginInProgress(false);
+    }
+  }, [status]);
+
+  const showLoading = loginInProgress && status === 'loading';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
         <StatusBar hidden />
         <View style={styles.background}>
           {/* Logo & Banner */}
@@ -141,10 +163,26 @@ export default function LoginScreen() {
                 placeholderTextColor="#2D2327"
                 onChangeText={(v) => {
                   setEmail(v);
-                  if (emailError) setEmailError(null);
+                  // Clear empty state when user starts typing
+                  if (emailEmptyOnBlur) {
+                    setEmailEmptyOnBlur(false);
+                  }
+                  // Only clear error if there was one, to prevent unnecessary re-renders
+                  if (emailError) {
+                    setEmailError(null);
+                  }
+                }}
+                onBlur={() => {
+                  // Highlight with red outline if empty on blur
+                  if (!email.trim()) {
+                    setEmailEmptyOnBlur(true);
+                  }
                 }}
                 value={email}
-                error={!!emailError}
+                error={!!emailError || emailEmptyOnBlur}
+                autoComplete="email"
+                keyboardType="email-address"
+                returnKeyType="next"
               />
               {emailError && <Text style={styles.errText}>{emailError}</Text>}
             </View>
@@ -158,10 +196,25 @@ export default function LoginScreen() {
                 secureTextEntry
                 onChangeText={(v) => {
                   setPassword(v);
-                  if (passwordError) setPasswordError(null);
+                  // Clear empty state when user starts typing
+                  if (passwordEmptyOnBlur) {
+                    setPasswordEmptyOnBlur(false);
+                  }
+                  // Only clear error if there was one, to prevent unnecessary re-renders
+                  if (passwordError) {
+                    setPasswordError(null);
+                  }
+                }}
+                onBlur={() => {
+                  // Highlight with red outline if empty on blur
+                  if (!password.trim()) {
+                    setPasswordEmptyOnBlur(true);
+                  }
                 }}
                 value={password}
-                error={!!passwordError}
+                error={!!passwordError || passwordEmptyOnBlur}
+                autoComplete="password"
+                returnKeyType="done"
               />
               {passwordError && <Text style={styles.errText}>{passwordError}</Text>}
             </View>
@@ -175,14 +228,21 @@ export default function LoginScreen() {
             </Pressable>
 
             {/* Submit */}
-            {status === 'loading' ? (
-              <ActivityIndicator size="large" color="#008CFF" />
-            ) : (
-              <CustomButton text={i18n.t('login')} onPress={handleLogin} />
-            )}
+            <View style={styles.buttonContainer}>
+              {showLoading ? (
+                <ActivityIndicator size="large" color="#008CFF" />
+              ) : (
+                <CustomButton 
+                  text={i18n.t('login')} 
+                  onPress={handleLogin}
+                  disabled={!email.trim() || !password.trim()}
+                />
+              )}
+            </View>
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
       
       {/* Regular toast for other errors */}
       {authError && !authError.includes("don't have any access to the app") && <Toast />}
@@ -239,17 +299,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    // alignItems: 'center',
     marginTop: -40,
-    // gap: 10, // Increased gap from 10 to 15
-    // paddingTop: 20, // Reduced from 60 to 40
     padding: 20,
-    justifyContent: 'center', // Added to center content vertically
+    justifyContent: 'center',
+    minHeight: 400, // Add minimum height to prevent layout shifts
   },
   inputContainer: {
     width: '100%',
-    gap: 5, // Reduced gap for tighter spacing
-    marginBottom: 5, // Added margin bottom for better separation
+    marginBottom: 15, // Increased margin for better spacing
+    minHeight: 80, // Add minimum height to prevent layout shifts
   },
   inputText: {
     fontSize: 16,
@@ -271,5 +329,10 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     lineHeight:30,
     marginBottom: 30,
+  },
+  buttonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -22,10 +22,9 @@ import {
   selectReportsError,
   selectReportsLoading,
   fetchReportSubmissions,
-  createReportSubmission,
 } from '@/app/features/reports/reportsSlice_new';
 import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
-import { AppDispatch } from '@/app/store';
+import { AppDispatch } from '@/app/store/types';
 import { formatExpectedCompletion, getUrduMonth } from '@/app/constants/urduLocalization';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import { ROUTES } from '@/app/constants/navigation';
@@ -40,6 +39,7 @@ import {
   initializeReportData, 
   selectOverallProgress, 
   selectOverallProgressForSubmission,
+  selectCurrentSubmissionId,
   selectQAState 
 } from '@/app/features/qa/qaSlice';
 
@@ -144,8 +144,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // Ref to track the last fetch time to prevent rapid successive calls
   const lastFetchTimeRef = useRef<number>(0);
 
-  // Ref to track if we've already attempted to create a submission for the current management
-  const submissionCreationAttemptedRef = useRef<{ mgmtId: number; unitId: number } | null>(null);
+
 
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
@@ -157,6 +156,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // QA module state
   const qaState = useSelector(selectQAState);
   const overallProgress = useSelector(selectOverallProgress);
+  const currentSubmissionId = useSelector(selectCurrentSubmissionId);
+  
+  // Debug loading state
+  useEffect(() => {
+    console.log('[ReportsView] Loading state changed:', {
+      loading,
+      error,
+      reportMgmtDetailsLength: reportMgmtDetails.length,
+      reportSubmissionsLength: reportSubmissions.length,
+      qaStateStatus: qaState.status,
+      qaStateError: qaState.error
+    });
+  }, [loading, error, reportMgmtDetails.length, reportSubmissions.length, qaState.status, qaState.error]);
   
   // Get tanzeem state for level information
   const tanzeemState = useSelector((state: any) => state.tanzeem);
@@ -328,66 +340,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     return null;
   }, [reportSubmissions.length, currentlyOpenManagement?.id, displayUnitId]);
 
-  // Function to create a new submission for the latest active management
-  const createNewSubmissionForActiveManagement = useCallback(async () => {
-    if (!currentlyOpenManagement || !displayUnitId || !currentTemplate?.id) {
-      return;
-    }
 
-    try {
-      // Use the reports slice's createReportSubmission to create a new submission
-      const result = await dispatch(createReportSubmission({
-        template_id: currentTemplate.id,
-        unit_id: displayUnitId,
-        mgmt_id: currentlyOpenManagement.id
-      })).unwrap();
-
-      // Refresh the submissions list to show the new submission with proper unit details
-      await dispatch(fetchReportSubmissions());
-
-    } catch (error) {
-      console.error('[ReportsView] Error creating new submission:', error);
-    }
-  }, [currentlyOpenManagement, displayUnitId, currentTemplate?.id, dispatch]);
-
-  // Effect to automatically create a new submission if none exists for the active management
-  useEffect(() => {
-    // Check if we've already attempted to create a submission for this management and unit
-    const currentAttempt = currentlyOpenManagement?.id && displayUnitId ? 
-      { mgmtId: currentlyOpenManagement.id, unitId: displayUnitId } : null;
-    
-    const alreadyAttempted = submissionCreationAttemptedRef.current && 
-      submissionCreationAttemptedRef.current.mgmtId === currentAttempt?.mgmtId &&
-      submissionCreationAttemptedRef.current.unitId === currentAttempt?.unitId;
-
-    if (currentlyOpenManagement && displayUnitId && !existingSubmission && !loading && reportSubmissions.length > 0 && !alreadyAttempted) {
-      submissionCreationAttemptedRef.current = currentAttempt;
-      createNewSubmissionForActiveManagement();
-    } else if (currentlyOpenManagement && displayUnitId && existingSubmission) {
-      // Reset the attempt ref since we found an existing submission
-      submissionCreationAttemptedRef.current = null;
-    }
-  }, [currentlyOpenManagement, displayUnitId, existingSubmission, loading, createNewSubmissionForActiveManagement]);
-
-  // Effect to reset submission creation attempt when unit or management changes
-  useEffect(() => {
-    submissionCreationAttemptedRef.current = null;
-  }, [displayUnitId, currentlyOpenManagement?.id]);
 
   // Determine if we should show the current report section
-    const shouldShowCurrentReport = useMemo(() => {
-    // Show active report if we have template and unit, OR if we have an existing submission
-    const shouldShow = (currentTemplate && displayUnitId) || (existingSubmission && displayUnitId);
+  const shouldShowCurrentReport = useMemo(() => {
+    // Only show active report if we have an existing submission for the current management
+    const shouldShow = Boolean(existingSubmission && displayUnitId);
 
     console.log('[ReportsView] shouldShowCurrentReport check:', {
-      currentTemplate: currentTemplate?.id,
       existingSubmission: existingSubmission?.id,
       displayUnitId,
       shouldShow
     });
 
     return shouldShow;
-  }, [currentTemplate?.id, existingSubmission?.id, displayUnitId]);
+  }, [existingSubmission?.id, displayUnitId]);
 
   // Memoized filtered submissions - exclude active submission from the list
   const filteredSubmissions = useMemo(() => {
@@ -412,13 +379,26 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       return true; // Include all other submissions
     });
     
-    // Sort by date_created in descending order (newest first)
+    // Sort by parent reports_mgmt's start_date in descending order (newest first)
     return excludeActive.sort((a, b) => {
-      const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
-      const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
-      return dateB - dateA; // Descending order (newest first)
+      // Find management for submission A
+      const managementA = reportMgmtDetails
+        .flatMap((r) => r.managements)
+        .find((m) => m.id === a.mgmt_id);
+      
+      // Find management for submission B  
+      const managementB = reportMgmtDetails
+        .flatMap((r) => r.managements)
+        .find((m) => m.id === b.mgmt_id);
+      
+      // Get reporting_start_date for both managements
+      const startDateA = managementA?.reporting_start_date ? new Date(managementA.reporting_start_date).getTime() : 0;
+      const startDateB = managementB?.reporting_start_date ? new Date(managementB.reporting_start_date).getTime() : 0;
+      
+      // Sort in descending order (newest start_date first)
+      return startDateB - startDateA;
     });
-  }, [reportSubmissions.length, selectedTab, displayUnitId, existingSubmission?.id]);
+  }, [reportSubmissions.length, selectedTab, displayUnitId, existingSubmission?.id, reportMgmtDetails.length]);
 
   // Default back handler if none provided
   const defaultBackHandler = useCallback(() => {
@@ -446,25 +426,20 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     // Ensure we have a fresh token before navigation
     ensureFreshTokenBeforeOperation()
       .then(() => {
-        // Use the currently open management period
-        const currentMgmt = currentlyOpenManagement;
-        
-        if (!currentMgmt) {
-          console.warn('No management period available for report creation');
-          router.push(ROUTES.ALL_REPORTS);
-          return;
-        }
-        
-        // Check if there's already a submission for this management period
-        const existingSubmission = reportSubmissions.find(
-          submission => submission.mgmt_id === currentMgmt.id && 
-                       submission.unit_id === displayUnitId
-        );
-        
+        // Use the active submission (the one displayed in the current report card)
         if (existingSubmission && existingSubmission.id) {
-          // If there's already a submission, navigate to edit/view it based on status
+          // If there's an active submission, navigate to edit/view it based on status
           // Draft reports: edit mode, Published/Submitted reports: view mode
           const mode = existingSubmission.status === 'draft' ? 'edit' : 'view';
+          
+          console.log('[ReportsView] Navigating to active submission:', {
+            submissionId: existingSubmission.id,
+            templateId: existingSubmission.template_id,
+            managementId: existingSubmission.mgmt_id,
+            unitId: existingSubmission.unit_id,
+            status: existingSubmission.status,
+            mode
+          });
           
           router.push({
             pathname: ROUTES.CREATE_REPORT,
@@ -477,6 +452,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({
               mode: mode
             }
           });
+          return;
+        }
+        
+        // If no existing submission, use the currently open management period
+        const currentMgmt = currentlyOpenManagement;
+        
+        if (!currentMgmt) {
+          console.warn('No management period available for report creation');
+          router.push(ROUTES.ALL_REPORTS);
           return;
         }
         
@@ -498,7 +482,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       .catch(error => {
         console.error('Error refreshing token before navigation:', error);
       });
-  }, [router, reportMgmtDetails, reportSubmissions, currentlyOpenManagement?.id, displayUnit?.id, ensureFreshTokenBeforeOperation, currentTemplate?.id]);
+  }, [router, existingSubmission, currentlyOpenManagement?.id, displayUnit?.id, ensureFreshTokenBeforeOperation, currentTemplate?.id]);
 
   // Combined function to fetch all necessary data with token refresh
   const fetchAllData = useCallback(async (forceQARefresh = false) => {
@@ -518,8 +502,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       lastFetchedUnitIdRef.current = displayUnit.id;
       lastFetchTimeRef.current = now;
       
-      // First ensure we have a fresh token
-      await ensureFreshTokenBeforeOperation();
+      // Only ensure fresh token if we're forcing refresh or haven't checked recently
+      if (forceQARefresh || now - lastFetchTimeRef.current > 30000) { // 30 seconds
+        await ensureFreshTokenBeforeOperation();
+      }
       
       // Step 1: Fetch reports data
       await dispatch(fetchReportsByUnitId(displayUnit.id));
@@ -528,9 +514,20 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       await dispatch(fetchReportSubmissions());
       
       // Step 3: Check if we need to initialize QA data
-      // Use the currently open management period
-      const currentReportMgmt = reportMgmtDetails?.[0] || null;
-      const currentManagement = currentlyOpenManagement;
+      // Get current template and management from the updated state
+      const currentState = (dispatch as any).getState?.() || {};
+      const currentReportMgmtDetails = currentState.reportsNew?.reports || [];
+      const currentSubmissions = currentState.reportsNew?.reportSubmissions || [];
+      
+      // Find the current template and management
+      const currentTemplate = currentReportMgmtDetails.find((report: any) => 
+        report.template?.unit_level_id === displayUnit.Level_id
+      )?.template;
+      
+      const currentManagement = currentTemplate ? 
+        findCurrentlyOpenManagement(currentReportMgmtDetails.find((report: any) => 
+          report.template?.id === currentTemplate.id
+        )?.managements || []) : null;
       
       if (!currentTemplate?.id || !currentManagement) {
         return;
@@ -568,21 +565,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     } catch (error) {
       console.error('[ReportsView] Error in fetchAllData:', error);
     }
-  }, [displayUnit?.id, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [displayUnit?.id, displayUnit?.Level_id, dispatch, ensureFreshTokenBeforeOperation]);
 
-  // Ensure we have a fresh token when the component mounts
-  useEffect(() => {
-    refreshTokenIfNeeded();
-  }, [refreshTokenIfNeeded]);
+
 
   // Only trigger fetch on unit change or force
   useEffect(() => {
     if (displayUnit?.id) {
-      if (lastFetchedUnitIdRef.current !== displayUnit.id) {
+      // Only fetch if we haven't fetched for this unit recently
+      const now = Date.now();
+      if (lastFetchedUnitIdRef.current !== displayUnit.id || now - lastFetchTimeRef.current > 5000) {
+        console.log('[ReportsView] Unit changed or timeout reached, fetching data');
         lastFetchedUnitIdRef.current = null;
         lastFetchTimeRef.current = 0;
+        fetchAllData(true);
       }
-      fetchAllData(true);
     }
     return () => {
       highlightedSubmissionsRef.current.clear();
@@ -592,9 +589,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       lastMgmtIdRef.current = null;
       lastFetchedUnitIdRef.current = null;
       lastFetchTimeRef.current = 0;
-      submissionCreationAttemptedRef.current = null;
     };
-  }, [displayUnit?.id, fetchAllData]);
+  }, [displayUnit?.id]);
   
   // Always fetch on focus to ensure fresh data
   useFocusEffect(
@@ -603,19 +599,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       shouldResetHighlightedRef.current = true;
       if (displayUnit?.id) {
         console.log('[ReportsView] Fetching data on focus for unit:', displayUnit.id);
-        refreshTokenIfNeeded()
-          .then(() => fetchAllData(true)) // Force refresh on focus
+        // Only refresh token if needed, don't force it
+        fetchAllData(true) // Force refresh on focus
           .catch(error => {
-            console.error('[ReportsView] Error refreshing token on focus:', error);
-            dispatch(logout());
+            console.error('[ReportsView] Error fetching data on focus:', error);
+            // Don't logout on fetch error, let the user retry
           });
       } else {
         console.log('[ReportsView] No display unit ID available on focus');
       }
       return () => {
-        // Cleanup function when screen loses focus (optional)
+        console.log('[ReportsView] Screen losing focus');
       };
-    }, [displayUnit?.id, fetchAllData, refreshTokenIfNeeded])
+    }, []) // Remove displayUnit?.id dependency to prevent infinite loop
   );
   
   // Effect to highlight the latest submission when reportSubmissions changes
@@ -679,11 +675,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // If no currently open management, fall back to the most recent one
   const currentManagement = currentlyOpenManagement;
   
-  // Calculate progress for the existing submission if it exists, otherwise use 0
-  const submissionId = existingSubmission?.id || null;
+  // Calculate progress for the active submission
+  // Prioritize currentSubmissionId from QA state, fallback to existingSubmission.id
+  const activeSubmissionId = currentSubmissionId || existingSubmission?.id || null;
   const completionPercentage = useSelector((state: any) => 
-    submissionId ? (selectOverallProgressForSubmission(state, submissionId) || 0) : 0
+    activeSubmissionId ? (selectOverallProgressForSubmission(state, activeSubmissionId) || 0) : 0
   );
+
+  // Determine progress color based on completion percentage
+  const getProgressColor = (percentage: number) => {
+    if (percentage < 30) return '#DC2626'; // Decent red
+    if (percentage < 70) return '#F59E0B'; // Yellow
+    return '#10B981'; // Green
+  };
   const daysRemaining = currentManagement
     ? Math.ceil(
         (new Date(currentManagement.reporting_end_date).getTime() - new Date().getTime()) /
@@ -701,15 +705,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     );
   }
 
-  // Render QA loading state separately
-  if (qaState.status === 'loading') {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <UrduText style={styles.loadingText}>رپورٹ ڈیٹا لوڈ ہو رہا ہے...</UrduText>
-      </View>
-    );
-  }
+  // Don't block the UI if QA is loading - let the reports screen show
+  // The QA data will load in the background
+  // if (qaState.status === 'loading') {
+  //   return (
+  //     <View style={[styles.container, styles.loadingContainer]}>
+  //       <ActivityIndicator size="large" color={COLORS.primary} />
+  //       <UrduText style={styles.loadingText}>رپورٹ ڈیٹا لوڈ ہو رہا ہے...</UrduText>
+  //     </View>
+  //   );
+  // }
 
   // Render error state
   if (error || qaState.error) {
@@ -794,10 +799,20 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                           }
                         }
                         
-                        // Format unit name with level: "Level Name: Unit Name" or just "Unit Name" if no level
-                        return unitLevelName 
-                          ? `${unitLevelName}: ${displayUnit?.Name || 'نامعلوم'}`
-                          : displayUnit?.Name || 'نامعلوم';
+                        // Format unit name with level and description: "Level Name: Unit Name - Unit Description"
+                        const unitName = displayUnit?.Name || '';
+                        const unitDescription = displayUnit?.Description || '';
+                        
+                        let formattedUnitName = unitLevelName 
+                          ? `${unitLevelName}: ${unitName}`
+                          : unitName;
+                          
+                        // Append description if available
+                        if (unitDescription && unitDescription.trim()) {
+                          formattedUnitName += ` - ${unitDescription}`;
+                        }
+                        
+                        return formattedUnitName;
                       })()}
                     </UrduText>
                   </View>
@@ -851,20 +866,30 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
                   </View>
                 </View>
+                {/* Debug Info for Active Report
+                <View style={styles.debugContainer}>
+                  <UrduText style={styles.debugText}>
+                    DEBUG: Submission ID: {existingSubmission?.id || 'NULL'} | Template: {currentTemplate?.id || 'NULL'} | Mgmt: {currentlyOpenManagement?.id || 'NULL'} | Unit: {displayUnitId}
+                  </UrduText>
+                </View> */}
+                
                 <View style={styles.progressContainer}>
                   <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+                    <View 
+                      style={[
+                        styles.progressFill, 
+                        { 
+                          width: `${completionPercentage}%`,
+                          backgroundColor: getProgressColor(completionPercentage)
+                        }
+                      ]} 
+                    />
                   </View>
                 </View>
                 {/* Debug mode: Show submission ID for current report */}
-                {/* {existingSubmission?.id && (
-                  <View style={styles.debugContainer}>
-                    <UrduText style={styles.debugText}>Current Submission ID: {existingSubmission.id}</UrduText>
-                    <UrduText style={styles.debugText}>Management ID: {currentlyOpenManagement?.id}</UrduText>
-                    <UrduText style={styles.debugText}>Template ID: {currentTemplate?.id}</UrduText>
-                    <UrduText style={styles.debugText}>Progress: {completionPercentage}% {completionPercentage === 0 ? '(No answers found)' : ''}</UrduText>
-                  </View>
-                )} */}
+                <View style={styles.debugContainer}>
+                  <UrduText style={styles.debugText}>Existing Submission ID: {existingSubmission?.id || 'NULL'}, QA Current Submission ID: {currentSubmissionId || 'NULL'}, Active Submission ID: {activeSubmissionId || 'NULL'}, Management ID: {currentlyOpenManagement?.id || 'NULL'}, Template ID: {currentTemplate?.id || 'NULL'}, Progress: {completionPercentage}% {completionPercentage === 0 ? '(No answers found)' : ''}</UrduText>
+                </View>
               </>
             ) : (
               <View style={styles.noReportsContainer}>
@@ -923,10 +948,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 }
               }
               
-              // Format unit name with level: "Level Name: Unit Name" or just "Unit Name" if no level
-              const unitNameWithLevel = unitLevelName 
-                ? `${unitLevelName}: ${submission.unitDetails?.Name || 'نامعلوم'}`
-                : submission.unitDetails?.Name || 'نامعلوم';
+              // Format unit name with level and description: "Level Name: Unit Name - Unit Description"
+              const unitName = submission.unitDetails?.Name || '';
+              const unitDescription = submission.unitDetails?.Description || '';
+              
+              let unitNameWithLevel = unitLevelName 
+                ? `${unitLevelName}: ${unitName}`
+                : unitName;
+                
+              // Append description if available
+              if (unitDescription && unitDescription.trim()) {
+                unitNameWithLevel += ` - ${unitDescription}`;
+              }
               
               // Check if this is the latest submission to highlight
               const isLatestSubmission = submission.id === latestSubmissionId;
@@ -1014,7 +1047,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 style={styles.noReportImage}
                 resizeMode="contain"
               />
-              <UrduText style={styles.noReportText}>اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔</UrduText>
+              <UrduText style={styles.noReportText}>اس وقت کوئی رپورٹ موجود نہیں ہے۔</UrduText>
             </View>
           )}
         </View>
@@ -1062,7 +1095,7 @@ const styles = StyleSheet.create({
     lineHeight: 40,
   },
   reportSummaryItemValue: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     marginBottom: SPACING.xs,
     lineHeight: 40,
@@ -1082,13 +1115,13 @@ const styles = StyleSheet.create({
   progressBar: {
     width: '100%',
     height: SIZES.button.height / 4,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.shadow,
     borderRadius: BORDER_RADIUS.sm,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.tertiary,
     borderRadius: BORDER_RADIUS.sm,
+    // backgroundColor is now set dynamically based on completion percentage
   },
   reportSection: {
     backgroundColor: COLORS.background,

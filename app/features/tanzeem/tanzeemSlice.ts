@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';

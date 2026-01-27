@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   selectedBadgeText: {
-    color: COLORS.primary,
+    color: COLORS.white,
     fontWeight: '600',
   },
 });

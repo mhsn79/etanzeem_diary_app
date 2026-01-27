@@ -495,7 +495,7 @@ const AllReportsScreen: React.FC = () => {
         ) : (
           <View style={styles.noReportsContainer}>
             <Image source={COMMON_IMAGES.noReport} style={styles.noReportImage} resizeMode="contain" />
-            <UrduText style={styles.noReportText}>اس وقت کوئی فعال رپورٹ موجود نہیں ہے۔</UrduText>
+            <UrduText style={styles.noReportText}>اس وقت کوئی رپورٹ موجود نہیں ہے۔</UrduText>
           </View>
         )}
 

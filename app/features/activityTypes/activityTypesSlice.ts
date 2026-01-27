@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import  { directApiRequest } from '../../services/apiClient';
 
 // Define the ActivityType interface

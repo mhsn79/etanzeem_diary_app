@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import apiRequest, { directApiRequest } from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import { calculateAverageSectionProgress } from './utils';
@@ -160,8 +160,11 @@ export const initializeReportData = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/initializeReportData', async (params, { dispatch, rejectWithValue }) => {
   try {
+    // console.log('[QA] initializeReportData thunk called with params:', params);
+    
     // Validate required fields
     if (!params.template_id || !params.unit_id || !params.mgmt_id) {
+      // console.error('[QA] Missing required fields:', { template_id: params.template_id, unit_id: params.unit_id, mgmt_id: params.mgmt_id });
       return rejectWithValue('Missing required fields for report initialization');
     }
     
@@ -205,34 +208,35 @@ export const initializeReportData = createAsyncThunk<
         ]
       };
       
+      console.log('[QA] Searching for existing submission with filter:', filter);
+      
       const existingSubmissionsResponse = await directApiRequest<{ data: ReportSubmission[] }>(
         '/items/reports_submissions',
         'GET',
         { filter }
       );
       
-      // Step 2: Use existing submission or create a new one
+      console.log('[QA] Found submissions:', existingSubmissionsResponse?.data?.map(s => ({
+        id: s.id,
+        template_id: s.template_id,
+        unit_id: s.unit_id,
+        mgmt_id: s.mgmt_id,
+        status: s.status
+      })));
+      
+      // Step 2: Use existing submission or reject if none exists
       if (existingSubmissionsResponse?.data && existingSubmissionsResponse.data.length > 0) {
         submission = existingSubmissionsResponse.data[0];
+        console.log('[QA] Using existing submission:', {
+          submissionId: submission.id,
+          templateId: submission.template_id,
+          unitId: submission.unit_id,
+          mgmtId: submission.mgmt_id,
+          status: submission.status
+        });
       } else {
-        const submissionData = {
-          template_id: params.template_id,
-          unit_id: params.unit_id,
-          mgmt_id: params.mgmt_id,
-          status: 'draft',
-        };
-        
-        submission = await apiRequest<ReportSubmission>(() => ({
-          path: '/items/reports_submissions',
-          method: 'POST',
-          body: JSON.stringify(submissionData),
-          headers: { 'Content-Type': 'application/json' },
-        }));
-        
-        if (!submission.id) {
-          console.error('New submission created but missing ID:', submission);
-          return rejectWithValue('Created submission is missing an ID');
-        }
+        console.error('[QA] No existing submission found for the given parameters');
+        return rejectWithValue('No existing submission found for the given parameters');
       }
     }
     
@@ -307,12 +311,21 @@ export const initializeReportData = createAsyncThunk<
     }
     
     // Return all the fetched data
-    return {
+    const result = {
       submission,
       sections,
       questions,
       answers
     };
+    
+    console.log('[QA] initializeReportData thunk completed successfully:', {
+      submissionId: submission.id,
+      sectionsCount: sections.length,
+      questionsCount: questions.length,
+      answersCount: answers.length
+    });
+    
+    return result;
   } catch (error: any) {
     console.error('Error in initializeReportData:', error);
     return rejectWithValue(error.message || 'Failed to initialize report data');
@@ -353,7 +366,14 @@ export const saveAnswer = createAsyncThunk<
     const state = getState();
     const submissionId = answerData.submission_id || state.qa.currentSubmissionId;
     
+    console.log('[QA] saveAnswer called with:', {
+      answerData,
+      currentSubmissionId: state.qa.currentSubmissionId,
+      finalSubmissionId: submissionId
+    });
+    
     if (!submissionId) {
+      console.error('[QA] No submission ID available for saving answer');
       return rejectWithValue('No submission ID available. Please initialize the report first.');
     }
     
@@ -550,7 +570,9 @@ const qaSlice = createSlice({
     
     // Clear answers for fresh loading
     clearAnswers: (state) => {
+      console.log('[QA] clearAnswers called - clearing currentSubmissionId');
       state.answers = initialAnswersState;
+      state.currentSubmissionId = null;
       state.progress = {};
     },
     
@@ -580,9 +602,11 @@ const qaSlice = createSlice({
     builder
       .addCase(initializeReportData.pending, (state) => {
         state.status = 'loading';
-        // Clear previous answers to ensure we load fresh data for the new submission
+        // Clear previous answers and submission ID to ensure we load fresh data for the new submission
         state.answers = initialAnswersState;
+        state.currentSubmissionId = null;
         state.progress = {};
+        console.log('[QA] initializeReportData.pending - cleared currentSubmissionId');
       })
       .addCase(initializeReportData.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -595,6 +619,16 @@ const qaSlice = createSlice({
             state.submissions.allIds.push(submission.id);
           }
           state.currentSubmissionId = submission.id;
+          
+          console.log('[QA] Initialized with submission ID:', {
+            submissionId: submission.id,
+            answersCount: action.payload.answers.length,
+            questionsCount: action.payload.questions.length,
+            sectionsCount: action.payload.sections.length,
+            currentSubmissionId: state.currentSubmissionId
+          });
+        } else {
+          console.error('[QA] Submission missing ID in fulfilled reducer');
         }
         
         // Store the sections
@@ -612,6 +646,7 @@ const qaSlice = createSlice({
       .addCase(initializeReportData.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Failed to initialize report data';
+        console.error('[QA] initializeReportData.rejected:', action.payload);
       })
       
       // Handle saveAnswer

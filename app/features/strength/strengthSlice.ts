@@ -4,7 +4,7 @@ import {
   PayloadAction,
   createSelector,
 } from '@reduxjs/toolkit';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch } from '../../store/types';
 import apiRequest, { directApiRequest } from '../../services/apiClient';
 
 // Types
@@ -15,6 +15,7 @@ export interface StrengthType {
   Gender: string; // "M", "F", "NA"
   Category: string; // "workforce", "place", "magazine"
   Reporting_Unit_Level: number;
+  sort?: number | null; // Sort order for display
 }
 
 export interface StrengthRecord {
@@ -538,9 +539,24 @@ export const selectStrengthByCategory = createSelector(
     // Define the order of categories
     const categoryOrder = ['workforce', 'place', 'magazine'];
     
-    // Group types by category
+    // Group types by category and sort within each category
     const byCategory = categoryOrder.reduce((acc, category) => {
-      acc[category] = types.filter(type => type.Category === category);
+      const categoryTypes = types.filter(type => type.Category === category);
+      
+      // Sort by 'sort' field first, then by 'id'
+      acc[category] = categoryTypes.sort((a, b) => {
+        // Handle null/undefined sort values by treating them as 0
+        const sortA = a.sort ?? 0;
+        const sortB = b.sort ?? 0;
+        
+        if (sortA !== sortB) {
+          return sortA - sortB;
+        }
+        
+        // If sort values are equal, sort by id
+        return a.id - b.id;
+      });
+      
       return acc;
     }, {} as Record<string, StrengthType[]>);
     

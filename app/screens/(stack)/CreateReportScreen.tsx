@@ -93,6 +93,17 @@ const CreateReportScreen = () => {
   const submitStatus = useSelector(selectSubmitStatus);
   const submitError = useSelector(selectSubmitError);
   const currentSubmissionId = useSelector(selectCurrentSubmissionId);
+  
+  // // Debug currentSubmissionId changes
+  // useEffect(() => {
+  //   console.log('[CreateReportScreen] currentSubmissionId changed:', {
+  //     currentSubmissionId,
+  //     submissionId,
+  //     templateId,
+  //     unitId,
+  //     managementId
+  //   });
+  // }, [currentSubmissionId, submissionId, templateId, unitId, managementId]);
 
   // Get submission-specific answers
   const submissionAnswers = useSelector((state) => 
@@ -188,18 +199,35 @@ const CreateReportScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       // Clear answers when screen comes into focus to ensure clean state
-      dispatch(clearAnswers());
+      if (submissionId && currentSubmissionId !== submissionId) {
+        console.log('[CreateReportScreen] Clearing QA state for new submission:', {
+          currentSubmissionId,
+          newSubmissionId: submissionId
+        });
+        dispatch(clearAnswers());
+      }
       
       ensureFreshToken()
         .catch((error) => {
           dispatch(setError('Your session has expired. Please log in again.'));
           router.replace('/screens/LoginScreen');
         });
-    }, [dispatch])
+    }, [dispatch, submissionId, currentSubmissionId])
   );
 
   // Ensure we have a fresh token before initializing report data
   useEffect(() => {
+    console.log('[CreateReportScreen] Initializing with params:', {
+      submissionId,
+      templateId,
+      unitId,
+      managementId,
+      mode,
+      isEditMode,
+      isViewMode,
+      currentSubmissionId
+    });
+    
     // If we're in edit or view mode and have a submissionId, we need to load existing data
     if ((isEditMode || isViewMode) && submissionId) {
       // Always initialize with the existing submission ID to get fresh data
@@ -211,11 +239,11 @@ const CreateReportScreen = () => {
           submission_id: submissionId
         };
         
+        console.log('[CreateReportScreen] Loading existing submission with params:', initParams);
+        
         // First ensure we have a fresh token
         ensureFreshTokenBeforeOperation()
           .then(() => {
-            // Clear previous answers to ensure clean state
-            dispatch(clearAnswers());
             // Then initialize the report data with the existing submission ID
             return dispatch(initializeReportData(initParams)).unwrap();
           })
@@ -253,11 +281,9 @@ const CreateReportScreen = () => {
       // First ensure we have a fresh token
       ensureFreshTokenBeforeOperation()
         .then(() => {
-          // Clear previous answers to ensure clean state
-          dispatch(clearAnswers());
           // Then initialize the report data
-                  return dispatch(initializeReportData(initParams)).unwrap();
-      })
+          return dispatch(initializeReportData(initParams)).unwrap();
+        })
       .then((result) => {
         console.log('[CreateReportScreen] Report data initialized successfully:', {
           submissionId: result.submission.id,
@@ -286,8 +312,23 @@ const CreateReportScreen = () => {
 
   // Handle answer changes
   const handleAnswerChange = useCallback((questionId: number, value: string | number) => {
+    console.log('[CreateReportScreen] handleAnswerChange called:', {
+      questionId,
+      value,
+      currentSubmissionId,
+      templateId,
+      unitId,
+      managementId
+    });
+    
     if (!currentSubmissionId) {
-      console.error('رپورٹ ابھی تک شروع نہیں ہوئی ہے');
+      console.error('[CreateReportScreen] No currentSubmissionId available:', {
+        currentSubmissionId,
+        templateId,
+        unitId,
+        managementId,
+        submissionId
+      });
       return;
     }
     
@@ -402,6 +443,13 @@ const CreateReportScreen = () => {
           style={styles.scrollContainer} 
           contentContainerStyle={{ paddingBottom: SPACING.xl * 2 }}
         >
+          {/* Debug Info */}
+          <View style={styles.debugContainer}>
+            <UrduText style={styles.debugText}>
+              DEBUG: Submission ID: {currentSubmissionId || 'NULL'} | Params: {submissionId || 'NULL'} | Template: {templateId} | Unit: {unitId} | Mgmt: {managementId}
+            </UrduText>
+          </View>
+          
           <View style={styles.headerInfoContainer}>
             <FormInput
               inputTitle="تنظیمی یونٹ"
@@ -426,6 +474,7 @@ const CreateReportScreen = () => {
             onAnswerChange={handleAnswerChange}
             disabled={isViewMode}
             currentUnitId={unitId}
+            submissionId={currentSubmissionId}
           />
         </ScrollView>
 
@@ -585,6 +634,20 @@ const styles = StyleSheet.create({
   successText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.success,
+  },
+  debugContainer: {
+    backgroundColor: COLORS.warning + '20',
+    padding: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  debugText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.warning,
+    fontFamily: 'SpaceMono-Regular',
   },
 });
 

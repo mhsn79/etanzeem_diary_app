@@ -55,7 +55,7 @@ import {
   createStrengthRecord,
   selectUserUnitId
 } from '@/app/features/strength/strengthSlice';
-import { AppDispatch, RootState } from '@/app/store';
+import { AppDispatch, RootState } from '@/app/store/types';
 
 // Theme and constants
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '../constants/theme';
@@ -552,7 +552,7 @@ export default function Workforce() {
     typeId: undefined as number | undefined
   });
 
-  // Calculate counts based on contact types
+  // Calculate counts based on contact types (excluding archived persons)
   const counts = useMemo(() => {
     if (!persons.length || !contactTypes.length) {
       return {
@@ -564,16 +564,19 @@ export default function Workforce() {
       };
     }
     
+    // Filter out archived persons
+    const activePersons = persons.filter(person => person.status !== 'archived');
+    
     const result = {
       rukun: 0,
       karkun: 0,
       umeedwar: 0,
       others: 0,
-      total: persons.length
+      total: activePersons.length
     };
     
     contactTypes.forEach(type => {
-      const count = persons.filter(person => person.contact_type === type.id).length;
+      const count = activePersons.filter(person => person.contact_type === type.id).length;
       if (type.type === 'rukun' || type.type === 'karkun' || type.type === 'umeedwar') {
         result[type.type] = count;
       } else {
@@ -597,11 +600,11 @@ export default function Workforce() {
 
   // Get category labels from strength types
   const getCategoryLabel = useCallback((category: string) => {
-    if (!strengthTypes.length) {
+    // if (!strengthTypes.length) {
       // Fallback to hardcoded labels if no strength types available
       switch (category) {
         case 'workforce':
-          return 'قوت کی تفصیل';
+          return 'افرادی قوت کی تفصیل';
         case 'place':
           return 'مقامات کی تفصیل';
         case 'magazine':
@@ -609,28 +612,28 @@ export default function Workforce() {
         default:
           return category;
       }
-    }
+    // }
     
-    // Find strength types for this category
-    const categoryTypes = strengthTypes.filter(type => type.Category === category);
+    // // Find strength types for this category
+    // const categoryTypes = strengthTypes.filter(type => type.Category === category);
     
-    if (categoryTypes.length === 0) {
-      // Fallback to hardcoded labels if no types found for this category
-      switch (category) {
-        case 'workforce':
-          return 'قوت کی تفصیل';
-        case 'place':
-          return 'مقامات کی تفصیل';
-        case 'magazine':
-          return 'رسائل کی تفصیل';
-        default:
-          return category;
-      }
-    }
+    // if (categoryTypes.length === 0) {
+    //   // Fallback to hardcoded labels if no types found for this category
+    //   switch (category) {
+    //     case 'workforce':
+    //       return 'قوت کی تفصیل';
+    //     case 'place':
+    //       return 'مقامات کی تفصیل';
+    //     case 'magazine':
+    //       return 'رسائل کی تفصیل';
+    //     default:
+    //       return category;
+    //   }
+    // }
     
-    // Use the Name_Plural from the first type in this category
-    const firstType = categoryTypes[0];
-    return `${firstType.Name_Plural} کی تفصیل`;
+    // // Use the Name_Plural from the first type in this category
+    // const firstType = categoryTypes[0];
+    // return `${firstType.Name_Plural} کی تفصیل`;
   }, [strengthTypes]);
 
   // Calculate annual target (placeholder for actual calculation)
@@ -660,6 +663,11 @@ export default function Workforce() {
   // Handle back navigation
   const handleBack = useCallback(() => {
     router.back();
+  }, [router]);
+
+  // Handle navigation to Arkan screen
+  const handleNavigateToArkan = useCallback(() => {
+    router.push('/screens/(tabs)/Arkan');
   }, [router]);
 
   // Render loading state
@@ -744,7 +752,13 @@ export default function Workforce() {
         <View style={styles.topContainer}>
           <View style={styles.quwatContainer}>
              {/* Karkun Count */}
-             <View style={styles.quwatBox}>
+             <Pressable 
+               style={styles.quwatBox}
+               onPress={handleNavigateToArkan}
+               accessibilityRole="button"
+               accessibilityLabel={`${i18n.t('karkun')} - ${i18n.t('view_list')}`}
+               accessibilityHint={i18n.t('navigate_to_arkan_screen')}
+             >
               <Image 
                 source={require('../../assets/images/red-target-icon.png')} 
                 style={styles.quwatIcon}
@@ -752,10 +766,16 @@ export default function Workforce() {
               />
               <Text style={styles.quwatValue}>{counts.karkun}</Text>
               <UrduText style={styles.quwatText}>{i18n.t('karkun')}</UrduText>
-            </View>
+            </Pressable>
          
               {/* Umeedwar Count */}
-              <View style={styles.quwatBox}>
+              <Pressable 
+                style={styles.quwatBox}
+                onPress={handleNavigateToArkan}
+                accessibilityRole="button"
+                accessibilityLabel={`${i18n.t('umeedwar')} - ${i18n.t('view_list')}`}
+                accessibilityHint={i18n.t('navigate_to_arkan_screen')}
+              >
               <Image 
                 source={require('../../assets/images/yellow-arkan-icon.png')} 
                 style={styles.quwatIcon}
@@ -763,10 +783,16 @@ export default function Workforce() {
               />
               <Text style={styles.quwatValue}>{counts.umeedwar}</Text>
               <UrduText style={styles.quwatText}>{i18n.t('umeedwar')}</UrduText>
-            </View>
+            </Pressable>
                        {/* Rukun Count */}
 
-            <View style={styles.quwatBox}>
+            <Pressable 
+              style={styles.quwatBox}
+              onPress={handleNavigateToArkan}
+              accessibilityRole="button"
+              accessibilityLabel={`${i18n.t('rukun')} - ${i18n.t('view_list')}`}
+              accessibilityHint={i18n.t('navigate_to_arkan_screen')}
+            >
               <Image 
                 source={require('../../assets/images/green-arkan-icon.png')} 
                 style={styles.quwatIcon}
@@ -774,13 +800,13 @@ export default function Workforce() {
               />
               <Text style={styles.quwatValue}>{counts.rukun}</Text>
               <UrduText style={styles.quwatText}>{i18n.t('rukun')}</UrduText>
-            </View>
+            </Pressable>
           
           </View>
           
-          <Link href="/screens/Arkan" style={styles.arkanLink}>
+          {/* <Link href="/screens/Arkan" style={styles.arkanLink}>
             {i18n.t('view_list_of_arkan') || "View List of Arkan"}
-          </Link>
+          </Link> */}
         </View>
 
       
@@ -845,7 +871,7 @@ const styles = StyleSheet.create({
   // Top section with stats
   topContainer: {
     backgroundColor: COLORS.primary,
-    height: "22%",
+    height: "15%",
     borderBottomLeftRadius: BORDER_RADIUS.lg,
     borderBottomRightRadius:BORDER_RADIUS.lg,
     alignItems: 'center',
