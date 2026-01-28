@@ -190,10 +190,10 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   }, [reportMgmtDetails, currentSubmissionId, reportSubmissions]);
 
   // Fetch contacts for popup
-  const fetchContactsForPopup = useCallback(async () => {
+  const fetchContactsForPopup = useCallback(async (): Promise<Person[]> => {
     if (!question.linked_to_id) {
       setContactsError('linked_to_id میسر نہیں ہے');
-      return;
+      return [];
     }
 
     setContactsLoading(true);
@@ -298,23 +298,26 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       if (response.data) {
         // console.log('[AutoQuestionInput] Setting contacts list with', response.data.length, 'items');
         setContactsList(response.data);
+        return response.data;
       } else {
         // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setContactsList([]);
+        return [];
       }
     } catch (error: any) {
       console.error('Error fetching contacts:', error);
       setContactsError(`${getContactTypeLabel()} حاصل کرنے میں ناکامی`);
+      return [];
     } finally {
       setContactsLoading(false);
     }
   }, [question.linked_to_id, question.aggregate_func, getCurrentReportingPeriod, userUnitDetails?.id, currentUnitId]);
 
   // Fetch activities for popup
-  const fetchActivitiesForPopup = useCallback(async () => {
+  const fetchActivitiesForPopup = useCallback(async (): Promise<Activity[]> => {
     if (!question.linked_to_id) {
       setActivitiesError('linked_to_id میسر نہیں ہے');
-      return;
+      return [];
     }
 
     setActivitiesLoading(true);
@@ -370,13 +373,16 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       if (response.data) {
         // console.log('[AutoQuestionInput] Setting activities list with', response.data.length, 'items');
         setActivitiesList(response.data);
+        return response.data;
       } else {
         // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setActivitiesList([]);
+        return [];
       }
     } catch (error: any) {
       console.error('Error fetching activities:', error);
       setActivitiesError(`${getActivityTypeLabel()} حاصل کرنے میں ناکامی`);
+      return [];
     } finally {
       setActivitiesLoading(false);
     }
@@ -593,8 +599,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         }
       } else if (question.linked_to_type === 'contacts') {
         // For contacts, fetch data first then calculate
-        await fetchContactsForPopup();
-        const contactsCount = contactsList.length;
+        const contacts = await fetchContactsForPopup();
+        const contactsCount = contacts.length;
         if (question.aggregate_func === 'total' || question.aggregate_func === 'count') {
           result = contactsCount;
           setCalculationSuccess(`${getContactTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
@@ -607,8 +613,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         }
       } else if (question.linked_to_type === 'activity') {
         // For activities, fetch data first then calculate
-        await fetchActivitiesForPopup();
-        const activitiesCount = activitiesList.length;
+        const activities = await fetchActivitiesForPopup();
+        const activitiesCount = activities.length;
         if (question.aggregate_func === 'total' || question.aggregate_func === 'count') {
           result = activitiesCount;
           setCalculationSuccess(`${getActivityTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);

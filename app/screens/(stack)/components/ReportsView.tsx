@@ -821,7 +821,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                       {currentManagement?.reporting_end_date 
                         ? formatExpectedCompletion(currentManagement.reporting_end_date)
                         : existingSubmission?.date_created
-                          ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK')
+                          ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                            })
                           : 'تاریخ دستیاب نہیں'
                       }
                     </UrduText>
@@ -924,7 +928,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
           {filteredSubmissions.length > 0 ? (
             filteredSubmissions.slice(0, 3).map((submission, index) => {
               const formattedDate = submission.date_created
-                ? new Date(submission.date_created).toLocaleDateString('ur-PK')
+                ? new Date(submission.date_created).toLocaleDateString('ur-PK', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                  })
                 : 'تاریخ دستیاب نہیں';
               const management = reportMgmtDetails
                 .flatMap((r) => r.managements)

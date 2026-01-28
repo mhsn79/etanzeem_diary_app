@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store/types';
 import { fetchNazimDetails } from '../persons/personSlice';
-import { fetchTanzeemLevelById } from './tanzeemSlice';
+import { fetchTanzeemLevelById, selectAllTanzeemiUnits } from './tanzeemSlice';
 import { TanzeemiUnit, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { Person, PersonResponse } from '@/app/models/Person';
 import { normalizeTanzeemiUnitData, normalizePersonData } from '@/app/utils/apiNormalizer';
@@ -341,21 +341,103 @@ export const selectSubordinateUnitsDisplayText = createSelector(
 );
 
 // Selector for dropdown options (subordinate units only)
+// Falls back to all tanzeemi units if hierarchy units are not available
 export const selectSubordinateUnitsForDropdown = createSelector(
-  [selectAllHierarchyUnits],
-  (hierarchyUnits) => {
+  [
+    selectAllHierarchyUnits, 
+    selectUserUnitId, 
+    (state: RootState) => state.tanzeem?.levelsById || {},
+    (state: RootState) => state.tanzeem?.userUnitDetails || null,
+    selectAllTanzeemiUnits // Fallback: get all units from tanzeem slice if hierarchy is empty
+  ],
+  (hierarchyUnits, userUnitId, levelsById, userUnitDetails, allTanzeemiUnits) => {
     console.log('selectSubordinateUnitsForDropdown - hierarchyUnits:', hierarchyUnits?.length || 0, 'units');
     console.log('selectSubordinateUnitsForDropdown - hierarchyUnits data:', hierarchyUnits);
+    console.log('selectSubordinateUnitsForDropdown - userUnitId:', userUnitId);
+    console.log('selectSubordinateUnitsForDropdown - allTanzeemiUnits fallback:', allTanzeemiUnits?.length || 0, 'units');
     
-    if (!hierarchyUnits || hierarchyUnits.length <= 1) return [];
+    // Use hierarchy units if available (more than 1 unit), otherwise fall back to all tanzeemi units
+    const unitsToProcess = (hierarchyUnits && hierarchyUnits.length > 1) 
+      ? hierarchyUnits 
+      : (allTanzeemiUnits && allTanzeemiUnits.length > 0 ? allTanzeemiUnits : []);
     
-    const dropdownOptions = hierarchyUnits
-      .slice(1) // Skip the first unit (user's own unit)
-      .map(unit => ({
-        id: unit.id.toString(),
-        label: unit.name || unit.Name || `Unit ${unit.id}`,
-        value: unit.id.toString()
-      }));
+    // Get current user's unit ID from either hierarchy or userUnitDetails
+    const currentUnitId = userUnitId || userUnitDetails?.id || null;
+    
+    if (!unitsToProcess || unitsToProcess.length === 0) {
+      console.log('selectSubordinateUnitsForDropdown - No units available');
+      return [];
+    }
+    
+    // Map units with level information and sort data, filtering out the current user's unit
+    const unitsWithLevelInfo = unitsToProcess
+      .filter(unit => currentUnitId && unit.id !== currentUnitId) // Explicitly filter out current user's unit
+      .map(unit => {
+        const levelId = unit.Level_id || unit.level_id;
+        const level = levelId && levelsById[levelId] ? levelsById[levelId] : null;
+        const levelName = level?.Name || level?.name || '';
+        
+        // Try multiple possible field names for unit name
+        const unitName = unit.Name || unit.name || unit.Description || unit.description || `Unit ${unit.id}`;
+        
+        // Format label: "Level Name: Unit Name" or just "Unit Name" if no level
+        const label = levelName ? `${levelName}: ${unitName}` : unitName;
+        
+        // Ensure label is never empty (fallback to unit ID if everything fails)
+        const finalLabel = label || `Unit ${unit.id}`;
+        
+        // Debug logging for first unit to understand data structure
+        if (hierarchyUnits.indexOf(unit) === 1) {
+          console.log('Sample unit data:', {
+            id: unit.id,
+            Name: unit.Name,
+            name: unit.name,
+            Description: unit.Description,
+            description: unit.description,
+            levelId,
+            levelName,
+            finalLabel
+          });
+        }
+        
+        return {
+          id: unit.id.toString(),
+          label: finalLabel,
+          value: unit.id.toString(),
+          // Sort fields for sorting
+          levelSort: level?.sort ?? null,
+          unitSort: unit.sort ?? null,
+          unitId: unit.id,
+          levelId: levelId || null,
+        };
+      });
+    
+    // Sort by level sort, then unit sort, then id
+    const sortedOptions = unitsWithLevelInfo.sort((a, b) => {
+      // First sort by level sort
+      const levelSortA = a.levelSort ?? 999999;
+      const levelSortB = b.levelSort ?? 999999;
+      if (levelSortA !== levelSortB) {
+        return levelSortA - levelSortB;
+      }
+      
+      // Then sort by unit sort
+      const unitSortA = a.unitSort ?? 999999;
+      const unitSortB = b.unitSort ?? 999999;
+      if (unitSortA !== unitSortB) {
+        return unitSortA - unitSortB;
+      }
+      
+      // Finally sort by id
+      return a.unitId - b.unitId;
+    });
+    
+    // Return only the dropdown format (id, label, value)
+    const dropdownOptions = sortedOptions.map(unit => ({
+      id: unit.id,
+      label: unit.label,
+      value: unit.value
+    }));
     
     console.log('selectSubordinateUnitsForDropdown - dropdownOptions:', dropdownOptions);
     

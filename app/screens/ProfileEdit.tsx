@@ -16,17 +16,15 @@ export default function ProfileEdit() {
   const userDetails = useSelector(selectUserDetails);
   const userDetailsStatus = useSelector(selectUserDetailsStatus);
   
-  // Local state for form fields
+  // Local state for form fields - only required fields
   const [formData, setFormData] = useState({
     name: '',
     parent: '',
-    dob: '',
-    cnic: '',
-    unit: '',
-    status: '',
+    address: '',
+    rukinat_date: '',
+    email: '',
     phone: '',
     whatsApp: '',
-    email: '',
   });
   
   // Update form data when userDetails changes
@@ -35,13 +33,11 @@ export default function ProfileEdit() {
       setFormData({
         name: userDetails.Name || userDetails.name || '',
         parent: userDetails.Father_Name || userDetails.parent || '',
-        dob: userDetails.Date_of_birth || userDetails.dob || '',
-        cnic: userDetails.CNIC || userDetails.cnic || '',
-        unit: userDetails.Tanzeemi_Unit?.toString() || userDetails.unit?.toString() || '',
-        status: userDetails.status || '',
-        phone: userDetails.Phone_Number || userDetails.phone || '',
-        whatsApp: userDetails.additional_phones || '',
+        address: userDetails.Address || userDetails.address || '',
+        rukinat_date: userDetails.Rukinat_Date || userDetails.rukinat_date || '',
         email: userDetails.Email || userDetails.email || '',
+        phone: userDetails.Phone_Number || userDetails.phone || '',
+        whatsApp: userDetails.additional_phones || userDetails.whatsApp || '',
       });
     }
   }, [userDetails]);
@@ -114,23 +110,35 @@ export default function ProfileEdit() {
               placeholder={i18n.t('parent')}
             />
             
-            <Text style={styles.textItem}>{i18n.t('dob')}</Text>
+            <Text style={styles.textItem}>{i18n.t('address')}</Text>
             <TextInput 
-              style={styles.input}
-              value={formData.dob}
-              onChangeText={(value) => handleInputChange('dob', value)}
-              placeholder={i18n.t('dob')}
+              style={[styles.input, styles.multilineInput]}
+              value={formData.address || ''}
+              onChangeText={(value) => handleInputChange('address', value)}
+              placeholder={i18n.t('address')}
+              multiline={true}
+              numberOfLines={3}
             />
             
-            <Text style={styles.textItem}>{i18n.t('cnic')}</Text>
+            <Text style={styles.textItem}>{i18n.t('rukinat_date')}</Text>
             <TextInput 
               style={styles.input}
-              value={formData.cnic}
-              onChangeText={(value) => handleInputChange('cnic', value)}
-              placeholder={i18n.t('cnic')}
+              value={formData.rukinat_date || ''}
+              onChangeText={(value) => handleInputChange('rukinat_date', value)}
+              placeholder="YYYY-MM-DD"
             />
             
             <Text style={styles.sectionTitle}>{i18n.t('contact_information')}</Text>
+            
+            <Text style={styles.textItem}>{i18n.t('email')}</Text>
+            <TextInput 
+              style={styles.input}
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              placeholder={i18n.t('email')}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
             
             <Text style={styles.textItem}>{i18n.t('phone_number')}</Text>
             <TextInput 
@@ -144,38 +152,10 @@ export default function ProfileEdit() {
             <Text style={styles.textItem}>{i18n.t('whatsapp_number')}</Text>
             <TextInput 
               style={styles.input}
-              value={formData.whatsApp}
+              value={formData.whatsApp || ''}
               onChangeText={(value) => handleInputChange('whatsApp', value)}
               placeholder={i18n.t('whatsapp_number')}
               keyboardType="phone-pad"
-            />
-            
-            <Text style={styles.textItem}>{i18n.t('email')}</Text>
-            <TextInput 
-              style={styles.input}
-              value={formData.email}
-              onChangeText={(value) => handleInputChange('email', value)}
-              placeholder={i18n.t('email')}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            
-            <Text style={styles.sectionTitle}>{i18n.t('tanzeemi_information')}</Text>
-            
-            <Text style={styles.textItem}>{i18n.t('unit')}</Text>
-            <TextInput 
-              style={styles.input}
-              value={formData.unit}
-              onChangeText={(value) => handleInputChange('unit', value)}
-              placeholder={i18n.t('unit')}
-            />
-            
-            <Text style={styles.textItem}>{i18n.t('status')}</Text>
-            <TextInput 
-              style={styles.input}
-              value={formData.status}
-              onChangeText={(value) => handleInputChange('status', value)}
-              placeholder={i18n.t('status')}
             />
             
             <View style={styles.buttonContainer}>
@@ -275,6 +255,10 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 16,
     backgroundColor: '#F9F9F9',
+  },
+  multilineInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   buttonContainer: {
     marginTop: 30,

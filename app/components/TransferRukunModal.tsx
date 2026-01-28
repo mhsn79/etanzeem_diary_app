@@ -11,8 +11,6 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { formatDate } from '../utils/dateFormat';
 
 import UrduText from './UrduText';
 import CustomDropdown, { Option } from './CustomDropdown';
@@ -63,8 +61,7 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
   const [transferType, setTransferType] = useState<'local' | 'outside'>('local');
   const [selectedLocalUnitId, setSelectedLocalUnitId] = useState<number | undefined>(undefined);
   const [cityName, setCityName] = useState<string>('');
-  const [transferDate, setTransferDate] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [reason, setReason] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -84,8 +81,7 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
       setTransferType('local');
       setSelectedLocalUnitId(undefined);
       setCityName('');
-      setTransferDate(new Date());
-      setShowDatePicker(false);
+      setReason('');
       setError('');
       setShowConfirmDialog(false);
       setShowSuccessDialog(false);
@@ -168,17 +164,9 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
     setError('');
   };
 
-  const handleDateConfirm = (selectedDate: Date) => {
-    setShowDatePicker(false);
-    setTransferDate(selectedDate);
-  };
-
-  const handleDateCancel = () => {
-    setShowDatePicker(false);
-  };
-
-  const toggleDatePicker = () => {
-    setShowDatePicker(!showDatePicker);
+  const handleReasonChange = (text: string) => {
+    setReason(text);
+    setError('');
   };
 
   const validateForm = (): boolean => {
@@ -199,9 +187,9 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
       return false;
     }
     
-    // Always validate transfer date
-    if (!transferDate) {
-      setError(i18n.t('please_select_date'));
+    // Validate reason field
+    if (!reason.trim()) {
+      setError(i18n.t('please_enter_reason') || 'براہ کرم منتقلی کی وجہ درج کریں');
       return false;
     }
     
@@ -222,14 +210,14 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
       const payload: {
         contact_id: number;
         transfer_type: 'local' | 'outside';
-        transfer_date: string;
+        reason: string;
         status: 'draft' | 'pending' | 'approved' | 'rejected';
         local_unit_id?: number;
         city_name?: string;
       } = {
         contact_id: rukunId,
         transfer_type: transferType,
-        transfer_date: formatDate(transferDate, 'yyyy-MM-dd'),
+        reason: reason.trim(),
         status: 'draft',
       };
 
@@ -237,7 +225,7 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
       if (transferType === 'local' && selectedLocalUnitId) {
         Object.assign(payload, { local_unit_id: selectedLocalUnitId });
       } else if (transferType === 'outside' && cityName) {
-        Object.assign(payload, { city_name: cityName });
+        Object.assign(payload, { city_name: cityName.trim() });
       }
 
       await dispatch(createRukunTransfer(payload)).unwrap();
@@ -364,27 +352,18 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
                 </View>
               )}
 
-              {/* Transfer Date */}
+              {/* Transfer Reason */}
               <View style={styles.fieldContainer}>
-                <UrduText style={styles.sectionLabel}>{i18n.t('transfer_date')}</UrduText>
-                <TouchableOpacity 
-                  style={styles.datePickerButton}
-                  onPress={toggleDatePicker}
-                  disabled={isLoading || hasExistingTransfer}
-                >
-                  <UrduText style={styles.dateText}>
-                    {formatDate(transferDate, 'yyyy-MM-dd')}
-                  </UrduText>
-                  <Ionicons name="calendar" size={20} color={COLORS.primary} />
-                </TouchableOpacity>
-                
-                <DateTimePickerModal
-                  isVisible={showDatePicker}
-                  mode="date"
-                  date={transferDate}
-                  onConfirm={handleDateConfirm}
-                  onCancel={handleDateCancel}
-                  minimumDate={new Date()}
+                <UrduText style={styles.sectionLabel}>{i18n.t('transfer_reason') || 'منتقلی کی وجہ'}</UrduText>
+                <TextInput
+                  style={[styles.textInput, styles.multilineInput]}
+                  value={reason}
+                  onChangeText={handleReasonChange}
+                  placeholder={i18n.t('enter_transfer_reason') || 'منتقلی کی وجہ درج کریں'}
+                  placeholderTextColor={COLORS.textSecondary}
+                  multiline={true}
+                  numberOfLines={4}
+                  editable={!isLoading && !hasExistingTransfer}
                 />
               </View>
               {/* Error Display - only show inline errors that aren't about existing transfers */}
@@ -632,19 +611,9 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
   },
-  datePickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray2,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    backgroundColor: COLORS.white,
-  },
-  dateText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.textPrimary,
+  multilineInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
   buttonContainer: {
     gap: SPACING.sm,

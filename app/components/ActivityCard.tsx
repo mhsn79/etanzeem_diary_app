@@ -66,13 +66,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   // Check if the current user is the creator of this activity
   const isCreator = useMemo(() => {
     if (!currentUser || !user_created) {
-      console.log(`Activity ${id}: User check failed - currentUser: ${currentUser?.id}, user_created: ${user_created}`);
       return false;
     }
-    console.log('=====================user',currentUser,user_created);
-    
     const result = String(currentUser.id) === String(user_created);
-    console.log(`Activity ${id}: User check - currentUser: ${currentUser.id}, user_created: ${user_created}, isCreator: ${result}`);
     return result;
   }, [currentUser, user_created, id]);
 

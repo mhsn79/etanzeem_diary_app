@@ -32,7 +32,8 @@ import {
   checkExistingTransfer,
   resetTransferStatus,
 } from '@/app/features/persons/personSlice';
-import { selectAllTanzeemiUnitsForDropdown, fetchTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { fetchTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectSubordinateUnitsForDropdown } from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
 import { COLORS, SPACING } from '@/app/constants/theme';
@@ -80,7 +81,7 @@ export default function RukunView() {
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
   const status = useAppSelector(selectPersonsStatus);
   const error = useAppSelector(selectPersonsError);
-  const tanzeemiUnitOptions = useAppSelector(selectAllTanzeemiUnitsForDropdown);
+  const tanzeemiUnitOptions = useAppSelector(selectSubordinateUnitsForDropdown);
 
   const displayPerson = person ?? rukun;
   
@@ -148,37 +149,33 @@ export default function RukunView() {
     return label.includes('rukun') || label.includes('ارکان');
   }, [contactTypeLabel]);
 
-  const detailRows = useMemo(() => {    
-    if (isDetailedContactType) {
-      // Comprehensive fields for umeedwar and rukun
-      return [
-        { label: i18n.t('father'), value: displayPerson.parent || displayPerson.Father_Name },
-        { label: i18n.t('unit'), value: displayPerson.unit || displayPerson.unit_name || displayPerson.Tanzeemi_Unit },
-        { label: i18n.t('gender'), value: displayPerson.gender || displayPerson.Gender },
-        { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
-        { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
-        { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
-        { label: i18n.t('cnic'), value: displayPerson.cnic || displayPerson.CNIC },
-        { label: i18n.t('dob'), value: displayPerson.dob || displayPerson.Date_of_birth },
-        { label: i18n.t('education'), value: displayPerson.education || displayPerson.Education },
-        { label: i18n.t('profession'), value: displayPerson.profession || displayPerson.Profession },
-        { label: i18n.t('rukn_no'), value: displayPerson.rukn_no || displayPerson.Rukn_No },
-        { label: i18n.t('rukinat_date'), value: displayPerson.rukinat_date || displayPerson.Rukinat_Date },
-        { label: i18n.t('transfer_from'), value: displayPerson.transfer_from || displayPerson.Transfer_from },
-        { label: i18n.t('transfer_to'), value: displayPerson.transfer_to || displayPerson.Transfet_to },
-      ].filter(row => row.value); // Only show rows with values
-    } else {
-      // Limited fields for karkun and others
-      return [
-        { label: i18n.t('unit'), value: displayPerson.unit || displayPerson.unit_name },
-        { label: i18n.t('unit_id'), value: displayPerson.unit_id },
-        { label: i18n.t('gender'), value: displayPerson.gender || displayPerson.Gender },
-        { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
-        { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number },
-        { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
-      ].filter(row => row.value); // Only show rows with values
-    }
-  }, [displayPerson, isDetailedContactType]);
+  const detailRows = useMemo(() => {
+    // Format date helper - only date format, no time
+    const formatDate = (dateString: string | null | undefined) => {
+      if (!dateString) return null;
+      try {
+        const date = new Date(dateString);
+        // Use toLocaleDateString with options to ensure only date is shown, no time
+        return date.toLocaleDateString('ur-PK', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        });
+      } catch (e) {
+        return dateString;
+      }
+    };
+
+    // Only show required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number
+    return [
+      { label: i18n.t('parent'), value: displayPerson.parent || displayPerson.Father_Name },
+      { label: i18n.t('address'), value: displayPerson.address || displayPerson.Address },
+      { label: i18n.t('rukinat_date'), value: formatDate(displayPerson.rukinat_date || displayPerson.Rukinat_Date) },
+      { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
+      { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
+      { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number || displayPerson.additional_phones || displayPerson.whatsApp },
+    ].filter(row => row.value); // Only show rows with values
+  }, [displayPerson]);
 
   // Get additional phone numbers if available
   const additionalPhones = displayPerson.additional_phone_numbers || [];

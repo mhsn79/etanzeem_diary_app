@@ -82,12 +82,17 @@ export default function ProfileView() {
   // Local state
   const [refreshing, setRefreshing] = useState(false);
 
-  // Format date of birth if available
+  // Format date if available - only date format, no time
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString();
+      // Use toLocaleDateString with options to ensure only date is shown, no time
+      return date.toLocaleDateString('ur-PK', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
     } catch (e) {
       console.error('Error formatting date:', e);
       return dateString;
@@ -225,30 +230,13 @@ export default function ProfileView() {
         <UrduText style={styles.personName}>{displayData.name || ''}</UrduText>
         <UrduText style={styles.personSub}>{displayData.parent || ''}</UrduText>
 
-        {/* {displayData.name && StaticField(i18n.t('name'), displayData.name)} */}
-        {/* {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)} */}
-        {/* {displayData.dob && StaticField(i18n.t('dob'), displayData.dob)} */}
-        {/* {displayData.cnic && StaticField(i18n.t('cnic'), displayData.cnic)} */}
-        {displayData.unit && StaticField(i18n.t('unit'), displayData.unit)}
-        {/* {tanzeemLevelDetails && StaticField(i18n.t('tanzeem_level'), tanzeemLevelDetails.Name)}
-        {tanzeemLevelDetails && StaticField(i18n.t('nazim_label'), tanzeemLevelDetails.Nazim_Label)}
-        {displayData.status && StaticField(i18n.t('status'), i18n.t(displayData.status))}
-        {displayData.role && StaticField(i18n.t('role'), displayData.role as string)} */}
+        {/* Only show required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number */}
+        {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)}
+        {displayData.address && StaticField(i18n.t('address'), displayData.address)}
+        {userDetails?.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(userDetails.Rukinat_Date))}
+        {displayData.email && StaticField(i18n.t('email'), displayData.email)}
         {displayData.phone && StaticField(i18n.t('phone_number'), displayData.phone)}
         {displayData.whatsApp && StaticField(i18n.t('whatsapp_number'), displayData.whatsApp)}
-        {displayData.email && StaticField(i18n.t('email'), displayData.email)}
-        {displayData.address && StaticField(i18n.t('address'), displayData.address)}
-        
-        {/* Additional fields from Person collection */}
-        {/* {userDetails?.Rukn_No && StaticField(i18n.t('rukn_no'), userDetails.Rukn_No.toString())}
-        {userDetails?.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(userDetails.Rukinat_Date))}
-        {userDetails?.Profession && StaticField(i18n.t('profession'), userDetails.Profession)}
-        {userDetails?.Education && StaticField(i18n.t('education'), userDetails.Education)}
-        {userDetails?.Gender && StaticField(i18n.t('gender'), 
-          userDetails.Gender === 'm' ? i18n.t('male') : 
-          userDetails.Gender === 'f' ? i18n.t('female') : 
-          userDetails.Gender
-        )} */}
 
         {/* <CustomDropdown
           dropdownTitle={i18n.t('language')}

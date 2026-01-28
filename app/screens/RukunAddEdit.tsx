@@ -86,15 +86,17 @@ export default function RukunAddEdit() {
   const transferError = useSelector(selectTransferError);
   
   
-  // Form state - simplified to only required fields
+  // Form state - only required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number
   const [formData, setFormData] = useState<UpdatePersonPayload | CreatePersonPayload>(() => {
     if (isEditMode && initialRukun) {
       return {
         id: initialRukun.id,
         name: initialRukun.name || initialRukun.Name || '',
+        parent: initialRukun.parent || initialRukun.Father_Name || '',
+        address: initialRukun.address || initialRukun.Address || '',
         email: initialRukun.email || initialRukun.Email || '',
-        gender: initialRukun.gender || initialRukun.Gender || 'male',
         phone: initialRukun.phone || initialRukun.Phone_Number || '',
+        whatsApp: initialRukun.whatsApp || initialRukun.additional_phones || '',
         contact_type: initialRukun.contact_type || undefined,
         tanzeemi_unit: initialRukun.Tanzeemi_Unit || undefined,
         status: initialRukun.status || 'draft',
@@ -103,14 +105,24 @@ export default function RukunAddEdit() {
       // Create mode - start with empty form
       return {
         name: '',
+        parent: '',
+        address: '',
         email: '',
-        gender: 'male',
         phone: '',
+        whatsApp: '',
         contact_type: undefined,
         tanzeemi_unit: undefined,
         status: 'draft',
       };
     }
+  });
+  
+  // Separate state for Rukinat Date (membership date)
+  const [rukinatDate, setRukinatDate] = useState<string>(() => {
+    if (isEditMode && initialRukun) {
+      return initialRukun.Rukinat_Date || initialRukun.rukinat_date || '';
+    }
+    return '';
   });
   
   // Image upload state
@@ -320,7 +332,7 @@ export default function RukunAddEdit() {
           contentContainerStyle={styles.scrollContent}
           style={styles.scrollWrapper}
         >
-          {/* Simplified Form Fields */}
+          {/* Only required fields: Name, Father's name, Address, Membership date, Email, Phone number */}
           <FormInput
             inputTitle={i18n.t('name')}
             value={formData.name || ''}
@@ -331,21 +343,38 @@ export default function RukunAddEdit() {
           />
           
           <FormInput
+            inputTitle={i18n.t('parent')}
+            value={formData.parent || ''}
+            onChange={(value) => handleChange('parent', value)}
+            placeholder={i18n.t('enter_parent_name')}
+            error={errors.parent}
+          />
+          
+          <FormInput
+            inputTitle={i18n.t('address')}
+            value={formData.address || ''}
+            onChange={(value) => handleChange('address', value)}
+            placeholder={i18n.t('enter_address')}
+            multiline={true}
+            numberOfLines={3}
+            error={errors.address}
+          />
+          
+          <FormInput
+            inputTitle={i18n.t('rukinat_date')}
+            value={rukinatDate}
+            onChange={(value) => setRukinatDate(value)}
+            placeholder="YYYY-MM-DD"
+            error={errors.rukinat_date}
+          />
+          
+          <FormInput
             inputTitle={i18n.t('email')}
             value={formData.email || ''}
             onChange={(value) => handleChange('email', value)}
             placeholder={i18n.t('enter_email')}
             keyboardType="email-address"
             error={errors.email}
-          />
-
-          <CustomDropdown
-            dropdownTitle={i18n.t('gender')}
-            options={genderOptions}
-            onSelect={handleGenderSelect}
-            selectedValue={formData.gender}
-            placeholder={i18n.t('gender')}
-            viewStyle={styles.dropdownContainer}
           />
           
           <FormInput
@@ -356,6 +385,15 @@ export default function RukunAddEdit() {
             keyboardType="phone-pad"
             error={errors.phone}
             required
+          />
+          
+          <FormInput
+            inputTitle={i18n.t('whatsapp_number')}
+            value={formData.whatsApp || ''}
+            onChange={(value) => handleChange('whatsApp', value)}
+            placeholder={i18n.t('enter_phone')}
+            keyboardType="phone-pad"
+            error={errors.whatsApp}
           />
 
           <CustomDropdown

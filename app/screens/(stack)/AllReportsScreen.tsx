@@ -336,7 +336,11 @@ const AllReportsScreen: React.FC = () => {
   const renderReportCard = useCallback(
     ({ item, index }: { item: any; index: number }) => {
       const formattedDate = item.date_created
-        ? new Date(item.date_created).toLocaleDateString('ur-PK')
+        ? new Date(item.date_created).toLocaleDateString('ur-PK', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
         : 'تاریخ دستیاب نہیں';
       const management = reportDetails
         .flatMap((r) => r.managements)

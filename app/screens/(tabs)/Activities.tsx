@@ -172,10 +172,18 @@ export default function Activities() {
         : 'غير متعين',
       attendance: activity.attendance != null ? activity.attendance.toString() : 'غير متعين',
       dateCreated: activity.date_created
-        ? new Date(activity.date_created).toLocaleDateString('ur-PK')
+        ? new Date(activity.date_created).toLocaleDateString('ur-PK', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
         : 'غير متعين',
       dateUpdated: activity.date_updated
-        ? new Date(activity.date_updated).toLocaleDateString('ur-PK')
+        ? new Date(activity.date_updated).toLocaleDateString('ur-PK', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
         : 'غير متعين',
       rawDateTime: activity.activity_date_and_time,
       user_created: activity.user_created,

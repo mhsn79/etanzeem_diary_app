@@ -115,7 +115,6 @@ export default function RukunUpdateScreen() {
     status: 'draft' as const,
     Name: '',
     Father_Name: '',
-    date_of_birth: '',
     Phone_Number: '',
     Email: '',
     Address: '',
@@ -218,30 +217,28 @@ export default function RukunUpdateScreen() {
         formDataToSet = {
           contact_id: rukun.id,
           status: statusToUse,
-          Name: dataToUse.name || '',
-          Father_Name: dataToUse.parent || '',
-          date_of_birth: dataToUse.dob || '',
-          Phone_Number: dataToUse.phone || '',
-          Email: dataToUse.email || '',
-          Address: dataToUse.address || '',
-          Profession: dataToUse.profession || '',
-          Education: dataToUse.education || '',
-          Additional_Phones: (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : ''),
+          Name: dataToUse.name || dataToUse.Name || '',
+          Father_Name: dataToUse.parent || dataToUse.Father_Name || '',
+          Phone_Number: dataToUse.phone || dataToUse.Phone_Number || '',
+          Email: dataToUse.email || dataToUse.Email || '',
+          Address: dataToUse.address || dataToUse.Address || '',
+          Profession: dataToUse.profession || dataToUse.Profession || '',
+          Education: dataToUse.education || dataToUse.Education || '',
+          Additional_Phones: dataToUse.whatsApp || dataToUse.additional_phones || (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : '') || '',
         };
       } else {
         // Using Rukn_Update table data (draft status)
         formDataToSet = {
           contact_id: rukun.id,
           status: statusToUse,
-          Name: dataToUse.Name || '',
-          Father_Name: dataToUse.Father_Name || '',
-          date_of_birth: dataToUse.date_of_birth || '',
-          Phone_Number: dataToUse.Phone_Number || '',
-          Email: dataToUse.Email || '',
-          Address: dataToUse.Address || '',
-          Profession: dataToUse.Profession || '',
-          Education: dataToUse.Education || '',
-          Additional_Phones: dataToUse.Additional_Phones || '',
+          Name: dataToUse.Name || dataToUse.name || '',
+          Father_Name: dataToUse.Father_Name || dataToUse.parent || '',
+          Phone_Number: dataToUse.Phone_Number || dataToUse.phone || '',
+          Email: dataToUse.Email || dataToUse.email || '',
+          Address: dataToUse.Address || dataToUse.address || '',
+          Profession: dataToUse.Profession || dataToUse.profession || '',
+          Education: dataToUse.Education || dataToUse.education || '',
+          Additional_Phones: dataToUse.Additional_Phones || dataToUse.whatsApp || dataToUse.additional_phones || (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : '') || '',
         };
       }
       
@@ -258,14 +255,21 @@ export default function RukunUpdateScreen() {
         return { ...formDataToSet }; // Create a new object to force re-render
       });
       
-      // Set additional phone based on source
+      // Set additional phone (WhatsApp Number) based on source
       let additionalPhoneValue = '';
       if (statusToUse === 'published') {
-        // From Person table
-        additionalPhoneValue = (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : '');
+        // From Person table - check multiple possible fields
+        additionalPhoneValue = dataToUse.whatsApp || 
+                              dataToUse.additional_phones || 
+                              (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : '') || 
+                              '';
       } else {
-        // From Rukn_Update table
-        additionalPhoneValue = dataToUse.Additional_Phones || '';
+        // From Rukn_Update table - check multiple possible fields
+        additionalPhoneValue = dataToUse.Additional_Phones || 
+                              dataToUse.whatsApp || 
+                              dataToUse.additional_phones || 
+                              (dataToUse.additional_phone_numbers && dataToUse.additional_phone_numbers.length > 0 ? dataToUse.additional_phone_numbers[0] : '') || 
+                              '';
       }
       setAdditionalPhone(additionalPhoneValue);
       
@@ -546,30 +550,16 @@ export default function RukunUpdateScreen() {
             disabled={!isEditable}
           />
           
-          {/* Date of Birth */}
+          {/* Address */}
           <FormInput
-            inputTitle={i18n.t('date_of_birth')}
-            value={formData.date_of_birth || ''}
-            onChange={(value) => handleChange('date_of_birth', value)}
-            placeholder="YYYY-MM-DD"
+            inputTitle={i18n.t('address')}
+            value={formData.Address || ''}
+            onChange={(value) => handleChange('Address', value)}
+            placeholder={i18n.t('enter_address')}
+            multiline={true}
+            numberOfLines={3}
             editable={isEditable}
             disabled={!isEditable}
-          />
-          
-          {/* Phone Number */}
-
-          <FormInput
-            key={`phone-${formKey}`}
-            inputTitle={i18n.t('phone_number')}
-            value={formData.Phone_Number || ''}
-            onChange={(value) => handleChange('Phone_Number', value)}
-            placeholder={i18n.t('enter_phone')}
-            keyboardType="phone-pad"
-            maxLength={15} // Allow for formatting characters like +, -, spaces
-            error={errors.Phone_Number}
-            editable={isEditable}
-            disabled={!isEditable}
-            helpText="Maximum 11 digits allowed"
           />
           
           {/* Email */}
@@ -584,41 +574,24 @@ export default function RukunUpdateScreen() {
             disabled={!isEditable}
           />
           
-          {/* Address */}
+          {/* Phone Number */}
           <FormInput
-            inputTitle={i18n.t('address')}
-            value={formData.Address || ''}
-            onChange={(value) => handleChange('Address', value)}
-            placeholder={i18n.t('enter_address')}
-            multiline={true}
-            numberOfLines={3}
+            key={`phone-${formKey}`}
+            inputTitle={i18n.t('phone_number')}
+            value={formData.Phone_Number || ''}
+            onChange={(value) => handleChange('Phone_Number', value)}
+            placeholder={i18n.t('enter_phone')}
+            keyboardType="phone-pad"
+            maxLength={15} // Allow for formatting characters like +, -, spaces
+            error={errors.Phone_Number}
             editable={isEditable}
             disabled={!isEditable}
+            helpText="Maximum 11 digits allowed"
           />
           
-          {/* Profession */}
+          {/* WhatsApp Number */}
           <FormInput
-            inputTitle={i18n.t('profession')}
-            value={formData.Profession || ''}
-            onChange={(value) => handleChange('Profession', value)}
-            placeholder={i18n.t('profession')}
-            editable={isEditable}
-            disabled={!isEditable}
-          />
-          
-          {/* Education */}
-          <FormInput
-            inputTitle={i18n.t('education')}
-            value={formData.Education || ''}
-            onChange={(value) => handleChange('Education', value)}
-            placeholder={i18n.t('education')}
-            editable={isEditable}
-            disabled={!isEditable}
-          />
-          
-          {/* Additional Phone Number */}
-          <FormInput
-            inputTitle={i18n.t('additional_phones')}
+            inputTitle={i18n.t('whatsapp_number')}
             value={additionalPhone}
             onChange={handleAdditionalPhoneChange}
             placeholder={i18n.t('enter_phone')}

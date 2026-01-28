@@ -57,12 +57,17 @@ export default function RukanDetails() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(!personDetails);
 
-  // Format date if available
+  // Format date if available - only date format, no time
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString();
+      // Use toLocaleDateString with options to ensure only date is shown, no time
+      return date.toLocaleDateString('ur-PK', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
     } catch (e) {
       console.error('Error formatting date:', e);
       return dateString;
@@ -134,18 +139,15 @@ export default function RukanDetails() {
         <UrduText style={styles.personName}>{personDetails.Name || personDetails.name || ''}</UrduText>
         <UrduText style={styles.personSub}>{personDetails.Father_Name || personDetails.parent || ''}</UrduText>
 
+        {/* Only show required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number */}
         {personDetails.Name && StaticField(i18n.t('name'), personDetails.Name || personDetails.name)}
         {personDetails.Father_Name && StaticField(i18n.t('parent'), personDetails.Father_Name || personDetails.parent)}
-        {personDetails.Date_of_birth && StaticField(i18n.t('dob'), formatDate(personDetails.Date_of_birth || personDetails.dob))}
-        {personDetails.CNIC && StaticField(i18n.t('cnic'), personDetails.CNIC || personDetails.cnic)}
-        {personDetails.Tanzeemi_Unit && StaticField(i18n.t('unit'), personDetails.Tanzeemi_Unit?.toString() || personDetails.unit?.toString())}
-        {personDetails.status && StaticField(i18n.t('status'), personDetails.status)}
-        {personDetails.Phone_Number && StaticField(i18n.t('phone_number'), personDetails.Phone_Number || personDetails.phone)}
-        {personDetails.additional_phones && StaticField(i18n.t('whatsapp_number'), personDetails.additional_phones)}
+        {(personDetails.Address || personDetails.address) && StaticField(i18n.t('address'), personDetails.Address || personDetails.address)}
+        {personDetails.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(personDetails.Rukinat_Date))}
         {personDetails.Email && StaticField(i18n.t('email'), personDetails.Email || personDetails.email)}
-        
-        {/* Additional fields */}
-        {personDetails.Rukn_No && StaticField(i18n.t('rukn_no'), personDetails.Rukn_No.toString())}
+        {personDetails.Phone_Number && StaticField(i18n.t('phone_number'), personDetails.Phone_Number || personDetails.phone)}
+        {(personDetails.additional_phones || personDetails.whatsApp) && StaticField(i18n.t('whatsapp_number'), personDetails.additional_phones || personDetails.whatsApp)}
+        {/*personDetails.Rukn_No && StaticField(i18n.t('rukn_no'), personDetails.Rukn_No.toString())}
         {personDetails.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(personDetails.Rukinat_Date))}
         {personDetails.Profession && StaticField(i18n.t('profession'), personDetails.Profession)}
         {personDetails.Education && StaticField(i18n.t('education'), personDetails.Education)}
@@ -153,7 +155,7 @@ export default function RukanDetails() {
           personDetails.Gender === 'm' ? i18n.t('male') : 
           personDetails.Gender === 'f' ? i18n.t('female') : 
           personDetails.Gender
-        )}
+        )} */}
 
         <View style={styles.buttonContainer}>
           <CustomButton

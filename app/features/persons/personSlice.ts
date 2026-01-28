@@ -482,7 +482,7 @@ export interface RukunTransferRequestPayload {
   transfer_type: 'local' | 'outside';
   local_unit_id?: number;
   city_name?: string;
-  transfer_date: string;
+  reason?: string; // Transfer reason
   status?: 'draft' | 'pending' | 'approved' | 'rejected';
 }
 
@@ -492,7 +492,7 @@ export interface RukunTransferRequest {
   transfer_type: 'local' | 'outside';
   local_unit_id?: number;
   city_name?: string;
-  transfer_date: string;
+  reason?: string; // Transfer reason
   status: 'draft' | 'pending' | 'approved' | 'rejected';
   date_created?: string;
   date_updated?: string;
@@ -515,7 +515,7 @@ export interface RukunUpdateResponse {
     date_created: string;
     user_updated: null | string;
     date_updated: string;
-    date_of_birth: string;
+    date_of_birth: string; // Backend field name in Rukn_Update table
     Father_Name: string;
     Phone_Number: string;
     Email: string;
@@ -738,7 +738,7 @@ export interface RukunUpdateRequest {
   status: 'draft' | 'published';
   Name?: string;
   Father_Name?: string;
-  date_of_birth?: string;
+  date_of_birth?: string; // Backend field name in Rukn_Update table
   Phone_Number?: string;
   Email?: string;
   Address?: string;

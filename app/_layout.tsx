@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform } from "react-native";
+import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -121,6 +121,19 @@ export default function RootLayout() {
   
   // Debug panel state (only in development)
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  const [fontsLoaded] = useFonts({
+    JameelNooriNastaleeq: require('../assets/fonts/JameelNooriNastaleeq.ttf'),
+    'noori-kasheed': require('../assets/fonts/noori-kasheed.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.fontLoading}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
   
 
   return (
@@ -210,6 +223,12 @@ function AppContent({
 }
 
 const styles = StyleSheet.create({
+  fontLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+  },
   headerContainer: {
     backgroundColor:COLORS.primary,
   },
