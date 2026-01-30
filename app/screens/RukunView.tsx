@@ -32,7 +32,7 @@ import {
   checkExistingTransfer,
   resetTransferStatus,
 } from '@/app/features/persons/personSlice';
-import { fetchTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { fetchTanzeemiUnits, selectTanzeemiUnitById, fetchTanzeemiUnitById } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectSubordinateUnitsForDropdown } from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
@@ -82,6 +82,28 @@ export default function RukunView() {
   const status = useAppSelector(selectPersonsStatus);
   const error = useAppSelector(selectPersonsError);
   const tanzeemiUnitOptions = useAppSelector(selectSubordinateUnitsForDropdown);
+  
+  // Get unit details from Redux
+  const currentUnitId = person?.Tanzeemi_Unit || person?.tanzeemi_unit || rukun?.Tanzeemi_Unit || rukun?.tanzeemi_unit;
+  const unitFromRedux = currentUnitId ? useAppSelector((state) => selectTanzeemiUnitById(state, currentUnitId)) : null;
+  const levelsById = useAppSelector((state) => state.tanzeem?.levelsById || {});
+  
+  // Fetch unit if not in Redux
+  useEffect(() => {
+    if (currentUnitId && !unitFromRedux) {
+      dispatch(fetchTanzeemiUnitById(currentUnitId));
+    }
+  }, [currentUnitId, unitFromRedux, dispatch]);
+  
+  // Format unit name with level
+  let formattedUnitName = '';
+  if (unitFromRedux) {
+    const levelId = unitFromRedux.Level_id || unitFromRedux.level_id;
+    const level = levelId && levelsById[levelId] ? levelsById[levelId] : null;
+    const levelName = level?.Name || level?.name || '';
+    const unitName = unitFromRedux.Name || unitFromRedux.name || '';
+    formattedUnitName = levelName ? `${levelName}: ${unitName}` : unitName;
+  }
 
   const displayPerson = person ?? rukun;
   
@@ -357,8 +379,8 @@ export default function RukunView() {
           onSuccess={handleTransferSuccess}
           rukunId={rukun.id}
           rukunName={displayPerson.name || ''}
-          currentUnitId={displayPerson.tanzeemi_unit || displayPerson.unit_id}
-          currentUnitName={displayPerson.unit || displayPerson.unit_name}
+          currentUnitId={currentUnitId}
+          currentUnitName={formattedUnitName || displayPerson.unit || displayPerson.unit_name}
           tanzeemiUnitOptions={tanzeemiUnitOptions}
         />
       )}

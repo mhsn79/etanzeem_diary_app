@@ -18,12 +18,13 @@ import CustomButton from './CustomButton';
 import Dialog from './Dialog';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import i18n from '../i18n';
-import { AppDispatch, RootState } from '../store';
+import { AppDispatch, RootState } from '../store/types';
 import { 
   createRukunTransfer, 
   checkExistingTransfer,
   resetTransferStatus
 } from '../features/persons/personSlice';
+import { selectTanzeemiUnitById, fetchTanzeemiUnitById } from '../features/tanzeem/tanzeemSlice';
 
 interface TransferRukunModalProps {
   visible: boolean;
@@ -53,6 +54,31 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
   const createError = useSelector((state: RootState) => state.persons.createTransferError);
   const checkStatus = useSelector((state: RootState) => state.persons.checkTransferStatus);
   const existingTransfers = useSelector((state: RootState) => state.persons.existingTransfers);
+  
+  // Get unit name from Redux if currentUnitName is not provided or is just an ID
+  const unitFromRedux = currentUnitId ? useSelector((state: RootState) => selectTanzeemiUnitById(state, currentUnitId)) : null;
+  const levelsById = useSelector((state: RootState) => state.tanzeem?.levelsById || {});
+  
+  // Determine display unit name - prioritize Redux unit name, then currentUnitName, but exclude if it's just an ID
+  let displayUnitName = '';
+  if (unitFromRedux) {
+    // Get level name if available
+    const levelId = unitFromRedux.Level_id || unitFromRedux.level_id;
+    const level = levelId && levelsById[levelId] ? levelsById[levelId] : null;
+    const levelName = level?.Name || level?.name || '';
+    const unitName = unitFromRedux.Name || unitFromRedux.name || '';
+    displayUnitName = levelName ? `${levelName}: ${unitName}` : unitName;
+  } else if (currentUnitName && currentUnitName !== currentUnitId?.toString() && !/^\d+$/.test(currentUnitName)) {
+    // Use currentUnitName if it's not just a number (ID)
+    displayUnitName = currentUnitName;
+  }
+  
+  // Fetch unit if not in Redux
+  useEffect(() => {
+    if (currentUnitId && !unitFromRedux) {
+      dispatch(fetchTanzeemiUnitById(currentUnitId));
+    }
+  }, [currentUnitId, unitFromRedux, dispatch]);
   // Safely find the existing transfer (if any)
   const existingTransfer = Array.isArray(existingTransfers) ? 
     existingTransfers.find(transfer => transfer && transfer.contact_id === rukunId) : undefined;
@@ -269,17 +295,17 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
               <UrduText style={styles.title}>{i18n.t('initiate_rukun_transfer')}</UrduText>
               
               {/* Status Display */}
-              <View style={styles.statusContainer}>
+              {/* <View style={styles.statusContainer}>
                 <UrduText style={styles.statusLabel}>{i18n.t('status')}:</UrduText>
                 <UrduText style={styles.statusValue}>{i18n.t('draft')}</UrduText>
-              </View>
+              </View> */}
               
               {/* Rukun Info */}
               <View style={styles.rukunInfo}>
                 <UrduText style={styles.rukunName}>{rukunName}</UrduText>
-                {currentUnitName && (
+                {displayUnitName && (
                   <UrduText style={styles.currentUnit}>
-                    {i18n.t('current_unit')}: {currentUnitName}
+                    {i18n.t('current_unit')}: {displayUnitName}
                   </UrduText>
                 )}
               </View>
@@ -340,12 +366,12 @@ const TransferRukunModal: React.FC<TransferRukunModalProps> = ({
               {/* City Name Input */}
               {transferType === 'outside' && (
                 <View style={styles.fieldContainer}>
-                  <UrduText style={styles.sectionLabel}>{i18n.t('city_name')}</UrduText>
+                  <UrduText style={styles.sectionLabel}>شہر کا نام</UrduText>
                   <TextInput
                     style={styles.textInput}
                     value={cityName}
                     onChangeText={handleCityNameChange}
-                    placeholder={i18n.t('enter_city_name')}
+                    placeholder="شہر کا نام"
                     placeholderTextColor={COLORS.textSecondary}
                     editable={!isLoading && !hasExistingTransfer}
                   />
@@ -525,6 +551,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     marginRight: SPACING.xs,
+    textAlign: 'left',
   },
   statusValue: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -547,6 +574,7 @@ const styles = StyleSheet.create({
   currentUnit: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
+    textAlign: 'left',
   },
   transferTypeContainer: {
     marginBottom: SPACING.md,
@@ -598,6 +626,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily.bold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
+    textAlign: 'left',
   },
   dropdown: {
     marginBottom: SPACING.sm,
@@ -610,6 +639,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
+    textAlign: 'right',
   },
   multilineInput: {
     minHeight: 100,

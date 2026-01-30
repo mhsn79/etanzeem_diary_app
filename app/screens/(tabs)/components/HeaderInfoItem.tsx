@@ -51,7 +51,9 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     headerInfoText: {
       color: 'white',
-      fontSize: 18,
+      fontSize: 20,
+      textAlign: 'left',
+      flex: 1,
     },
   });
 };

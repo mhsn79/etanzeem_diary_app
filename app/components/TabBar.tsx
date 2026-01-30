@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform, TouchableOpacity, Dimensions, StyleSheet, View, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import HomeIconBlack from '../../assets/images/home-icon-black.svg';
 import ArkanIconBlack from '../../assets/images/arkan-icon-black.svg';
 import ActivitiesIconBlack from '../../assets/images/activities-icon-black.svg';
@@ -13,15 +14,23 @@ import ReportIcon2White from '../../assets/images/report-icon-2-white.svg';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
-const VALID_LABELS = ['ڈیش بورڈ', 'ارکان', 'سرگرمیاں', 'رپورٹس'] as const;
+const VALID_LABELS = ['صفحہ اول', 'ارکان', 'سرگرمیاں', 'رپورٹس'] as const;
 type ValidLabel = typeof VALID_LABELS[number];
+
+// Map label to tab screen name so we always navigate to the correct tab (state.routes order can differ in Expo Router)
+const LABEL_TO_TAB_NAME: Record<ValidLabel, string> = {
+  'صفحہ اول': 'Dashboard',
+  'ارکان': 'Arkan',
+  'سرگرمیاں': 'Activities',
+  'رپورٹس': 'Reports',
+};
 
 function getIcon(label: ValidLabel, focused: boolean) {
   const iconSize = wp(6);
   const iconStyle = { width: iconSize, height: iconSize };
 
   const icons = {
-    'ڈیش بورڈ': focused ? HomeIconWhite : HomeIconBlack,
+    'صفحہ اول': focused ? HomeIconWhite : HomeIconBlack,
     'ارکان': focused ? ArkanIconWhite : ArkanIconBlack,
     'سرگرمیاں': focused ? ActivitiesIconWhite : ActivitiesIconBlack,
     'رپورٹس': focused ? ReportIcon2White : ReportIcon2Black,
@@ -38,6 +47,7 @@ function getIcon(label: ValidLabel, focused: boolean) {
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const displayedRoutes = state.routes.slice(0, 4);
 
   return (
@@ -74,7 +84,13 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            // Reports: same as home screen rectangular button – go to ReportsManagementScreen
+            if (validLabel === 'رپورٹس') {
+              router.push('/screens/ReportsManagementScreen');
+              return;
+            }
+            const tabName = LABEL_TO_TAB_NAME[validLabel];
+            navigation.navigate(tabName);
           }
         };
 

@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   ViewStyle,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../constants/theme';
@@ -59,6 +60,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     options?.find(opt => opt.value === selectedValue) || null
   );
   const [layout, setLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
   const triggerRef = useRef<View | null>(null);
 
   // Initialize selected option when component mounts or when options/selectedValue change
@@ -91,7 +93,10 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     });
   };
 
-  const close = () => setIsOpen(false);
+  const close = () => {
+    setIsOpen(false);
+    setSearchQuery(''); // Clear search when closing
+  };
 
   const handleSelect = (option: Option) => {
     setSelectedOption(option);
@@ -99,15 +104,29 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
     close();
   };
 
+  // Filter options based on search query
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return options || [];
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return (options || []).filter(option => 
+      option.label.toLowerCase().includes(query) ||
+      option.value.toLowerCase().includes(query)
+    );
+  }, [options, searchQuery]);
+
   const placement = useMemo(() => {
     const spaceBelow = WINDOW.height - (layout.y + layout.height);
-    const neededHeight = Math.min(maxHeight, (options?.length || 0) * ROW_HEIGHT);
+    // Add extra height for search input (48px)
+    const searchInputHeight = 48;
+    const neededHeight = Math.min(maxHeight, (filteredOptions?.length || 0) * ROW_HEIGHT + searchInputHeight);
     const showAbove = spaceBelow < neededHeight && layout.y > neededHeight;
     return {
       top: showAbove ? layout.y - neededHeight : layout.y + layout.height,
       maxHeight: neededHeight,
     };
-  }, [layout, options?.length, maxHeight]);
+  }, [layout, filteredOptions?.length, maxHeight]);
 
   // Adjust positioning for RTL
   const listPosition = useMemo(() => {
@@ -166,8 +185,27 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
             listWrapperStyle,
           ]}
         >
+          {/* Search Input */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="تلاش کریں..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
           <FlatList
-            data={options || []}
+            data={filteredOptions}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -182,6 +220,11 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
               </TouchableOpacity>
             )}
             bounces={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <UrduText style={styles.emptyText}>کوئی نتیجہ نہیں ملا</UrduText>
+              </View>
+            }
           />
         </View>
       </Modal>
@@ -251,6 +294,37 @@ const styles = StyleSheet.create({
   selectedOptionText: {
     color: COLORS.primary,
     fontWeight: '600',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+  },
+  searchIcon: {
+    marginRight: SPACING.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.black,
+    paddingVertical: SPACING.xs,
+    textAlign: 'right',
+  },
+  clearButton: {
+    marginLeft: SPACING.sm,
+    padding: SPACING.xs,
+  },
+  emptyContainer: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
   },
 });
 

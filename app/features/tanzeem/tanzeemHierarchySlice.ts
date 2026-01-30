@@ -369,9 +369,45 @@ export const selectSubordinateUnitsForDropdown = createSelector(
       return [];
     }
     
-    // Map units with level information and sort data, filtering out the current user's unit
+    // Map units with level information and sort data, filtering out the current user's unit and Ward level
     const unitsWithLevelInfo = unitsToProcess
-      .filter(unit => currentUnitId && unit.id !== currentUnitId) // Explicitly filter out current user's unit
+      .filter(unit => {
+        // Filter out current user's unit
+        if (currentUnitId && unit.id === currentUnitId) {
+          return false;
+        }
+        
+        // Filter out Ward (وارڈ) level units - only show UC (یوسی), Zone (زون), and Halqa (حلقہ)
+        const levelId = unit.Level_id || unit.level_id;
+        const level = levelId && levelsById[levelId] ? levelsById[levelId] : null;
+        const levelName = level?.Name || level?.name || '';
+        
+        // Exclude Ward level (level ID 7 or level name contains "وارڈ" or "Ward")
+        if (levelId === 7 || levelName.toLowerCase().includes('ward') || levelName.includes('وارڈ')) {
+          return false;
+        }
+        
+        // Only include UC (یوسی - level 6), Zone (زون - level 4), and Halqa (حلقہ - level 3)
+        // Also allow other levels if they match the names
+        const allowedLevelNames = ['یوسی', 'زون', 'حلقہ', 'uc', 'zone', 'halqa'];
+        const isAllowedLevel = allowedLevelNames.some(name => 
+          levelName.toLowerCase().includes(name.toLowerCase())
+        );
+        
+        // If level name matches allowed levels, include it
+        // Also include if level ID is 3, 4, or 6 (Halqa, Zone, UC)
+        if (isAllowedLevel || levelId === 3 || levelId === 4 || levelId === 6) {
+          return true;
+        }
+        
+        // If no level info, include it (will be handled in mapping)
+        if (!levelId && !levelName) {
+          return true;
+        }
+        
+        // Exclude by default if level doesn't match
+        return false;
+      })
       .map(unit => {
         const levelId = unit.Level_id || unit.level_id;
         const level = levelId && levelsById[levelId] ? levelsById[levelId] : null;
@@ -387,7 +423,7 @@ export const selectSubordinateUnitsForDropdown = createSelector(
         const finalLabel = label || `Unit ${unit.id}`;
         
         // Debug logging for first unit to understand data structure
-        if (hierarchyUnits.indexOf(unit) === 1) {
+        if (unitsToProcess.indexOf(unit) === 0) {
           console.log('Sample unit data:', {
             id: unit.id,
             Name: unit.Name,
@@ -400,11 +436,23 @@ export const selectSubordinateUnitsForDropdown = createSelector(
           });
         }
         
+        // Determine level priority for sorting: UC (1), Zone (2), Halqa/City (3)
+        let levelPriority = 999;
+        const levelNameLower = levelName.toLowerCase();
+        if (levelId === 6 || levelNameLower.includes('یوسی') || levelNameLower.includes('uc')) {
+          levelPriority = 1; // UC first
+        } else if (levelId === 4 || levelNameLower.includes('زون') || levelNameLower.includes('zone')) {
+          levelPriority = 2; // Zone second
+        } else if (levelId === 3 || levelNameLower.includes('حلقہ') || levelNameLower.includes('halqa') || levelNameLower.includes('city')) {
+          levelPriority = 3; // Halqa/City third
+        }
+        
         return {
           id: unit.id.toString(),
           label: finalLabel,
           value: unit.id.toString(),
           // Sort fields for sorting
+          levelPriority: levelPriority,
           levelSort: level?.sort ?? null,
           unitSort: unit.sort ?? null,
           unitId: unit.id,
@@ -412,9 +460,14 @@ export const selectSubordinateUnitsForDropdown = createSelector(
         };
       });
     
-    // Sort by level sort, then unit sort, then id
+    // Sort by level priority (UC -> Zone -> Halqa/City), then level sort, then unit sort, then id
     const sortedOptions = unitsWithLevelInfo.sort((a, b) => {
-      // First sort by level sort
+      // First sort by level priority (UC first, then Zone, then Halqa/City)
+      if (a.levelPriority !== b.levelPriority) {
+        return a.levelPriority - b.levelPriority;
+      }
+      
+      // Then sort by level sort
       const levelSortA = a.levelSort ?? 999999;
       const levelSortB = b.levelSort ?? 999999;
       if (levelSortA !== levelSortB) {

@@ -15,7 +15,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="Dashboard"
           options={{
-            tabBarLabel: "ڈیش بورڈ"
+            tabBarLabel: "صفحہ اول"
           }}
         />
         <Tabs.Screen

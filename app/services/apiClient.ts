@@ -27,6 +27,7 @@ let requestQueue: Array<{
   resolve: () => void;
   reject: (error: Error) => void;
 }> = [];
+let refreshTimeoutLogoutTriggered = false;
 
 // Maximum number of retry attempts for API requests
 const MAX_REQUEST_RETRIES = 2;
@@ -79,6 +80,15 @@ const waitForTokenRefresh = async (): Promise<void> => {
     
     if (getStore().getState().auth?.isRefreshing) {
       console.warn(`[API] Token refresh timeout after ${timeout}ms (${Platform.OS})`);
+      if (!refreshTimeoutLogoutTriggered) {
+        refreshTimeoutLogoutTriggered = true;
+        try {
+          const { logout } = require('../features/auth/authSlice');
+          getStore().dispatch(logout());
+        } finally {
+          refreshTimeoutLogoutTriggered = false;
+        }
+      }
       throw new Error('Token refresh timeout');
     }
     
