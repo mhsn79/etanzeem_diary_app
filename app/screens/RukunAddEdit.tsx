@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Text,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -227,7 +228,7 @@ export default function RukunAddEdit() {
 
   const handleTransferSuccess = () => {
     // Refresh the data or navigate back
-    navigation.goBack();
+    InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
   
   // Validate form
@@ -266,7 +267,7 @@ export default function RukunAddEdit() {
           {
             text: i18n.t('ok'),
             onPress: () => {
-              navigation.goBack();
+              InteractionManager.runAfterInteractions(() => navigation.goBack());
             }
           }
         ]
@@ -298,7 +299,7 @@ export default function RukunAddEdit() {
   
   // Handle back button press
   const handleBackPress = () => {
-    navigation.goBack();
+    InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
   
   // Image upload disabled
@@ -529,6 +530,7 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: SPACING.md,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   dropdownContainer: {
     marginBottom: SPACING.md,
@@ -538,6 +540,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   
   // Transfer Rukun styles

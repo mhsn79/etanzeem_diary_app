@@ -12,6 +12,7 @@ import {
   StatusBar,
   Platform,
   ViewStyle,
+  InteractionManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -40,9 +41,10 @@ interface ScreenWrapperProps {
   children: React.ReactNode;
   headerTitle: string;
   onBack: () => void;
+  showBack?: boolean;
 }
 
-const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ children, headerTitle, onBack }) => {
+const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ children, headerTitle, onBack, showBack = true }) => {
 
 
   return (
@@ -57,6 +59,7 @@ const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ children, headerTitle, on
         <Header 
           title={headerTitle} 
           onBack={onBack}
+          showBack={showBack}
         />
       </View>
       <View style={styles.contentWrapper}>{children}</View>
@@ -106,11 +109,18 @@ export default function Activities() {
       dispatch(fetchActivities());
   }, [dispatch]);
 
-  // Refetch activities when screen comes into focus
+  // Refetch on focus. Defer + abort on blur so we never update state after leaving (avoids Fabric "Unable to find viewState for tag").
   useFocusEffect(
     useCallback(() => {
+      const controller = new AbortController();
       console.log('[Activities] Screen focused, fetching activities');
-      dispatch(fetchActivities());
+      const task = InteractionManager.runAfterInteractions(() => {
+        dispatch(fetchActivities({ signal: controller.signal }));
+      });
+      return () => {
+        controller.abort();
+        task.cancel();
+      };
     }, [dispatch])
   );
 
@@ -196,7 +206,9 @@ export default function Activities() {
   const currentDate = new Date();
   const threeDaysFromNow = new Date();
   threeDaysFromNow.setDate(currentDate.getDate() + 3);
-  
+  // Stable key so formattedActivities useMemo only recomputes when the calendar day changes (fixes Fabric viewState crash)
+  const dateKey = new Date().toDateString();
+
   // Memoize allowed unit IDs to prevent recalculation
   const allowedUnitIds = useMemo(() => {
     const ids = new Set<number>();
@@ -231,7 +243,7 @@ export default function Activities() {
     });
   }, [activities, allowedUnitIds]);
 
-  // Memoize formatted activities
+  // Memoize formatted activities (depend on dateKey only so we don't recompute every render → avoids Fabric viewState crash)
   const formattedActivities = useMemo(() => {
     const allFormatted = filteredByUnit.map(formatActivityData);
     const filtered = allFormatted.filter((activity) =>
@@ -304,7 +316,7 @@ export default function Activities() {
     
     // For reported tab, return activities as is
     return sortedActivities.map(activity => ({ type: 'activity' as const, data: activity }));
-  }, [filteredByUnit, selectedTab, currentDate, threeDaysFromNow]);
+  }, [filteredByUnit, selectedTab, dateKey]);
 
   const handleAdd = useCallback(() => setShowDialog(true), []);
   const handleReportActivity = useCallback(() => {
@@ -346,7 +358,7 @@ export default function Activities() {
   if (status === 'loading' && !refreshing) {
     return (
       <ErrorBoundary>
-        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
+        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => {}} showBack={false}>
           <View style={styles.center}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
@@ -359,7 +371,7 @@ export default function Activities() {
   if (status === 'failed') {
     return (
       <ErrorBoundary>
-        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
+        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => {}} showBack={false}>
           <View style={styles.center}>
             <Text style={styles.errorText}>{error || 'سرگرمیاں لوڈ کرنے میں ناکامی'}</Text>
           </View>
@@ -368,16 +380,16 @@ export default function Activities() {
     );
   }
 
-  // Main content
+  // Main content. collapsable={false} on Android avoids view merging that can cause getChildDrawingOrder crash when switching tabs.
   return (
     <ErrorBoundary>
-      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => router.back()}>
-      <View style={styles.container}>
+      <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => {}} showBack={false}>
+      <View style={styles.container} collapsable={!(Platform.OS === 'android')}>
         <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
         <FlatList
           data={formattedActivities}
           keyExtractor={(item) => item.type === 'separator' ? `separator-${item.data.id}` : `activity-${item.data.id}`}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false}
           maxToRenderPerBatch={10}
           windowSize={10}
           initialNumToRender={5}
@@ -501,7 +513,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white, // Ensure container is white
     paddingTop: SPACING.lg,
     marginHorizontal: SPACING.md,
-    zIndex: 0,
+    // Avoid zIndex on Android to prevent getChildDrawingOrder() crash when switching tabs (elevation used for FAB/toasts instead).
+    ...(Platform.OS !== 'android' ? { zIndex: 0 } : {}),
   },
   listContent: {
     paddingBottom: hp('12%'),
@@ -516,12 +529,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     padding: SPACING.lg,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   emptyText: {
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: SPACING.xl,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   fab: {
     position: 'absolute',
@@ -534,7 +549,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.medium,
-    zIndex: 1000,
+    ...(Platform.OS === 'android' ? { elevation: 8 } : { zIndex: 1000 }),
   },
   confirmButtonStyle: {
     backgroundColor: COLORS.primary,
@@ -565,7 +580,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 1001,
+    ...(Platform.OS === 'android' ? { elevation: 10 } : { zIndex: 1001 }),
   },
   toast: {
     flexDirection: 'row',
@@ -582,6 +597,7 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontSize: 14,
     fontWeight: '500',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   separatorContainer: {
     paddingHorizontal: SPACING.sm,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, InteractionManager } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
 import UrduText from '@/app/components/UrduText';
 import ScreenLayout from '@/app/components/ScreenLayout';
@@ -552,7 +552,10 @@ const ActivityScreen = () => {
   }, [activityDetails.activityType, activityTypes, userTanzeemiLevelDetails]);
 
   const navigateBack = () => {
-    navigation.goBack();
+    // Defer to avoid Fabric "Unable to find viewState for tag" when going back
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => navigation.goBack(), 50);
+    });
   };
 
   const handleDateTimeChange = (date: Date) => {
@@ -770,7 +773,9 @@ const ActivityScreen = () => {
 
   const handleSuccessDialogConfirm = () => {
     setShowSuccessDialog(false);
-    navigation.goBack();
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => navigation.goBack(), 50);
+    });
   };
 
   const getScreenTitle = () => {

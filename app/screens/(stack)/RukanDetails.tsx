@@ -7,6 +7,7 @@ import {
   Text,
   ActivityIndicator,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router, useLocalSearchParams } from 'expo-router';
@@ -105,7 +106,7 @@ export default function RukanDetails() {
         <Text style={styles.errorText}>{i18n.t('no_profile_data')}</Text>
         <CustomButton
           text={i18n.t('go_back')}
-          onPress={() => router.back()}
+          onPress={() => InteractionManager.runAfterInteractions(() => router.back())}
           viewStyle={styles.backButton}
         />
       </View>
@@ -160,7 +161,7 @@ export default function RukanDetails() {
         <View style={styles.buttonContainer}>
           <CustomButton
             text={i18n.t('go_back')}
-            onPress={() => router.back()}
+            onPress={() => InteractionManager.runAfterInteractions(() => router.back())}
             viewStyle={styles.backButton}
           />
         </View>
@@ -225,6 +226,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   errorText: {
     marginTop: 16,
@@ -232,5 +234,6 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginBottom: 20,
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Image, Animated } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Image, Animated, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -132,7 +132,9 @@ const AllReportsScreen: React.FC = () => {
   }, [reportSubmissions, reportDetails, tanzeemiUnits, searchText, filterCriteria, selectedTab]);
 
   const handleBack = useCallback(() => {
-    router.canGoBack() ? router.back() : router.push(ROUTES.DASHBOARD);
+    InteractionManager.runAfterInteractions(() => {
+      router.canGoBack() ? router.back() : router.push(ROUTES.DASHBOARD);
+    });
   }, [router]);
 
   const handleFilterPress = useCallback(() => {
@@ -541,6 +543,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     paddingHorizontal: SPACING.sm,
     textAlign: 'right',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   filterIcon: {
     padding: SPACING.xs,

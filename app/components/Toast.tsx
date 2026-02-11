@@ -82,9 +82,11 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     flex: 1,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   accessDeniedText: {
     fontSize: 16,
     fontWeight: 'bold',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

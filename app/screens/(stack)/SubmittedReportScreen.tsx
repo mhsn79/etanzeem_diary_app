@@ -3,7 +3,7 @@ import { useNavigation } from 'expo-router';
 import ScreenLayout from '../../components/ScreenLayout';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import UrduText from '@/app/components/UrduText';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList, InteractionManager } from 'react-native';
 import FormInput from '@/app/components/FormInput';
 import CustomButton from '@/app/components/CustomButton';
 import Dialog from '@/app/components/Dialog';
@@ -81,7 +81,7 @@ const SubmittedReportScreen = () => {
   });
 
   const handleBack = () => {
-    navigation.goBack();
+    InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
 
   const handleInputChange = (field: string) => (value: string) => {

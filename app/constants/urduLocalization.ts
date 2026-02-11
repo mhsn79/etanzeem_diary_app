@@ -89,8 +89,9 @@ export const formatExpectedCompletion = (
   const formattedDay = useUrduDigits ? toUrduDigits(day) : day.toString();
   const formattedYear = useUrduDigits ? toUrduDigits(year) : year.toString();
 
-  // 5) آخری سٹرنگ تیار
-  return `${label}: ${formattedDay} ${month} ${formattedYear}`;
+  // 5) آخری سٹرنگ تیار — اگر label خالی ہو تو صرف تاریخ واپس کریں
+  const datePart = `${formattedDay} ${month} ${formattedYear}`;
+  return label ? `${label}: ${datePart}` : datePart;
 };
 
 /* ------------------------------------------------------------------ */

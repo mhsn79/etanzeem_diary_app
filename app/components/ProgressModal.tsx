@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });
 

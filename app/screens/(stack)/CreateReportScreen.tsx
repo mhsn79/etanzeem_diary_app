@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpacity, Clipboard, Alert, Platform, InteractionManager } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
+import { ROUTES } from '@/app/constants/navigation';
 import UrduText from '@/app/components/UrduText';
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
@@ -37,10 +38,34 @@ import { getUrduMonth } from '@/app/constants/urduLocalization';
 import { ensureFreshToken, directApiRequest } from '@/app/services/apiClient';
 import { setError } from '@/app/features/auth/authSlice';
 
-const CreateReportScreen = () => {
+export type CreateReportInitialParams = {
+  submissionId: number;
+  templateId: number;
+  managementId: number;
+  unitId: number;
+  mode: 'edit' | 'view';
+  status?: string;
+};
+
+type CreateReportScreenProps = {
+  /** When opening from Reports tab in-place, params are passed so we don't rely on router (avoids empty params / immediate back). */
+  initialParams?: CreateReportInitialParams | null;
+  /** When opening from Reports tab, parent provides back handler so we stay in tab. */
+  onBackOverride?: () => void;
+};
+
+const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }: CreateReportScreenProps = {}) => {
+  // Log mount immediately to confirm CreateReportScreen ever renders
+  console.log('[CreateReportScreen] MOUNT/RE-RENDER', { hasInitialParams: !!initialParamsProp, hasOnBackOverride: !!onBackOverride, submissionId: initialParamsProp?.submissionId });
   const navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
   const params = useLocalSearchParams();
+  const fromRouter = params.submissionId != null || params.templateId != null;
+  const submissionId = fromRouter ? (params.submissionId ? Number(params.submissionId) : null) : (initialParamsProp?.submissionId ?? null);
+  const templateId = fromRouter ? (params.templateId ? Number(params.templateId) : null) : (initialParamsProp?.templateId ?? null);
+  const managementId = fromRouter ? (params.managementId ? Number(params.managementId) : null) : (initialParamsProp?.managementId ?? null);
+  const unitId = fromRouter ? (params.unitId ? Number(params.unitId) : null) : (initialParamsProp?.unitId ?? null);
+  const mode = (fromRouter ? params.mode : initialParamsProp?.mode) as 'view' | 'edit' | undefined;
   
   // Helper function to format unit name with description
   const formatUnitName = (unit: any) => {
@@ -55,16 +80,21 @@ const CreateReportScreen = () => {
     return name;
   };
 
-
-  
-  const templateId = params.templateId ? Number(params.templateId) : null;
-  const submissionId = params.submissionId ? Number(params.submissionId) : null;
-  const managementId = params.managementId ? Number(params.managementId) : null;
-  const unitId = params.unitId ? Number(params.unitId) : null;
-  const mode = params.mode as 'view' | 'edit' | undefined;
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
-  
+
+  // Log params on mount/change to debug report not opening (always use submission's own mgmt_id)
+  useEffect(() => {
+    console.log('[CreateReportScreen] Params received:', {
+      submissionId,
+      templateId,
+      managementId,
+      unitId,
+      mode,
+      fromInitialParams: !!initialParamsProp,
+      rawParams: params
+    });
+  }, [submissionId, templateId, managementId, unitId, mode, params, initialParamsProp]);
 
   // Use our token refresh hook
   const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
@@ -78,7 +108,7 @@ const CreateReportScreen = () => {
   
   // Animation ref for button press
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Selectors
   const sectionsWithProgress = useSelector((state) => selectSectionsWithProgress(state, templateId || undefined));
   const questionsArray = useSelector(selectQuestionsArray);
@@ -198,6 +228,7 @@ const CreateReportScreen = () => {
   // Force token refresh on screen focus
   useFocusEffect(
     React.useCallback(() => {
+      console.log('[CreateReportScreen] useFocusEffect RUN (screen focused)', { submissionId, hasOnBackOverride: !!onBackOverride });
       // Clear answers when screen comes into focus to ensure clean state
       if (submissionId && currentSubmissionId !== submissionId) {
         console.log('[CreateReportScreen] Clearing QA state for new submission:', {
@@ -208,15 +239,23 @@ const CreateReportScreen = () => {
       }
       
       ensureFreshToken()
+        .then(() => console.log('[CreateReportScreen] useFocusEffect ensureFreshToken resolved'))
         .catch((error) => {
+          console.log('[CreateReportScreen] useFocusEffect ensureFreshToken REJECTED', error?.message ?? error);
           dispatch(setError('Your session has expired. Please log in again.'));
-          router.replace('/screens/LoginScreen');
+          // When in-place (onBackOverride), do NOT call onBackOverride on token failure - that would send user back immediately. Only navigate to Login when opened via stack.
+          if (!onBackOverride) {
+            router.replace('/screens/LoginScreen');
+          }
         });
-    }, [dispatch, submissionId, currentSubmissionId])
+      return () => console.log('[CreateReportScreen] useFocusEffect CLEANUP (screen unfocused / unmount)');
+    }, [dispatch, submissionId, currentSubmissionId, onBackOverride])
   );
 
   // Ensure we have a fresh token before initializing report data
   useEffect(() => {
+    const inEditOrViewWithSubmission = (isEditMode || isViewMode) && !!submissionId;
+
     console.log('[CreateReportScreen] Initializing with params:', {
       submissionId,
       templateId,
@@ -227,9 +266,9 @@ const CreateReportScreen = () => {
       isViewMode,
       currentSubmissionId
     });
-    
+
     // If we're in edit or view mode and have a submissionId, we need to load existing data
-    if ((isEditMode || isViewMode) && submissionId) {
+    if (inEditOrViewWithSubmission) {
       // Always initialize with the existing submission ID to get fresh data
       if (templateId && unitId && managementId && submissionId) {
         const initParams = {
@@ -238,9 +277,9 @@ const CreateReportScreen = () => {
           mgmt_id: managementId,
           submission_id: submissionId
         };
-        
+
         console.log('[CreateReportScreen] Loading existing submission with params:', initParams);
-        
+
         // First ensure we have a fresh token
         ensureFreshTokenBeforeOperation()
           .then(() => {
@@ -266,32 +305,30 @@ const CreateReportScreen = () => {
           submissionId
         });
       }
-      
+
       return;
     }
-    
-    // For new report creation
+
+    // For new report creation only: require templateId, userUnitDetails, latestReportMgmt
     if (templateId && userUnitDetails?.id && latestReportMgmt[0]?.managements[0]?.id) {
       const initParams = {
         template_id: templateId,
         unit_id: userUnitDetails.id,
         mgmt_id: latestReportMgmt[0]?.managements[0]?.id
       };
-      
-      // First ensure we have a fresh token
+
       ensureFreshTokenBeforeOperation()
         .then(() => {
-          // Then initialize the report data
           return dispatch(initializeReportData(initParams)).unwrap();
         })
-      .then((result) => {
-        console.log('[CreateReportScreen] Report data initialized successfully:', {
-          submissionId: result.submission.id,
-          sectionsCount: result.sections.length,
-          questionsCount: result.questions.length,
-          answersCount: result.answers.length
-        });
-      })
+        .then((result) => {
+          console.log('[CreateReportScreen] Report data initialized successfully:', {
+            submissionId: result.submission.id,
+            sectionsCount: result.sections.length,
+            questionsCount: result.questions.length,
+            answersCount: result.answers.length
+          });
+        })
         .catch((error) => {
           console.error('[CreateReportScreen] Error initializing report data:', error);
         });
@@ -303,11 +340,7 @@ const CreateReportScreen = () => {
       });
     }
 
-    if (!templateId || !userUnitDetails?.id || !latestReportMgmt[0]?.managements[0]?.id) {
-      dispatch(setError('Missing required information to create a report. Please try again.'));
-      router.replace('/screens/Dashboard');
-      return;
-    }
+    // Do not auto-redirect: when opening from (tabs)/Reports, params can be delayed or missing from useLocalSearchParams(), and redirecting sent the user back immediately. Show error state instead if new-report params are missing (handled by status/error UI below).
   }, [templateId, userUnitDetails?.id, latestReportMgmt[0]?.managements[0]?.id, submissionId, isEditMode, isViewMode]);
 
   // Handle answer changes
@@ -404,7 +437,23 @@ const CreateReportScreen = () => {
       });
   }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation, templateId, unitId, managementId]);
 
-  // Show loading state
+  // Must be called before any early return (React hooks rule)
+  const handleBack = useCallback(() => {
+    if (onBackOverride) {
+      console.log('[CreateReportScreen] Back: calling onBackOverride (in-tab)');
+      onBackOverride();
+    } else {
+      InteractionManager.runAfterInteractions(() => {
+        if (router.canGoBack()) {
+          navigation.goBack();
+        } else {
+          router.replace(ROUTES.DASHBOARD);
+        }
+      });
+    }
+  }, [onBackOverride, router, navigation]);
+
+  // Show loading state (after all hooks)
   if (status === 'loading') {
     return (
       <View style={styles.loadingContainer}>
@@ -421,7 +470,7 @@ const CreateReportScreen = () => {
         <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
         <CustomButton
           text="دوبارہ کوشش کریں"
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           viewStyle={{
             backgroundColor: COLORS.primary,
             marginTop: SPACING.md,
@@ -436,20 +485,28 @@ const CreateReportScreen = () => {
   return (
     <ScreenLayout
       title={isViewMode ? 'رپورٹ دیکھیں' : isEditMode ? 'رپورٹ ترمیم کریں' : 'رپورٹ بنائیں'}
-      onBack={() => navigation.goBack()}
+      onBack={handleBack}
     >
       <View style={styles.container}>
         <ScrollView 
           style={styles.scrollContainer} 
           contentContainerStyle={{ paddingBottom: SPACING.xl * 2 }}
         >
-          {/* Debug Info */}
-          <View style={styles.debugContainer}>
-            <UrduText style={styles.debugText}>
-              DEBUG: Submission ID: {currentSubmissionId || 'NULL'} | Params: {submissionId || 'NULL'} | Template: {templateId} | Unit: {unitId} | Mgmt: {managementId}
-            </UrduText>
-          </View>
-          
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.copyDebugButton}
+              onPress={() => {
+                const debugStr = `[CreateReportScreen] Submission ID: ${currentSubmissionId ?? 'NULL'}, Params: ${submissionId ?? 'NULL'}, Template: ${templateId}, Unit: ${unitId}, Mgmt: ${managementId}`;
+                Clipboard.setString(debugStr);
+                if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                  Alert.alert('کاپی ہو گیا', 'ڈیبگ معلومات کاپی ہو گئی۔');
+                }
+              }}
+            >
+              <UrduText style={styles.copyDebugButtonText}>ڈیبگ معلومات کاپی کریں</UrduText>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.headerInfoContainer}>
             <FormInput
               inputTitle="تنظیمی یونٹ"
@@ -543,11 +600,11 @@ const CreateReportScreen = () => {
             visible={showSuccessDialog}
             onConfirm={() => {
               setShowSuccessDialog(false);
-              navigation.goBack();
+              handleBack();
             }}
             onClose={() => {
               setShowSuccessDialog(false);
-              navigation.goBack();
+              handleBack();
             }}
             title="رپورٹ جمع ہو گئی"
             description="آپ کی رپورٹ کامیابی سے جمع کروا دی گئی ہے۔"
@@ -635,19 +692,18 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.success,
   },
-  debugContainer: {
-    backgroundColor: COLORS.warning + '20',
-    padding: SPACING.sm,
-    marginHorizontal: SPACING.md,
+  copyDebugButton: {
     marginTop: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.lightGray,
     borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.warning,
   },
-  debugText: {
+  copyDebugButtonText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.warning,
-    fontFamily: 'SpaceMono-Regular',
+    color: COLORS.textSecondary,
   },
 });
 

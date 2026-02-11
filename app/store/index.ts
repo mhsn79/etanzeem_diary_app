@@ -65,8 +65,8 @@ setPersistor(persistor);
 // Import AppDispatch type
 import { AppDispatch } from './types';
 
-// Export store and persistor
-export { store, persistor };
+// Export store, persistor, and types
+export { store, persistor, AppDispatch };
 // Default export to prevent Expo Router from treating this as a route
 export default {
   store,

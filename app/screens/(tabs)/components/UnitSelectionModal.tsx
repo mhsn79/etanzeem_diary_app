@@ -171,8 +171,8 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
             {isUserUnitLeaf ? (
               // Scenario 2: User unit is leaf - show grandparent, parent, current (all fixed)
               <>
-                {renderFixedUnit(grandparentUnit, "اوپر کی یونٹ")}
-                {renderFixedUnit(parentUnit, "درمیانی یونٹ")}
+                {renderFixedUnit(grandparentUnit, "بالائی یونٹ")}
+                {renderFixedUnit(parentUnit, "بالائی یونٹ")}
                 {renderFixedUnit(userUnit, "موجودہ یونٹ")}
                 
                 <View style={styles.infoContainer}>
@@ -184,7 +184,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
             ) : (
               // Scenario 1: User unit has children - show parent (fixed), current (selectable), children (selectable)
               <>
-                {renderFixedUnit(parentUnit, "اوپر کی یونٹ")}
+                {renderFixedUnit(parentUnit, "بالائی یونٹ")}
                 
                 <DropdownSection
                   options={selectableOptions}

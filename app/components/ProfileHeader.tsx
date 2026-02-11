@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   I18nManager,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6, Ionicons } from '@expo/vector-icons';
@@ -49,7 +50,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   title,
   avatarSource = require('@/assets/images/avatar.png'),
   backgroundSource,
-  onBackPress = () => router.back(),
+  onBackPress = () => InteractionManager.runAfterInteractions(() => router.back()),
   onSettingsPress = () => {},
   onCameraPress = () => {},
   onEditPress = () => {},

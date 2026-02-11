@@ -35,7 +35,6 @@ const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
         await Font.loadAsync({
           JameelNooriNastaleeq: require('../../assets/fonts/JameelNooriNastaleeq.ttf'),
-          'noori-kasheed': require('../../assets/fonts/noori-kasheed.ttf'),
         });
 
         setIsFontLoaded(true);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, TextInput, ActivityIndicator, InteractionManager } from 'react-native';
 import i18n from '../i18n';
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +56,7 @@ export default function ProfileEdit() {
   const handleSave = () => {
     // Save functionality would go here
     console.log('Saving profile data:', formData);
-    router.back();
+    InteractionManager.runAfterInteractions(() => router.back());
   };
 
   // Show loading indicator when initially loading
@@ -73,7 +73,7 @@ export default function ProfileEdit() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => InteractionManager.runAfterInteractions(() => router.back())} style={styles.backButton}>
             <FontAwesome5 name="arrow-left" size={20} color={COLORS.primary} />
           </Pressable>
           <Text style={styles.headerTitle}>{i18n.t('profile')}</Text>
@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.primary,
     marginLeft: 10,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   imageContainer: {
     alignItems: 'center',
@@ -227,6 +228,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   formContainer: {
     flex: 1,
@@ -237,6 +239,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginTop: 20,
     marginBottom: 10,
+    fontFamily: 'JameelNooriNastaleeq',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
     paddingBottom: 5,
@@ -279,5 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

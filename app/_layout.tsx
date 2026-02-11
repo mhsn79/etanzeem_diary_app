@@ -1,9 +1,9 @@
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
+import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform, ActivityIndicator, InteractionManager } from "react-native";
 import { useFonts } from 'expo-font';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,25 +38,19 @@ type HeaderProps = {
   title?: string;
 };
 
+// Helper to get full path from navigation state (defined outside to avoid recreating)
+function getFullPathFromState(state: any): string {
+  if (!state?.routes?.[state.index]) return 'No route';
+  const route = state.routes[state.index];
+  let fullPath = route.name;
+  if (route.state) fullPath += '/' + getFullPathFromState(route.state);
+  return fullPath;
+}
+
 function CustomHeader({ navigation, route, title }: HeaderProps) {
   const [menuVisible, setMenuVisible] = useState(false);
-  const state = useNavigationState((state) => state);
-  const currentRoute = state?.routes[state.index];
-
-  // Helper function to recursively get nested routes
-  const getFullPath = (state: any): string => {
-    const route = state.routes[state.index];
-    let fullPath = route.name;
-
-    if (route.state) {
-      // If there's a nested navigator, recursively find the full path
-      fullPath += '/' + getFullPath(route.state);
-    }
-
-    return fullPath;
-  };
-
-  const fullPath = state ? getFullPath(state) : 'No route';
+  // Subscribe only to the path string to avoid re-renders from whole state reference changes
+  const fullPath = useNavigationState((state) => (state ? getFullPathFromState(state) : 'No route'));
   const { currentLanguage, changeLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -64,14 +58,22 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
   // Simplified navigation logic
   const isLoginScreen = route.name === "screens/LoginScreen";
   const isInTabs = route.name === "screens/(tabs)";
+  const isCreateReportScreen = fullPath?.includes?.('CreateReportScreen') ?? false;
 
-  const handleBack = () => {
-    // When not in tabs, go back to Dashboard tab
-    router.back()
-  };
+  const handleBack = useCallback(() => {
+    // Defer to avoid Fabric "Unable to find viewState for tag" when going back from stack screens
+    InteractionManager.runAfterInteractions(() => {
+      router.back();
+    });
+  }, [router]);
 
-  // Only show back button on non-tab screens (except login)
-  const showBackButton = !isInTabs && !isLoginScreen;
+  // Defer profile navigation to break out of any synchronous update cycle (avoids "Maximum update depth exceeded")
+  const handleProfilePress = useCallback(() => {
+    setTimeout(() => router.push('/screens/ProfileView'), 0);
+  }, [router]);
+
+  // Only show back button on non-tab screens (except login). Hide on CreateReportScreen so its own header handles back (avoids accidental root back when opening report from tabs).
+  const showBackButton = !isInTabs && !isLoginScreen && !isCreateReportScreen;
 
   return (
     <View style={[
@@ -100,7 +102,7 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
 
 
           {isInTabs && (
-            <Pressable onPress={() => router.push('/screens/ProfileView')} style={styles.iconButton}>
+            <Pressable onPress={handleProfilePress} style={styles.iconButton}>
               <Ionicons name="person-circle-outline" size={42} color={COLORS.orange} />
             </Pressable>
           )}
@@ -124,7 +126,6 @@ export default function RootLayout() {
 
   const [fontsLoaded] = useFonts({
     JameelNooriNastaleeq: require('../assets/fonts/JameelNooriNastaleeq.ttf'),
-    'noori-kasheed': require('../assets/fonts/noori-kasheed.ttf'),
   });
 
   if (!fontsLoaded) {

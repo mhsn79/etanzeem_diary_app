@@ -306,6 +306,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
     textAlign: 'right',
     width: '100%',
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
   },
   helpText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -314,6 +315,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
     textAlign: 'right',
     width: '100%',
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
   },
 });
 

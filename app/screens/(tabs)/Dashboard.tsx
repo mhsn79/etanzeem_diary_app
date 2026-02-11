@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import i18n from '@/app/i18n';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import LocationIcon from '@/assets/images/location-icon-yellow.svg';
 import UserIcon from '@/assets/images/user-icon.svg';
@@ -48,6 +49,8 @@ const SIDE_MARGIN = SPACING.lg;
 const BUTTON_SIZE_SCALE = 0.9;
 
 const Dashboard = () => {
+  const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = screenWidth - 2 * SIDE_MARGIN;
@@ -103,8 +106,8 @@ const Dashboard = () => {
 
   const gridButtons = [
     { key: 'initial_info', label: i18n.t('initial_info'), color: DASHBOARD_BUTTON_COLORS.initialInfo, onPress: () => router.push('/screens/Workforce') },
-    { key: 'activities', label: i18n.t('activities'), color: DASHBOARD_BUTTON_COLORS.activities, onPress: () => router.push('/screens/(tabs)/Activities') },
-    { key: 'contacts', label: i18n.t('contacts'), color: DASHBOARD_BUTTON_COLORS.contacts, onPress: () => router.push('/screens/(tabs)/Arkan') },
+    { key: 'activities', label: i18n.t('activities'), color: DASHBOARD_BUTTON_COLORS.activities, onPress: () => (navigation as any).navigate('Activities') },
+    { key: 'contacts', label: i18n.t('contacts'), color: DASHBOARD_BUTTON_COLORS.contacts, onPress: () => (navigation as any).navigate('Arkan') },
     { key: 'money', label: i18n.t('money'), color: DASHBOARD_BUTTON_COLORS.baitulMal, onPress: () => router.push('/screens/Income') },
   ] as const;
 
@@ -137,7 +140,7 @@ const Dashboard = () => {
               <View style={styles.reportsButtonWrapper}>
                 <TouchableOpacity
                   style={[styles.reportsButton, { height: buttonHeight }]}
-                  onPress={() => router.push('/screens/ReportsManagementScreen')}
+                  onPress={() => (navigation as any).navigate('Reports')}
                   activeOpacity={0.85}
                 >
                   <UrduText style={styles.dashboardButtonText}>{i18n.t('reports')}</UrduText>

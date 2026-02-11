@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar, InteractionManager } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import i18n from '../../i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
@@ -98,12 +98,16 @@ export default function Arkan() {
     }
   }, [dispatch, contactTypesStatus]);
 
-  // Fetch persons based on selected unit
+  // Fetch persons based on selected unit. Defer so we don't run in same frame as tab transition (avoids Fabric "Unable to find viewState for tag" when switching from Activities).
   useEffect(() => {
-    if (displayUnitId && typeof displayUnitId === 'number') {
-      console.log('Arkan: Fetching persons for unit ID:', displayUnitId);
-      dispatch(fetchPersonsByUnitId(displayUnitId));
-    }
+    if (!displayUnitId || typeof displayUnitId !== 'number') return;
+    const id = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => {
+        console.log('Arkan: Fetching persons for unit ID:', displayUnitId);
+        dispatch(fetchPersonsByUnitId(displayUnitId));
+      });
+    }, 120);
+    return () => clearTimeout(id);
   }, [displayUnitId, dispatch]);
 
   // Filter persons based on search query and selected tab
@@ -248,6 +252,7 @@ export default function Arkan() {
         style={styles.keyboardAvoidingContainer}
       >
         <FlatList
+          removeClippedSubviews={false}
           contentContainerStyle={{
             flexGrow: 1,
             paddingTop: 10,
@@ -369,10 +374,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '600',
     color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   addButton: {
     borderRadius: 25,
@@ -387,6 +394,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -408,6 +416,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: COLORS.textPrimary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   tabSection: {
     marginBottom: 15,
@@ -416,11 +425,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   errorText: {
     fontSize: 16,
     color: COLORS.error,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   retryButton: {
     marginTop: 20,
@@ -434,6 +445,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   emptyContainer: {
     flex: 1,
@@ -446,5 +458,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

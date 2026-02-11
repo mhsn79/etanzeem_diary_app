@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, InteractionManager } from 'react-native';
 import { COLORS, SPACING } from '@/app/constants/theme';
 import UrduText from '@/app/components/UrduText';
 import ScreenLayout from '@/app/components/ScreenLayout';
@@ -44,7 +44,7 @@ const ScheduleActivitiesScreen = () => {
     ];
 
     const handleBack = () => {
-        navigation.goBack();
+        InteractionManager.runAfterInteractions(() => navigation.goBack());
     };
 
     const handleDateTimeSelect = (date: Date) => {

@@ -15,7 +15,8 @@ import {
   StatusBar,
   ActivityIndicator,
   Animated,
-  TextInput
+  TextInput,
+  InteractionManager
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { Link, useRouter } from 'expo-router';
@@ -662,7 +663,7 @@ export default function Workforce() {
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    router.back();
+    InteractionManager.runAfterInteractions(() => router.back());
   }, [router]);
 
   // Handle navigation to Arkan screen
@@ -899,10 +900,12 @@ const styles = StyleSheet.create({
   quwatValue: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontWeight: 'bold',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   quwatText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   arkanLink: {
     color: COLORS.white,
@@ -947,7 +950,8 @@ const styles = StyleSheet.create({
   detailNum: {
     marginLeft: "auto",
     fontSize: TYPOGRAPHY.fontSize.md,
-    margin: SPACING.sm
+    margin: SPACING.sm,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   editIcon: {
     padding: SPACING.sm,
@@ -1028,11 +1032,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   totalValue: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontWeight: 'bold',
     color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   changeTypeContainer: {
     flexDirection: 'row',
@@ -1102,6 +1108,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     height: '100%',
     color: COLORS.textPrimary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   positiveValue: {
     color: COLORS.success,
@@ -1159,11 +1166,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   errorText: {
     fontSize: 16,
     color: COLORS.error,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   retryButton: {
     marginTop: 20,

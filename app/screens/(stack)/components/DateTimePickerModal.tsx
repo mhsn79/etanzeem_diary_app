@@ -702,6 +702,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '500',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   tabTextActive: {
     color: COLORS.white,
@@ -715,6 +716,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: SPACING.sm,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   monthNav: {
     flexDirection: 'row',
@@ -727,6 +729,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   daysOfWeekRow: {
     flexDirection: 'row-reverse',
@@ -737,6 +740,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontWeight: '600',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   weekRow: {
     flexDirection: 'row-reverse',
@@ -752,6 +756,7 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   timeContainer: {
     alignItems: 'center',
@@ -762,6 +767,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
     marginBottom: SPACING.md,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   radialClockWrapper: {
     alignItems: 'center',
@@ -779,6 +785,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   manualTimeContainer: {
     marginBottom: SPACING.md,
@@ -795,6 +802,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
     marginBottom: SPACING.md,
+    fontFamily: 'JameelNooriNastaleeq',
   },
   timeSeparator: {  
     fontSize: TYPOGRAPHY.fontSize.xl,
@@ -815,6 +823,7 @@ const styles = StyleSheet.create({
     color: 'red',
     marginTop: SPACING.xs,
     fontSize: TYPOGRAPHY.fontSize.sm,
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });
 

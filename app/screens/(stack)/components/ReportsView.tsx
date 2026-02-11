@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  Clipboard,
+  Alert,
+  InteractionManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -43,6 +46,15 @@ import {
   selectQAState 
 } from '@/app/features/qa/qaSlice';
 
+export type OpenReportParams = {
+  submissionId: number;
+  templateId: number;
+  managementId: number;
+  unitId: number;
+  mode: 'edit' | 'view';
+  status?: string;
+};
+
 interface ReportsViewProps {
   showHeader?: boolean;
   title?: string;
@@ -50,6 +62,8 @@ interface ReportsViewProps {
   extraScrollContentStyle?: object;
   selectedUnit?: any;
   selectedUnitId?: number;
+  /** When set, opening current report calls this instead of router (keeps flow inside Reports tab). */
+  onOpenReport?: (params: OpenReportParams) => void;
 }
 
 // Helper function to determine if a management period is currently open
@@ -109,6 +123,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   extraScrollContentStyle = {},
   selectedUnit,
   selectedUnitId,
+  onOpenReport,
 }) => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -221,9 +236,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     // Find the latest open management for this template
     const openManagement = findCurrentlyOpenManagement(matchingTemplate.managements);
     
-    // If no open management found, use the most recent management as fallback
+    // If no open management found, use the most recent management as fallback (copy before sort - Redux state is immutable)
     const fallbackManagement = matchingTemplate.managements.length > 0 
-      ? matchingTemplate.managements.sort((a, b) => {
+      ? [...matchingTemplate.managements].sort((a, b) => {
           const dateA = new Date(a.reporting_start_date).getTime();
           const dateB = new Date(b.reporting_start_date).getTime();
           return dateB - dateA;
@@ -247,11 +262,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     };
   }, [displayUnit?.Level_id, reportMgmtDetails]);
 
-  // Find currently open management for the selected unit's level
+  // Find currently open management for the selected unit's level (used only for picking "current vs most recent" submission)
   const currentlyOpenManagement = currentTemplateAndManagement.management;
   const currentTemplate = currentTemplateAndManagement.template;
 
-  // Find existing submission for the selected unit (any status)
+  // Find existing submission for the selected unit (current management, else most recent)
   const existingSubmission = useMemo(() => {
     if (!displayUnitId) {
       console.log('[ReportsView] No display unit ID for existing submission check');
@@ -282,8 +297,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     );
     
     if (unitSubmissions.length > 0) {
-      // Sort by date_created in descending order and take the most recent
-      const mostRecent = unitSubmissions.sort((a, b) => {
+      // Sort by date_created in descending order and take the most recent (copy before sort - avoid mutating selector data)
+      const mostRecent = [...unitSubmissions].sort((a, b) => {
         const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
         const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
         return dateB - dateA;
@@ -307,6 +322,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     return null;
   }, [reportSubmissions.length, currentlyOpenManagement?.id, displayUnitId]);
 
+  // Management and template for the selected submission (always use submission's own mgmt_id, never mix with open mgmt)
+  const submissionManagementAndTemplate = useMemo(() => {
+    if (!existingSubmission) return { management: null, template: null };
+    const management = reportMgmtDetails
+      .flatMap((r) => r.managements)
+      .find((m) => m.id === existingSubmission.mgmt_id);
+    const template = reportMgmtDetails.find(
+      (r) => r.template?.id === existingSubmission.template_id
+    )?.template;
+    return { management, template };
+  }, [existingSubmission?.id, existingSubmission?.mgmt_id, existingSubmission?.template_id, reportMgmtDetails]);
+
   // Find existing draft submission for the selected unit
   const existingDraftSubmission = useMemo(() => {
     if (!displayUnitId) return null;
@@ -329,8 +356,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     );
     
     if (unitDrafts.length > 0) {
-      // Sort by date_created in descending order and take the most recent
-      return unitDrafts.sort((a, b) => {
+      // Sort by date_created in descending order and take the most recent (copy before sort - avoid mutating selector data)
+      return [...unitDrafts].sort((a, b) => {
         const dateA = a.date_created ? new Date(a.date_created).getTime() : 0;
         const dateB = b.date_created ? new Date(b.date_created).getTime() : 0;
         return dateB - dateA;
@@ -342,19 +369,23 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
 
 
-  // Determine if we should show the current report section
+  // Only show موجودہ رپورٹ for current user's unit (not when a child unit is selected)
+  const isCurrentUserUnit = displayUnitId === userUnitDetails?.id;
   const shouldShowCurrentReport = useMemo(() => {
-    // Only show active report if we have an existing submission for the current management
-    const shouldShow = Boolean(existingSubmission && displayUnitId);
-
+    const shouldShow = Boolean(
+      existingSubmission &&
+      displayUnitId &&
+      isCurrentUserUnit
+    );
     console.log('[ReportsView] shouldShowCurrentReport check:', {
       existingSubmission: existingSubmission?.id,
       displayUnitId,
+      userUnitId: userUnitDetails?.id,
+      isCurrentUserUnit,
       shouldShow
     });
-
     return shouldShow;
-  }, [existingSubmission?.id, displayUnitId]);
+  }, [existingSubmission?.id, displayUnitId, isCurrentUserUnit, userUnitDetails?.id]);
 
   // Memoized filtered submissions - exclude active submission from the list
   const filteredSubmissions = useMemo(() => {
@@ -379,8 +410,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       return true; // Include all other submissions
     });
     
-    // Sort by parent reports_mgmt's start_date in descending order (newest first)
-    return excludeActive.sort((a, b) => {
+    // Sort by parent reports_mgmt's start_date in descending order (newest first) (copy before sort - avoid mutating selector data)
+    return [...excludeActive].sort((a, b) => {
       // Find management for submission A
       const managementA = reportMgmtDetails
         .flatMap((r) => r.managements)
@@ -400,9 +431,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     });
   }, [reportSubmissions.length, selectedTab, displayUnitId, existingSubmission?.id, reportMgmtDetails.length]);
 
-  // Default back handler if none provided
+  // Default back handler if none provided (defer to avoid Fabric viewState crash)
   const defaultBackHandler = useCallback(() => {
-    router.canGoBack() ? router.back() : router.push(ROUTES.DASHBOARD);
+    InteractionManager.runAfterInteractions(() => {
+      router.canGoBack() ? router.back() : router.push(ROUTES.DASHBOARD);
+    });
   }, [router]);
 
   // Use provided onBack or default handler
@@ -423,64 +456,63 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   }, [router, refreshTokenIfNeeded]);
 
   const handleCreateReport = useCallback(() => {
-    // Ensure we have a fresh token before navigation
+    // Always use the selected report submission's own mgmt_id (do not mix with open mgmt id)
     ensureFreshTokenBeforeOperation()
       .then(() => {
-        // Use the active submission (the one displayed in the current report card)
         if (existingSubmission && existingSubmission.id) {
-          // If there's an active submission, navigate to edit/view it based on status
-          // Draft reports: edit mode, Published/Submitted reports: view mode
           const mode = existingSubmission.status === 'draft' ? 'edit' : 'view';
-          
-          console.log('[ReportsView] Navigating to active submission:', {
-            submissionId: existingSubmission.id,
-            templateId: existingSubmission.template_id,
-            managementId: existingSubmission.mgmt_id,
-            unitId: existingSubmission.unit_id,
-            status: existingSubmission.status,
+          const params = {
+            submissionId: existingSubmission.id.toString(),
+            templateId: existingSubmission.template_id.toString(),
+            managementId: existingSubmission.mgmt_id.toString(),
+            unitId: existingSubmission.unit_id.toString(),
+            status: existingSubmission.status ?? '',
             mode
+          };
+          console.log('[ReportsView] Opening report (using submission mgmt_id):', {
+            ...params,
+            submissionMgmtId: existingSubmission.mgmt_id,
+            submissionTemplateId: existingSubmission.template_id
           });
-          
-          router.push({
+          if (onOpenReport) {
+            console.log('[ReportsView] Calling onOpenReport (in-tab flow), submissionId:', existingSubmission.id);
+            onOpenReport({
+              submissionId: existingSubmission.id!,
+              templateId: existingSubmission.template_id,
+              managementId: existingSubmission.mgmt_id,
+              unitId: existingSubmission.unit_id,
+              mode: existingSubmission.status === 'draft' ? 'edit' : 'view',
+              status: existingSubmission.status
+            });
+            return;
+          }
+          router.replace({
             pathname: ROUTES.CREATE_REPORT,
-            params: {
-              submissionId: existingSubmission.id.toString(),
-              templateId: existingSubmission.template_id.toString(),
-              managementId: existingSubmission.mgmt_id.toString(),
-              unitId: existingSubmission.unit_id.toString(),
-              status: existingSubmission.status,
-              mode: mode
-            }
+            params
           });
           return;
         }
-        
-        // If no existing submission, use the currently open management period
         const currentMgmt = currentlyOpenManagement;
-        
         if (!currentMgmt) {
-          console.warn('No management period available for report creation');
+          console.warn('[ReportsView] No management period available for report creation');
           router.push(ROUTES.ALL_REPORTS);
           return;
         }
-        
-        // If we have a template, create a new submission
         if (currentTemplate?.id) {
           router.push({
             pathname: ROUTES.CREATE_REPORT,
-            params: { 
+            params: {
               templateId: currentTemplate.id.toString(),
               managementId: currentMgmt.id.toString(),
               unitId: displayUnit?.id?.toString() || ''
             }
           });
         } else {
-          // If no template is available, just navigate without params
           router.push(ROUTES.CREATE_REPORT);
         }
       })
       .catch(error => {
-        console.error('Error refreshing token before navigation:', error);
+        console.error('[ReportsView] Error before opening report:', error);
       });
   }, [router, existingSubmission, currentlyOpenManagement?.id, displayUnit?.id, ensureFreshTokenBeforeOperation, currentTemplate?.id]);
 
@@ -492,9 +524,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         return;
       }
       
-      // Only debounce if not forcing refresh
+      // Skip fetch if same unit and we loaded recently (keeps data in memory on quick tab switches)
       const now = Date.now();
-      if (!forceQARefresh && lastFetchedUnitIdRef.current === displayUnit.id && now - lastFetchTimeRef.current < 2000) {
+      const REFETCH_ON_FOCUS_INTERVAL_MS = 60 * 1000; // 1 minute
+      if (!forceQARefresh && lastFetchedUnitIdRef.current === displayUnit.id && now - lastFetchTimeRef.current < REFETCH_ON_FOCUS_INTERVAL_MS) {
         return;
       }
       
@@ -592,26 +625,26 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     };
   }, [displayUnit?.id]);
   
-  // Always fetch on focus to ensure fresh data
+  // Fetch on focus only if data is stale. Defer so we don't run in same frame as tab transition (avoids Fabric "Unable to find viewState for tag" when switching from Activities).
   useFocusEffect(
     useCallback(() => {
       console.log('[ReportsView] useFocusEffect triggered');
       shouldResetHighlightedRef.current = true;
-      if (displayUnit?.id) {
-        console.log('[ReportsView] Fetching data on focus for unit:', displayUnit.id);
-        // Only refresh token if needed, don't force it
-        fetchAllData(true) // Force refresh on focus
-          .catch(error => {
-            console.error('[ReportsView] Error fetching data on focus:', error);
-            // Don't logout on fetch error, let the user retry
-          });
-      } else {
-        console.log('[ReportsView] No display unit ID available on focus');
-      }
+      const id = setTimeout(() => {
+        if (displayUnit?.id) {
+          fetchAllData(false)
+            .catch(error => {
+              console.error('[ReportsView] Error fetching data on focus:', error);
+            });
+        } else {
+          console.log('[ReportsView] No display unit ID available on focus');
+        }
+      }, 100);
       return () => {
+        clearTimeout(id);
         console.log('[ReportsView] Screen losing focus');
       };
-    }, []) // Remove displayUnit?.id dependency to prevent infinite loop
+    }, [fetchAllData, displayUnit?.id])
   );
   
   // Effect to highlight the latest submission when reportSubmissions changes
@@ -671,10 +704,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     }
   }, [reportSubmissions, highlightAnim]);
 
-  // Use the currently open management instead of just the first one
-  // If no currently open management, fall back to the most recent one
-  const currentManagement = currentlyOpenManagement;
-  
+  // Use the selected submission's own management for card title and days (never mix with open mgmt)
+  const currentManagement = submissionManagementAndTemplate.management ?? currentlyOpenManagement;
+
   // Calculate progress for the active submission
   // Prioritize currentSubmissionId from QA state, fallback to existingSubmission.id
   const activeSubmissionId = currentSubmissionId || existingSubmission?.id || null;
@@ -772,9 +804,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
             {shouldShowCurrentReport ? (
               <>
                 <UrduText style={styles.reportSummaryItemTitle}>
-                  {currentTemplate && currentlyOpenManagement
-                    ? `${currentTemplate.report_name}۔ ماہ ${getUrduMonth(currentlyOpenManagement.month)} ${currentlyOpenManagement.year}ء`
-                    : existingSubmission 
+                  {submissionManagementAndTemplate.template && submissionManagementAndTemplate.management
+                    ? `${submissionManagementAndTemplate.template.report_name}۔ ماہ ${getUrduMonth(submissionManagementAndTemplate.management.month)} ${submissionManagementAndTemplate.management.year}ء`
+                    : existingSubmission
                       ? `ماہانہ رپورٹ ${existingSubmission.id}`
                       : 'ماہانہ رپورٹ'
                   }
@@ -816,20 +848,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                       })()}
                     </UrduText>
                   </View>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
-                    <UrduText style={styles.reportSummaryItemValue}>
-                      {currentManagement?.reporting_end_date 
-                        ? formatExpectedCompletion(currentManagement.reporting_end_date)
-                        : existingSubmission?.date_created
-                          ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                            })
-                          : 'تاریخ دستیاب نہیں'
-                      }
-                    </UrduText>
-                  </View>
                 </View>
                 <View style={styles.reportSummaryItemValueContainer}>
                   <View style={styles.reportSummaryItemValueContainerItem}>
@@ -863,20 +881,28 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     </UrduText>
                   </View>
                 </View>
-                <View style={styles.reportSummaryItemValueContainer}>
-                  <View style={styles.reportSummaryItemValueContainerItem}>
+                <View style={[styles.reportSummaryItemValueContainer, styles.reportSummaryItemValueContainerThirdRow]}>
+                  <View style={[styles.reportSummaryItemValueContainerItem, styles.reportSummaryItemLeft]}>
                     <UrduText style={styles.reportSummaryItemValue}>پروگریس</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
                   </View>
+                  <View style={[styles.reportSummaryItemValueContainerItem, styles.reportSummaryItemRight]}>
+                    <UrduText style={styles.reportSummaryItemValue}>آخری تاریخ</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>
+                      {currentManagement?.reporting_end_date
+                        ? formatExpectedCompletion(currentManagement.reporting_end_date, { label: '' })
+                        : existingSubmission?.date_created
+                          ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                            })
+                          : 'تاریخ دستیاب نہیں'}
+                    </UrduText>
+                  </View>
                 </View>
-                {/* Debug Info for Active Report
-                <View style={styles.debugContainer}>
-                  <UrduText style={styles.debugText}>
-                    DEBUG: Submission ID: {existingSubmission?.id || 'NULL'} | Template: {currentTemplate?.id || 'NULL'} | Mgmt: {currentlyOpenManagement?.id || 'NULL'} | Unit: {displayUnitId}
-                  </UrduText>
-                </View> */}
-                
                 <View style={styles.progressContainer}>
                   <View style={styles.progressBar}>
                     <View 
@@ -890,10 +916,22 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     />
                   </View>
                 </View>
-                {/* Debug mode: Show submission ID for current report */}
-                <View style={styles.debugContainer}>
-                  <UrduText style={styles.debugText}>Existing Submission ID: {existingSubmission?.id || 'NULL'}, QA Current Submission ID: {currentSubmissionId || 'NULL'}, Active Submission ID: {activeSubmissionId || 'NULL'}, Management ID: {currentlyOpenManagement?.id || 'NULL'}, Template ID: {currentTemplate?.id || 'NULL'}, Progress: {completionPercentage}% {completionPercentage === 0 ? '(No answers found)' : ''}</UrduText>
-                </View>
+                {__DEV__ && (
+                  <TouchableOpacity
+                    style={styles.copyDebugButton}
+                    onPress={() => {
+                      const submissionMgmtId = existingSubmission?.mgmt_id ?? 'NULL';
+                      const submissionTemplateId = existingSubmission?.template_id ?? 'NULL';
+                      const debugStr = `[ReportsView] Submission ID: ${existingSubmission?.id ?? 'NULL'}, Mgmt ID (submission): ${submissionMgmtId}, Template ID (submission): ${submissionTemplateId}, Unit: ${displayUnitId}, QA Current: ${currentSubmissionId ?? 'NULL'}, Active: ${activeSubmissionId ?? 'NULL'}, Progress: ${completionPercentage}%`;
+                      Clipboard.setString(debugStr);
+                      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                        Alert.alert('کاپی ہو گیا', 'ڈیبگ معلومات کاپی ہو گئی۔');
+                      }
+                    }}
+                  >
+                    <UrduText style={styles.copyDebugButtonText}>ڈیبگ معلومات کاپی کریں</UrduText>
+                  </TouchableOpacity>
+                )}
               </>
             ) : (
               <View style={styles.noReportsContainer}>
@@ -1011,9 +1049,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
                     showEdit={submission.status === 'draft'} // Only show edit button for draft reports
-                    submissionId={submission.id} // Add submission ID for debug mode
-                    managementId={submission.mgmt_id} // Add management ID for debug mode
-                    templateId={submission.template_id} // Add template ID for debug mode
                     onEdit={() => {
                       // Navigate to CREATE_REPORT in edit mode for draft reports
                       const mode = submission.status === 'draft' ? 'edit' : 'view';
@@ -1114,8 +1149,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  reportSummaryItemValueContainerThirdRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'nowrap',
+  },
   reportSummaryItemValueContainerItem: {
     flexDirection: 'row',
+  },
+  reportSummaryItemLeft: {
+    flex: 0,
+    alignSelf: 'flex-start',
+  },
+  reportSummaryItemRight: {
+    flex: 0,
+    alignSelf: 'flex-end',
   },
   progressContainer: {
     alignItems: 'center',
@@ -1208,19 +1256,19 @@ const styles = StyleSheet.create({
     borderColor: COLORS.tertiary,
     backgroundColor: COLORS.lightGray,
   },
-  debugContainer: {
+  copyDebugButton: {
     marginTop: SPACING.sm,
-    padding: SPACING.sm,
-    backgroundColor: COLORS.secondary,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
     alignSelf: 'flex-start',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.textSecondary,
   },
-  debugText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.primary,
-    fontWeight: '600',
+  copyDebugButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
   },
 });
 

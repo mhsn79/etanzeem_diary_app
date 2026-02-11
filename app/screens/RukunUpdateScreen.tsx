@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Text,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -61,7 +62,7 @@ export default function RukunUpdateScreen() {
         <Text style={styles.errorText}>{i18n.t('invalid_contact_id')}</Text>
         <CustomButton
           text={i18n.t('go_back')}
-          onPress={() => navigation.goBack()}
+          onPress={() => InteractionManager.runAfterInteractions(() => navigation.goBack())}
           viewStyle={styles.errorButton}
           textStyle={styles.errorButtonText}
         />
@@ -404,7 +405,7 @@ export default function RukunUpdateScreen() {
               text: i18n.t('ok'),
               onPress: () => {
                 console.log(`[RukunUpdateScreen] 🔙 Navigating back after successful submission...`);
-                navigation.goBack();
+                InteractionManager.runAfterInteractions(() => navigation.goBack());
               },
             }
           ]
@@ -427,7 +428,7 @@ export default function RukunUpdateScreen() {
   
   // Handle back button press
   const handleBackPress = () => {
-    navigation.goBack();
+    InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
   
   // Clean up status when component unmounts (temporarily disabled)
@@ -662,6 +663,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: SPACING.xs,
     fontStyle: 'italic',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 
 

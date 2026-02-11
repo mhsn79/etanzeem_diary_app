@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, InteractionManager } from 'react-native';
 import i18n from '../i18n';
 import CustomButton from '../components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +20,7 @@ export default function Meetings() {
           size={24}
           color="black" // You can customize the color here
           style={{ marginLeft: 15 }} // Adjust the position of the button
-          onPress={() => router.back()} // Navigate to Home screen on press
+          onPress={() => InteractionManager.runAfterInteractions(() => router.back())} // Navigate to Home screen on press
         />
         <View>
           <Text>{i18n.t('meetings')}</Text>

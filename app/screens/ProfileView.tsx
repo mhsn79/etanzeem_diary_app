@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
+import Constants from 'expo-constants';
 import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
@@ -228,12 +229,10 @@ export default function ProfileView() {
         }
       >
         <UrduText style={styles.personName}>{displayData.name || ''}</UrduText>
-        <UrduText style={styles.personSub}>{displayData.parent || ''}</UrduText>
 
-        {/* Only show required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number */}
+        {/* Only show required fields: Name, Father's name, Address, Email, Phone number, WhatsApp Number */}
         {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)}
         {displayData.address && StaticField(i18n.t('address'), displayData.address)}
-        {userDetails?.Rukinat_Date && StaticField(i18n.t('rukinat_date'), formatDate(userDetails.Rukinat_Date))}
         {displayData.email && StaticField(i18n.t('email'), displayData.email)}
         {displayData.phone && StaticField(i18n.t('phone_number'), displayData.phone)}
         {displayData.whatsApp && StaticField(i18n.t('whatsapp_number'), displayData.whatsApp)}
@@ -255,6 +254,10 @@ export default function ProfileView() {
             viewStyle={[styles.logoutBtn]}
           />
         </View>
+
+        <Text style={styles.versionText}>
+          Version {Constants.expoConfig?.version ?? require('../../package.json').version}
+        </Text>
       </ScrollView>
     </View>
   );
@@ -284,12 +287,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: '#008CFF',
     textAlign: 'center',
-    marginBottom: 4,
-  },
-  personSub: {
-    fontSize: 16,
-    textAlign: 'center',
-    fontFamily: 'JameelNooriNastaleeq',
     marginBottom: 16,
   },
 
@@ -300,7 +297,15 @@ const styles = StyleSheet.create({
   logoutBtn: {
     backgroundColor: COLORS.error,
   },
-  
+
+  versionText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+
   /* loading state */
   centerContainer: {
     flex: 1,
@@ -314,5 +319,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     textAlign: 'center',
+    fontFamily: 'JameelNooriNastaleeq',
   },
 });

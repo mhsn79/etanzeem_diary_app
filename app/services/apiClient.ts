@@ -206,12 +206,14 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
 
 /**
  * Direct API request using fetch (for cases where directus SDK doesn't work well)
- * Enhanced with the same token refresh mechanism as apiRequest
+ * Enhanced with the same token refresh mechanism as apiRequest.
+ * Pass signal to abort in-flight request (e.g. on screen blur to avoid "Unable to find viewState" Fabric crash).
  */
 export const directApiRequest = async <T>(
   endpoint: string,
   method: string = 'GET',
-  body?: any
+  body?: any,
+  signal?: AbortSignal
 ): Promise<T> => {
   // Get the current state
   const auth = getAuthState();
@@ -240,11 +242,10 @@ export const directApiRequest = async <T>(
           'Authorization': `Bearer ${accessToken}`
         }
       };
-      
+      if (signal) options.signal = signal;
       if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      
       const response = await fetch(url, options);
       
       if (!response.ok) {
@@ -254,6 +255,7 @@ export const directApiRequest = async <T>(
       
       return await response.json() as T;
     } catch (error: any) {
+      if (error?.name === 'AbortError') throw error;
       // Check if the error is a token expiration error
       const isTokenError = 
         error.message.includes('401') || 
@@ -324,16 +326,24 @@ export const directApiRequest = async <T>(
  */
 export const ensureFreshToken = async (): Promise<string> => {
   try {
-    await refreshOnce('ensureFreshToken');
-    
-    // Get the current state after potential refresh
     const auth = getAuthState();
-    
-    if (!auth.tokens?.accessToken) {
+    const accessToken = auth.tokens?.accessToken;
+    const expiresAt = auth.tokens?.expiresAt;
+
+    if (!accessToken) {
       throw new Error('No authentication token available');
     }
-    
-    return auth.tokens.accessToken;
+
+    if (isTokenExpiredOrExpiring(expiresAt)) {
+      await refreshOnce('ensureFreshToken');
+      const refreshedAuth = getAuthState();
+      if (!refreshedAuth.tokens?.accessToken) {
+        throw new Error('No authentication token available');
+      }
+      return refreshedAuth.tokens.accessToken;
+    }
+
+    return accessToken;
   } catch (error: any) {
     console.error(`[API] Failed to ensure fresh token: ${error.message} (${Platform.OS})`);
     

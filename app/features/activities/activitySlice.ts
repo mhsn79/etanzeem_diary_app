@@ -258,17 +258,17 @@ export const editActivity = createAsyncThunk<
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
- * Thunk to fetch activities
+ * Thunk to fetch activities. Pass { signal } to abort when screen blurs (avoids Fabric "Unable to find viewState").
  * ────────────────────────────────────────────────────────────────────────────────*/
 export const fetchActivities = createAsyncThunk<
   Activity[],
-  void,
+  void | { signal?: AbortSignal },
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('activities/fetch', async (_, { rejectWithValue, getState }) => {
+>('activities/fetch', async (arg, { rejectWithValue, getState }) => {
+  const signal = (typeof arg === 'object' && arg != null && 'signal' in arg) ? arg.signal : undefined;
   try {
     console.log('[Activities] Fetching activities:', Platform.OS);
     
-    // Get the current user ID from auth state
     const state = getState();
     const userId = state.auth.user?.id;
     
@@ -276,33 +276,52 @@ export const fetchActivities = createAsyncThunk<
       return rejectWithValue('User not authenticated. Please log in again.');
     }
     
-    // Check if we already have activities and they're recent (within 30 seconds)
+    // Filter by user's unit and sub-unit hierarchy (backend filter, not UI)
+    const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
+    const userUnitId = state.tanzeem?.userUnitDetails?.id;
+    const unitIds: number[] = userUnitHierarchyIds.length > 0
+      ? userUnitHierarchyIds
+      : (userUnitId != null ? [userUnitId] : []);
+    
+    if (unitIds.length === 0) {
+      console.log('[Activities] No unit context yet, skipping fetch');
+      return [];
+    }
+    
     const currentActivities = state.activities?.ids?.length || 0;
     const lastFetchTime = state.activities?.lastFetchTime || 0;
     const now = Date.now();
     
-    // If we have activities and they were fetched recently, skip the fetch
-    // BUT only if lastFetchTime is not 0 (which indicates a unit change)
     if (currentActivities > 0 && lastFetchTime > 0 && (now - lastFetchTime) < 30000) {
       console.log('[Activities] Activities already loaded recently, skipping fetch');
       return state.activities?.entities ? Object.values(state.activities.entities).filter(Boolean) as Activity[] : [];
     }
     
-    // If lastFetchTime is 0, it means activities were cleared due to unit change
     if (lastFetchTime === 0) {
       console.log('[Activities] Activities cleared due to unit change, fetching fresh data');
     }
     
-    // Use directApiRequest which uses fetch directly for more reliable results
-    // Fetch all activities except archived ones
+    // Backend filter: only activities belonging to user's unit and its sub-units (field: tanzeemi_unit)
+    const unitFilter = unitIds.length === 1
+      ? `filter[tanzeemi_unit][_eq]=${unitIds[0]}`
+      : `filter[tanzeemi_unit][_in]=${unitIds.join(',')}`;
+    const endpoint = `/items/Activities?sort=-activity_date_and_time&fields=*&filter[status][_neq]=archived&${unitFilter}`;
+    
     const response = await directApiRequest<{ data: Activity[] }>(
-      `/items/Activities?sort=-activity_date_and_time&fields=*&filter[status][_neq]=archived`,
-      'GET'
+      endpoint,
+      'GET',
+      undefined,
+      signal
     );
     
     if (!response.data) throw new Error('Failed to fetch activities');
+    const count = Array.isArray(response.data) ? response.data.length : 0;
+    console.log('[Activities] Activities loaded successfully:', count, 'activities (filtered by unit hierarchy)');
     return response.data;
   } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      return rejectWithValue('aborted');
+    }
     console.error('Fetch activities error:', error);
     return rejectWithValue(error.message || 'Failed to fetch activities');
   }
@@ -431,9 +450,9 @@ const activitiesSlice = createSlice({
         state.status = 'succeeded';
         state.lastFetchTime = Date.now();
         activitiesAdapter.setAll(state, action.payload);
-        console.log('[Activities] Activities loaded successfully:', action.payload.length, 'activities');
       })
       .addCase(fetchActivities.rejected, (state, action) => {
+        if (action.payload === 'aborted') return; // Screen blurred; don't update UI
         state.status = 'failed';
         state.error = action.payload ?? 'Failed to fetch activities';
       })

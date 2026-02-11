@@ -93,7 +93,7 @@ const normalizeResponse = <T>(response: T | { data: T }, entity: string): T => {
   throw new Error(`Invalid ${entity} response format`);
 };
 
-// Async thunks
+// Async thunks: fetch submissions for logged-in user's unit and all units in hierarchy below it
 export const fetchReportSubmissions = createAsyncThunk<
   ReportSubmission[],
   void,
@@ -101,18 +101,21 @@ export const fetchReportSubmissions = createAsyncThunk<
 >('reports/fetchReportSubmissions', async (_, { getState, rejectWithValue }) => {
   try {
     const { tanzeem } = getState();
-    const tanzeemiUnitIds = tanzeem?.ids ?? [];
+    const userUnitId = tanzeem?.userUnitDetails?.id;
+    const hierarchyIds = tanzeem?.userUnitHierarchyIds ?? [];
+    const unitIds = userUnitId != null
+      ? [...new Set([userUnitId, ...hierarchyIds])]
+      : hierarchyIds.length ? hierarchyIds : (tanzeem?.ids ?? []);
 
-    if (!tanzeemiUnitIds.length) {
+    if (!unitIds.length) {
       return [];
     }
 
     const params = {
-      filter: { unit_id: { _in: tanzeemiUnitIds } },
+      filter: { unit_id: { _in: unitIds } },
       sort: 'id',
     };
 
-    // The centralized API client handles token refresh automatically
     const response = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
       path: '/items/reports_submissions',
       method: 'GET',

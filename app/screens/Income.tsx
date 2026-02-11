@@ -1,38 +1,65 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View } from 'react-native';
-import i18n from '../i18n';
-import CustomButton from '../components/CustomButton';
+import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// Import theme constants
-import { COLORS, SPACING } from '../constants/theme';
-import { Appearance, useColorScheme } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
+import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import UrduText from '../components/UrduText';
 
 export default function Income() {
   const insets = useSafeAreaInsets();
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[{ flexGrow: 1, paddingTop: insets.top }]} style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]} style={styles.container}>
         <Ionicons
-          name="arrow-back" // The back arrow icon
+          name="arrow-back"
           size={24}
-          color="black" // You can customize the color here
-          style={{ marginLeft: 15 }} // Adjust the position of the button
-          onPress={() => router.back()} // Navigate to Home screen on press
+          color="black"
+          style={styles.backIcon}
+          onPress={() => InteractionManager.runAfterInteractions(() => router.back())}
         />
-        <View>
-          <Text>{i18n.t('income')}</Text>
+        <View style={styles.centerMessage}>
+          <UrduText style={styles.comingSoonText}>بیت المال کا فیچر ابھی مکمل نہیں</UrduText>
+          <UrduText style={styles.comingSoonSubtext}>Coming soon</UrduText>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
-  }
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    position: 'absolute',
+    top: 0,
+    left: 15,
+    zIndex: 1,
+  },
+  centerMessage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  comingSoonText: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  comingSoonSubtext: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
 });

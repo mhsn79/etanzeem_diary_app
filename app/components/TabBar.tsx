@@ -1,8 +1,7 @@
-import React from 'react';
-import { Platform, TouchableOpacity, Dimensions, StyleSheet, View, Text } from 'react-native';
+import React, { useRef } from 'react';
+import { Platform, TouchableOpacity, StyleSheet, View, Text, InteractionManager } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import HomeIconBlack from '../../assets/images/home-icon-black.svg';
 import ArkanIconBlack from '../../assets/images/arkan-icon-black.svg';
 import ActivitiesIconBlack from '../../assets/images/activities-icon-black.svg';
@@ -45,10 +44,13 @@ function getIcon(label: ValidLabel, focused: boolean) {
   return <IconComponent style={iconStyle} />;
 }
 
+// Delay so Fabric can finish layout before tab switch (avoids "Unable to find viewState for tag" when leaving Activities).
+const TAB_SWITCH_DELAY_MS = 280;
+
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const displayedRoutes = state.routes.slice(0, 4);
+  const pendingRef = useRef(false);
 
   return (
     <View
@@ -83,14 +85,22 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
             canPreventDefault: true,
           });
 
-          if (!isFocused && !event.defaultPrevented) {
-            // Reports: same as home screen rectangular button – go to ReportsManagementScreen
-            if (validLabel === 'رپورٹس') {
-              router.push('/screens/ReportsManagementScreen');
-              return;
-            }
+          if (!isFocused && !event.defaultPrevented && !pendingRef.current) {
+            pendingRef.current = true;
             const tabName = LABEL_TO_TAB_NAME[validLabel];
-            navigation.navigate(tabName);
+            // Defer tab switch + short delay so Fabric can finish layout (avoids "Unable to find viewState for tag" on quick Activities -> Reports)
+            InteractionManager.runAfterInteractions(() => {
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  navigation.navigate(tabName);
+                  pendingRef.current = false;
+                }, TAB_SWITCH_DELAY_MS);
+                // Safety: unblock after 500ms if something goes wrong
+                setTimeout(() => {
+                  pendingRef.current = false;
+                }, 500);
+              });
+            });
           }
         };
 
