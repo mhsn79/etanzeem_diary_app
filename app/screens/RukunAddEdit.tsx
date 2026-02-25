@@ -10,21 +10,26 @@ import {
   ActivityIndicator,
   Text,
   InteractionManager,
+  TextInput,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
+import { Ionicons } from '@expo/vector-icons';
 
 import i18n from '../i18n';
 import { AppDispatch, RootState } from '@/app/store/types';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
-import { 
-  updatePerson, 
-  createPerson, 
-  
+import {
+  updatePerson,
+  createPerson,
+  checkPhoneExists,
+  archivePerson,
   transferRukun,
-  selectUpdatePersonStatus, 
+  selectUpdatePersonStatus,
   selectUpdatePersonError,
   selectCreatePersonStatus,
   selectCreatePersonError,
@@ -33,6 +38,7 @@ import {
   resetUpdateStatus,
   resetCreateStatus,
   resetTransferStatus,
+  resetArchiveStatus,
   fetchContactTypes,
   selectContactTypes,
   selectContactTypesStatus,
@@ -41,8 +47,13 @@ import {
 import {
   selectSubordinateUnitsForDropdown
 } from '@/app/features/tanzeem/tanzeemHierarchySlice';
+import {
+  selectDashboardSelectedUnitId,
+  selectDashboardSelectedUnit,
+  selectUserUnitDetails,
+  selectLevelsById
+} from '@/app/features/tanzeem/tanzeemSlice';
 import { Person, UpdatePersonPayload, CreatePersonPayload } from '@/app/models/Person';
-// import { getImageUrl } from '@/app/utils/imageUpload';
 
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
@@ -51,7 +62,7 @@ import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import TransferRukunModal from '@/app/components/TransferRukunModal';
 import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../constants/theme';
 
 type RukunAddEditRouteProp = RouteProp<RootStackParamList, 'screens/RukunAddEdit'>;
 
@@ -65,11 +76,12 @@ export default function RukunAddEdit() {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RukunAddEditRouteProp>();
-  
+
   // Get the rukun data from route params if it exists (for edit mode)
   const initialRukun = route.params?.rukun;
+  const initialContactTypeId = route.params?.contactTypeId;
   const isEditMode = !!initialRukun && !!initialRukun.id;
-  
+
   // Redux state for tracking API operations
   const updateStatus = useSelector(selectUpdatePersonStatus);
   const updateError = useSelector(selectUpdatePersonError);
@@ -78,16 +90,34 @@ export default function RukunAddEdit() {
   const contactTypes = useSelector(selectContactTypes);
   const contactTypesStatus = useSelector(selectContactTypesStatus);
   const contactTypesError = useSelector(selectContactTypesError);
-  
+
   // Redux state for hierarchy units (subordinate units for dropdown)
   const tanzeemiUnitOptions = useSelector(selectSubordinateUnitsForDropdown);
-  
+
+  // Current user's unit (for pre-selecting in create mode)
+  const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
+  const dashboardSelectedUnit = useSelector(selectDashboardSelectedUnit);
+  const userUnit = useSelector(selectUserUnitDetails);
+  const levelsById = useSelector(selectLevelsById);
+  const currentUnitId = selectedUnitId || userUnit?.id;
+  const currentUnitName = useMemo(() => {
+    const unit = dashboardSelectedUnit || userUnit;
+    if (!unit) return '';
+    const unitName = unit.Name || unit.name || '';
+    const levelId = unit.Level_id || unit.level_id;
+    if (levelId && levelsById[levelId]) {
+      const levelName = levelsById[levelId].Name || levelsById[levelId].name || '';
+      if (levelName) return `${levelName}: ${unitName}`;
+    }
+    return unitName;
+  }, [dashboardSelectedUnit, userUnit, levelsById]);
+
   // Transfer status
   const transferStatus = useSelector(selectTransferStatus);
   const transferError = useSelector(selectTransferError);
-  
-  
-  // Form state - only required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number
+
+
+  // Form state
   const [formData, setFormData] = useState<UpdatePersonPayload | CreatePersonPayload>(() => {
     if (isEditMode && initialRukun) {
       return {
@@ -103,7 +133,7 @@ export default function RukunAddEdit() {
         status: initialRukun.status || 'draft',
       };
     } else {
-      // Create mode - start with empty form
+      // Create mode - pre-select contact type from navigation params
       return {
         name: '',
         parent: '',
@@ -111,13 +141,20 @@ export default function RukunAddEdit() {
         email: '',
         phone: '',
         whatsApp: '',
-        contact_type: undefined,
+        contact_type: initialContactTypeId || undefined,
         tanzeemi_unit: undefined,
         status: 'draft',
       };
     }
   });
-  
+
+  // Pre-select current unit in create mode once it's available
+  useEffect(() => {
+    if (!isEditMode && currentUnitId && !formData.tanzeemi_unit) {
+      setFormData(prev => ({ ...prev, tanzeemi_unit: currentUnitId }));
+    }
+  }, [isEditMode, currentUnitId]);
+
   // Separate state for Rukinat Date (membership date)
   const [rukinatDate, setRukinatDate] = useState<string>(() => {
     if (isEditMode && initialRukun) {
@@ -125,17 +162,27 @@ export default function RukunAddEdit() {
     }
     return '';
   });
-  
+
   // Image upload state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Transfer Rukun state
+
+  // Transfer state (admin approval for rukun)
   const [showTransferModal, setShowTransferModal] = useState(false);
-  
+
+  // Direct transfer state (for umeedwar/karkun)
+  const [showDirectTransferModal, setShowDirectTransferModal] = useState(false);
+  const [selectedTransferUnitId, setSelectedTransferUnitId] = useState<number | undefined>(undefined);
+  const [directTransferLoading, setDirectTransferLoading] = useState(false);
+
+  // Archive state
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveError, setArchiveError] = useState('');
+
   // Fetch contact types on component mount
   useEffect(() => {
     if (contactTypesStatus === 'idle') {
@@ -143,61 +190,94 @@ export default function RukunAddEdit() {
     }
   }, [dispatch, contactTypesStatus]);
 
-  // Gender options
-  const genderOptions: Option[] = useMemo(() => [
-    { id: 'male', label: i18n.t('male'), value: 'male' },
-    { id: 'female', label: i18n.t('female'), value: 'female' },
-  ], []);
+  // Determine the current contact type string
+  const selectedContactTypeStr = useMemo(() => {
+    if (!formData.contact_type || !contactTypes || contactTypes.length === 0) return '';
+    const ct = contactTypes.find(type => type.id === formData.contact_type);
+    return ct?.type || '';
+  }, [formData.contact_type, contactTypes]);
 
-  // Contact type options - filtered to only show "karkun" and "others"
+  // Determine the initial (edit mode) contact type string
+  const initialContactTypeStr = useMemo(() => {
+    if (!isEditMode || !initialRukun?.contact_type || !contactTypes || contactTypes.length === 0) return '';
+    const ct = contactTypes.find(type => type.id === initialRukun.contact_type);
+    return ct?.type || '';
+  }, [isEditMode, initialRukun, contactTypes]);
+
+  // Whether this is a rukun type
+  const isRukunType = selectedContactTypeStr === 'rukun';
+
+  // Whether transfer is allowed (rukun, umeedwar, karkun — not others)
+  const isTransferableType = ['rukun', 'umeedwar', 'karkun'].includes(selectedContactTypeStr);
+
+  // Whether archive is allowed (non-rukun types)
+  const isArchivableType = selectedContactTypeStr !== '' && selectedContactTypeStr !== 'rukun';
+
+  // Contact type dropdown options based on mode and current type
   const contactTypeOptions: Option[] = useMemo(() => {
     if (!contactTypes || contactTypes.length === 0) return [];
-    
+
+    let allowedTypes: string[];
+
+    if (!isEditMode) {
+      // Create mode: umeedwar, karkun, others (not rukun)
+      allowedTypes = ['umeedwar', 'karkun', 'others'];
+    } else if (initialContactTypeStr === 'umeedwar') {
+      // Edit umeedwar: locked (only umeedwar shown)
+      allowedTypes = ['umeedwar'];
+    } else if (initialContactTypeStr === 'karkun') {
+      // Edit karkun: can promote to umeedwar
+      allowedTypes = ['umeedwar', 'karkun'];
+    } else if (initialContactTypeStr === 'others') {
+      // Edit others: can change to umeedwar, karkun, or others
+      allowedTypes = ['umeedwar', 'karkun', 'others'];
+    } else {
+      // Edit rukun or unknown: show current type only
+      allowedTypes = [initialContactTypeStr].filter(Boolean);
+    }
+
     return contactTypes
-      .filter(type => type.type === 'karkun' || type.type === 'others')
+      .filter(type => allowedTypes.includes(type.type))
       .map(type => ({
         id: type.id.toString(),
         label: i18n.t(type.type) || type.type,
         value: type.id.toString()
       }));
-  }, [contactTypes]);
+  }, [contactTypes, isEditMode, initialContactTypeStr]);
+
+  // Whether the contact type dropdown should be disabled
+  const isContactTypeDisabled = isEditMode && initialContactTypeStr === 'umeedwar';
 
   // Dynamic header title based on contact type
   const headerTitle = useMemo(() => {
-    if (!isEditMode) {
-      return i18n.t('add_rukun');
-    }
-    
-    // In edit mode, get the contact type label
+    // If contact type is selected, show its label
     if (formData.contact_type && contactTypes && contactTypes.length > 0) {
       const contactType = contactTypes.find(type => type.id === formData.contact_type);
       if (contactType) {
-        // Return the localized contact type name
-        return i18n.t(contactType.type) || contactType.type;
+        return contactType.label_singular || i18n.t(contactType.type) || contactType.type;
       }
     }
-    
-    // Show loading state if contact types are still being fetched
+
     if (contactTypesStatus === 'loading') {
       return i18n.t('loading') || 'Loading...';
     }
-    
-    // Fallback to generic "رکن" if contact type not found or not loaded yet
-    return 'رکن';
+
+    // No contact type selected yet
+    return i18n.t('add_new');
   }, [isEditMode, formData.contact_type, contactTypes, contactTypesStatus]);
 
   // Hide the header
   useEffect(() => {
-    navigation.setOptions({ 
+    navigation.setOptions({
       headerShown: false,
       title: headerTitle
     });
   }, [navigation, headerTitle]);
-  
+
   // Handle form input changes
   const handleChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error for this field if it exists
     if (errors[field]) {
       setErrors(prev => {
@@ -209,10 +289,6 @@ export default function RukunAddEdit() {
   };
 
   // Handle dropdown selections
-  const handleGenderSelect = (option: Option) => {
-    handleChange('gender', option.value);
-  };
-
   const handleContactTypeSelect = (option: Option) => {
     handleChange('contact_type', parseInt(option.value));
   };
@@ -221,41 +297,162 @@ export default function RukunAddEdit() {
     handleChange('tanzeemi_unit', parseInt(option.value));
   };
 
-  // Transfer Rukun handlers
-  const handleTransferRukun = () => {
-    setShowTransferModal(true);
+  // Transfer handlers
+  const handleTransferPress = () => {
+    if (isRukunType) {
+      // Rukun: admin approval flow
+      setShowTransferModal(true);
+    } else {
+      // Umeedwar/Karkun: direct transfer
+      setSelectedTransferUnitId(undefined);
+      setShowDirectTransferModal(true);
+    }
   };
 
   const handleTransferSuccess = () => {
-    // Refresh the data or navigate back
     InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
-  
+
+  const handleDirectTransferConfirm = async () => {
+    if (!selectedTransferUnitId) {
+      Alert.alert(i18n.t('error'), i18n.t('please_select_unit'));
+      return;
+    }
+    if (!isEditMode || !('id' in formData) || !formData.id) return;
+
+    setDirectTransferLoading(true);
+    try {
+      await dispatch(updatePerson({
+        id: formData.id,
+        unit: selectedTransferUnitId.toString(),
+      })).unwrap();
+
+      setShowDirectTransferModal(false);
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('transfer_successful_message', { rukunName: formData.name || '' }),
+        [{ text: i18n.t('ok'), onPress: () => InteractionManager.runAfterInteractions(() => navigation.goBack()) }]
+      );
+    } catch (err: any) {
+      Alert.alert(i18n.t('error'), err || i18n.t('transfer_failed'));
+    } finally {
+      setDirectTransferLoading(false);
+    }
+  };
+
+  // Archive handlers
+  const handleArchivePress = () => {
+    setArchiveReason('');
+    setArchiveError('');
+    setShowArchiveModal(true);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveReason.trim()) {
+      setArchiveError(i18n.t('archive_reason_required'));
+      return;
+    }
+
+    if (!isEditMode || !('id' in formData) || !formData.id) return;
+
+    setShowArchiveModal(false);
+    try {
+      await dispatch(archivePerson({ id: formData.id, reason: archiveReason.trim() })).unwrap();
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('archive_successful'),
+        [{ text: i18n.t('ok'), onPress: () => InteractionManager.runAfterInteractions(() => navigation.goBack()) }]
+      );
+    } catch (error: any) {
+      Alert.alert(i18n.t('error'), error || i18n.t('archive_failed'));
+    }
+  };
+
   // Validate form
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    
-    // Required fields
+
     if (!formData.name?.trim()) newErrors.name = i18n.t('field_required');
     if (!formData.phone?.trim()) newErrors.phone = i18n.t('field_required');
     if (!formData.contact_type) newErrors.contact_type = i18n.t('field_required');
-    
-    // Email validation (if provided)
+
     if (formData.email && formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = i18n.t('invalid_email_format');
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
 
+    // Check phone uniqueness
+    try {
+      const phoneExists = await dispatch(checkPhoneExists({
+        phone: formData.phone!.trim(),
+        excludeId: isEditMode && 'id' in formData ? formData.id : undefined,
+      })).unwrap();
+
+      if (phoneExists) {
+        setErrors(prev => ({ ...prev, phone: i18n.t('phone_already_exists') }));
+        return;
+      }
+    } catch {
+      // If phone check fails, continue with save (don't block on network errors)
+    }
+
+    if (isEditMode && 'id' in formData && formData.id) {
+      // Update mode
+      const payload: UpdatePersonPayload = {
+        id: formData.id,
+        name: formData.name,
+        parent: formData.parent,
+        address: formData.address,
+        email: formData.email,
+        phone: formData.phone,
+        whatsApp: formData.whatsApp,
+        contact_type: formData.contact_type,
+      };
+      // Include Rukinat_Date only for rukun type
+      if (isRukunType && rukinatDate) {
+        (payload as any).Rukinat_Date = rukinatDate;
+      }
+
+      const result = await dispatch(updatePerson(payload));
+      if (updatePerson.fulfilled.match(result)) {
+        Alert.alert(
+          i18n.t('success'),
+          i18n.t('update_successful') || 'Updated successfully',
+          [{ text: i18n.t('ok'), onPress: () => InteractionManager.runAfterInteractions(() => navigation.goBack()) }]
+        );
+      }
+    } else {
+      // Create mode
+      const payload: CreatePersonPayload = {
+        name: formData.name || '',
+        parent: formData.parent,
+        address: formData.address,
+        email: formData.email,
+        phone: formData.phone,
+        whatsApp: formData.whatsApp,
+        contact_type: formData.contact_type,
+        tanzeemi_unit: formData.tanzeemi_unit as number | undefined,
+        status: 'draft',
+      };
+
+      const result = await dispatch(createPerson(payload));
+      if (createPerson.fulfilled.match(result)) {
+        Alert.alert(
+          i18n.t('success'),
+          i18n.t('save') || 'Saved successfully',
+          [{ text: i18n.t('ok'), onPress: () => InteractionManager.runAfterInteractions(() => navigation.goBack()) }]
+        );
+      }
+    }
   };
-  
+
   // Handle transfer success and error
   useEffect(() => {
     if (transferStatus === 'succeeded') {
@@ -294,23 +491,24 @@ export default function RukunAddEdit() {
       dispatch(resetUpdateStatus());
       dispatch(resetCreateStatus());
       dispatch(resetTransferStatus());
+      dispatch(resetArchiveStatus());
     };
   }, [dispatch]);
-  
+
   // Handle back button press
   const handleBackPress = () => {
     InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
-  
+
   // Image upload disabled
   const handleImageUpload = async (_imageUri: string) => {
     return;
   };
-        
-  
+
+
   // Show loading indicator during API operations
   const isLoading = updateStatus === 'loading' || createStatus === 'loading' || isUploading;
-  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -333,7 +531,6 @@ export default function RukunAddEdit() {
           contentContainerStyle={styles.scrollContent}
           style={styles.scrollWrapper}
         >
-          {/* Only required fields: Name, Father's name, Address, Membership date, Email, Phone number */}
           <FormInput
             inputTitle={i18n.t('name')}
             value={formData.name || ''}
@@ -342,7 +539,7 @@ export default function RukunAddEdit() {
             error={errors.name}
             required
           />
-          
+
           <FormInput
             inputTitle={i18n.t('parent')}
             value={formData.parent || ''}
@@ -350,7 +547,7 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_parent_name')}
             error={errors.parent}
           />
-          
+
           <FormInput
             inputTitle={i18n.t('address')}
             value={formData.address || ''}
@@ -360,15 +557,18 @@ export default function RukunAddEdit() {
             numberOfLines={3}
             error={errors.address}
           />
-          
-          <FormInput
-            inputTitle={i18n.t('rukinat_date')}
-            value={rukinatDate}
-            onChange={(value) => setRukinatDate(value)}
-            placeholder="YYYY-MM-DD"
-            error={errors.rukinat_date}
-          />
-          
+
+          {/* Rukinat Date - only for rukun type */}
+          {isRukunType && (
+            <FormInput
+              inputTitle={i18n.t('rukinat_date')}
+              value={rukinatDate}
+              onChange={(value) => setRukinatDate(value)}
+              placeholder="YYYY-MM-DD"
+              error={errors.rukinat_date}
+            />
+          )}
+
           <FormInput
             inputTitle={i18n.t('email')}
             value={formData.email || ''}
@@ -377,7 +577,7 @@ export default function RukunAddEdit() {
             keyboardType="email-address"
             error={errors.email}
           />
-          
+
           <FormInput
             inputTitle={i18n.t('phone_number')}
             value={formData.phone || ''}
@@ -387,7 +587,7 @@ export default function RukunAddEdit() {
             error={errors.phone}
             required
           />
-          
+
           <FormInput
             inputTitle={i18n.t('whatsapp_number')}
             value={formData.whatsApp || ''}
@@ -404,9 +604,10 @@ export default function RukunAddEdit() {
             selectedValue={formData.contact_type?.toString()}
             placeholder={i18n.t('contact_type')}
             loading={contactTypesStatus === 'loading'}
+            disabled={isContactTypeDisabled}
             viewStyle={styles.dropdownContainer}
           />
-          
+
           {errors.contact_type && (
             <Text style={styles.fieldErrorText}>{errors.contact_type}</Text>
           )}
@@ -415,11 +616,11 @@ export default function RukunAddEdit() {
             options={tanzeemiUnitOptions}
             onSelect={handleTanzeemiUnitSelect}
             selectedValue={formData.tanzeemi_unit?.toString()}
-            placeholder={i18n.t('select_unit')}
-            disabled={isEditMode}
+            placeholder={currentUnitName || i18n.t('select_unit')}
+            disabled={true}
             viewStyle={styles.dropdownContainer}
           />
-          
+
           {errors.tanzeemi_unit && (
             <Text style={styles.fieldErrorText}>{errors.tanzeemi_unit}</Text>
           )}
@@ -439,53 +640,176 @@ export default function RukunAddEdit() {
               viewStyle={styles.submitBtn}
               disabled={isLoading}
             />
-            
+
             {isLoading && (
-              <ActivityIndicator 
-                size="small" 
-                color={COLORS.primary} 
-                style={styles.loader} 
+              <ActivityIndicator
+                size="small"
+                color={COLORS.primary}
+                style={styles.loader}
               />
             )}
           </View>
 
-          {/* Transfer Rukun Feature - Only visible in edit mode */}
-          {isEditMode && (
+          {/* Transfer Feature - Only visible in edit mode for transferable types */}
+          {isEditMode && isTransferableType && (
             <View style={styles.transferContainer}>
               <CustomButton
-                text={transferStatus === 'loading' ? i18n.t('transferring') : i18n.t('transfer_rukun')}
-                onPress={handleTransferRukun}
+                text={transferStatus === 'loading' || directTransferLoading ? i18n.t('transferring') : i18n.t('transfer_contact')}
+                onPress={handleTransferPress}
                 viewStyle={styles.transferBtn}
-                disabled={isLoading || transferStatus === 'loading'}
+                disabled={isLoading || transferStatus === 'loading' || directTransferLoading}
               />
-              
+
               {transferStatus === 'loading' && (
-                <ActivityIndicator 
-                  size="small" 
-                  color={COLORS.primary} 
-                  style={styles.transferLoader} 
+                <ActivityIndicator
+                  size="small"
+                  color={COLORS.primary}
+                  style={styles.transferLoader}
                 />
               )}
+            </View>
+          )}
+
+          {/* Archive/Remove Feature - Only visible in edit mode for non-rukun types */}
+          {isEditMode && isArchivableType && (
+            <View style={styles.archiveContainer}>
+              <CustomButton
+                text={i18n.t('archive_person')}
+                onPress={handleArchivePress}
+                viewStyle={styles.archiveBtn}
+                disabled={isLoading}
+              />
             </View>
           )}
         </ScrollView>
       </View>
 
-      {/* Transfer Rukun Modal */}
+      {/* Transfer Modal */}
       {isEditMode && 'id' in formData && formData.id && (
         <TransferRukunModal
           visible={showTransferModal}
           onClose={() => setShowTransferModal(false)}
           onSuccess={handleTransferSuccess}
           rukunId={formData.id}
-          rukunName={formData.name || 'Unknown Rukun'}
+          rukunName={formData.name || 'Unknown'}
           currentUnitId={formData.tanzeemi_unit}
-          currentUnitName={tanzeemiUnitOptions.find(unit => 
+          currentUnitName={tanzeemiUnitOptions.find(unit =>
             unit.value === formData.tanzeemi_unit?.toString()
           )?.label}
           tanzeemiUnitOptions={tanzeemiUnitOptions}
         />
       )}
+
+      {/* Direct Transfer Modal (for umeedwar/karkun) */}
+      <Modal
+        visible={showDirectTransferModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDirectTransferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowDirectTransferModal(false)}
+              disabled={directTransferLoading}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+
+            <UrduText style={styles.modalTitle}>
+              {i18n.t('transfer_contact')}
+            </UrduText>
+
+            <CustomDropdown
+              dropdownTitle={i18n.t('select_new_unit')}
+              options={tanzeemiUnitOptions}
+              onSelect={(option: Option) => setSelectedTransferUnitId(parseInt(option.value))}
+              selectedValue={selectedTransferUnitId?.toString()}
+              placeholder={i18n.t('choose_destination_unit')}
+              disabled={directTransferLoading}
+              viewStyle={styles.dropdownContainer}
+            />
+
+            <View style={styles.modalButtonContainer}>
+              <CustomButton
+                text={directTransferLoading ? i18n.t('transferring') : i18n.t('confirm')}
+                onPress={handleDirectTransferConfirm}
+                viewStyle={styles.modalConfirmBtn}
+                disabled={directTransferLoading || !selectedTransferUnitId}
+              />
+              <CustomButton
+                text={i18n.t('cancel')}
+                onPress={() => setShowDirectTransferModal(false)}
+                viewStyle={styles.modalCancelBtn}
+                disabled={directTransferLoading}
+              />
+            </View>
+
+            {directTransferLoading && (
+              <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Archive Reason Modal */}
+      <Modal
+        visible={showArchiveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowArchiveModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowArchiveModal(false)}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+
+            <UrduText style={styles.modalTitle}>
+              {i18n.t('archive_person_title')}
+            </UrduText>
+
+            <UrduText style={styles.modalDescription}>
+              {i18n.t('archive_person_confirm', { name: formData.name || '' })}
+            </UrduText>
+
+            <TextInput
+              style={styles.modalTextInput}
+              value={archiveReason}
+              onChangeText={(text) => {
+                setArchiveReason(text);
+                if (archiveError) setArchiveError('');
+              }}
+              placeholder={i18n.t('archive_reason_placeholder')}
+              placeholderTextColor={COLORS.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlign="right"
+            />
+
+            {archiveError ? (
+              <Text style={styles.modalErrorText}>{archiveError}</Text>
+            ) : null}
+
+            <View style={styles.modalButtonContainer}>
+              <CustomButton
+                text={i18n.t('confirm')}
+                onPress={handleArchiveConfirm}
+                viewStyle={styles.modalConfirmBtn}
+              />
+              <CustomButton
+                text={i18n.t('cancel')}
+                onPress={() => setShowArchiveModal(false)}
+                viewStyle={styles.modalCancelBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -494,25 +818,23 @@ export default function RukunAddEdit() {
    Styles
    ────────────────────── */
 const styles = StyleSheet.create({
-  flex1: { 
-    flex: 1 
+  flex1: {
+    flex: 1
   },
-  root: { 
-    flex: 1, 
-    backgroundColor: '#fff' 
+  root: {
+    flex: 1,
+    backgroundColor: '#fff'
   },
-  
+
   scrollWrapper: {
-    marginTop: AVATAR_SIZE / 2 + 20, // ensures list starts below the avatar
+    marginTop: AVATAR_SIZE / 2 + 20,
   },
-  
-  /* scroll area */
+
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
 
-  /* form */
   buttonContainer: {
     marginTop: 32,
     flexDirection: 'row',
@@ -542,8 +864,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontFamily: 'JameelNooriNastaleeq',
   },
-  
-  // Transfer Rukun styles
+
+  // Transfer styles
   transferContainer: {
     marginTop: SPACING.lg,
     alignItems: 'center',
@@ -554,5 +876,86 @@ const styles = StyleSheet.create({
   },
   transferLoader: {
     marginTop: SPACING.sm,
+  },
+
+  // Archive styles
+  archiveContainer: {
+    marginTop: SPACING.md,
+    alignItems: 'center',
+  },
+  archiveBtn: {
+    backgroundColor: COLORS.error,
+    minWidth: 200,
+  },
+
+  // Archive Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: COLORS.background || '#fff',
+    borderRadius: BORDER_RADIUS?.lg || 16,
+    padding: SPACING.lg,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.md,
+    zIndex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY?.fontSize?.xxl || 22,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  modalDescription: {
+    fontSize: TYPOGRAPHY?.fontSize?.md || 16,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    borderRadius: BORDER_RADIUS?.md || 8,
+    padding: SPACING.md,
+    fontSize: TYPOGRAPHY?.fontSize?.md || 16,
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.white,
+    textAlign: 'right',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  modalErrorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  modalButtonContainer: {
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  modalConfirmBtn: {
+    backgroundColor: COLORS.error,
+  },
+  modalCancelBtn: {
+    backgroundColor: COLORS.lightGray2,
   },
 });

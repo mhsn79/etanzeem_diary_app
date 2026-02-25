@@ -5,7 +5,7 @@ import { Person } from "@/app/models/Person";
 export type RootStackParamList = {
     // Home: undefined;
     'screens/RukunView': { rukun: RukunData | Person; contactTypeLabel?: string };
-    'screens/RukunAddEdit': { rukun?: RukunData | Person };
+    'screens/RukunAddEdit': { rukun?: RukunData | Person; contactTypeId?: number };
     'screens/RukunUpdateScreen': { rukun: RukunData | Person; contactTypeLabel?: string };
     'screens/ProfileView': { profile?: RukunData | Person };
     'screens/ProfileEdit': { profile?: any };

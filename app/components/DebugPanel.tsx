@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
-import { useAppDispatch } from '../../src/hooks/useAppDispatch';
+
 import { selectAuthState } from '../features/auth/authSlice';
-import { getBackgroundRefreshStatus, triggerBackgroundRefresh } from '../utils/tokenRefresh';
+import { useTokenRefresh } from '../utils/tokenRefresh';
 import { COLORS } from '../constants/theme';
 
 interface DebugPanelProps {
@@ -12,23 +12,23 @@ interface DebugPanelProps {
 }
 
 export default function DebugPanel({ isVisible = false, onToggle }: DebugPanelProps) {
-  const [refreshStatus, setRefreshStatus] = useState<any>(null);
   const auth = useAppSelector(selectAuthState);
-  const dispatch = useAppDispatch();
+  const { refreshTokenIfNeeded, getTokenInfo } = useTokenRefresh();
+  const [tokenInfo, setTokenInfo] = useState(getTokenInfo());
 
-  // Update refresh status periodically
+  // Update token info periodically
   useEffect(() => {
     if (!isVisible) return;
 
     const updateStatus = () => {
-      setRefreshStatus(getBackgroundRefreshStatus());
+      setTokenInfo(getTokenInfo());
     };
 
     updateStatus();
     const interval = setInterval(updateStatus, 1000);
 
     return () => clearInterval(interval);
-  }, [isVisible]);
+  }, [isVisible, getTokenInfo]);
 
   if (!isVisible) {
     return null;
@@ -85,26 +85,18 @@ export default function DebugPanel({ isVisible = false, onToggle }: DebugPanelPr
         {/* Token Refresh Status */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Token Refresh</Text>
-          {refreshStatus && (
-            <>
-              <Text style={styles.text}>
-                Background Refresh: {refreshStatus.isActive ? 'Active' : 'Inactive'}
-              </Text>
-              <Text style={styles.text}>
-                Last Refresh: {refreshStatus.lastRefreshTime ? formatTime(Date.now() - refreshStatus.lastRefreshTime) : 'Never'}
-              </Text>
-              <Text style={styles.text}>
-                Time Since Last: {formatTime(refreshStatus.timeSinceLastRefresh)}
-              </Text>
-            </>
-          )}
-          <TouchableOpacity 
+          <Text style={styles.text}>
+            Expired: {tokenInfo.isExpired ? 'Yes' : 'No'}
+          </Text>
+          <Text style={styles.text}>
+            Time Until Expiry: {formatTime(tokenInfo.timeUntilExpiry)}
+          </Text>
+          <Text style={styles.text}>
+            Should Refresh: {tokenInfo.shouldRefresh ? 'Yes' : 'No'}
+          </Text>
+          <TouchableOpacity
             style={styles.button}
-            onPress={() => {
-              if (auth.tokens) {
-                triggerBackgroundRefresh(dispatch, auth.tokens);
-              }
-            }}
+            onPress={() => refreshTokenIfNeeded()}
           >
             <Text style={styles.buttonText}>Trigger Refresh</Text>
           </TouchableOpacity>

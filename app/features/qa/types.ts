@@ -116,6 +116,8 @@ export interface QAState {
   saveError: string | null;
   submitStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   submitError: string | null;
+  batchFillStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  batchFillProgress: { current: number; total: number };
 }
 
 // Default export to satisfy Expo Router

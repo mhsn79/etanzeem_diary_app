@@ -4,6 +4,7 @@ import { AppDispatch } from '../store/types';
 import { selectAuthState, isTokenExpiredOrExpiring, checkAndRefreshTokenIfNeeded, logout } from '../features/auth/authSlice';
 import { ensureFreshToken } from '../services/apiClient';
 import { Platform } from 'react-native';
+import { authLogger } from './logger';
 
 /**
  * Enhanced custom hook to ensure a fresh token before component mounts or when needed
@@ -20,13 +21,13 @@ export const useTokenRefresh = () => {
     
     try {
       if (isTokenExpiredOrExpiring(auth.tokens.expiresAt)) {
-        console.log('[TokenRefresh] Token is expired or about to expire, refreshing...', Platform.OS);
+        authLogger.debug('[TokenRefresh] Token is expired or about to expire, refreshing...', Platform.OS);
         await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
         return true;
       }
       return false;
     } catch (error: any) {
-      console.error('[TokenRefresh] Failed to refresh token:', error);
+      authLogger.error('[TokenRefresh] Failed to refresh token:', error);
       // Only logout if it's a critical auth error, otherwise let the next API call handle it
       const errorMessage = error?.message || '';
       if (errorMessage.includes('expired') || errorMessage.includes('invalid') || errorMessage.includes('401')) {
@@ -41,7 +42,7 @@ export const useTokenRefresh = () => {
     try {
       return await ensureFreshToken();
     } catch (error) {
-      console.error('[TokenRefresh] Failed to ensure fresh token:', error);
+      authLogger.error('[TokenRefresh] Failed to ensure fresh token:', error);
       // The logout function will handle navigation to login screen
       await dispatch(logout('Authentication expired. Please log in again.')).unwrap();
       throw error;
@@ -89,7 +90,7 @@ export const withTokenRefresh = async <T>(
     // Then make the API call
     return await apiCall();
   } catch (error: any) {
-    console.error('[TokenRefresh] Error in withTokenRefresh:', error);
+    authLogger.error('[TokenRefresh] Error in withTokenRefresh:', error);
     throw error;
   }
 };

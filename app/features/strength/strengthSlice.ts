@@ -22,10 +22,13 @@ export interface StrengthRecord {
   id: number;
   Tanzeemi_Unit: number;
   Type: number; // Links to StrengthType.id
-  Value: number;
-  change_type: string; // "plus" or "minus"
-  new_total: number;
-  Reporting_Time?: string;
+  plus_value: number; // Monthly increase (اضافہ)
+  minus_value: number; // Monthly decrease (کمی)
+  previous_total: number; // Total at start of month (carried forward)
+  new_total: number; // = previous_total + plus_value - minus_value
+  report_year: number;
+  report_month: number;
+  notes?: string; // Optional comments/notes
 }
 
 export interface StrengthState {
@@ -36,6 +39,8 @@ export interface StrengthState {
   recordsLoading: boolean;
   recordsError: string | null;
   userUnitId: number | null; // Store the user's unit ID for reference
+  currentYear: number; // Currently viewed year
+  currentMonth: number; // Currently viewed month (1-12)
   strengthCount: number;
   strengthTotals: Record<number, number>;
   strengthSum: number;
@@ -43,6 +48,7 @@ export interface StrengthState {
 }
 
 // Initial state
+const now = new Date();
 const initialState: StrengthState = {
   strengthTypes: [],
   strengthRecords: [],
@@ -51,6 +57,8 @@ const initialState: StrengthState = {
   recordsLoading: false,
   recordsError: null,
   userUnitId: null,
+  currentYear: now.getFullYear(),
+  currentMonth: now.getMonth() + 1,
   strengthCount: 0,
   strengthTotals: {},
   strengthSum: 0,
@@ -184,66 +192,41 @@ export const fetchStrengthTypes = createAsyncThunk<
 
 export const fetchStrengthRecords = createAsyncThunk<
   StrengthRecord[],
-  void,
+  { year?: number; month?: number } | void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('strength/fetchStrengthRecords', async (_, { getState, rejectWithValue }) => {
+>('strength/fetchStrengthRecords', async (params, { getState, rejectWithValue }) => {
   try {
-    // Get the user's unit ID from the strength slice or tanzeem slice
-    const userUnitId = getState().strength.userUnitId;
-    const userUnitDetails = getState().tanzeem.userUnitDetails;
+    const state = getState();
+    const userUnitId = state.strength.userUnitId;
+    const userUnitDetails = state.tanzeem.userUnitDetails;
     const unitId = userUnitId || (userUnitDetails?.id || null);
-    
-    // If we don't have the user's unit ID, return an empty array
+
     if (!unitId) {
       console.warn('No user unit ID available, cannot fetch strength records');
       return [];
     }
-    
-    console.log(`[STRENGTH_RECORDS_DEBUG] Fetching strength records for unit ID: ${unitId}`);
-    
-    const params = {
-      filter: { Tanzeemi_Unit: { _eq: unitId } },
-      sort: '-Reporting_Time', // Sort by most recent first
-    };
-    
-    console.log(`[STRENGTH_RECORDS_DEBUG] Request params:`, JSON.stringify(params, null, 2));
 
-    // The centralized API client handles token refresh automatically
-    const response = await apiRequest<StrengthRecord[] | { data: StrengthRecord[] }>(() => ({
-      path: '/items/Strength_Records',
-      method: 'GET',
-      params,
-    }));
-    
-    console.log('[STRENGTH_RECORDS_DEBUG] ===================== API RESPONSE ================');
-    console.log('[STRENGTH_RECORDS_DEBUG] Response structure:', Object.keys(response));
-    
-    // Check if response has data property
-    if ('data' in response && response.data) {
-      console.log('[STRENGTH_RECORDS_DEBUG] Response has data property');
-      console.log('[STRENGTH_RECORDS_DEBUG] Response data type:', Array.isArray(response.data) ? 'Array' : typeof response.data);
-      console.log('[STRENGTH_RECORDS_DEBUG] Response data length:', Array.isArray(response.data) ? response.data.length : 'N/A');
-      
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log('[STRENGTH_RECORDS_DEBUG] First record sample:', JSON.stringify(response.data[0], null, 2));
-      }
-    } else {
-      console.log('[STRENGTH_RECORDS_DEBUG] Response is direct data (no data property)');
-      console.log('[STRENGTH_RECORDS_DEBUG] Response type:', Array.isArray(response) ? 'Array' : typeof response);
-      console.log('[STRENGTH_RECORDS_DEBUG] Response length:', Array.isArray(response) ? response.length : 'N/A');
-      
-      if (Array.isArray(response) && response.length > 0) {
-        console.log('[STRENGTH_RECORDS_DEBUG] First record sample:', JSON.stringify(response[0], null, 2));
-      }
-    }
+    const year = params?.year || state.strength.currentYear;
+    const month = params?.month || state.strength.currentMonth;
 
-    const strengthRecords = normalizeResponse<StrengthRecord[]>(response, 'Strength Records');
-    console.log(`[STRENGTH_RECORDS_DEBUG] Found ${strengthRecords.length} strength records for unit ID: ${unitId}`);
-    
-    // Log unique types in the records
-    const uniqueTypes = [...new Set(strengthRecords.map(record => record.Type))];
-    console.log(`[STRENGTH_RECORDS_DEBUG] Records contain ${uniqueTypes.length} unique types:`, uniqueTypes);
-    
+    console.log(`[STRENGTH_RECORDS_DEBUG] Fetching strength records for unit ${unitId}, ${year}-${month}`);
+
+    const filter = JSON.stringify({
+      _and: [
+        { Tanzeemi_Unit: { _eq: unitId } },
+        { report_year: { _eq: year } },
+        { report_month: { _eq: month } },
+      ],
+    });
+
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}`,
+      'GET'
+    );
+
+    const strengthRecords = response.data || [];
+    console.log(`[STRENGTH_RECORDS_DEBUG] Found ${strengthRecords.length} records for ${year}-${month}`);
+
     return strengthRecords;
   } catch (error: any) {
     console.error('Error in fetchStrengthRecords:', error);
@@ -251,189 +234,291 @@ export const fetchStrengthRecords = createAsyncThunk<
   }
 });
 
-export const createStrengthRecord = createAsyncThunk<
-  StrengthRecord,
-  Omit<StrengthRecord, 'id' | 'Tanzeemi_Unit'> & { Tanzeemi_Unit?: number },
-  { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('strength/createStrengthRecord', async (recordData, { getState, dispatch, rejectWithValue }) => {
+// Helper to fetch the previous month's new_total for a given unit/type
+async function fetchPreviousTotal(
+  unitId: number,
+  typeId: number,
+  year: number,
+  month: number
+): Promise<number> {
   try {
-    // Get the user's unit ID from the strength slice or tanzeem slice
-    const userUnitId = getState().strength.userUnitId;
-    const userUnitDetails = getState().tanzeem.userUnitDetails;
-    const unitId = recordData.Tanzeemi_Unit || userUnitId || (userUnitDetails?.id || null);
-    
-    // If we don't have the user's unit ID, reject the request
-    if (!unitId) {
-      return rejectWithValue('No user unit ID available, cannot create strength record');
-    }
-    
-    // Create the record data with the user's unit ID
-    const completeRecordData = {
-      ...recordData,
-      Tanzeemi_Unit: unitId,
-      Reporting_Time: recordData.Reporting_Time || new Date().toISOString(),
-    };
-    
-    console.log(`[CREATE_RECORD_DEBUG] Processing strength record for unit ID: ${unitId} and Type: ${recordData.Type}`);
-    console.log(`[CREATE_RECORD_DEBUG] Record data:`, JSON.stringify(completeRecordData, null, 2));
-    
-    // First, check if a record already exists for this unit and type
-    const existingRecords = getState().strength.strengthRecords;
-    
-    // Find the most recent record for this unit and type
-    const existingRecord = existingRecords.find(record => 
-      record.Tanzeemi_Unit === unitId && 
-      record.Type === recordData.Type
+    // Find the most recent record before (year, month) for this unit/type
+    const filter = JSON.stringify({
+      _and: [
+        { Tanzeemi_Unit: { _eq: unitId } },
+        { Type: { _eq: typeId } },
+        {
+          _or: [
+            { report_year: { _lt: year } },
+            {
+              _and: [
+                { report_year: { _eq: year } },
+                { report_month: { _lt: month } },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}&sort=-report_year,-report_month&limit=1`,
+      'GET'
     );
-    
-    let response;
-    
+
+    if (response.data?.[0]) {
+      return response.data[0].new_total;
+    }
+    return 0;
+  } catch (error) {
+    console.error('[STRENGTH] Error fetching previous total:', error);
+    return 0;
+  }
+}
+
+/**
+ * Cascade updates to all subsequent months after a record is saved.
+ * When a month's new_total changes, every later month's previous_total
+ * (and therefore new_total) must be recalculated in chronological order.
+ */
+async function cascadeSubsequentMonths(
+  unitId: number,
+  typeId: number,
+  savedYear: number,
+  savedMonth: number,
+  savedNewTotal: number
+): Promise<void> {
+  try {
+    // Fetch all records for this (unit, type) AFTER the saved month, sorted chronologically
+    const filter = JSON.stringify({
+      _and: [
+        { Tanzeemi_Unit: { _eq: unitId } },
+        { Type: { _eq: typeId } },
+        {
+          _or: [
+            { report_year: { _gt: savedYear } },
+            {
+              _and: [
+                { report_year: { _eq: savedYear } },
+                { report_month: { _gt: savedMonth } },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}&sort=report_year,report_month&limit=-1`,
+      'GET'
+    );
+
+    const subsequentRecords = response.data || [];
+    if (subsequentRecords.length === 0) return;
+
+    console.log(`[STRENGTH_CASCADE] Updating ${subsequentRecords.length} subsequent records for unit=${unitId}, type=${typeId}`);
+
+    let carryForward = savedNewTotal;
+
+    for (const record of subsequentRecords) {
+      const newPreviousTotal = carryForward;
+      const newNewTotal = Math.max(0, newPreviousTotal + (record.plus_value || 0) - (record.minus_value || 0));
+
+      // Only PATCH if values actually changed
+      if (record.previous_total !== newPreviousTotal || record.new_total !== newNewTotal) {
+        await directApiRequest(
+          `/items/Strength_Records/${record.id}`,
+          'PATCH',
+          { previous_total: newPreviousTotal, new_total: newNewTotal }
+        );
+        console.log(`[STRENGTH_CASCADE] Updated record ${record.id} (${record.report_year}-${record.report_month}): prev=${newPreviousTotal}, total=${newNewTotal}`);
+      }
+
+      carryForward = newNewTotal;
+    }
+  } catch (error) {
+    // Log but don't fail the main upsert — cascade is best-effort
+    console.error('[STRENGTH_CASCADE] Error cascading subsequent months:', error);
+  }
+}
+
+export const upsertStrengthRecord = createAsyncThunk<
+  StrengthRecord,
+  {
+    typeId: number;
+    plus_value: number;
+    minus_value: number;
+    year: number;
+    month: number;
+    notes?: string;
+    Tanzeemi_Unit?: number;
+  },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('strength/upsertStrengthRecord', async (params, { getState, dispatch, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const unitId = params.Tanzeemi_Unit || state.strength.userUnitId || state.tanzeem.userUnitDetails?.id;
+
+    if (!unitId) {
+      return rejectWithValue('No unit ID available, cannot save strength record');
+    }
+
+    console.log(`[STRENGTH_UPSERT] unit=${unitId}, type=${params.typeId}, ${params.year}-${params.month}, +${params.plus_value} -${params.minus_value}`);
+
+    // Check for existing record for this (unit, type, year, month)
+    const filter = JSON.stringify({
+      _and: [
+        { Tanzeemi_Unit: { _eq: unitId } },
+        { Type: { _eq: params.typeId } },
+        { report_year: { _eq: params.year } },
+        { report_month: { _eq: params.month } },
+      ],
+    });
+
+    const existingResponse = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}&limit=1`,
+      'GET'
+    );
+
+    const existingRecord = existingResponse.data?.[0];
+
+    // Determine previous_total
+    let previous_total: number;
     if (existingRecord) {
-      // Update the existing record
-      console.log(`[CREATE_RECORD_DEBUG] Found existing record with ID: ${existingRecord.id}, updating...`);
-      
-      // Prepare update data with explicit fields to prevent null values
-      const recordToUpdate = {
-        Value: recordData.Value,
-        change_type: recordData.change_type,
-        new_total: recordData.new_total,
-        Reporting_Time: recordData.Reporting_Time || new Date().toISOString(),
-        // Include these fields to ensure they're not nullified
-        Tanzeemi_Unit: unitId,
-        Type: recordData.Type
-      };
-      
-      console.log(`[CREATE_RECORD_DEBUG] Update data:`, JSON.stringify(recordToUpdate, null, 2));
-      
-      response = await directApiRequest<StrengthRecord | { data: StrengthRecord }>(
+      previous_total = existingRecord.previous_total;
+    } else {
+      previous_total = await fetchPreviousTotal(unitId, params.typeId, params.year, params.month);
+    }
+
+    const new_total = Math.max(0, previous_total + params.plus_value - params.minus_value);
+
+    const recordData: Record<string, any> = {
+      Tanzeemi_Unit: unitId,
+      Type: params.typeId,
+      plus_value: params.plus_value,
+      minus_value: params.minus_value,
+      previous_total,
+      new_total,
+      report_year: params.year,
+      report_month: params.month,
+    };
+
+    // Only include notes if provided (avoid overwriting existing notes with undefined)
+    if (params.notes !== undefined) {
+      recordData.notes = params.notes;
+    }
+
+    let response: { data: StrengthRecord } | StrengthRecord;
+
+    if (existingRecord) {
+      console.log(`[STRENGTH_UPSERT] Updating record ${existingRecord.id}`);
+      response = await directApiRequest<{ data: StrengthRecord } | StrengthRecord>(
         `/items/Strength_Records/${existingRecord.id}`,
         'PATCH',
-        recordToUpdate
-      ).catch(apiError => {
-        console.error(`[CREATE_RECORD_DEBUG] API error during update:`, apiError);
-        console.error(`[CREATE_RECORD_DEBUG] Error message:`, apiError.message);
-        console.error(`[CREATE_RECORD_DEBUG] Error details:`, apiError.response?.data);
-        throw apiError;
-      });
-      
-      console.log('[CREATE_RECORD_DEBUG] ===================== UPDATE RESPONSE ================');
+        recordData
+      );
     } else {
-      // Create a new record
-      console.log(`[CREATE_RECORD_DEBUG] No existing record found, creating new record...`);
-      
-      // Ensure all required fields are explicitly set to prevent null values
-      const recordToCreate = {
-        Tanzeemi_Unit: unitId,
-        Type: recordData.Type,
-        Value: recordData.Value,
-        change_type: recordData.change_type,
-        new_total: recordData.new_total,
-        Reporting_Time: recordData.Reporting_Time || new Date().toISOString()
-      };
-      
-      console.log(`[CREATE_RECORD_DEBUG] Create data:`, JSON.stringify(recordToCreate, null, 2));
-      
-      response = await directApiRequest<StrengthRecord | { data: StrengthRecord }>(
+      console.log(`[STRENGTH_UPSERT] Creating new record`);
+      response = await directApiRequest<{ data: StrengthRecord } | StrengthRecord>(
         '/items/Strength_Records',
         'POST',
-        recordToCreate
-      ).catch(apiError => {
-        console.error(`[CREATE_RECORD_DEBUG] API error during creation:`, apiError);
-        console.error(`[CREATE_RECORD_DEBUG] Error message:`, apiError.message);
-        console.error(`[CREATE_RECORD_DEBUG] Error details:`, apiError.response?.data);
-        throw apiError;
-      });
-      
-      console.log('[CREATE_RECORD_DEBUG] ===================== CREATE RESPONSE ================');
+        recordData
+      );
     }
-    
-    console.log('[CREATE_RECORD_DEBUG] Response structure:', Object.keys(response));
-    console.log('[CREATE_RECORD_DEBUG] Response data:', JSON.stringify(response, null, 2));
-    
+
     const resultRecord = normalizeResponse<StrengthRecord>(response, 'Strength Record');
-    console.log(`[CREATE_RECORD_DEBUG] ${existingRecord ? 'Updated' : 'Created'} record with ID: ${resultRecord.id}`);
-    console.log(`[CREATE_RECORD_DEBUG] Normalized record:`, JSON.stringify(resultRecord, null, 2));
-    
-    // Refresh records after creation/update
-    dispatch(fetchStrengthRecords());
-    
+    console.log(`[STRENGTH_UPSERT] Saved record ID=${resultRecord.id}, new_total=${resultRecord.new_total}`);
+
+    // Cascade: update subsequent months' previous_total and new_total
+    await cascadeSubsequentMonths(unitId, params.typeId, params.year, params.month, new_total);
+
+    // Refresh records for the current month
+    dispatch(fetchStrengthRecords({ year: params.year, month: params.month }));
+
     return resultRecord;
   } catch (error: any) {
-    console.error('Error in createStrengthRecord:', error);
-    return rejectWithValue(error.message || 'Failed to create/update strength record');
+    console.error('Error in upsertStrengthRecord:', error);
+    return rejectWithValue(error.message || 'Failed to save strength record');
   }
 });
 
 export const refreshStrengthData = createAsyncThunk<
   void,
-  void,
+  { year?: number; month?: number } | void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('strength/refreshStrengthData', async (_, { getState, dispatch }) => {
-  console.log('[REFRESH_DEBUG] Starting strength data refresh');
-  
-  // Get the user's unit ID from the tanzeem slice
-  const userUnitDetails = getState().tanzeem.userUnitDetails;
+>('strength/refreshStrengthData', async (params, { getState, dispatch }) => {
+  const state = getState();
+  const userUnitDetails = state.tanzeem.userUnitDetails;
   const unitId = userUnitDetails?.id || null;
-  
-  console.log(`[REFRESH_DEBUG] User unit details:`, JSON.stringify(userUnitDetails, null, 2));
-  console.log(`[REFRESH_DEBUG] Unit ID: ${unitId}`);
-  
-  // Set the user's unit ID in the strength slice
+
   if (unitId) {
-    console.log(`[REFRESH_DEBUG] Setting user unit ID: ${unitId}`);
     dispatch(setUserUnitId(unitId));
-  } else {
-    console.log(`[REFRESH_DEBUG] No unit ID available, skipping setUserUnitId`);
   }
-  
-  // Fetch strength types and records
-  console.log(`[REFRESH_DEBUG] Dispatching fetchStrengthTypes and fetchStrengthRecords`);
-  
+
+  const year = params?.year || state.strength.currentYear;
+  const month = params?.month || state.strength.currentMonth;
+
+  console.log(`[STRENGTH_REFRESH] Refreshing for unit=${unitId}, ${year}-${month}`);
+
   try {
     const [typesResult, recordsResult] = await Promise.all([
       dispatch(fetchStrengthTypes()),
-      dispatch(fetchStrengthRecords())
+      dispatch(fetchStrengthRecords({ year, month })),
     ]);
-    
-    console.log(`[REFRESH_DEBUG] Fetch results:`);
-    console.log(`[REFRESH_DEBUG] Types: ${typesResult.payload?.length || 0} items`);
-    console.log(`[REFRESH_DEBUG] Records: ${recordsResult.payload?.length || 0} items`);
-    
-    console.log(`[REFRESH_DEBUG] Strength data refresh completed successfully`);
+
+    console.log(`[STRENGTH_REFRESH] Types: ${(typesResult.payload as any[])?.length || 0}, Records: ${(recordsResult.payload as any[])?.length || 0}`);
   } catch (error) {
-    console.error(`[REFRESH_DEBUG] Error refreshing strength data:`, error);
+    console.error('[STRENGTH_REFRESH] Error:', error);
   }
 });
 
-// Thunk to fetch strength record count and new_total aggregates for a given Type and userUnitHierarchyIds
+// Thunk to fetch strength record aggregates for a given Type across hierarchy units for a month
 export const fetchStrengthCountAndTotals = createAsyncThunk<
-  { count: number, totals: Record<number, number>, sum: number, avg: number },
-  { linkedToId: number },
+  { count: number; totals: Record<number, number>; sum: number; avg: number; plus_total: number; minus_total: number },
+  { linkedToId: number; year?: number; month?: number },
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('strength/fetchCountAndTotals', async ({ linkedToId }, { getState, rejectWithValue }) => {
+>('strength/fetchCountAndTotals', async ({ linkedToId, year, month }, { getState, rejectWithValue }) => {
   try {
     const state = getState();
     const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
     if (!linkedToId || !userUnitHierarchyIds.length) {
-      return { count: 0, totals: {}, sum: 0, avg: 0 };
+      return { count: 0, totals: {}, sum: 0, avg: 0, plus_total: 0, minus_total: 0 };
     }
-    const filter = `filter[Type][_eq]=${linkedToId}&filter[Tanzeemi_Unit][_in]=${userUnitHierarchyIds.join(',')}`;
-    const url = `/items/Strength_Records?${filter}`;
-    const response = await directApiRequest<{ data: any[] }>(url, 'GET');
+
+    const filterYear = year || state.strength.currentYear;
+    const filterMonth = month || state.strength.currentMonth;
+
+    const filter = JSON.stringify({
+      _and: [
+        { Type: { _eq: linkedToId } },
+        { Tanzeemi_Unit: { _in: userUnitHierarchyIds } },
+        { report_year: { _eq: filterYear } },
+        { report_month: { _eq: filterMonth } },
+      ],
+    });
+
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}`,
+      'GET'
+    );
+
     const records = response.data || [];
     const count = records.length;
     const totals: Record<number, number> = {};
     let sum = 0;
-    records.forEach(record => {
+    let plus_total = 0;
+    let minus_total = 0;
+
+    records.forEach((record) => {
       const unit = record.Tanzeemi_Unit;
-      const newTotal = record.new_total;
-      if (unit != null && typeof newTotal === 'number') {
-        totals[unit] = newTotal; // latest new_total per unit (could be replaced with sum/avg logic)
-        sum += newTotal;
-      }
+      totals[unit] = record.new_total;
+      sum += record.new_total;
+      plus_total += record.plus_value || 0;
+      minus_total += record.minus_value || 0;
     });
-    const avg = count > 0 ? sum / count : 0;
-    return { count, totals, sum, avg };
+
+    const avg = count > 0 ? Math.round(sum / count) : 0;
+    return { count, totals, sum, avg, plus_total, minus_total };
   } catch (error: any) {
     return rejectWithValue(error.message || 'Failed to fetch strength record count and totals');
   }
@@ -456,6 +541,10 @@ const strengthSlice = createSlice({
     },
     setUserUnitId: (state, action: PayloadAction<number | null>) => {
       state.userUnitId = action.payload;
+    },
+    setCurrentPeriod: (state, action: PayloadAction<{ year: number; month: number }>) => {
+      state.currentYear = action.payload.year;
+      state.currentMonth = action.payload.month;
     },
   },
   extraReducers: (builder) => {
@@ -488,9 +577,9 @@ const strengthSlice = createSlice({
         state.recordsError = action.payload ?? 'Failed to fetch strength records';
       })
       
-      // createStrengthRecord - no state changes needed as we refresh records after creation
-      .addCase(createStrengthRecord.rejected, (state, action) => {
-        state.recordsError = action.payload ?? 'Failed to create strength record';
+      // upsertStrengthRecord - no state changes needed as we refresh records after save
+      .addCase(upsertStrengthRecord.rejected, (state, action) => {
+        state.recordsError = action.payload ?? 'Failed to save strength record';
       })
       
       // fetchStrengthCountAndTotals
@@ -516,6 +605,8 @@ export const selectStrengthCount = (state: RootState) => state.strength.strength
 export const selectStrengthTotals = (state: RootState) => state.strength.strengthTotals;
 export const selectStrengthSum = (state: RootState) => state.strength.strengthSum;
 export const selectStrengthAvg = (state: RootState) => state.strength.strengthAvg;
+export const selectCurrentYear = (state: RootState) => state.strength.currentYear;
+export const selectCurrentMonth = (state: RootState) => state.strength.currentMonth;
 
 // Memoized selectors
 export const selectStrengthByGender = createSelector(
@@ -564,42 +655,33 @@ export const selectStrengthByCategory = createSelector(
   }
 );
 
-export const selectLatestStrengthRecordsByType = createSelector(
+// Records are already filtered by (unit, year, month) via the thunk,
+// so this just indexes them by Type for O(1) lookup
+export const selectCurrentMonthRecordsByType = createSelector(
   [selectStrengthRecords, selectUserUnitId],
   (records, userUnitId) => {
-    // Group records by Type and get the latest for each Type
-    // Only include records for the user's unit if available
-    const recordsByType = records.reduce((acc, record) => {
-      // Skip records that don't match the user's unit ID if it's available
-      if (userUnitId && record.Tanzeemi_Unit !== userUnitId) {
-        return acc;
+    const recordsByType: Record<number, StrengthRecord> = {};
+    records.forEach((record) => {
+      if (!userUnitId || record.Tanzeemi_Unit === userUnitId) {
+        recordsByType[record.Type] = record;
       }
-      
-      // Check if we already have a record for this type
-      const existingRecord = acc[record.Type];
-      
-      // If no existing record, or this record is newer
-      if (!existingRecord || 
-          (record.Reporting_Time && existingRecord.Reporting_Time && 
-           new Date(record.Reporting_Time).getTime() > new Date(existingRecord.Reporting_Time).getTime())) {
-        acc[record.Type] = record;
-      }
-      return acc;
-    }, {} as Record<number, StrengthRecord>);
-    
+    });
     return recordsByType;
   }
 );
 
+// Backward-compatible alias
+export const selectLatestStrengthRecordsByType = selectCurrentMonthRecordsByType;
+
 export const selectStrengthValueByType = createSelector(
-  [selectLatestStrengthRecordsByType, (_state: RootState, typeId: number) => typeId],
+  [selectCurrentMonthRecordsByType, (_state: RootState, typeId: number) => typeId],
   (recordsByType, typeId) => {
     return recordsByType[typeId]?.new_total || 0;
   }
 );
 
 export const selectTotalStrengthValue = createSelector(
-  [selectLatestStrengthRecordsByType, selectStrengthTypes],
+  [selectCurrentMonthRecordsByType, selectStrengthTypes],
   (recordsByType, types) => {
     // Calculate total strength value from the latest records
     // Only include types that are relevant to the user's unit level
@@ -616,10 +698,8 @@ export const selectTotalStrengthValue = createSelector(
 export const selectTotalChangeValue = createSelector(
   [selectStrengthRecords],
   (records) => {
-    // Calculate total change from all records
     return records.reduce((total, record) => {
-      const changeValue = record.change_type === 'plus' ? record.Value : -record.Value;
-      return total + changeValue;
+      return total + (record.plus_value || 0) - (record.minus_value || 0);
     }, 0);
   }
 );
@@ -651,5 +731,5 @@ export const selectStrengthByCategoryAndGender = createSelector(
 );
 
 // Exports
-export const { clearStrengthTypes, clearStrengthRecords, setUserUnitId } = strengthSlice.actions;
+export const { clearStrengthTypes, clearStrengthRecords, setUserUnitId, setCurrentPeriod } = strengthSlice.actions;
 export default strengthSlice.reducer;

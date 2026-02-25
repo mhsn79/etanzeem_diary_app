@@ -13,7 +13,7 @@ import { useLanguage } from "../app/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
-import { useNavigationState, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { useNavigationState } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
 import { store, persistor } from '@/app/store';              // ← adjust paths if needed
 import { usePushNotifications } from "@/src/hooks/usePushNotifications";
@@ -75,12 +75,20 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
   // Only show back button on non-tab screens (except login). Hide on CreateReportScreen so its own header handles back (avoids accidental root back when opening report from tabs).
   const showBackButton = !isInTabs && !isLoginScreen && !isCreateReportScreen;
 
+  // Collapse header for Activities tab (it has its own ScreenWrapper header).
+  // IMPORTANT: we keep the view tree identical (no conditional mount/unmount)
+  // and only change styles — this prevents the Fabric "Unable to find viewState"
+  // crash that occurs when headerShown toggles and native views are created/destroyed
+  // during tab transitions.
+  const isActivitiesTab = fullPath?.includes?.('Activities') ?? false;
+
   return (
     <View style={[
       fullPath === 'screens/(tabs)/Arkan' ? styles.headerContainerSubscreen : styles.headerContainer,
       {
         paddingTop: insets.top,
-      }
+      },
+      isActivitiesTab && styles.headerCollapsed,
     ]}>
       <View style={styles.header}>
         <View style={styles.leftSection}>
@@ -210,13 +218,7 @@ function AppContent({
           <Stack.Screen name="splash" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="screens/LoginScreen" options={{ headerShown: false }} />
-          <Stack.Screen name="screens/(tabs)" 
-           options={({ route }) => {
-            // If no tab is focused yet, you'll get undefined: default to TRUE.
-            const focused = getFocusedRouteNameFromRoute(route);
-            const hideForActivities = focused === "Activities";
-            return { headerShown: !hideForActivities };
-          }} />
+          <Stack.Screen name="screens/(tabs)" options={{ headerShown: true }} />
           <Stack.Screen name="screens/(stack)" options={{ headerShown: false }} />
         </Stack>
     </>
@@ -231,7 +233,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   headerContainer: {
-    backgroundColor:COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  headerCollapsed: {
+    height: 0,
+    overflow: 'hidden',
+    paddingTop: 0,
   },
   headerContainerSubscreen: {
     backgroundColor: COLORS.primary,

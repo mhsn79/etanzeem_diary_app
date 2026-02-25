@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpacity, Clipboard, Alert, Platform, InteractionManager } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { ROUTES } from '@/app/constants/navigation';
 import UrduText from '@/app/components/UrduText';
@@ -9,10 +9,9 @@ import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
 import Dialog from '@/app/components/Dialog';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
-import { AppDispatch } from '@/app/store';
-import { 
-  initializeReportData, 
-  selectOverallProgress, 
+import {
+  initializeReportData,
+  selectOverallProgress,
   selectQAState,
   clearAnswers,
   selectAnswersBySubmissionId,
@@ -26,11 +25,13 @@ import {
   selectSubmitStatus,
   selectSubmitError,
   selectCurrentSubmissionId,
-  saveAnswer,
-  submitReport
+  submitReport,
+  batchAutoFillAnswers,
+  selectBatchFillStatus,
+  selectBatchFillProgress,
 } from '@/app/features/qa/qaSlice';
 import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectManagementReportsList } from '@/app/features/reports/reportsSlice_new';
+import { selectManagementReportsList } from '@/app/features/reports/reportsSlice';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
 import ScreenLayout from '@/app/components/ScreenLayout';
@@ -58,7 +59,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   // Log mount immediately to confirm CreateReportScreen ever renders
   console.log('[CreateReportScreen] MOUNT/RE-RENDER', { hasInitialParams: !!initialParamsProp, hasOnBackOverride: !!onBackOverride, submissionId: initialParamsProp?.submissionId });
   const navigation = useNavigation();
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
   const params = useLocalSearchParams();
   const fromRouter = params.submissionId != null || params.templateId != null;
   const submissionId = fromRouter ? (params.submissionId ? Number(params.submissionId) : null) : (initialParamsProp?.submissionId ?? null);
@@ -102,6 +103,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   // Dialog states
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showLowProgressWarning, setShowLowProgressWarning] = useState(false);
   
   // State to store fetched management details for historical submissions
   const [fetchedManagementDetails, setFetchedManagementDetails] = useState<any>(null);
@@ -110,33 +112,25 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Selectors
-  const sectionsWithProgress = useSelector((state) => selectSectionsWithProgress(state, templateId || undefined));
-  const questionsArray = useSelector(selectQuestionsArray);
-  const storedAnswers = useSelector(selectAnswers);
-  const userUnitDetails = useSelector(selectUserUnitDetails);
-  const userTanzeemiLevelDetails = useSelector(selectUserTanzeemiLevelDetails);
-  const latestReportMgmt = useSelector(selectManagementReportsList);
-  const status = useSelector(selectStatus);
-  const error = useSelector(selectError);
-  const saveStatus = useSelector(selectSaveStatus);
-  const saveError = useSelector(selectSaveError);
-  const submitStatus = useSelector(selectSubmitStatus);
-  const submitError = useSelector(selectSubmitError);
-  const currentSubmissionId = useSelector(selectCurrentSubmissionId);
-  
-  // // Debug currentSubmissionId changes
-  // useEffect(() => {
-  //   console.log('[CreateReportScreen] currentSubmissionId changed:', {
-  //     currentSubmissionId,
-  //     submissionId,
-  //     templateId,
-  //     unitId,
-  //     managementId
-  //   });
-  // }, [currentSubmissionId, submissionId, templateId, unitId, managementId]);
+  const sectionsWithProgress = useAppSelector((state) => selectSectionsWithProgress(state, templateId || undefined));
+  const questionsArray = useAppSelector(selectQuestionsArray);
+  const storedAnswers = useAppSelector(selectAnswers);
+  const userUnitDetails = useAppSelector(selectUserUnitDetails);
+  const userTanzeemiLevelDetails = useAppSelector(selectUserTanzeemiLevelDetails);
+  const latestReportMgmt = useAppSelector(selectManagementReportsList);
+  const status = useAppSelector(selectStatus);
+  const error = useAppSelector(selectError);
+  const saveStatus = useAppSelector(selectSaveStatus);
+  const saveError = useAppSelector(selectSaveError);
+  const submitStatus = useAppSelector(selectSubmitStatus);
+  const submitError = useAppSelector(selectSubmitError);
+  const currentSubmissionId = useAppSelector(selectCurrentSubmissionId);
+  const overallProgress = useAppSelector(selectOverallProgress);
+  const batchFillStatus = useAppSelector(selectBatchFillStatus);
+  const batchFillProgress = useAppSelector(selectBatchFillProgress);
 
   // Get submission-specific answers
-  const submissionAnswers = useSelector((state) => 
+  const submissionAnswers = useAppSelector((state) => 
     currentSubmissionId ? selectAnswersBySubmissionId(state, currentSubmissionId) : []
   );
 
@@ -224,6 +218,21 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
     
     return fallbackPeriod;
   }, [latestReportMgmt, managementId, fetchedManagementDetails, fetchManagementDetails]);
+
+  // Extract raw month/year for batch auto-fill
+  const reportingPeriodValues = useMemo(() => {
+    if (managementId) {
+      if (fetchedManagementDetails && fetchedManagementDetails.id === managementId) {
+        return { month: fetchedManagementDetails.month, year: fetchedManagementDetails.year };
+      }
+      const mgmt = latestReportMgmt.find(report =>
+        report.managements.some((m: any) => m.id === managementId)
+      )?.managements.find((m: any) => m.id === managementId);
+      if (mgmt) return { month: mgmt.month, year: mgmt.year };
+    }
+    const fallback = latestReportMgmt[0]?.managements[0];
+    return fallback ? { month: fallback.month, year: fallback.year } : null;
+  }, [latestReportMgmt, managementId, fetchedManagementDetails]);
 
   // Force token refresh on screen focus
   useFocusEffect(
@@ -343,52 +352,13 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
     // Do not auto-redirect: when opening from (tabs)/Reports, params can be delayed or missing from useLocalSearchParams(), and redirecting sent the user back immediately. Show error state instead if new-report params are missing (handled by status/error UI below).
   }, [templateId, userUnitDetails?.id, latestReportMgmt[0]?.managements[0]?.id, submissionId, isEditMode, isViewMode]);
 
-  // Handle answer changes
-  const handleAnswerChange = useCallback((questionId: number, value: string | number) => {
-    console.log('[CreateReportScreen] handleAnswerChange called:', {
-      questionId,
-      value,
-      currentSubmissionId,
-      templateId,
-      unitId,
-      managementId
-    });
-    
-    if (!currentSubmissionId) {
-      console.error('[CreateReportScreen] No currentSubmissionId available:', {
-        currentSubmissionId,
-        templateId,
-        unitId,
-        managementId,
-        submissionId
-      });
-      return;
-    }
-    
-    // First ensure we have a fresh token
-    ensureFreshTokenBeforeOperation()
-      .then(() => {
-        // Then save the answer
-        return dispatch(saveAnswer({
-          submission_id: currentSubmissionId,
-          question_id: questionId,
-          string_value: typeof value === 'string' ? value : null,
-          number_value: typeof value === 'number' ? value : null
-        })).unwrap();
-      })
-      .catch((error) => {
-        console.error('Error saving answer:', error);
-        console.error('جواب محفوظ کرنے میں خرابی');
-      });
-  }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation, templateId, unitId, managementId]);
-
   // Handle report submission
   const handleSubmit = useCallback(() => {
     if (!currentSubmissionId) {
       console.error('رپورٹ ابھی تک شروع نہیں ہوئی ہے');
       return;
     }
-    
+
     // Animate button press
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -402,17 +372,21 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     // Refresh token if needed before showing the dialog
     refreshTokenIfNeeded()
       .then(() => {
-        // Show confirmation dialog
-        setShowSubmitDialog(true);
+        // Show low progress warning if below 70%
+        if (overallProgress < 70) {
+          setShowLowProgressWarning(true);
+        } else {
+          setShowSubmitDialog(true);
+        }
       })
       .catch((error) => {
         console.error('Error refreshing token before submission:', error);
       });
-  }, [currentSubmissionId, scaleAnim, refreshTokenIfNeeded]);
+  }, [currentSubmissionId, scaleAnim, refreshTokenIfNeeded, overallProgress]);
   
   // Handle confirm submission
   const handleConfirmSubmit = useCallback(() => {
@@ -433,9 +407,32 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
       })
       .catch((error) => {
         console.error('Error submitting report:', error);
-        console.error('رپورٹ جمع کروانے میں خرابی');
+        console.error('رپورٹ جمع نہیں ہو سکی');
       });
   }, [currentSubmissionId, dispatch, ensureFreshTokenBeforeOperation, templateId, unitId, managementId]);
+
+  // Handle batch auto-fill from existing data
+  const handleBatchAutoFill = useCallback(async () => {
+    if (!reportingPeriodValues || !currentSubmissionId) return;
+
+    const reportUnitId = unitId || userUnitDetails?.id;
+    if (!reportUnitId) return;
+
+    try {
+      const result = await dispatch(batchAutoFillAnswers({
+        unitId: reportUnitId,
+        month: reportingPeriodValues.month,
+        year: reportingPeriodValues.year,
+      })).unwrap();
+
+      console.log(`[CreateReportScreen] Batch auto-fill: ${result.filled}/${result.total} filled`);
+      if (result.errors.length > 0) {
+        console.warn('[CreateReportScreen] Batch auto-fill errors:', result.errors);
+      }
+    } catch (error: any) {
+      console.error('[CreateReportScreen] Batch auto-fill failed:', error);
+    }
+  }, [dispatch, reportingPeriodValues, unitId, userUnitDetails?.id, currentSubmissionId]);
 
   // Must be called before any early return (React hooks rule)
   const handleBack = useCallback(() => {
@@ -458,7 +455,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
+        <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
       </View>
     );
   }
@@ -467,7 +464,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   if (status === 'failed' && error) {
     return (
       <View style={styles.errorContainer}>
-        <UrduText style={styles.errorText}>خرابی: {error}</UrduText>
+        <UrduText style={styles.errorText}>{error}</UrduText>
         <CustomButton
           text="دوبارہ کوشش کریں"
           onPress={handleBack}
@@ -484,7 +481,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   }
   return (
     <ScreenLayout
-      title={isViewMode ? 'رپورٹ دیکھیں' : isEditMode ? 'رپورٹ ترمیم کریں' : 'رپورٹ بنائیں'}
+      title={isViewMode ? 'رپورٹ دیکھیں' : isEditMode ? 'رپورٹ بنائیں' : 'رپورٹ بنائیں'}
       onBack={handleBack}
     >
       <View style={styles.container}>
@@ -523,12 +520,29 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
               layout="one-line"
             />
           </View>
-          
+
+          {!isViewMode && (
+            <View style={styles.batchFillContainer}>
+              <CustomButton
+                text={batchFillStatus === 'loading'
+                  ? `ڈیٹا حاصل کیا جا رہا ہے... (${batchFillProgress.current}/${batchFillProgress.total})`
+                  : 'موجود ڈیٹا سے رپورٹ بنائیں'}
+                onPress={handleBatchAutoFill}
+                viewStyle={{
+                  backgroundColor: batchFillStatus === 'succeeded' ? COLORS.success : COLORS.primary,
+                  flex: 1,
+                }}
+                textStyle={{ color: COLORS.white }}
+                loading={batchFillStatus === 'loading'}
+                disabled={batchFillStatus === 'loading'}
+              />
+            </View>
+          )}
+
           <SectionList
             sections={sectionsWithProgress}
             questions={questionsArray}
             answers={submissionAnswers}
-            onAnswerChange={handleAnswerChange}
             disabled={isViewMode}
             currentUnitId={unitId}
             submissionId={currentSubmissionId}
@@ -574,10 +588,29 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
         
         {saveStatus === 'failed' && saveError && (
           <View style={[styles.statusIndicator, styles.errorIndicator]}>
-            <UrduText style={styles.errorText}>خرابی: {saveError}</UrduText>
+            <UrduText style={styles.errorText}>{saveError}</UrduText>
           </View>
         )} */}
         
+        {/* Low Progress Warning Dialog */}
+        {!isViewMode && (
+          <Dialog
+            visible={showLowProgressWarning}
+            onConfirm={() => {
+              setShowLowProgressWarning(false);
+              setShowSubmitDialog(true);
+            }}
+            onCancel={() => setShowLowProgressWarning(false)}
+            onClose={() => setShowLowProgressWarning(false)}
+            title="نامکمل رپورٹ"
+            description={`رپورٹ صرف ${overallProgress}% مکمل ہے۔ کیا آپ پھر بھی جمع کروانا چاہتے ہیں؟`}
+            confirmText="جمع کروائیں"
+            cancelText="واپس جائیں"
+            type="confirm"
+            showWarningIcon={true}
+          />
+        )}
+
         {/* Submit Confirmation Dialog */}
         {!isViewMode && (
           <Dialog
@@ -586,7 +619,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
             onCancel={() => setShowSubmitDialog(false)}
             onClose={() => setShowSubmitDialog(false)}
             title="رپورٹ جمع کروائیں"
-            description="کیا آپ واقعی رپورٹ جمع کروانا چاہتے ہیں؟"
+            description="کیا آپ رپورٹ جمع کروانا چاہتے ہیں؟"
             confirmText="جمع کروائیں"
             cancelText="منسوخ کریں"
             type="confirm"
@@ -607,7 +640,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
               handleBack();
             }}
             title="رپورٹ جمع ہو گئی"
-            description="آپ کی رپورٹ کامیابی سے جمع کروا دی گئی ہے۔"
+            description="آپ کی رپورٹ جمع کروا دی گئی ہے۔"
             confirmText="ٹھیک ہے"
             type="success"
             showSuccessIcon={true}
@@ -636,6 +669,10 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     flexDirection: 'column',
     gap: SPACING.sm,
+  },
+  batchFillContainer: {
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   buttonContainer: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Modal, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/app/constants/theme';
@@ -23,13 +23,14 @@ import {
 import { fetchActivityCount } from '@/app/features/activities/activitySlice';
 import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
 import { directApiRequest } from '@/app/services/apiClient';
+import { router } from 'expo-router';
 import i18n from '@/app/i18n';
 import { ReportQuestion, ReportAnswer } from '../features/qa/types';
 import { saveAnswer } from '../features/qa/qaSlice';
-import { calculateAutoValue, getCalculationButtonText } from '../features/qa/utils';
+import { getCalculationButtonText } from '../features/qa/utils';
 import { AppDispatch } from '../store';
 import { selectUserUnitDetails, selectUserUnitHierarchyIds } from '../features/tanzeem/tanzeemSlice';
-import { selectManagementReportsList, selectReportSubmissions } from '../features/reports/reportsSlice_new';
+import { selectManagementReportsList, selectReportSubmissions } from '../features/reports/reportsSlice';
 import { selectCurrentSubmissionId } from '../features/qa/qaSlice';
 
 interface AutoQuestionInputProps {
@@ -71,10 +72,12 @@ interface StrengthRecord {
   id: number;
   Tanzeemi_Unit: number;
   Type: number;
-  Value: number;
-  change_type: string; // "plus" or "minus"
+  plus_value: number;
+  minus_value: number;
+  previous_total: number;
   new_total: number;
-  Reporting_Time?: string;
+  report_year: number;
+  report_month: number;
 }
 
 const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
@@ -99,6 +102,18 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [calculationSuccess, setCalculationSuccess] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState<string>(String(value || ''));
+
+  // Debounce timer for typing in editable auto questions
+  const typingDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) {
+        clearTimeout(typingDebounceRef.current);
+      }
+    };
+  }, []);
   
   // Popup state for contacts
   const [showContactsPopup, setShowContactsPopup] = useState(false);
@@ -111,28 +126,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const [activitiesList, setActivitiesList] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
-
-  // Popup state for strength records
-  const [showStrengthPopup, setShowStrengthPopup] = useState(false);
-  const [strengthRecordsList, setStrengthRecordsList] = useState<StrengthRecord[]>([]);
-  const [strengthLoading, setStrengthLoading] = useState(false);
-  const [strengthError, setStrengthError] = useState<string | null>(null);
-
-  // // Debug contactsList changes
-  // useEffect(() => {
-  //   console.log('[AutoQuestionInput] contactsList changed:', {
-  //     length: contactsList.length,
-  //     firstFew: contactsList.slice(0, 3)
-  //   });
-  // }, [contactsList]);
-
-  // // Debug strengthRecordsList changes
-  // useEffect(() => {
-  //   console.log('[AutoQuestionInput] strengthRecordsList changed:', {
-  //     length: strengthRecordsList.length,
-  //     firstFew: strengthRecordsList.slice(0, 3)
-  //   });
-  // }, [strengthRecordsList]);
 
   // Fetch contact types, activity types, and strength types on component mount
   useEffect(() => {
@@ -189,10 +182,54 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     };
   }, [reportMgmtDetails, currentSubmissionId, reportSubmissions]);
 
+  // Get contact type label for the current question
+  const getContactTypeLabel = useCallback(() => {
+    if (!question.linked_to_id || !contactTypes.length) {
+      return 'افراد'; // Default fallback
+    }
+
+    const contactType = contactTypes.find(type => type.id === question.linked_to_id);
+    if (contactType) {
+      // Try to get plural label from the correct field
+      return contactType.label_plural || i18n.t(contactType.type) || contactType.type;
+    }
+
+    return 'افراد'; // Default fallback
+  }, [question.linked_to_id, contactTypes]);
+
+  // Get activity type label for the current question
+  const getActivityTypeLabel = useCallback(() => {
+    if (!question.linked_to_id || !activityTypes.length) {
+      return 'سرگرمیاں'; // Default fallback
+    }
+
+    const activityType = activityTypes.find(type => type.id === question.linked_to_id);
+    if (activityType) {
+      return activityType.Name_plural || activityType.Name || 'سرگرمیاں';
+    }
+
+    return 'سرگرمیاں'; // Default fallback
+  }, [question.linked_to_id, activityTypes]);
+
+  // Get strength type label for the current question
+  const getStrengthTypeLabel = useCallback(() => {
+    if (!question.linked_to_id || !strengthTypes.length) {
+      return 'قوت'; // Default fallback
+    }
+
+    const strengthType = strengthTypes.find(type => type.id === Number(question.linked_to_id));
+
+    if (strengthType) {
+      return strengthType.Name_Plural || strengthType.Name_Singular || 'قوت';
+    }
+
+    return 'قوت'; // Default fallback
+  }, [question.linked_to_id, strengthTypes]);
+
   // Fetch contacts for popup
   const fetchContactsForPopup = useCallback(async (): Promise<Person[]> => {
     if (!question.linked_to_id) {
-      setContactsError('linked_to_id میسر نہیں ہے');
+      setContactsError('سوال درست طریقے سے ترتیب نہیں دیا گیا');
       return [];
     }
 
@@ -206,23 +243,23 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       let dateFilter = {};
       
       if (question.aggregate_func === 'plus') {
-        // For plus function, show persons whose date_created OR Rukinat_Date is within current reporting month
+        // Rukun uses Rukinat_Date, Umeedwar/Karkun use date_created
+        const ct = contactTypes.find((c: any) => c.id === question.linked_to_id);
+        const isRukun = ct?.type === 'rukun';
+        const dateField = isRukun ? 'Rukinat_Date' : 'date_created';
+
         const unitIdToUse = currentUnitId || userUnitDetails?.id;
-        // Calculate the last day of the month
         const lastDayOfMonth = new Date(reportingPeriod.year, reportingPeriod.month, 0).getDate();
         const startDate = `${reportingPeriod.year}-${String(reportingPeriod.month).padStart(2, '0')}-01`;
         const endDate = `${reportingPeriod.year}-${String(reportingPeriod.month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
-        
+
         dateFilter = {
           _and: [
+            { status: { _neq: 'archived' } },
             { Tanzeemi_Unit: { _eq: unitIdToUse } },
-            {
-              _and: [
-                { Rukinat_Date: { _nnull: true } },
-                { Rukinat_Date: { _gte: startDate } },
-                { Rukinat_Date: { _lte: endDate } }
-              ]
-            }
+            { [dateField]: { _nnull: true } },
+            { [dateField]: { _gte: startDate } },
+            { [dateField]: { _lte: endDate } },
           ]
         };
       } else if (question.aggregate_func === 'minus') {
@@ -261,12 +298,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         ]
       };
 
-      // console.log('[AutoQuestionInput] Fetching contacts with filter:', JSON.stringify(filter, null, 2));
-      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
-      // console.log('[AutoQuestionInput] Aggregate function:', question.aggregate_func);
-      
       // Build the query string manually to ensure proper encoding
       const params = new URLSearchParams();
       
@@ -282,25 +313,15 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       const queryString = params.toString();
       const url = `/items/Person?${queryString}`;
       
-      // console.log('[AutoQuestionInput] API URL:', url);
-      
       const response = await directApiRequest<{ data: Person[] }>(
         url,
         'GET'
       );
 
-      // console.log('[AutoQuestionInput] API response:', {
-      //   dataLength: response.data?.length || 0,
-      //   firstFewItems: response.data?.slice(0, 3) || [],
-      //   fullResponse: response
-      // });
-
       if (response.data) {
-        // console.log('[AutoQuestionInput] Setting contacts list with', response.data.length, 'items');
         setContactsList(response.data);
         return response.data;
       } else {
-        // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setContactsList([]);
         return [];
       }
@@ -311,12 +332,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     } finally {
       setContactsLoading(false);
     }
-  }, [question.linked_to_id, question.aggregate_func, getCurrentReportingPeriod, userUnitDetails?.id, currentUnitId]);
+  }, [question.linked_to_id, question.aggregate_func, getCurrentReportingPeriod, userUnitDetails?.id, currentUnitId, contactTypes, getContactTypeLabel]);
 
   // Fetch activities for popup
   const fetchActivitiesForPopup = useCallback(async (): Promise<Activity[]> => {
     if (!question.linked_to_id) {
-      setActivitiesError('linked_to_id میسر نہیں ہے');
+      setActivitiesError('سوال درست طریقے سے ترتیب نہیں دیا گیا');
       return [];
     }
 
@@ -337,11 +358,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         ]
       };
 
-      // console.log('[AutoQuestionInput] Fetching activities with filter:', JSON.stringify(filter, null, 2));
-      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
-      
       // Build the query string manually to ensure proper encoding
       const params = new URLSearchParams();
       
@@ -357,25 +373,15 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       const queryString = params.toString();
       const url = `/items/Activities?${queryString}`;
       
-      // console.log('[AutoQuestionInput] API URL:', url);
-      
       const response = await directApiRequest<{ data: Activity[] }>(
         url,
         'GET'
       );
 
-      // console.log('[AutoQuestionInput] API response:', {
-      //   dataLength: response.data?.length || 0,
-      //   firstFewItems: response.data?.slice(0, 3) || [],
-      //   fullResponse: response
-      // });
-
       if (response.data) {
-        // console.log('[AutoQuestionInput] Setting activities list with', response.data.length, 'items');
         setActivitiesList(response.data);
         return response.data;
       } else {
-        // console.log('[AutoQuestionInput] No data in response, setting empty list');
         setActivitiesList([]);
         return [];
       }
@@ -388,82 +394,29 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     }
   }, [question.linked_to_id, getCurrentReportingPeriod, currentUnitId, userUnitDetails?.id]);
 
-  // Fetch strength records for popup
-  const fetchStrengthRecordsForPopup = useCallback(async () => {
-    if (!question.linked_to_id) {
-      setStrengthError('linked_to_id میسر نہیں ہے');
-      return;
-    }
+  // Fetch single monthly strength record for a given type/unit/month
+  const fetchMonthlyStrengthRecord = useCallback(async (): Promise<StrengthRecord | null> => {
+    if (!question.linked_to_id) return null;
 
-    setStrengthLoading(true);
-    setStrengthError(null);
+    const reportingPeriod = getCurrentReportingPeriod();
+    const unitIdToUse = currentUnitId || userUnitDetails?.id;
 
-    try {
-      const reportingPeriod = getCurrentReportingPeriod();
-      const unitIdToUse = currentUnitId || userUnitDetails?.id;
-      
-      // Calculate the last day of the month
-      const lastDayOfMonth = new Date(reportingPeriod.year, reportingPeriod.month, 0).getDate();
-      const startDate = `${reportingPeriod.year}-${String(reportingPeriod.month).padStart(2, '0')}-01`;
-      const endDate = `${reportingPeriod.year}-${String(reportingPeriod.month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
-      
-      const filter = {
-        _and: [
-          { Type: { _eq: question.linked_to_id } },
-          { Tanzeemi_Unit: { _eq: unitIdToUse } },
-          { Reporting_Time: { _nnull: true } },
-          { Reporting_Time: { _gte: startDate } },
-          { Reporting_Time: { _lte: endDate } }
-        ]
-      };
+    const filter = JSON.stringify({
+      _and: [
+        { Type: { _eq: question.linked_to_id } },
+        { Tanzeemi_Unit: { _eq: unitIdToUse } },
+        { report_year: { _eq: reportingPeriod.year } },
+        { report_month: { _eq: reportingPeriod.month } },
+      ],
+    });
 
-      // console.log('[AutoQuestionInput] Fetching strength records with filter:', JSON.stringify(filter, null, 2));
-      // console.log('[AutoQuestionInput] Current unit ID:', currentUnitId);
-      // console.log('[AutoQuestionInput] User unit ID:', userUnitDetails?.id);
-      // console.log('[AutoQuestionInput] Reporting period:', reportingPeriod);
-      
-      // Build the query string manually to ensure proper encoding
-      const params = new URLSearchParams();
-      
-      // Add filter as JSON string
-      params.append('filter', JSON.stringify(filter));
-      
-      // Add fields
-      params.append('fields', 'id,Tanzeemi_Unit,Type,Value,change_type,new_total,Reporting_Time');
-      
-      // Add limit to get all results
-      params.append('limit', '-1');
-      
-      const queryString = params.toString();
-      const url = `/items/Strength_Records?${queryString}`;
-      
-      // console.log('[AutoQuestionInput] API URL:', url);
-      
-      const response = await directApiRequest<{ data: StrengthRecord[] }>(
-        url,
-        'GET'
-      );
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}&limit=1`,
+      'GET'
+    );
 
-      // console.log('[AutoQuestionInput] API response:', {
-      //   dataLength: response.data?.length || 0,
-      //   firstFewItems: response.data?.slice(0, 3) || [],
-      //   fullResponse: response
-      // });
-
-      if (response.data) {
-        // console.log('[AutoQuestionInput] Setting strength records list with', response.data.length, 'items');
-        setStrengthRecordsList(response.data);
-      } else {
-        // console.log('[AutoQuestionInput] No data in response, setting empty list');
-        setStrengthRecordsList([]);
-      }
-    } catch (error: any) {
-      console.error('Error fetching strength records:', error);
-      setStrengthError(`${getStrengthTypeLabel()} حاصل کرنے میں ناکامی`);
-    } finally {
-      setStrengthLoading(false);
-    }
-  }, [question.linked_to_id, getCurrentReportingPeriod, userUnitDetails?.id, currentUnitId]);
+    return response.data?.[0] || null;
+  }, [question.linked_to_id, getCurrentReportingPeriod, currentUnitId, userUnitDetails?.id]);
 
   // Handle popup open for contacts
   const handleContactsPopupOpen = useCallback(() => {
@@ -477,60 +430,15 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     fetchActivitiesForPopup();
   }, [fetchActivitiesForPopup]);
 
-  // Handle popup open for strength records
-  const handleStrengthPopupOpen = useCallback(() => {
-    setShowStrengthPopup(true);
-    fetchStrengthRecordsForPopup();
-  }, [fetchStrengthRecordsForPopup]);
-
   // Handle popup close
   const handlePopupClose = useCallback(() => {
     setShowContactsPopup(false);
     setShowActivitiesPopup(false);
-    setShowStrengthPopup(false);
     setContactsList([]);
     setActivitiesList([]);
-    setStrengthRecordsList([]);
     setContactsError(null);
     setActivitiesError(null);
-    setStrengthError(null);
   }, []);
-
-  // Fetch latest strength record for total/sum/count functions
-  const fetchLatestStrengthRecord = useCallback(async () => {
-    if (!question.linked_to_id) {
-      throw new Error('linked_to_id میسر نہیں ہے');
-    }
-
-    const unitIdToUse = currentUnitId || userUnitDetails?.id;
-    
-    const filter = {
-      _and: [
-        { Type: { _eq: question.linked_to_id } },
-        { Tanzeemi_Unit: { _eq: unitIdToUse } }
-      ]
-    };
-
-    const params = new URLSearchParams();
-    params.append('filter', JSON.stringify(filter));
-    params.append('fields', 'id,Tanzeemi_Unit,Type,Value,change_type,new_total,Reporting_Time');
-    params.append('sort', '-Reporting_Time');
-    params.append('limit', '1');
-    
-    const queryString = params.toString();
-    const url = `/items/Strength_Records?${queryString}`;
-    
-    const response = await directApiRequest<{ data: StrengthRecord[] }>(
-      url,
-      'GET'
-    );
-
-    if (response.data && response.data.length > 0) {
-      return response.data[0];
-    }
-    
-    return null;
-  }, [question.linked_to_id, currentUnitId, userUnitDetails?.id]);
 
   // Fetch count based on linked_to_type and update input value
   const handleFetchCount = useCallback(async () => {
@@ -546,20 +454,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       return;
     }
 
-    // For strength, show popup for plus/minus functions, or fetch latest record for total/sum/count
-    if (question.linked_to_type === 'strength') {
-      if (question.aggregate_func === 'plus' || question.aggregate_func === 'minus') {
-        handleStrengthPopupOpen();
-        return;
-      }
-    }
-
     setIsCalculating(true);
     setCalculationError(null);
     setCalculationSuccess(null);
     try {
       if (!question.linked_to_id) {
-        setCalculationError('linked_to_id میسر نہیں ہے');
+        setCalculationError('سوال درست طریقے سے ترتیب نہیں دیا گیا');
         setIsCalculating(false);
         return;
       }
@@ -568,34 +468,41 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
       // Handle different linked_to_type cases
       if (question.linked_to_type === 'strength') {
-        // For total, sum, or count functions, fetch the latest record and use new_total
-        if (question.aggregate_func === 'total' || question.aggregate_func === 'sum' || question.aggregate_func === 'count') {
-          const latestRecord = await fetchLatestStrengthRecord();
-          if (latestRecord) {
-            result = latestRecord.new_total;
-            setCalculationSuccess(`${getStrengthTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        const reportingPeriod = getCurrentReportingPeriod();
+
+        if (question.aggregate_func === 'avg') {
+          // For avg, aggregate across hierarchy units for the month
+          const aggResult = await dispatch(fetchStrengthCountAndTotals({
+            linkedToId: question.linked_to_id ?? 0,
+            year: reportingPeriod.year,
+            month: reportingPeriod.month,
+          })).unwrap();
+          result = aggResult.avg;
+          setCalculationSuccess(`${getStrengthTypeLabel()} کی معلومات کامیابی سے حاصل ہو گئیں`);
+        } else {
+          // For plus, minus, total, sum, count - fetch the single monthly record
+          const monthlyRecord = await fetchMonthlyStrengthRecord();
+
+          if (monthlyRecord) {
+            switch (question.aggregate_func) {
+              case 'plus':
+                result = monthlyRecord.plus_value || 0;
+                break;
+              case 'minus':
+                result = monthlyRecord.minus_value || 0;
+                break;
+              case 'total':
+              case 'sum':
+              case 'count':
+              default:
+                result = monthlyRecord.new_total || 0;
+                break;
+            }
+            setCalculationSuccess(`${getStrengthTypeLabel()} کی تعداد کامیابی سے حاصل ہو گئی`);
           } else {
             result = 0;
-            setCalculationSuccess(`${getStrengthTypeLabel()} کے لیے کوئی ریکارڈ نہیں ملا`);
+            setCalculationSuccess(`${getStrengthTypeLabel()} کے لیے اس مہینے کوئی اندراج نہیں ملا`);
           }
-        } else {
-          // For other functions, use the existing logic
-          result = await dispatch(fetchStrengthCountAndTotals({
-            linkedToId: question.linked_to_id ?? 0
-          })).unwrap();
-          let displayValue = '';
-          if (question.aggregate_func === 'avg') {
-            displayValue = String(result.avg);
-          } else {
-            displayValue = String(result.sum); // default to sum
-          }
-          setInputValue(displayValue);
-          setCalculationSuccess(`${getStrengthTypeLabel()} کی معلومات کامیابی سے حاصل ہو گئیں`);
-          if (onValueChange) {
-            onValueChange(displayValue);
-          }
-          setTimeout(() => setCalculationSuccess(null), 3000);
-          return;
         }
       } else if (question.linked_to_type === 'contacts') {
         // For contacts, fetch data first then calculate
@@ -609,7 +516,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
           setCalculationSuccess(`${getContactTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
         } else {
           result = 0;
-          setCalculationSuccess(`${getContactTypeLabel()} کے لیے کوئی ریکارڈ نہیں ملا`);
+          setCalculationSuccess(`${getContactTypeLabel()} کے لیے کوئی اندراج نہیں ملا`);
         }
       } else if (question.linked_to_type === 'activity') {
         // For activities, fetch data first then calculate
@@ -623,22 +530,16 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
           setCalculationSuccess(`${getActivityTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
         } else {
           result = 0;
-          setCalculationSuccess(`${getActivityTypeLabel()} کے لیے کوئی ریکارڈ نہیں ملا`);
+          setCalculationSuccess(`${getActivityTypeLabel()} کے لیے کوئی اندراج نہیں ملا`);
         }
       } else {
-        setCalculationError('نامعلوم linked_to_type');
+        setCalculationError('سوال کی قسم نامعلوم ہے');
         setIsCalculating(false);
         return;
       }
 
       setInputValue(String(result));
       if (onValueChange) {
-        // console.log('[AutoQuestionInput] Calling onValueChange with result:', {
-        //   result,
-        //   resultType: typeof result,
-        //   questionId: question.id,
-        //   submissionId
-        // });
         onValueChange(result);
       }
       setTimeout(() => setCalculationSuccess(null), 3000);
@@ -647,15 +548,48 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     } finally {
       setIsCalculating(false);
     }
-  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleStrengthPopupOpen, fetchLatestStrengthRecord, fetchContactsForPopup, fetchActivitiesForPopup, contactsList, activitiesList]);
+  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleActivitiesPopupOpen, fetchMonthlyStrengthRecord, getCurrentReportingPeriod, fetchContactsForPopup, fetchActivitiesForPopup, getStrengthTypeLabel, getContactTypeLabel, getActivityTypeLabel]);
+
+  // Navigate to the source screen for this question's linked data
+  const handleNavigateToSource = useCallback(() => {
+    const period = getCurrentReportingPeriod();
+
+    switch (question.linked_to_type) {
+      case 'strength':
+        router.push({
+          pathname: '/screens/Workforce',
+          params: {
+            preSelectedMonth: String(period.month),
+            preSelectedYear: String(period.year),
+          },
+        });
+        break;
+      case 'contacts': {
+        const ct = contactTypes.find((c: any) => c.id === question.linked_to_id);
+        router.push(`/screens/(tabs)/Arkan?contactType=${ct?.type || ''}`);
+        break;
+      }
+      case 'activity':
+        router.push({
+          pathname: '/screens/(tabs)/Activities',
+          params: {
+            preSelectedTab: '1',
+            preSelectedMonth: String(period.month),
+            preSelectedYear: String(period.year),
+          },
+        });
+        break;
+    }
+  }, [question.linked_to_type, question.linked_to_id, getCurrentReportingPeriod, contactTypes]);
 
   // Get button text based on aggregate function
   const buttonText = getCalculationButtonText(question.aggregate_func || null);
 
   // Get icon based on aggregate function
-  const getButtonIcon = () => {
+  const buttonIcon = useMemo(() => {
     switch (question.aggregate_func) {
       case 'sum':
+      case 'total':
         return 'add-circle-outline';
       case 'count':
         return 'list-outline';
@@ -668,51 +602,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       default:
         return 'calculator-outline';
     }
-  };
-
-  // Get contact type label for the current question
-  const getContactTypeLabel = useCallback(() => {
-    if (!question.linked_to_id || !contactTypes.length) {
-      return 'رابطے'; // Default fallback
-    }
-    
-    const contactType = contactTypes.find(type => type.id === question.linked_to_id);
-    if (contactType) {
-      // Try to get plural label from the correct field
-      return contactType.label_plural || i18n.t(contactType.type) || contactType.type;
-    }
-    
-    return 'رابطے'; // Default fallback
-  }, [question.linked_to_id, contactTypes]);
-
-  // Get activity type label for the current question
-  const getActivityTypeLabel = useCallback(() => {
-    if (!question.linked_to_id || !activityTypes.length) {
-      return 'سرگرمیاں'; // Default fallback
-    }
-    
-    const activityType = activityTypes.find(type => type.id === question.linked_to_id);
-    if (activityType) {
-      return activityType.Name_plural || activityType.Name || 'سرگرمیاں';
-    }
-    
-    return 'سرگرمیاں'; // Default fallback
-  }, [question.linked_to_id, activityTypes]);
-
-  // Get strength type label for the current question
-  const getStrengthTypeLabel = useCallback(() => {
-    if (!question.linked_to_id || !strengthTypes.length) {
-      return 'تعداد'; // Default fallback
-    }
-    
-    const strengthType = strengthTypes.find(type => type.id === Number(question.linked_to_id));
-    
-    if (strengthType) {
-      return strengthType.Name_Plural || strengthType.Name_Singular || 'تعداد';
-    }
-    
-    return 'تعداد'; // Default fallback
-  }, [question.linked_to_id, strengthTypes]);
+  }, [question.aggregate_func]);
 
   // Get strength type singular label for the current question
   const getStrengthTypeSingularLabel = useCallback(() => {
@@ -763,7 +653,11 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     strength: 'قوت',
   };
 
-
+  // Memoize published activities count to avoid repeated filtering in JSX
+  const publishedActivitiesCount = useMemo(
+    () => activitiesList.filter(a => a.status === 'published').length,
+    [activitiesList]
+  );
 
   // Handle OK button in contacts popup
   const handleContactsPopupOK = useCallback(() => {
@@ -779,32 +673,14 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Handle OK button in activities popup
   const handleActivitiesPopupOK = useCallback(() => {
-    // Count only published activities
-    const publishedCount = activitiesList.filter(activity => activity.status === 'published').length;
-    setInputValue(String(publishedCount));
+    setInputValue(String(publishedActivitiesCount));
     if (onValueChange) {
-      onValueChange(publishedCount);
+      onValueChange(publishedActivitiesCount);
     }
     setShowActivitiesPopup(false);
-    setCalculationSuccess(`کل ${publishedCount} ${getTypeLabel()}`);
+    setCalculationSuccess(`کل ${publishedActivitiesCount} ${getTypeLabel()}`);
     setTimeout(() => setCalculationSuccess(null), 3000);
-  }, [activitiesList, onValueChange, getTypeLabel]);
-
-  // Handle OK button in strength popup
-  const handleStrengthPopupOK = useCallback(() => {
-    const count = strengthRecordsList.length;
-    // Get the latest record's new_total for display
-    const latestRecord = strengthRecordsList.length > 0 ? strengthRecordsList[0] : null;
-    const totalValue = latestRecord ? latestRecord.new_total : 0;
-    
-    setInputValue(String(totalValue));
-    if (onValueChange) {
-      onValueChange(totalValue);
-    }
-    setShowStrengthPopup(false);
-    setCalculationSuccess(`کل ${totalValue} ${getTypeLabel()}`);
-    setTimeout(() => setCalculationSuccess(null), 3000);
-  }, [strengthRecordsList, onValueChange, getTypeLabel]);
+  }, [publishedActivitiesCount, onValueChange, getTypeLabel]);
 
   // Check if this question has auto-calculate capability
   const hasAutoCalculateCapability = Boolean(question.linked_to_type && question.linked_to_id);
@@ -814,78 +690,71 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     ? getTypeLabel()
     : '';
 
-  // Right icon triggers handleFetchCount
+  // Right icon: fetch button + navigate button
   const rightIcon = (
-    <TouchableOpacity
-      style={[
-        styles.rightButton,
-        isCalculating && styles.rightButtonLoading,
-        disabled && styles.rightButtonDisabled
-      ]}
-      onPress={handleFetchCount}
-      disabled={disabled || isCalculating}
-      activeOpacity={0.7}
-    >
-      {isCalculating ? (
-        <ActivityIndicator size="small" color={COLORS.white} />
-      ) : (
-        <View style={styles.buttonContent}>
-          <Ionicons 
-            name={getButtonIcon() as any}
-            size={16} 
-            color={COLORS.white} 
-            style={styles.buttonIcon}
-          />
-          <UrduText style={styles.buttonText} numberOfLines={1}>
-            {buttonText}
-            {typeLabel ? ` (${typeLabel})` : ''}
-          </UrduText>
-        </View>
-      )}
-    </TouchableOpacity>
+    <View style={styles.rightButtonContainer}>
+      {/* Navigate to source screen */}
+      <TouchableOpacity
+        style={styles.navButton}
+        onPress={handleNavigateToSource}
+        disabled={disabled}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="open-outline" size={18} color={COLORS.primary} />
+      </TouchableOpacity>
+
+      {/* Fetch value */}
+      <TouchableOpacity
+        style={[
+          styles.rightButton,
+          isCalculating && styles.rightButtonLoading,
+          disabled && styles.rightButtonDisabled
+        ]}
+        onPress={handleFetchCount}
+        disabled={disabled || isCalculating}
+        activeOpacity={0.7}
+      >
+        {isCalculating ? (
+          <ActivityIndicator size="small" color={COLORS.white} />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Ionicons
+              name={buttonIcon as any}
+              size={16}
+              color={COLORS.white}
+              style={styles.buttonIcon}
+            />
+            <UrduText style={styles.buttonText} numberOfLines={1}>
+              {buttonText}
+              {typeLabel ? ` (${typeLabel})` : ''}
+            </UrduText>
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 
-  // Debug logging
-  // console.log('[AutoQuestionInput] Auto-calculate check:', {
-  //   questionId: question.id,
-  //   linked_to_type: question.linked_to_type,
-  //   linked_to_id: question.linked_to_id,
-  //   category: question.category,
-  //   hasAutoCalculateCapability,
-  //   isEditable: question.category === 'manual',
-  //   rightIconExists: !!rightIcon,
-  //   buttonText,
-  //   typeLabel,
-  //   questionId33: question.id === 33 ? 'THIS IS QUESTION 33' : 'not 33'
-  // });
-
   // Render contact item for popup
-  const renderContactItem = ({ item }: { item: Person }) => {
-    // console.log('[AutoQuestionInput] Rendering contact item:', item);
-    
+  const renderContactItem = useCallback(({ item }: { item: Person }) => {
     // Use only the fields that exist in the API
     const personName = item.Name || 'نام نہیں ملا';
     const personPhone = item.Phone_Number || 'فون نمبر نہیں ملا';
-    
-    // console.log('[AutoQuestionInput] Person name:', personName, 'Phone:', personPhone);
-    
+
     return (
       <View style={styles.contactItem}>
         <UrduText style={styles.contactName}>{personName}</UrduText>
         <Text style={styles.contactPhone}>{personPhone}</Text>
       </View>
     );
-  };
+  }, []);
 
   // Render activity item for popup
-  const renderActivityItem = ({ item }: { item: Activity }) => {
-    // console.log('[AutoQuestionInput] Rendering activity item:', item);
-    
+  const renderActivityItem = useCallback(({ item }: { item: Activity }) => {
     const activityDate = item.activity_date_and_time 
       ? new Date(item.activity_date_and_time).toLocaleDateString('ur-PK')
       : 'تاریخ دستیاب نہیں';
     const activityStatus = item.status === 'published' ? 'جمع شدہ' : 
-                          item.status === 'draft' ? 'ڈرافٹ' : 
+                          item.status === 'draft' ? 'مسودہ' : 
                           item.status === 'archived' ? 'محفوظ شدہ' : item.status;
     
     // Get activity type name
@@ -908,35 +777,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         </View>
       </View>
     );
-  };
-
-  // Render strength record item for popup
-  const renderStrengthRecordItem = ({ item }: { item: StrengthRecord }) => {
-    // console.log('[AutoQuestionInput] Rendering strength record item:', item);
-    
-    const changeTypeText = item.change_type === 'plus' ? 'اضافہ' : 'کمی';
-    const changeTypeColor = item.change_type === 'plus' ? COLORS.success : COLORS.error;
-    const value = item.Value || 0;
-    const newTotal = item.new_total || 0;
-    
-    // Format the reporting time
-    const reportingTime = item.Reporting_Time ? new Date(item.Reporting_Time).toLocaleDateString('ur-PK') : 'تاریخ نہیں ملی';
-    
-    return (
-      <View style={styles.strengthRecordItem}>
-        <View style={styles.strengthRecordLeft}>
-          <View style={[styles.changeTypeBadge, { backgroundColor: changeTypeColor }]}>
-            <UrduText style={styles.changeTypeText}>{changeTypeText}</UrduText>
-          </View>
-          <UrduText style={styles.strengthRecordValue}>{value}</UrduText>
-        </View>
-        <View style={styles.strengthRecordRight}>
-          <UrduText style={styles.strengthRecordTotal}>کل: {newTotal}</UrduText>
-          <Text style={styles.strengthRecordDate}>{reportingTime}</Text>
-        </View>
-      </View>
-    );
-  };
+  }, [activityTypes]);
 
   // Determine if input should be editable based on category only
   const isEditable = question.category === 'manual';
@@ -949,17 +790,31 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         onChange={(text) => {
           setInputValue(text);
           if (onValueChange) {
-            onValueChange(text);
+            // Debounce save to avoid API call per keystroke
+            if (typingDebounceRef.current) {
+              clearTimeout(typingDebounceRef.current);
+            }
+            typingDebounceRef.current = setTimeout(() => {
+              onValueChange(text);
+            }, 500);
           }
         }}
-        placeholder={hasAutoCalculateCapability ? "آٹو کیلکولیٹ کریں یا جواب یہاں لکھیں" : "جواب یہاں لکھیں"}
-        keyboardType="numeric"
+        onBlur={() => {
+          // On blur, flush pending debounce and save immediately
+          if (typingDebounceRef.current) {
+            clearTimeout(typingDebounceRef.current);
+            typingDebounceRef.current = null;
+          }
+          if (onValueChange && inputValue !== String(value || '')) {
+            onValueChange(inputValue);
+          }
+        }}
+        placeholder={hasAutoCalculateCapability ? (isEditable ? "نمبر درج کریں یا ڈیٹا کےلئے بٹن کلک کریں" : "ڈیٹا کےلئے بٹن کلک کریں") : "ڈیٹا کےلئے بٹن کلک کریں"}
+        keyboardType={question.input_type === 'number' ? 'numeric' : 'default'}
         editable={isEditable}
         disabled={disabled}
         loading={isCalculating}
         rightIcon={hasAutoCalculateCapability ? rightIcon : undefined}
-        // Debug: Force show button for testing
-        // rightIcon={rightIcon}
       />
 
       {/* Error message */}
@@ -982,13 +837,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         transparent={true}
         animationType="slide"
         onRequestClose={handlePopupClose}
-        onShow={() => {
-          // console.log('[AutoQuestionInput] Modal opened, contactsList:', {
-          //   length: contactsList.length,
-          //   firstFew: contactsList.slice(0, 3),
-          //   hasData: contactsList.length > 0
-          // });
-        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1006,7 +854,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
             {contactsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
+                <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
               </View>
             ) : contactsError ? (
               <View style={styles.errorContainer}>
@@ -1029,11 +877,9 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                   showsVerticalScrollIndicator={true}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                      <UrduText style={styles.emptyText}>کوئی {getContactTypeLabel()} نہیں ملے ({contactsList.length})</UrduText>
+                      <UrduText style={styles.emptyText}>کوئی {getContactTypeLabel()} نہیں ملے</UrduText>
                     </View>
                   }
-                  // onLayout={() => console.log('[AutoQuestionInput] FlatList onLayout, data length:', contactsList.length)}
-                  // onContentSizeChange={() => console.log('[AutoQuestionInput] FlatList onContentSizeChange, data length:', contactsList.length)}
                   getItemLayout={(data, index) => ({
                     length: 50, // Height of each compact item
                     offset: 50 * index,
@@ -1069,13 +915,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         transparent={true}
         animationType="slide"
         onRequestClose={handlePopupClose}
-        onShow={() => {
-          // console.log('[AutoQuestionInput] Activities Modal opened, activitiesList:', {
-          //   length: activitiesList.length,
-          //   firstFew: activitiesList.slice(0, 3),
-          //   hasData: activitiesList.length > 0
-          // });
-        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1091,7 +930,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
             {activitiesLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
+                <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
               </View>
             ) : activitiesError ? (
               <View style={styles.errorContainer}>
@@ -1101,7 +940,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
               <>
                 <View style={styles.listHeader}>
                   <UrduText style={styles.listHeaderText}>
-                    کل {activitiesList.length} سرگرمی (جمع شدہ: {activitiesList.filter(a => a.status === 'published').length})
+                    کل {activitiesList.length} سرگرمی (جمع شدہ: {publishedActivitiesCount})
                   </UrduText>
                 </View>
                 
@@ -1114,11 +953,9 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                   showsVerticalScrollIndicator={true}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                      <UrduText style={styles.emptyText}>کوئی سرگرمی نہیں ملی ({activitiesList.length})</UrduText>
+                      <UrduText style={styles.emptyText}>کوئی سرگرمی نہیں ملی</UrduText>
                     </View>
                   }
-                  // onLayout={() => console.log('[AutoQuestionInput] Activities FlatList onLayout, data length:', activitiesList.length)}
-                  // onContentSizeChange={() => console.log('[AutoQuestionInput] Activities FlatList onContentSizeChange, data length:', activitiesList.length)}
                   getItemLayout={(data, index) => ({
                     length: 60, // Height of each activity item
                     offset: 60 * index,
@@ -1138,7 +975,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                     style={styles.okButton}
                     onPress={handleActivitiesPopupOK}
                   >
-                    <UrduText style={styles.okButtonText}>ٹھیک ہے ({activitiesList.filter(a => a.status === 'published').length})</UrduText>
+                    <UrduText style={styles.okButtonText}>ٹھیک ہے ({publishedActivitiesCount})</UrduText>
                   </TouchableOpacity>
                 </View>
               </>
@@ -1147,93 +984,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         </View>
       </Modal>
 
-      {/* Strength Records Popup Modal */}
-      <Modal
-        visible={showStrengthPopup}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={handlePopupClose}
-        onShow={() => {
-          // console.log('[AutoQuestionInput] Strength Modal opened, strengthRecordsList:', {
-          //   length: strengthRecordsList.length,
-          //   firstFew: strengthRecordsList.slice(0, 3),
-          //   hasData: strengthRecordsList.length > 0
-          // });
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <UrduText style={styles.modalTitle}>
-                {question.aggregate_func === 'plus' ? `${getStrengthTypeSingularLabel()} اضافہ` : 
-                 question.aggregate_func === 'minus' ? `${getStrengthTypeSingularLabel()} کمی` : 
-                 `${getStrengthTypeLabel()} ریکارڈز`}
-              </UrduText>
-              <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {strengthLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <UrduText style={styles.loadingText}>لوڈ ہو رہا ہے...</UrduText>
-              </View>
-            ) : strengthError ? (
-              <View style={styles.errorContainer}>
-                <UrduText style={styles.errorText}>{strengthError}</UrduText>
-              </View>
-            ) : (
-              <>
-                <View style={styles.listHeader}>
-                  <UrduText style={styles.listHeaderText}>
-                    کل {strengthRecordsList.length} {getStrengthTypeSingularLabel()} ریکارڈ
-                  </UrduText>
-                </View>
-                
-                <FlatList
-                  data={strengthRecordsList}
-                  renderItem={renderStrengthRecordItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  style={styles.contactsList}
-                  contentContainerStyle={styles.contactsListContent}
-                  showsVerticalScrollIndicator={true}
-                  ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                      <UrduText style={styles.emptyText}>کوئی {getStrengthTypeSingularLabel()} ریکارڈ نہیں ملا ({strengthRecordsList.length})</UrduText>
-                    </View>
-                  }
-                  // onLayout={() => console.log('[AutoQuestionInput] Strength FlatList onLayout, data length:', strengthRecordsList.length)}
-                  // onContentSizeChange={() => console.log('[AutoQuestionInput] Strength FlatList onContentSizeChange, data length:', strengthRecordsList.length)}
-                  getItemLayout={(data, index) => ({
-                    length: 60, // Height of each strength record item
-                    offset: 60 * index,
-                    index,
-                  })}
-                />
-
-                <View style={styles.modalFooter}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={handlePopupClose}
-                  >
-                    <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.okButton}
-                    onPress={handleStrengthPopupOK}
-                  >
-                    <UrduText style={styles.okButtonText}>
-                      ٹھیک ہے ({strengthRecordsList.length > 0 ? strengthRecordsList[0].new_total : 0})
-                    </UrduText>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -1241,6 +991,21 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
+  },
+  rightButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  navButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.sm,
+    height: 40,
+    width: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   rightButton: {
     backgroundColor: COLORS.primary,
@@ -1252,7 +1017,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.xs,
     ...SHADOWS.small,
   },
   rightButtonLoading: {
@@ -1355,7 +1119,7 @@ const styles = StyleSheet.create({
   contactsList: {
     flex: 1,
     maxHeight: 600,
-    backgroundColor: '#f0f0f0', // Debug background color
+    backgroundColor: COLORS.white,
   },
   contactsListContent: {
     flexGrow: 1,
@@ -1427,53 +1191,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.white,
-  },
-  // Strength record styles
-  strengthRecordItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
-    minHeight: 60,
-  },
-  strengthRecordLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  changeTypeBadge: {
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  changeTypeText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  strengthRecordValue: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  strengthRecordRight: {
-    alignItems: 'flex-end',
-  },
-  strengthRecordTotal: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  strengthRecordDate: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
   },
   // Activity item styles
   activityItem: {

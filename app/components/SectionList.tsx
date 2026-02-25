@@ -39,12 +39,12 @@ const processInputValue = (value: string, inputType: string): string | number | 
   // Handle the three specific input types
   switch (inputType) {
     case 'number':
-      // For empty inputs, return 0
+      // For empty inputs, return null so progress tracking reflects unanswered
       if (value === '' || value === null || value === undefined) {
-        return 0;
+        return null;
       } else {
         const numValue = parseFloat(value);
-        return !isNaN(numValue) ? numValue : 0;
+        return !isNaN(numValue) ? numValue : null;
       }
     case 'string':
       // For string inputs, return the value or null
@@ -142,7 +142,7 @@ const Question = memo(({
   const saveAnswerToApi = useCallback((valueToSave: string | number | null) => {
     if (!submissionId) {
       console.error('Cannot save answer: No submission ID available');
-      setError('محفوظ نہیں کیا جا سکتا: کوئی سبمشن آئی ڈی میسر نہیں');
+      setError('محفوظ نہیں ہو سکا: رپورٹ ابھی تیار نہیں ہوئی');
       return;
     }
     
@@ -238,7 +238,7 @@ const Question = memo(({
         // Basic validation for string input
         setInputValue(text);
         if (text.length > 100) {
-          setError('ان پٹ بہت لمبا ہے (زیادہ سے زیادہ 100 حروف)');
+          setError('متن بہت لمبا ہے (زیادہ سے زیادہ 100 حروف)');
         } else {
           debouncedSave(text, false);
         }
@@ -258,10 +258,12 @@ const Question = memo(({
     }
   }, [question.input_type, debouncedSave]);
   
-  // Handle blur event to save immediately
+  // Handle blur event — save immediately (cancels any pending debounce)
   const handleBlur = useCallback(() => {
-    // No immediate save on blur as per existing logic
-  }, []);
+    if (inputValue !== stringValue) {
+      debouncedSave(inputValue, true);
+    }
+  }, [inputValue, stringValue, debouncedSave]);
   
   // Clean up the debounce timer on unmount
   useEffect(() => {
@@ -284,28 +286,16 @@ const Question = memo(({
     }
   }, [question.input_type]);
 
-  // Determine if the input should be multiline
-  const shouldBeMultiline = useCallback(() => {
-    // Text type is always multiline
-    if (question.input_type === 'text') {
-      return true;
-    }
-    
-    // Also make it multiline if the current input is long
-    if (inputValue.length > 50) {
-      return true;
-    }
-    
-    return false;
-  }, [question.input_type, inputValue.length]);
+  // Determine if the input should be multiline — only text type is multiline
+  const isMultiline = question.input_type === 'text';
 
   // Get placeholder text based on question type
   const getPlaceholder = useCallback(() => {
     switch (question.input_type) {
       case 'number':
-        return 'نمبر کی صورت میں جواب لکھیں';
+        return 'نمبر میں جواب لکھیں';
       case 'text':
-        return 'تفصیلی جواب لکھیں';
+        return 'الفاظ میں تفصیل لکھیں';
       case 'string':
       default:
         return 'الفاظ میں جواب لکھیں';
@@ -323,8 +313,8 @@ const Question = memo(({
         keyboardType={getKeyboardType()}
         loading={isSaving}
         editable={!disabled}
-        multiline={shouldBeMultiline()}
-        numberOfLines={shouldBeMultiline() ? 3 : 1}
+        multiline={isMultiline}
+        numberOfLines={isMultiline ? 3 : 1}
         error={error}
       />
       
@@ -430,10 +420,9 @@ interface SectionListProps {
   sections: Array<ReportSection & { progress: number }>;
   questions: ReportQuestion[];
   answers: ReportAnswer[];
-  onAnswerChange?: (questionId: number, value: any) => void;
   disabled?: boolean;
-  currentUnitId?: number | null; // Add current unit ID for filtering
-  submissionId?: number | null; // Add submission ID for AutoQuestionInput
+  currentUnitId?: number | null;
+  submissionId?: number | null;
 }
 
 // Main SectionList component
@@ -441,7 +430,6 @@ const SectionList: React.FC<SectionListProps> = ({
   sections,
   questions,
   answers,
-  onAnswerChange,
   disabled = false,
   currentUnitId,
   submissionId,
@@ -449,16 +437,6 @@ const SectionList: React.FC<SectionListProps> = ({
   // Use the submissionId prop if provided, otherwise get from Redux
   const reduxSubmissionId = useSelector(selectCurrentSubmissionId);
   const finalSubmissionId = submissionId || reduxSubmissionId;
-  
-  // // Debug submissionId
-  // useEffect(() => {
-  //   console.log('[SectionList] submissionId debug:', {
-  //     submissionId,
-  //     reduxSubmissionId,
-  //     finalSubmissionId,
-  //     hasSubmissionId: !!finalSubmissionId
-  //   });
-  // }, [submissionId, reduxSubmissionId, finalSubmissionId]);
 
   // Memoize the section components to avoid unnecessary re-renders
   const sectionComponents = useMemo(() => {

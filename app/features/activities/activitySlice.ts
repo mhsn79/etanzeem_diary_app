@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter, createSelector } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store/types';
 import { Activity } from '@/src/types/Activity';
-import apiClient, { directApiRequest } from '../../services/apiClient';
+import { directApiRequest } from '../../services/apiClient';
 import { Platform } from 'react-native';
 import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
 
@@ -443,7 +443,12 @@ const activitiesSlice = createSlice({
   extraReducers: builder => {
     builder
       .addCase(fetchActivities.pending, state => {
-        state.status = 'loading';
+        // Keep existing list mounted during background refreshes.
+        // Switching whole screen to "loading" while navigating can trigger Fabric
+        // viewState tag crashes on Android.
+        if ((state.ids?.length ?? 0) === 0) {
+          state.status = 'loading';
+        }
         state.error = null;
       })
       .addCase(fetchActivities.fulfilled, (state, action: PayloadAction<Activity[]>) => {

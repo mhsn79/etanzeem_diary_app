@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, InteractionManager } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, InteractionManager, Pressable } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
 import UrduText from '@/app/components/UrduText';
 import ScreenLayout from '@/app/components/ScreenLayout';
@@ -7,8 +7,9 @@ import { useNavigation, useLocalSearchParams } from 'expo-router';
 import CustomDropdown from '@/app/components/CustomDropdown';
 import FormInput from '@/app/components/FormInput';
 import CustomButton from '@/app/components/CustomButton';
-import Dialog from '@/app/components/Dialog';
-import { Ionicons } from '@expo/vector-icons';
+// Dialog removed — inline View overlays used instead (no Modal = no Fabric viewState crash)
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { getUrduMonth } from '@/app/constants/urduLocalization';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import {
   fetchActivityTypes,
@@ -46,11 +47,65 @@ const ActivityScreen = () => {
   const mode = (params.mode || 'schedule') as 'report' | 'schedule' | 'edit';
   const activityId = params.id ? Number(params.id) : undefined;
   const isEditMode = mode === 'edit' && activityId !== undefined;
+  const presetMonth = params.reportMonth ? String(params.reportMonth) : '';
+  const presetYear = params.reportYear ? String(params.reportYear) : '';
   
-  // Get initial date based on mode
+  // Compute date bounds for the reporting period
+  const dateBounds = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    if (presetMonth && presetYear) {
+      const m = parseInt(presetMonth, 10);
+      const y = parseInt(presetYear, 10);
+      const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      const monthEnd = new Date(y, m, 0, 23, 59, 59, 999); // Last day of month
+
+      if (mode === 'report') {
+        // Report: start of month → min(end of month, today)
+        return {
+          minimumDate: monthStart,
+          maximumDate: monthEnd < today ? monthEnd : today,
+        };
+      } else if (mode === 'schedule') {
+        // Schedule: max(start of month, today) → end of month
+        return {
+          minimumDate: monthStart > todayStart ? monthStart : todayStart,
+          maximumDate: monthEnd,
+        };
+      }
+    }
+
+    // Fallback: no preset period
+    if (mode === 'schedule') return { minimumDate: todayStart, maximumDate: undefined };
+    if (mode === 'report') return { minimumDate: undefined, maximumDate: today };
+    return { minimumDate: undefined, maximumDate: undefined };
+  }, [presetMonth, presetYear, mode]);
+
+  // Get initial date based on mode and preset period
   const getInitialDate = () => {
-    if (mode === 'report') return new Date(); // Today for report mode
-    if (mode === 'schedule') return new Date(new Date().setDate(new Date().getDate() + 1)); // Tomorrow for schedule mode
+    if (presetMonth && presetYear) {
+      const m = parseInt(presetMonth, 10);
+      const y = parseInt(presetYear, 10);
+      const today = new Date();
+      const monthStart = new Date(y, m - 1, 1);
+      const monthEnd = new Date(y, m, 0);
+
+      if (mode === 'report') {
+        // Use today if within the month, else last day of month
+        if (today.getFullYear() === y && today.getMonth() + 1 === m) return today;
+        return monthEnd; // Past month — default to last day
+      }
+      if (mode === 'schedule') {
+        // Use today if within the month, else first day of month
+        if (today.getFullYear() === y && today.getMonth() + 1 === m) return today;
+        return monthStart; // Future month — default to first day
+      }
+    }
+    if (mode === 'report') return new Date();
+    if (mode === 'schedule') return new Date();
     return new Date(); // Default for edit mode (will be overridden)
   };
 
@@ -63,8 +118,8 @@ const ActivityScreen = () => {
     tanzeemiUnit: '',
     notes: '',
     attendance: '',
-    reportingMonth: '',
-    reportingYear: '',
+    reportingMonth: presetMonth,
+    reportingYear: presetYear,
   });
   
 
@@ -127,19 +182,21 @@ const ActivityScreen = () => {
     }
   }, [userUnitDetails, isEditMode]);
 
-  // Auto-fill reporting month and year for report mode or past published activities
+  // Auto-fill reporting month and year — preset from Activities screen takes priority
   useEffect(() => {
+    // If preset values provided from Activities screen, use them (already set in initial state)
+    if (presetMonth && presetYear) return;
+    // Otherwise fall back to date-based auto-fill for report mode
     if ((mode === 'report' || (isEditMode && activity && isPastActivity(activity) && activity.status === 'published')) && selectedActivityDate) {
       const month = selectedActivityDate.getMonth() + 1;
       const year = selectedActivityDate.getFullYear();
-      
       setActivityDetails(prev => ({
         ...prev,
         reportingMonth: String(month),
         reportingYear: String(year),
       }));
     }
-  }, [mode, selectedActivityDate, isEditMode, activity]);
+  }, [mode, selectedActivityDate, isEditMode, activity, presetMonth, presetYear]);
   
   // Fetch activity data in edit mode - only once when component mounts
   useEffect(() => {
@@ -326,66 +383,59 @@ const ActivityScreen = () => {
     }
   }, [createActivityStatus, createActivityError, editActivityStatus, editActivityError, isSubmitting]);
 
-  // Filter activity types by current unit level and add "دیگر" option
+  // Filter activity types by the SELECTED tanzeemi unit's level
   const filteredActivityTypeOptions = React.useMemo(() => {
-    console.log('Activity types filtering:', {
-      totalActivityTypes: activityTypes.length,
-      userUnitLevelId: userUnitDetails?.level_id || userUnitDetails?.Level_id,
-      userUnitLevel: userUnitDetails?.level,
-      userTanzeemiLevelName: userTanzeemiLevelDetails?.Name,
-      childUnitsLevelIds: childUnits?.map(unit => unit.level_id || unit.Level_id) || [],
-      activityTypes: activityTypes.map(type => ({ id: type.id, name: type.Name, level_id: type.level_id }))
-    });
-    
-    // Get current unit's level name
-    const currentLevelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
-    
-    // Get all child units' level names
-    const childLevelNames = childUnits?.map(unit => {
-      const childLevelId = unit.level_id || unit.Level_id;
-      return childLevelId && levelsById[childLevelId] ? levelsById[childLevelId].Name : '';
-    }).filter(Boolean) || [];
-    
-    // Combine current level and child levels
-    const allowedLevelNames = [currentLevelName, ...childLevelNames].filter(Boolean);
-    
-    console.log('Allowed level names for filtering:', allowedLevelNames);
-    
-    // Filter activity types by level names in their titles
+    // Find the selected unit's Level_id
+    let selectedLevelId: number | null = null;
+    const selectedUnitId = activityDetails.tanzeemiUnit ? Number(activityDetails.tanzeemiUnit) : null;
+
+    if (selectedUnitId) {
+      if (userUnitDetails && userUnitDetails.id === selectedUnitId) {
+        selectedLevelId = userUnitDetails.level_id || userUnitDetails.Level_id || null;
+      } else {
+        const childUnit = childUnits?.find(u => u.id === selectedUnitId);
+        if (childUnit) {
+          selectedLevelId = childUnit.level_id || childUnit.Level_id || null;
+        }
+      }
+    }
+
+    // Filter activity types whose Level_id matches the selected unit's level
     const filteredTypes = activityTypes.filter(type => {
-      const typeName = type.Name || '';
-      
-      // Check if the activity type name contains any of the allowed level names
-      const matchesLevel = allowedLevelNames.some(levelName => 
-        typeName.includes(levelName)
-      );
-      
-      // Also include generic activity types that don't specify a level
-      const isGeneric = !typeName.includes('(') && !typeName.includes('حلقہ') && !typeName.includes('یوسی') && !typeName.includes('زون');
-      
-      console.log(`Activity type "${typeName}" - Matches level: ${matchesLevel}, Is generic: ${isGeneric}`);
-      
-      return matchesLevel || isGeneric;
+      if (!selectedLevelId) return true; // No unit selected yet — show all
+      const typeLevelId = type.Level_id || type.level_id;
+      if (!typeLevelId) return true; // Generic type with no level — always show
+      return typeLevelId === selectedLevelId;
     });
-    
-    console.log(`Filtered ${filteredTypes.length} activity types out of ${activityTypes.length} total`);
-    
+
     const options = filteredTypes.map((type) => ({
       id: String(type.id),
       label: type.Name,
       value: String(type.id),
     }));
-    
-    // Add "دیگر" (Other) option at the end
+
+    // Always add "دیگر" (Other) option at the end
     options.push({
       id: 'other',
       label: 'دیگر',
       value: 'other',
     });
-    
-    console.log('Final activity type options:', options.length);
+
     return options;
-  }, [activityTypes, userUnitDetails, childUnits, userTanzeemiLevelDetails, levelsById]);
+  }, [activityTypes, activityDetails.tanzeemiUnit, userUnitDetails, childUnits]);
+
+  // Clear activity type if it's no longer valid for the new unit's level
+  React.useEffect(() => {
+    if (activityDetails.activityType) {
+      const stillValid = filteredActivityTypeOptions.some(
+        opt => opt.value === activityDetails.activityType
+      );
+      if (!stillValid) {
+        setActivityDetails(prev => ({ ...prev, activityType: '' }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredActivityTypeOptions]);
 
   // Create tanzeemi unit options
   const tanzeemiUnitOptions = React.useMemo(() => {
@@ -729,10 +779,15 @@ const ActivityScreen = () => {
     
     // Determine status and reporting details based on mode
     let status = 'draft';
-    let reportMonth = activityDate.getMonth() + 1; // Default from activity date
-    let reportYear = activityDate.getFullYear(); // Default from activity date
+    // Use preset month/year if available, otherwise derive from activity date
+    let reportMonth = activityDetails.reportingMonth
+      ? parseInt(activityDetails.reportingMonth)
+      : activityDate.getMonth() + 1;
+    let reportYear = activityDetails.reportingYear
+      ? parseInt(activityDetails.reportingYear)
+      : activityDate.getFullYear();
     let attendance = null;
-    
+
     if (mode === 'report') {
       status = 'published';
       reportMonth = parseInt(activityDetails.reportingMonth);
@@ -813,6 +868,16 @@ const ActivityScreen = () => {
           automaticallyAdjustKeyboardInsets={true}
         >
           <View style={styles.content}>
+            {/* Reporting period info bar */}
+            {presetMonth && presetYear && (
+              <View style={styles.periodInfoBar}>
+                <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+                <UrduText style={styles.periodInfoText}>
+                  رپورٹنگ مدت: {getUrduMonth(parseInt(presetMonth))} {presetYear}
+                </UrduText>
+              </View>
+            )}
+
             <DateTimePicker
               key={`date-picker-${selectedActivityDate?.getTime() || 'initial'}`}
               label="تاریخ اور وقت"
@@ -820,8 +885,8 @@ const ActivityScreen = () => {
               mode="datetime"
               initialDate={selectedActivityDate || undefined}
               onDateChange={handleDateTimeChange}
-              minimumDate={mode === 'schedule' ? new Date() : undefined}
-              maximumDate={mode === 'report' ? new Date() : undefined}
+              minimumDate={isEditMode ? undefined : dateBounds.minimumDate}
+              maximumDate={isEditMode ? undefined : dateBounds.maximumDate}
               // In edit mode, don't restrict dates
               disabled={isEditMode && activity?.status !== 'draft'}
               useUrduText={true}
@@ -905,24 +970,29 @@ const ActivityScreen = () => {
                   keyboardType="numeric"
                   required
                 />
-                
-                <CustomDropdown
-                  options={urduMonths}
-                  onSelect={selectReportingMonth}
-                  dropdownTitle="رپورٹنگ کا مہینہ"
-                  placeholder="مہینہ منتخب کریں"
-                  selectedValue={activityDetails.reportingMonth}
-                  dropdownContainerStyle={styles.dropdownContainer}
-                />
-                
-                <CustomDropdown
-                  options={yearOptions}
-                  onSelect={selectReportingYear}
-                  dropdownTitle="رپورٹنگ کا سال"
-                  placeholder="سال منتخب کریں"
-                  selectedValue={activityDetails.reportingYear}
-                  dropdownContainerStyle={styles.dropdownContainer}
-                />
+
+                {/* Show month/year dropdowns only when no preset values (fallback for edit mode) */}
+                {!presetMonth && !presetYear && (
+                  <>
+                    <CustomDropdown
+                      options={urduMonths}
+                      onSelect={selectReportingMonth}
+                      dropdownTitle="رپورٹنگ کا مہینہ"
+                      placeholder="مہینہ منتخب کریں"
+                      selectedValue={activityDetails.reportingMonth}
+                      dropdownContainerStyle={styles.dropdownContainer}
+                    />
+
+                    <CustomDropdown
+                      options={yearOptions}
+                      onSelect={selectReportingYear}
+                      dropdownTitle="رپورٹنگ کا سال"
+                      placeholder="سال منتخب کریں"
+                      selectedValue={activityDetails.reportingYear}
+                      dropdownContainerStyle={styles.dropdownContainer}
+                    />
+                  </>
+                )}
               </>
             )}
             
@@ -959,34 +1029,77 @@ const ActivityScreen = () => {
         </View>
       </View>
       
-      <Dialog
-        visible={showConfirmDialog}
-        onConfirm={handleConfirmSubmit}
-        onClose={() => setShowConfirmDialog(false)}
-        title={isEditMode ? "سرگرمی اپڈیٹ کرنے کی تصدیق" : "سرگرمی جمع کروانے کی تصدیق"}
-        description={isEditMode 
-          ? "کیا آپ واقعاً اس سرگرمی کو اپڈیٹ کرنا چاہتے ہیں؟"
-          : "کیا اس سرگرمی کی رپورٹ محفوظ کر لیں؟"
-        }
-        confirmText={isEditMode ? "ہاں، اپڈیٹ کریں" : "ہاں، جمع کروائیں"}
-        cancelText="نہیں، واپس جائیں"
-        showWarningIcon={true}
-      />
-      <Dialog
-        visible={showSuccessDialog}
-        onConfirm={handleSuccessDialogConfirm}
-        onClose={() => setShowSuccessDialog(false)}
-        title={isEditMode 
-          ? "آپ کی سرگرمی اپڈیٹ کر دی گئی ہے!" 
-          : "آپ کی سرگرمی جمع کر دی گئی ہے!"
-        }
-        description={isEditMode
-          ? "آپ کی سرگرمی کامیابی سے اپڈیٹ ہو چکی ہے۔"
-          : "آپ کی سرگرمی کامیابی سے سبمٹ ہو چکی ہے۔ آپ چاہیں تو جمع شدہ سرگرمیاں دیکھ سکتے ہیں یا واپس ہوم پیج پر جا سکتے ہیں۔"
-        }
-        confirmText="ٹھیک ہے"
-        showSuccessIcon={true}
-      />
+      {/* Confirm submission — inline overlay, NO Modal */}
+      {showConfirmDialog && (
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <Pressable style={styles.overlayBackdrop} onPress={() => !isSubmitting && setShowConfirmDialog(false)} />
+          <View style={styles.overlayCenter}>
+            <View style={styles.dialogBox}>
+              <View style={styles.dialogIconWrapWarning}>
+                <MaterialIcons name="warning" size={30} color={COLORS.white} />
+              </View>
+              <UrduText style={styles.dialogTitle}>
+                {isEditMode ? "سرگرمی اپڈیٹ کرنے کی تصدیق" : "سرگرمی جمع کروانے کی تصدیق"}
+              </UrduText>
+              <UrduText style={styles.dialogDesc}>
+                {isEditMode
+                  ? "کیا آپ واقعاً اس سرگرمی کو اپڈیٹ کرنا چاہتے ہیں؟"
+                  : "کیا اس سرگرمی کی رپورٹ محفوظ کر لیں؟"}
+              </UrduText>
+              <TouchableOpacity
+                style={[styles.dialogConfirmBtn, isSubmitting && styles.dialogBtnDisabled]}
+                onPress={handleConfirmSubmit}
+                disabled={isSubmitting}
+                activeOpacity={0.7}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <UrduText style={styles.dialogConfirmText}>
+                    {isEditMode ? "ہاں، اپڈیٹ کریں" : "ہاں، جمع کروائیں"}
+                  </UrduText>
+                )}
+              </TouchableOpacity>
+              {!isSubmitting && (
+                <TouchableOpacity onPress={() => setShowConfirmDialog(false)} activeOpacity={0.7}>
+                  <UrduText style={styles.dialogCancelText}>نہیں، واپس جائیں</UrduText>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Success — inline overlay, NO Modal */}
+      {showSuccessDialog && (
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <View style={styles.overlayBackdrop} />
+          <View style={styles.overlayCenter}>
+            <View style={styles.dialogBox}>
+              <View style={styles.dialogIconWrapSuccess}>
+                <Ionicons name="checkmark-circle" size={30} color={COLORS.white} />
+              </View>
+              <UrduText style={styles.dialogTitle}>
+                {isEditMode
+                  ? "آپ کی سرگرمی اپڈیٹ کر دی گئی ہے!"
+                  : "آپ کی سرگرمی جمع کر دی گئی ہے!"}
+              </UrduText>
+              <UrduText style={styles.dialogDesc}>
+                {isEditMode
+                  ? "آپ کی سرگرمی کامیابی سے اپڈیٹ ہو چکی ہے۔"
+                  : "آپ کی سرگرمی کامیابی سے سبمٹ ہو چکی ہے۔"}
+              </UrduText>
+              <TouchableOpacity
+                style={styles.dialogConfirmBtn}
+                onPress={handleSuccessDialogConfirm}
+                activeOpacity={0.7}
+              >
+                <UrduText style={styles.dialogConfirmText}>ٹھیک ہے</UrduText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </ScreenLayout>
   );
 };
@@ -1011,17 +1124,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: SPACING.md,
-    paddingBottom: SPACING.xl * 4, // Increased padding to account for sticky button height
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xl * 4,
   },
   content: {
     // Content styling if needed
   },
   datePickerContainer: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   dropdownContainer: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   errorContainer: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
@@ -1066,8 +1180,99 @@ const styles = StyleSheet.create({
     right: SPACING.sm,
     zIndex: 1,
   },
+  periodInfoBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightPrimary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  periodInfoText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
+  },
   bottomSpacer: {
-    height: SPACING.xl * 2, // Adjust as needed to create space
+    height: SPACING.xl * 2,
+  },
+  // --- Inline overlay styles (replaces Modal-based Dialog) ---
+  overlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  overlayCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
+  },
+  dialogBox: {
+    width: '85%',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    ...({ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }),
+    ...(Platform.OS === 'android' ? { elevation: 12 } : {}),
+  },
+  dialogIconWrapWarning: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.warning,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  dialogIconWrapSuccess: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  dialogTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  dialogDesc: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.black,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  dialogConfirmBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.sm,
+    width: '80%',
+    alignItems: 'center',
+  },
+  dialogBtnDisabled: {
+    backgroundColor: COLORS.disabled,
+    opacity: 0.7,
+  },
+  dialogConfirmText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  dialogCancelText: {
+    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+    paddingVertical: SPACING.sm,
   },
 });
 

@@ -31,8 +31,8 @@ const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }
     const contactType = contactTypes.find(type => type.id === item.contact_type);
     if (!contactType) return false;
     
-    // Hide edit icon for umeedwar and rukun contact types
-    return contactType.type === 'umeedwar' || contactType.type === 'rukun';
+    // Hide edit icon for rukun contact type (rukun edits go through admin approval)
+    return contactType.type === 'rukun';
   };
 
   const toggleExpanded = (e: GestureResponderEvent) => {

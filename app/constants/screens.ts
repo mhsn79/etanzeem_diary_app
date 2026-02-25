@@ -79,10 +79,10 @@ export const SCREEN_TITLES = {
   [SCREENS.MEETINGS]: 'اجلاسات',
   [SCREENS.UNIT_SELECTION]: 'تنظیمی ہیئت',
   [SCREENS.WORKFORCE]: 'تنظیمی قوت',
-  [SCREENS.RUKUN_VIEW]: 'ارکان',
-  [SCREENS.RUKUN_ADD_EDIT]: 'رکن شامل کریں',
+  [SCREENS.RUKUN_VIEW]: 'فرد کی تفصیل',
+  [SCREENS.RUKUN_ADD_EDIT]: 'فرد شامل کریں/ترمیم کریں',
   [SCREENS.SCHEDULE_ACTIVITIES_SCREEN]:'سرگرمی شیڈول کریں',
-  [SCREENS.RUKAN_DETAILS]: 'رکن کی تفصیل'
+  [SCREENS.RUKAN_DETAILS]: 'فرد کی تفصیل'
 
 } as const;
 

@@ -18,7 +18,7 @@ import {
   selectReportSubmissions,
   selectReportsError,
   selectReportsLoading,
-} from '@/app/features/reports/reportsSlice_new';
+} from '@/app/features/reports/reportsSlice';
 import { selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 import { getUrduMonth } from '@/app/constants/urduLocalization';

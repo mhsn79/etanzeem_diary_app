@@ -133,13 +133,6 @@ export const calculateAutoValue = async (
   dispatch?: any
 ): Promise<number> => {
   try {
-    console.log(`[AUTO_CALC] Calculating auto value for question ${question.id}:`, {
-      aggregate_func: question.aggregate_func,
-      linked_to_type: question.linked_to_type,
-      linked_to_id: question.linked_to_id,
-      unitId
-    });
-
     // Handle count operations for different linked_to_type
     if (question.aggregate_func === 'count') {
       if (question.linked_to_type === 'contacts' && dispatch) {
@@ -166,11 +159,9 @@ export const calculateAutoValue = async (
       case 'avg':
         return getStaticAvgValue(question.linked_to_type || null, question.linked_to_id || null);
       default:
-        console.warn(`[AUTO_CALC] Unknown aggregate function: ${question.aggregate_func}`);
         return 0;
     }
-  } catch (error) {
-    console.error(`[AUTO_CALC] Error calculating auto value for question ${question.id}:`, error);
+  } catch {
     return 0;
   }
 };
@@ -209,22 +200,9 @@ const getStaticAvgValue = (linkedToType: string | null, linkedToId: number | nul
  * Check if a question is auto-calculated
  */
 export const isAutoQuestion = (question: ReportQuestion): boolean => {
-  // A question is considered "auto" if it has linked_to attributes (for auto-calculation)
-  // OR if it's explicitly marked as auto category
   const hasLinkedAttributes = Boolean(question.linked_to_type && question.linked_to_id);
   const isAutoCategory = question.category === 'auto' && question.aggregate_func !== null;
-  const isAuto = hasLinkedAttributes || isAutoCategory;
-  
-  console.log(`[AUTO_CHECK] Question ${question.id} auto check:`, {
-    category: question.category,
-    aggregate_func: question.aggregate_func,
-    linked_to_type: question.linked_to_type,
-    linked_to_id: question.linked_to_id,
-    hasLinkedAttributes,
-    isAutoCategory,
-    isAuto
-  });
-  return isAuto;
+  return hasLinkedAttributes || isAutoCategory;
 };
 
 /**
@@ -233,10 +211,9 @@ export const isAutoQuestion = (question: ReportQuestion): boolean => {
 export const getCalculationButtonText = (aggregateFunc: string | null): string => {
   switch (aggregateFunc) {
     case 'sum':
-      return 'کل ';
     case 'total':
       return 'کل';
-      case 'count':
+    case 'count':
       return 'تعداد';
     case 'avg':
       return 'اوسط';

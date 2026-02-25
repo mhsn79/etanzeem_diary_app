@@ -47,7 +47,7 @@ export const fetchActivityTypes = createAsyncThunk<
   try {
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ActivityType[] }>(
-      '/items/Activity_Type?fields=id,Name,Name_plural',
+      '/items/Activity_Type?fields=id,Name,Name_plural,Level_id',
       'GET'
     );
     

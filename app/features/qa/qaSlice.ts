@@ -4,6 +4,7 @@ import { RootState, AppDispatch } from '../../store/types';
 import apiRequest, { directApiRequest } from '../../services/apiClient';
 import { checkAndRefreshTokenIfNeeded, logout } from '../auth/authSlice';
 import { calculateAverageSectionProgress } from './utils';
+import { reduxLogger } from '../../utils/logger';
 import {
   QAState,
   ReportSection,
@@ -53,7 +54,9 @@ const initialState: QAState = {
   saveStatus: 'idle',
   saveError: null,
   submitStatus: 'idle',
-  submitError: null
+  submitError: null,
+  batchFillStatus: 'idle',
+  batchFillProgress: { current: 0, total: 0 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +81,30 @@ const normalizeEntities = <T extends { id: number } | { id?: number }>(entities:
 };
 
 /**
- * Calculate progress for a section
+ * Create an index of answers by question_id for O(1) lookup
+ * This avoids the O(n²) complexity of nested loops in progress calculation
+ */
+const createAnswerIndexByQuestion = (
+  answers: NormalizedEntities<ReportAnswer>,
+  currentSubmissionId: number | null
+): Map<number, ReportAnswer> => {
+  const index = new Map<number, ReportAnswer>();
+
+  if (!answers.byId || !currentSubmissionId) return index;
+
+  Object.values(answers.byId).forEach(answer => {
+    if (answer &&
+        answer.submission_id === currentSubmissionId &&
+        (answer.string_value !== null || answer.number_value !== null)) {
+      index.set(answer.question_id, answer);
+    }
+  });
+
+  return index;
+};
+
+/**
+ * Calculate progress for a section (optimized with O(1) answer lookup)
  */
 const calculateSectionProgress = (
   sectionId: number,
@@ -89,32 +115,28 @@ const calculateSectionProgress = (
   if (!questions.byId) {
     return { totalQuestions: 0, answeredQuestions: 0, percentage: 0 };
   }
-  
+
   // Get all questions for this section
   const sectionQuestions = Object.values(questions.byId).filter(
     q => q && q.section_id === sectionId
   );
-  
+
   // Count total questions
   const totalQuestions = sectionQuestions.length;
-  
-  // Count answered questions - only consider answers for the current submission
+
+  // Create answer index for O(1) lookup (instead of O(n) for each question)
+  const answerIndex = createAnswerIndexByQuestion(answers, currentSubmissionId);
+
+  // Count answered questions using the index - now O(n) instead of O(n²)
   const answeredQuestions = sectionQuestions.filter(question => {
-    if (!answers.byId || !currentSubmissionId) return false;
-    
-    return Object.values(answers.byId).some(answer => 
-      answer && 
-      answer.question_id === question.id && 
-      answer.submission_id === currentSubmissionId &&
-      (answer.string_value !== null || answer.number_value !== null)
-    );
+    return answerIndex.has(question.id);
   }).length;
-  
+
   // Calculate percentage
-  const percentage = totalQuestions > 0 
-    ? Math.round((answeredQuestions / totalQuestions) * 100) 
+  const percentage = totalQuestions > 0
+    ? Math.round((answeredQuestions / totalQuestions) * 100)
     : 0;
-  
+
   return {
     totalQuestions,
     answeredQuestions,
@@ -129,9 +151,9 @@ const updateAllSectionsProgress = (
   state: QAState
 ): { [sectionId: number]: SectionProgress } => {
   const progress: { [sectionId: number]: SectionProgress } = {};
-  
+
   const sectionIds = Array.isArray(state.sections.allIds) ? state.sections.allIds : [];
-  
+
   sectionIds.forEach(sectionId => {
     if (sectionId !== undefined) {
       progress[sectionId] = calculateSectionProgress(
@@ -142,7 +164,41 @@ const updateAllSectionsProgress = (
       );
     }
   });
-  
+
+  return progress;
+};
+
+/**
+ * Update progress for a single section (optimized for saveAnswer)
+ * Returns the full progress object with only the affected section recalculated
+ */
+const updateSingleSectionProgress = (
+  state: QAState,
+  questionId: number
+): { [sectionId: number]: SectionProgress } => {
+  // Find which section this question belongs to
+  const question = state.questions.byId?.[questionId] ||
+    Object.values(state.questions.byId || {}).find(q => q?.id === questionId);
+
+  if (!question) {
+    // Question not found, fall back to full recalculation
+    return updateAllSectionsProgress(state);
+  }
+
+  const sectionId = question.section_id;
+  if (sectionId == null) {
+    return updateAllSectionsProgress(state);
+  }
+
+  // Copy existing progress and only recalculate the affected section
+  const progress = { ...state.progress };
+  progress[sectionId] = calculateSectionProgress(
+    sectionId,
+    state.questions,
+    state.answers,
+    state.currentSubmissionId
+  );
+
   return progress;
 };
 
@@ -160,21 +216,21 @@ export const initializeReportData = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/initializeReportData', async (params, { dispatch, rejectWithValue }) => {
   try {
-    // console.log('[QA] initializeReportData thunk called with params:', params);
+    // reduxLogger.debug('[QA] initializeReportData thunk called with params:', params);
     
     // Validate required fields
     if (!params.template_id || !params.unit_id || !params.mgmt_id) {
-      // console.error('[QA] Missing required fields:', { template_id: params.template_id, unit_id: params.unit_id, mgmt_id: params.mgmt_id });
-      return rejectWithValue('Missing required fields for report initialization');
+      // reduxLogger.error('[QA] Missing required fields:', { template_id: params.template_id, unit_id: params.unit_id, mgmt_id: params.mgmt_id });
+      return rejectWithValue('رپورٹ شروع کرنے کے لیے ضروری معلومات نہیں ملیں');
     }
     
     // First, check and refresh token if needed
     try {
       await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
     } catch (refreshError) {
-      console.error('Token refresh failed in initializeReportData:', refreshError);
+      reduxLogger.error('Token refresh failed in initializeReportData:', refreshError);
       dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
+      return rejectWithValue('آپ کا سیشن ختم ہو گیا ہے۔ دوبارہ لاگ ان کریں۔');
     }
     
     // Initialize submission variable
@@ -191,12 +247,12 @@ export const initializeReportData = createAsyncThunk<
         if (submissionResponse?.data) {
           submission = submissionResponse.data;
         } else {
-          console.error(`Submission with ID ${params.submission_id} not found`);
-          return rejectWithValue(`Submission with ID ${params.submission_id} not found`);
+          reduxLogger.error(`رپورٹ نہیں مل سکی`);
+          return rejectWithValue(`رپورٹ نہیں مل سکی`);
         }
       } catch (error) {
-        console.error(`Error fetching submission with ID ${params.submission_id}:`, error);
-        return rejectWithValue(`Error fetching submission with ID ${params.submission_id}`);
+        reduxLogger.error(`Error fetching submission with ID ${params.submission_id}:`, error);
+        return rejectWithValue(`رپورٹ حاصل نہیں ہو سکی`);
       }
     } else {
       // Step 1b: Check for existing submission if no specific ID was provided
@@ -208,7 +264,7 @@ export const initializeReportData = createAsyncThunk<
         ]
       };
       
-      console.log('[QA] Searching for existing submission with filter:', filter);
+      reduxLogger.debug('[QA] Searching for existing submission with filter:', filter);
       
       const existingSubmissionsResponse = await directApiRequest<{ data: ReportSubmission[] }>(
         '/items/reports_submissions',
@@ -216,7 +272,7 @@ export const initializeReportData = createAsyncThunk<
         { filter }
       );
       
-      console.log('[QA] Found submissions:', existingSubmissionsResponse?.data?.map(s => ({
+      reduxLogger.debug('[QA] Found submissions:', existingSubmissionsResponse?.data?.map(s => ({
         id: s.id,
         template_id: s.template_id,
         unit_id: s.unit_id,
@@ -227,7 +283,7 @@ export const initializeReportData = createAsyncThunk<
       // Step 2: Use existing submission or reject if none exists
       if (existingSubmissionsResponse?.data && existingSubmissionsResponse.data.length > 0) {
         submission = existingSubmissionsResponse.data[0];
-        console.log('[QA] Using existing submission:', {
+        reduxLogger.debug('[QA] Using existing submission:', {
           submissionId: submission.id,
           templateId: submission.template_id,
           unitId: submission.unit_id,
@@ -235,8 +291,8 @@ export const initializeReportData = createAsyncThunk<
           status: submission.status
         });
       } else {
-        console.error('[QA] No existing submission found for the given parameters');
-        return rejectWithValue('No existing submission found for the given parameters');
+        reduxLogger.error('[QA] No existing submission found for the given parameters');
+        return rejectWithValue('اس ٹیمپلیٹ کے لیے کوئی رپورٹ دستیاب نہیں');
       }
     }
     
@@ -255,16 +311,16 @@ export const initializeReportData = createAsyncThunk<
     } else if (sectionsResponse?.data && Array.isArray(sectionsResponse.data)) {
       sections = sectionsResponse.data;
     } else {
-      console.error('Invalid response format for Report Sections:', sectionsResponse);
-      return rejectWithValue('Invalid response format for Report Sections');
+      reduxLogger.error('Invalid response format for Report Sections:', sectionsResponse);
+      return rejectWithValue('رپورٹ کے سیکشنز حاصل نہیں ہو سکے');
     }
     
     // Step 4: Fetch all questions for the template in a single batch
     const sectionIds = sections.map(section => section.id);
     
     if (sectionIds.length === 0) {
-      console.error('No sections found for template:', params.template_id);
-      return rejectWithValue('No sections found for template');
+      reduxLogger.error('No sections found for template:', params.template_id);
+      return rejectWithValue('اس رپورٹ میں کوئی سیکشن نہیں ملا');
     }
     
     const questionsFilter = { section_id: { _in: sectionIds } };
@@ -281,8 +337,8 @@ export const initializeReportData = createAsyncThunk<
     } else if (questionsResponse?.data && Array.isArray(questionsResponse.data)) {
       questions = questionsResponse.data;
     } else {
-      console.error('Invalid response format for Report Questions:', questionsResponse);
-      return rejectWithValue('Invalid response format for Report Questions');
+      reduxLogger.error('Invalid response format for Report Questions:', questionsResponse);
+      return rejectWithValue('رپورٹ کے سوالات حاصل نہیں ہو سکے');
     }
     
     // Step 5: Fetch answers for the submission if it exists
@@ -304,7 +360,7 @@ export const initializeReportData = createAsyncThunk<
           answers = answersResponse.data;
         }
       } catch (error) {
-        console.error('Error fetching answers:', error);
+        reduxLogger.error('Error fetching answers:', error);
         // Don't fail the entire operation if answers fetch fails
         answers = [];
       }
@@ -318,7 +374,7 @@ export const initializeReportData = createAsyncThunk<
       answers
     };
     
-    console.log('[QA] initializeReportData thunk completed successfully:', {
+    reduxLogger.debug('[QA] initializeReportData thunk completed successfully:', {
       submissionId: submission.id,
       sectionsCount: sections.length,
       questionsCount: questions.length,
@@ -327,8 +383,8 @@ export const initializeReportData = createAsyncThunk<
     
     return result;
   } catch (error: any) {
-    console.error('Error in initializeReportData:', error);
-    return rejectWithValue(error.message || 'Failed to initialize report data');
+    reduxLogger.error('Error in initializeReportData:', error);
+    return rejectWithValue(error.message || 'رپورٹ کی معلومات حاصل نہیں ہو سکیں');
   }
 });
 
@@ -341,40 +397,40 @@ export const saveAnswer = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/saveAnswer', async (answerData, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Saving answer:', answerData);
+    reduxLogger.debug('Saving answer:', answerData);
     
     // Validate question_id is provided
     if (!answerData.question_id) {
-      return rejectWithValue('Missing question_id for answer submission');
+      return rejectWithValue('جواب محفوظ نہیں ہو سکا: سوال کی شناخت نہیں ملی');
     }
     
     // Check if at least one value is provided
     if (answerData.string_value === undefined && answerData.number_value === undefined) {
-      return rejectWithValue('Either string_value or number_value must be provided');
+      return rejectWithValue('جواب محفوظ نہیں ہو سکا: کوئی جواب درج نہیں کیا گیا');
     }
     
     // First, check and refresh token if needed
     try {
       await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
     } catch (refreshError) {
-      console.error('Token refresh failed in saveAnswer:', refreshError);
+      reduxLogger.error('Token refresh failed in saveAnswer:', refreshError);
       dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
+      return rejectWithValue('آپ کا سیشن ختم ہو گیا ہے۔ دوبارہ لاگ ان کریں۔');
     }
     
     // Get the current state to check for existing submission ID
     const state = getState();
     const submissionId = answerData.submission_id || state.qa.currentSubmissionId;
     
-    console.log('[QA] saveAnswer called with:', {
+    reduxLogger.debug('[QA] saveAnswer called with:', {
       answerData,
       currentSubmissionId: state.qa.currentSubmissionId,
       finalSubmissionId: submissionId
     });
     
     if (!submissionId) {
-      console.error('[QA] No submission ID available for saving answer');
-      return rejectWithValue('No submission ID available. Please initialize the report first.');
+      reduxLogger.error('[QA] No submission ID available for saving answer');
+      return rejectWithValue('رپورٹ ابھی تیار نہیں ہوئی۔ براہ کرم دوبارہ کوشش کریں۔');
     }
     
     // Update the answer data with the submission ID
@@ -383,7 +439,7 @@ export const saveAnswer = createAsyncThunk<
       submission_id: submissionId
     };
     
-    console.log('Saving answer with submission ID:', submissionId);
+    reduxLogger.debug('Saving answer with submission ID:', submissionId);
     
     // Check if an answer for this question already exists
     // Build the filter as URL parameters for GET request
@@ -392,7 +448,7 @@ export const saveAnswer = createAsyncThunk<
     filterParams.append('filter[question_id][_eq]', answerData.question_id.toString());
     
     const filterUrl = `/items/report_answers?${filterParams.toString()}`;
-    console.log('Checking for existing answers with URL:', filterUrl);
+    reduxLogger.debug('Checking for existing answers with URL:', filterUrl);
     
     let existingAnswer: ReportAnswer | null = null;
     
@@ -404,17 +460,17 @@ export const saveAnswer = createAsyncThunk<
       
       // Extract data from response
       const existingAnswers = existingAnswersResponse?.data || [];
-      console.log('Existing answers found:', existingAnswers.length, 'for question_id:', answerData.question_id);
+      reduxLogger.debug('Existing answers found:', existingAnswers.length, 'for question_id:', answerData.question_id);
       
       if (Array.isArray(existingAnswers) && existingAnswers.length > 0) {
         existingAnswer = existingAnswers[0];
-        console.log('Found existing answer:', existingAnswer);
+        reduxLogger.debug('Found existing answer:', existingAnswer);
       } else {
-        console.log('No existing answer found for question_id:', answerData.question_id);
+        reduxLogger.debug('No existing answer found for question_id:', answerData.question_id);
       }
     } catch (filterError) {
-      console.error('Error checking for existing answers:', filterError);
-      console.log('Proceeding with creating new answer due to filter error');
+      reduxLogger.error('Error checking for existing answers:', filterError);
+      reduxLogger.debug('Proceeding with creating new answer due to filter error');
       // Continue with creating a new answer if the filter fails
     }
     
@@ -426,26 +482,26 @@ export const saveAnswer = createAsyncThunk<
     if (existingAnswer && existingAnswer.id) {
       // Validate that the existing answer belongs to the correct question
       if (existingAnswer.question_id !== answerData.question_id) {
-        console.error('Found existing answer with wrong question_id:', {
+        reduxLogger.error('Found existing answer with wrong question_id:', {
           existingAnswerQuestionId: existingAnswer.question_id,
           requestedQuestionId: answerData.question_id,
           existingAnswerId: existingAnswer.id
         });
         // If the question_id doesn't match, create a new answer instead
-        console.log('Creating new answer due to question_id mismatch');
+        reduxLogger.debug('Creating new answer due to question_id mismatch');
         method = 'POST';
       } else {
         method = 'PATCH';
         path = `/items/report_answers/${existingAnswer.id}`;
-        console.log(`Updating existing answer with ID: ${existingAnswer.id} for question_id: ${answerData.question_id}`);
+        reduxLogger.debug(`Updating existing answer with ID: ${existingAnswer.id} for question_id: ${answerData.question_id}`);
       }
     } else {
-      console.log('Creating new answer');
+      reduxLogger.debug('Creating new answer');
     }
     
     // Make API request
-    console.log(`Making ${method} request to: ${path}`);
-    console.log('Request payload:', method === 'PATCH' 
+    reduxLogger.debug(`Making ${method} request to: ${path}`);
+    reduxLogger.debug('Request payload:', method === 'PATCH' 
       ? { string_value: updatedAnswerData.string_value, number_value: updatedAnswerData.number_value }
       : updatedAnswerData);
     
@@ -468,11 +524,11 @@ export const saveAnswer = createAsyncThunk<
       data = response as ReportAnswer;
     }
     
-    console.log('Successfully saved answer:', data);
-    console.log('Answer details - ID:', data.id, 'Question ID:', data.question_id, 'Submission ID:', data.submission_id);
+    reduxLogger.debug('Successfully saved answer:', data);
+    reduxLogger.debug('Answer details - ID:', data.id, 'Question ID:', data.question_id, 'Submission ID:', data.submission_id);
     return data;
   } catch (error: any) {
-    console.error('Error saving answer:', error);
+    reduxLogger.error('Error saving answer:', error);
     
     // Check if it's an authentication error
     if (error.message?.includes('Authentication expired') || 
@@ -483,7 +539,7 @@ export const saveAnswer = createAsyncThunk<
     }
     
     return rejectWithValue(
-      error.message || 'Failed to save answer'
+      error.message || 'جواب محفوظ نہیں ہو سکا'
     );
   }
 });
@@ -497,15 +553,15 @@ export const submitReport = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('qa/submitReport', async (params, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log('Submitting report:', params);
+    reduxLogger.debug('Submitting report:', params);
     
     // First, check and refresh token if needed
     try {
       await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
     } catch (refreshError) {
-      console.error('Token refresh failed in submitReport:', refreshError);
+      reduxLogger.error('Token refresh failed in submitReport:', refreshError);
       dispatch(logout());
-      return rejectWithValue('Authentication expired. Please log in again.');
+      return rejectWithValue('آپ کا سیشن ختم ہو گیا ہے۔ دوبارہ لاگ ان کریں۔');
     }
     
     // Get the current state to check for existing submission ID
@@ -513,11 +569,11 @@ export const submitReport = createAsyncThunk<
     const submissionId = params.submission_id || state.qa.currentSubmissionId;
     
     if (!submissionId) {
-      return rejectWithValue('No submission ID available. Please initialize the report first.');
+      return rejectWithValue('رپورٹ ابھی تیار نہیں ہوئی۔ براہ کرم دوبارہ کوشش کریں۔');
     }
     
     // Update the submission status to 'published'
-    console.log(`Finalizing report submission with ID: ${submissionId}`);
+    reduxLogger.debug(`Finalizing report submission with ID: ${submissionId}`);
     
     const response = await apiRequest<ReportSubmission | { data: ReportSubmission }>(() => ({
       path: `/items/reports_submissions/${submissionId}`,
@@ -536,10 +592,10 @@ export const submitReport = createAsyncThunk<
       data = response as ReportSubmission;
     }
     
-    console.log('Successfully submitted report:', data);
+    reduxLogger.debug('Successfully submitted report:', data);
     return data;
   } catch (error: any) {
-    console.error('Error submitting report:', error);
+    reduxLogger.error('Error submitting report:', error);
     
     // Check if it's an authentication error
     if (error.message?.includes('Authentication expired') || 
@@ -550,8 +606,85 @@ export const submitReport = createAsyncThunk<
     }
     
     return rejectWithValue(
-      error.message || 'Failed to submit report'
+      error.message || 'رپورٹ جمع نہیں ہو سکی'
     );
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* 3b. Batch auto-fill thunk                                          */
+/* ------------------------------------------------------------------ */
+
+export const batchAutoFillAnswers = createAsyncThunk<
+  { filled: number; total: number; errors: string[] },
+  { unitId: number; month: number; year: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('qa/batchAutoFillAnswers', async ({ unitId, month, year }, { getState, dispatch, rejectWithValue }) => {
+  try {
+    const { isAutoQuestion } = await import('./utils');
+    const { fetchAutoValueForQuestion } = await import('./batchAutoFill');
+    const { ensureFreshToken } = await import('../../services/apiClient');
+
+    // Ensure fresh token before starting batch
+    await ensureFreshToken();
+
+    const state = getState();
+    const questions = state.qa.questions;
+    const submissionId = state.qa.currentSubmissionId;
+
+    if (!submissionId) {
+      return rejectWithValue('کوئی رپورٹ منتخب نہیں ہے');
+    }
+
+    // Get all auto-questions
+    const autoQuestions = questions.allIds
+      .map(id => questions.byId[id])
+      .filter(q => isAutoQuestion(q));
+
+    const total = autoQuestions.length;
+    if (total === 0) {
+      return { filled: 0, total: 0, errors: [] };
+    }
+
+    // Update progress: starting
+    dispatch({ type: 'qa/setBatchFillProgress', payload: { current: 0, total } });
+
+    // Pass contact types so the utility can distinguish rukun vs umeedwar/karkun
+    const contactTypes = state.persons?.contactTypes || [];
+    const context = { unitId, month, year, contactTypes };
+    const errors: string[] = [];
+    let filled = 0;
+
+    // Process sequentially to avoid race conditions on saveAnswer
+    for (let i = 0; i < autoQuestions.length; i++) {
+      const question = autoQuestions[i];
+
+      try {
+        const result = await fetchAutoValueForQuestion(question, context, dispatch);
+
+        if (result.success) {
+          // Save the answer
+          await dispatch(saveAnswer({
+            submission_id: submissionId,
+            question_id: question.id,
+            string_value: question.input_type === 'number' ? null : String(result.value),
+            number_value: question.input_type === 'number' ? result.value : null,
+          })).unwrap();
+          filled++;
+        } else if (result.error) {
+          errors.push(`${question.question_text}: ${result.error}`);
+        }
+      } catch (err: any) {
+        errors.push(`${question.question_text}: ${err.message || 'ناکام'}`);
+      }
+
+      // Update progress
+      dispatch({ type: 'qa/setBatchFillProgress', payload: { current: i + 1, total } });
+    }
+
+    return { filled, total, errors };
+  } catch (error: any) {
+    return rejectWithValue(error.message || 'خودکار بھرنا ناکام ہو گیا');
   }
 });
 
@@ -570,7 +703,7 @@ const qaSlice = createSlice({
     
     // Clear answers for fresh loading
     clearAnswers: (state) => {
-      console.log('[QA] clearAnswers called - clearing currentSubmissionId');
+      reduxLogger.debug('[QA] clearAnswers called - clearing currentSubmissionId');
       state.answers = initialAnswersState;
       state.currentSubmissionId = null;
       state.progress = {};
@@ -595,7 +728,12 @@ const qaSlice = createSlice({
     // Update progress manually
     updateProgress: (state) => {
       state.progress = updateAllSectionsProgress(state);
-    }
+    },
+
+    // Batch fill progress (called from thunk)
+    setBatchFillProgress: (state, action: PayloadAction<{ current: number; total: number }>) => {
+      state.batchFillProgress = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Handle initializeReportData
@@ -606,7 +744,7 @@ const qaSlice = createSlice({
         state.answers = initialAnswersState;
         state.currentSubmissionId = null;
         state.progress = {};
-        console.log('[QA] initializeReportData.pending - cleared currentSubmissionId');
+        reduxLogger.debug('[QA] initializeReportData.pending - cleared currentSubmissionId');
       })
       .addCase(initializeReportData.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -620,7 +758,7 @@ const qaSlice = createSlice({
           }
           state.currentSubmissionId = submission.id;
           
-          console.log('[QA] Initialized with submission ID:', {
+          reduxLogger.debug('[QA] Initialized with submission ID:', {
             submissionId: submission.id,
             answersCount: action.payload.answers.length,
             questionsCount: action.payload.questions.length,
@@ -628,7 +766,7 @@ const qaSlice = createSlice({
             currentSubmissionId: state.currentSubmissionId
           });
         } else {
-          console.error('[QA] Submission missing ID in fulfilled reducer');
+          reduxLogger.error('[QA] Submission missing ID in fulfilled reducer');
         }
         
         // Store the sections
@@ -645,8 +783,8 @@ const qaSlice = createSlice({
       })
       .addCase(initializeReportData.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload || 'Failed to initialize report data';
-        console.error('[QA] initializeReportData.rejected:', action.payload);
+        state.error = action.payload || 'رپورٹ کی معلومات حاصل نہیں ہو سکیں';
+        reduxLogger.error('[QA] initializeReportData.rejected:', action.payload);
       })
       
       // Handle saveAnswer
@@ -683,15 +821,15 @@ const qaSlice = createSlice({
             };
           }
           
-          // Update progress
-          state.progress = updateAllSectionsProgress(state);
+          // Update progress only for the affected section
+          state.progress = updateSingleSectionProgress(state, answer.question_id);
         } catch (error) {
-          console.error('Error in saveAnswer.fulfilled reducer:', error);
+          reduxLogger.error('Error in saveAnswer.fulfilled reducer:', error);
         }
       })
       .addCase(saveAnswer.rejected, (state, action) => {
         state.saveStatus = 'failed';
-        state.saveError = action.payload || 'Failed to save answer';
+        state.saveError = action.payload || 'جواب محفوظ نہیں ہو سکا';
       })
       
       // Handle submitReport
@@ -717,7 +855,18 @@ const qaSlice = createSlice({
       })
       .addCase(submitReport.rejected, (state, action) => {
         state.submitStatus = 'failed';
-        state.submitError = action.payload || 'Failed to submit report';
+        state.submitError = action.payload || 'رپورٹ جمع نہیں ہو سکی';
+      })
+      // Handle batchAutoFillAnswers
+      .addCase(batchAutoFillAnswers.pending, (state) => {
+        state.batchFillStatus = 'loading';
+        state.batchFillProgress = { current: 0, total: 0 };
+      })
+      .addCase(batchAutoFillAnswers.fulfilled, (state) => {
+        state.batchFillStatus = 'succeeded';
+      })
+      .addCase(batchAutoFillAnswers.rejected, (state) => {
+        state.batchFillStatus = 'failed';
       });
   }
 });
@@ -727,7 +876,7 @@ const qaSlice = createSlice({
 /* ------------------------------------------------------------------ */
 
 // Export actions
-export const { setCurrentSubmissionId, resetState, updateProgress, clearAnswers } = qaSlice.actions;
+export const { setCurrentSubmissionId, resetState, updateProgress, clearAnswers, setBatchFillProgress } = qaSlice.actions;
 
 // Add a clearSubmissions function for logout
 export const clearSubmissions = () => resetState();
@@ -746,6 +895,8 @@ export const selectSaveStatus = (state: RootState) => state.qa.saveStatus;
 export const selectSaveError = (state: RootState) => state.qa.saveError;
 export const selectSubmitStatus = (state: RootState) => state.qa.submitStatus;
 export const selectSubmitError = (state: RootState) => state.qa.submitError;
+export const selectBatchFillStatus = (state: RootState) => state.qa.batchFillStatus;
+export const selectBatchFillProgress = (state: RootState) => state.qa.batchFillProgress;
 
 // Memoized selectors
 export const selectSectionsByTemplateId = createSelector(

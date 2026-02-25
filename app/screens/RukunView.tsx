@@ -7,11 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   Text,
+  TextInput,
   View,
   ActivityIndicator,
   GestureResponderEvent,
   Alert,
   RefreshControl,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
 import { Linking } from 'react-native';
 import {
@@ -21,6 +24,7 @@ import {
   useFocusEffect,
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
 import {
@@ -28,15 +32,21 @@ import {
   selectPersonById,
   selectPersonsStatus,
   selectPersonsError,
+  updatePerson,
+  archivePerson,
   createRukunTransfer,
   checkExistingTransfer,
   resetTransferStatus,
+  resetArchiveStatus,
+  selectContactTypes,
+  fetchContactTypes,
+  selectContactTypesStatus,
 } from '@/app/features/persons/personSlice';
 import { fetchTanzeemiUnits, selectTanzeemiUnitById, fetchTanzeemiUnitById } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectSubordinateUnitsForDropdown } from '@/app/features/tanzeem/tanzeemHierarchySlice';
 import { getImageUrl } from '@/app/utils/imageUpload';
 
-import { COLORS, SPACING } from '@/app/constants/theme';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
 import { RootState, AppDispatch } from '@/app/store/types';
 
@@ -44,6 +54,7 @@ import i18n from '../i18n';
 
 // Components
 import CustomButton from '@/app/components/CustomButton';
+import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import ContactActionButton from '../components/ContactActionButton';
@@ -53,7 +64,7 @@ import { COMMON_IMAGES } from '@/app/constants/images';
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunView'>;
 
 /* --------------------------
-   Typed hooks (optional)
+   Typed hooks
 ---------------------------*/
 const useAppDispatch = () => useDispatch<AppDispatch>();
 const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -71,30 +82,49 @@ export default function RukunView() {
   // Image upload state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Transfer modal state
+
+  // Transfer modal state (for rukun admin approval flow)
   const [showTransferModal, setShowTransferModal] = useState(false);
+
+  // Direct transfer modal state (for umeedwar/karkun)
+  const [showDirectTransferModal, setShowDirectTransferModal] = useState(false);
+  const [selectedTransferUnitId, setSelectedTransferUnitId] = useState<number | undefined>(undefined);
+  const [directTransferLoading, setDirectTransferLoading] = useState(false);
+
+  // Archive modal state
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveError, setArchiveError] = useState('');
 
   const person = useAppSelector((state) => selectPersonById(state, rukun.id));
   const status = useAppSelector(selectPersonsStatus);
   const error = useAppSelector(selectPersonsError);
   const tanzeemiUnitOptions = useAppSelector(selectSubordinateUnitsForDropdown);
-  
+  const contactTypes = useAppSelector(selectContactTypes);
+  const contactTypesStatus = useAppSelector(selectContactTypesStatus);
+
   // Get unit details from Redux
   const currentUnitId = person?.Tanzeemi_Unit || person?.tanzeemi_unit || rukun?.Tanzeemi_Unit || rukun?.tanzeemi_unit;
   const unitFromRedux = currentUnitId ? useAppSelector((state) => selectTanzeemiUnitById(state, currentUnitId)) : null;
   const levelsById = useAppSelector((state) => state.tanzeem?.levelsById || {});
-  
+
+  // Fetch contact types if not loaded
+  useEffect(() => {
+    if (contactTypesStatus === 'idle') {
+      dispatch(fetchContactTypes());
+    }
+  }, [dispatch, contactTypesStatus]);
+
   // Fetch unit if not in Redux
   useEffect(() => {
     if (currentUnitId && !unitFromRedux) {
       dispatch(fetchTanzeemiUnitById(currentUnitId));
     }
   }, [currentUnitId, unitFromRedux, dispatch]);
-  
+
   // Format unit name with level
   let formattedUnitName = '';
   if (unitFromRedux) {
@@ -106,10 +136,34 @@ export default function RukunView() {
   }
 
   const displayPerson = person ?? rukun;
-  
-  // Use the passed contact type label or fallback to default
-  const displayContactTypeLabel = contactTypeLabel || 'رکن';
-  
+
+  // Use the passed contact type label or derive from person's contact type
+  const displayContactTypeLabel = useMemo(() => {
+    if (contactTypeLabel) return contactTypeLabel;
+    const ctId = displayPerson.contact_type;
+    if (ctId && contactTypes && contactTypes.length > 0) {
+      const ct = contactTypes.find(type => type.id === ctId);
+      if (ct) return ct.label_singular || i18n.t(ct.type) || ct.type;
+    }
+    return '';
+  }, [contactTypeLabel, displayPerson.contact_type, contactTypes]);
+
+  // Determine contact type string from the person's contact_type ID
+  const contactTypeStr = useMemo(() => {
+    const ctId = displayPerson.contact_type;
+    if (!ctId || !contactTypes || contactTypes.length === 0) return '';
+    const ct = contactTypes.find(type => type.id === ctId);
+    return ct?.type || '';
+  }, [displayPerson.contact_type, contactTypes]);
+
+  // Contact type flags
+  const isRukunContactType = contactTypeStr === 'rukun';
+  const isTransferableType = ['umeedwar', 'karkun'].includes(contactTypeStr);
+  const isArchivableType = contactTypeStr !== '' && contactTypeStr !== 'rukun';
+
+  // Whether edit icon should show (hide only for rukun)
+  const shouldShowEditIcon = !isRukunContactType;
+
   // Image upload disabled per requirements
   const handleImageUpload = async (_imageUri: string) => {
     Alert.alert(i18n.t('info'), i18n.t('feature_not_available'));
@@ -129,20 +183,14 @@ export default function RukunView() {
 
   /* ──────────── Data fetching ────────────*/
   useEffect(() => {
-    // Always fetch the latest data when the screen is focused
     dispatch(fetchPersonById(rukun.id));
-    
-    // Fetch all tanzeemi units for the transfer dropdown
     dispatch(fetchTanzeemiUnits());
   }, [dispatch, rukun.id]);
-  
-  // Also refetch when the screen comes into focus (e.g., after editing)
+
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchPersonById(rukun.id));
-      return () => {
-        // Cleanup if needed
-      };
+      return () => {};
     }, [dispatch, rukun.id])
   );
 
@@ -150,34 +198,16 @@ export default function RukunView() {
   useFocusEffect(
     useCallback(() => {
       navigation.setOptions({ headerShown: false });
-      return () => {
-        // Cleanup if needed
-      };
+      return () => {};
     }, [navigation])
   );
 
-  /* ──────────── Derived state ────────────*/
-  // Determine if this is a detailed contact type (umeedwar or rukun)
-  const isDetailedContactType = useMemo(() => {
-    // Check if contactTypeLabel contains umeedwar or rukun (in any language)
-    const label = contactTypeLabel?.toLowerCase() || '';
-    return label.includes('umeedwar') || label.includes('rukun') || 
-           label.includes('امیدوار') || label.includes('ارکان');
-  }, [contactTypeLabel]);
-
-  // Determine if this is specifically a "rukun" contact type
-  const isRukunContactType = useMemo(() => {
-    const label = contactTypeLabel?.toLowerCase() || '';
-    return label.includes('rukun') || label.includes('ارکان');
-  }, [contactTypeLabel]);
-
+  /* ──────────── Detail rows ────────────*/
   const detailRows = useMemo(() => {
-    // Format date helper - only date format, no time
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return null;
       try {
         const date = new Date(dateString);
-        // Use toLocaleDateString with options to ensure only date is shown, no time
         return date.toLocaleDateString('ur-PK', {
           year: 'numeric',
           month: '2-digit',
@@ -188,23 +218,116 @@ export default function RukunView() {
       }
     };
 
-    // Only show required fields: Name, Father's name, Address, Membership date, Email, Phone number, WhatsApp Number
-    return [
+    const rows = [
       { label: i18n.t('parent'), value: displayPerson.parent || displayPerson.Father_Name },
       { label: i18n.t('address'), value: displayPerson.address || displayPerson.Address },
-      { label: i18n.t('rukinat_date'), value: formatDate(displayPerson.rukinat_date || displayPerson.Rukinat_Date) },
+    ];
+
+    // Only show Rukinat_Date for rukun type
+    if (isRukunContactType) {
+      rows.push({ label: i18n.t('rukinat_date'), value: formatDate(displayPerson.rukinat_date || displayPerson.Rukinat_Date) });
+    }
+
+    rows.push(
       { label: i18n.t('email'), value: displayPerson.email || displayPerson.Email },
       { label: i18n.t('phone_number'), value: displayPerson.phone_number || displayPerson.Phone_Number || displayPerson.phone },
       { label: i18n.t('whatsapp_number'), value: displayPerson.whatsapp_number || displayPerson.additional_phones || displayPerson.whatsApp },
-    ].filter(row => row.value); // Only show rows with values
-  }, [displayPerson]);
+    );
 
-  // Get additional phone numbers if available
+    return rows.filter(row => row.value);
+  }, [displayPerson, isRukunContactType]);
+
   const additionalPhones = displayPerson.additional_phone_numbers || [];
 
   /* ──────────── Helpers ────────────*/
   const openLink = (url: string) =>
     Linking.openURL(url).catch((e) => console.error('Link error', e));
+
+  /* ──────────── Handlers ────────────*/
+  const handleEditDetails = () => {
+    navigation.navigate('screens/RukunAddEdit', { rukun: displayPerson });
+  };
+
+  const handleGenerateRukunUpdateRequest = () => {
+    navigation.navigate('screens/RukunUpdateScreen', {
+      rukun: displayPerson,
+      contactTypeLabel: displayContactTypeLabel
+    });
+  };
+
+  // Rukun transfer (admin approval flow)
+  const handleInitiateRukunTransfer = () => {
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSuccess = () => {
+    dispatch(fetchPersonById(rukun.id));
+  };
+
+  // Direct transfer for umeedwar/karkun (local only)
+  const handleDirectTransfer = () => {
+    setSelectedTransferUnitId(undefined);
+    setShowDirectTransferModal(true);
+  };
+
+  const handleDirectTransferConfirm = async () => {
+    if (!selectedTransferUnitId) {
+      Alert.alert(i18n.t('error'), i18n.t('please_select_unit'));
+      return;
+    }
+
+    setDirectTransferLoading(true);
+    try {
+      await dispatch(updatePerson({
+        id: rukun.id,
+        unit: selectedTransferUnitId.toString(),
+      })).unwrap();
+
+      setShowDirectTransferModal(false);
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('transfer_successful_message', { rukunName: displayPerson.name || '' }),
+        [{ text: i18n.t('ok'), onPress: () => dispatch(fetchPersonById(rukun.id)) }]
+      );
+    } catch (err: any) {
+      Alert.alert(i18n.t('error'), err || i18n.t('transfer_failed'));
+    } finally {
+      setDirectTransferLoading(false);
+    }
+  };
+
+  // Archive handlers
+  const handleArchivePress = () => {
+    setArchiveReason('');
+    setArchiveError('');
+    setShowArchiveModal(true);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveReason.trim()) {
+      setArchiveError(i18n.t('archive_reason_required'));
+      return;
+    }
+
+    setShowArchiveModal(false);
+    try {
+      await dispatch(archivePerson({ id: rukun.id, reason: archiveReason.trim() })).unwrap();
+      Alert.alert(
+        i18n.t('success'),
+        i18n.t('archive_successful'),
+        [{ text: i18n.t('ok'), onPress: () => navigation.goBack() }]
+      );
+    } catch (err: any) {
+      Alert.alert(i18n.t('error'), err || i18n.t('archive_failed'));
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      dispatch(resetArchiveStatus());
+    };
+  }, [dispatch]);
 
   /* ──────────── Async states ────────────*/
   if (status === 'loading' && !person) {
@@ -229,27 +352,7 @@ export default function RukunView() {
       </CenteredContainer>
     );
   }
-  const handleEditDetails = () => {
-    // Navigate to edit screen with the most up-to-date person data
-    navigation.navigate('screens/RukunAddEdit', { rukun: displayPerson });
-  };
 
-  const handleGenerateRukunUpdateRequest = () => {
-    // Navigate to Rukun Update screen
-    navigation.navigate('screens/RukunUpdateScreen', { 
-      rukun: displayPerson, 
-      contactTypeLabel: displayContactTypeLabel 
-    });
-  };
-  
-  const handleInitiateRukunTransfer = () => {
-    setShowTransferModal(true);
-  };
-  
-  const handleTransferSuccess = () => {
-    // Refresh the rukun data after successful transfer
-    dispatch(fetchPersonById(rukun.id));
-  };
   /* ──────────── Main UI ────────────*/
   return (
     <KeyboardAvoidingView
@@ -266,13 +369,13 @@ export default function RukunView() {
               ? { uri: getImageUrl(displayPerson.picture) }
               : require('@/assets/images/avatar.png')
           }
-          showEditIcon={!isDetailedContactType}
+          showEditIcon={shouldShowEditIcon}
           onEditPress={handleEditDetails}
           showSettings={false}
-                     showCamera={false}
-           personId={rukun.id}
-           isUploading={false}
-         />
+          showCamera={false}
+          personId={rukun.id}
+          isUploading={false}
+        />
 
         {/* Content */}
         <ScrollView
@@ -332,7 +435,7 @@ export default function RukunView() {
             {detailRows.map(({ label, value }) => (
               <DetailRow key={label} label={label} value={value ?? '-'} />
             ))}
-            
+
             {/* Additional Phone Numbers Section */}
             {additionalPhones.length > 0 && (
               <View style={styles.additionalPhonesSection}>
@@ -340,38 +443,69 @@ export default function RukunView() {
                   {i18n.t('additional_phone_numbers')}
                 </UrduText>
                 {additionalPhones.map((phone: string, index: number) => (
-                  <DetailRow 
-                    key={`additional-phone-${index}`} 
-                    label={`${i18n.t('phone')} ${index + 2}`} 
-                    value={phone} 
+                  <DetailRow
+                    key={`additional-phone-${index}`}
+                    label={`${i18n.t('phone')} ${index + 2}`}
+                    value={phone}
                   />
                 ))}
               </View>
             )}
 
-            {/* Rukun Update and Transfer Buttons */}
+            {/* Rukun-specific actions (admin approval flow) */}
             {isRukunContactType && (
-              <View style={styles.rukunUpdateSection}>
+              <View style={styles.actionSection}>
                 <CustomButton
                   text={i18n.t('generate_rukun_update_request')}
                   onPress={handleGenerateRukunUpdateRequest}
-                  viewStyle={styles.rukunUpdateButton}
-                  textStyle={styles.rukunUpdateButtonText}
+                  viewStyle={styles.actionButton}
+                  textStyle={styles.actionButtonText}
                 />
-                
+
                 <CustomButton
                   text={i18n.t('initiate_rukun_transfer')}
                   onPress={handleInitiateRukunTransfer}
-                  viewStyle={[styles.rukunUpdateButton, styles.rukunTransferButton]}
-                  textStyle={styles.rukunUpdateButtonText}
+                  viewStyle={[styles.actionButton, styles.transferButton]}
+                  textStyle={styles.actionButtonText}
+                />
+              </View>
+            )}
+
+            {/* Umeedwar/Karkun actions (direct) */}
+            {isTransferableType && (
+              <View style={styles.actionSection}>
+                <CustomButton
+                  text={i18n.t('transfer_contact')}
+                  onPress={handleDirectTransfer}
+                  viewStyle={[styles.actionButton, styles.transferButton]}
+                  textStyle={styles.actionButtonText}
+                />
+
+                <CustomButton
+                  text={i18n.t('archive_person')}
+                  onPress={handleArchivePress}
+                  viewStyle={[styles.actionButton, styles.archiveButton]}
+                  textStyle={styles.actionButtonText}
+                />
+              </View>
+            )}
+
+            {/* Others type - only archive */}
+            {!isRukunContactType && !isTransferableType && contactTypeStr !== '' && (
+              <View style={styles.actionSection}>
+                <CustomButton
+                  text={i18n.t('archive_person')}
+                  onPress={handleArchivePress}
+                  viewStyle={[styles.actionButton, styles.archiveButton]}
+                  textStyle={styles.actionButtonText}
                 />
               </View>
             )}
           </View>
         </ScrollView>
       </View>
-      
-      {/* Transfer Rukun Modal */}
+
+      {/* Transfer Rukun Modal (admin approval flow for rukun) */}
       {showTransferModal && (
         <TransferRukunModal
           visible={showTransferModal}
@@ -384,6 +518,126 @@ export default function RukunView() {
           tanzeemiUnitOptions={tanzeemiUnitOptions}
         />
       )}
+
+      {/* Direct Transfer Modal (for umeedwar/karkun - local transfer only) */}
+      <Modal
+        visible={showDirectTransferModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDirectTransferModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowDirectTransferModal(false)}
+              disabled={directTransferLoading}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+
+            <UrduText style={styles.modalTitle}>
+              {i18n.t('transfer_contact')}
+            </UrduText>
+
+            <View style={styles.modalInfo}>
+              <UrduText style={styles.modalInfoName}>{displayPerson.name || ''}</UrduText>
+              {formattedUnitName ? (
+                <UrduText style={styles.modalInfoUnit}>
+                  {i18n.t('current_unit')}: {formattedUnitName}
+                </UrduText>
+              ) : null}
+            </View>
+
+            <CustomDropdown
+              dropdownTitle={i18n.t('select_new_unit')}
+              options={tanzeemiUnitOptions || []}
+              onSelect={(option: Option) => setSelectedTransferUnitId(parseInt(option.value))}
+              selectedValue={selectedTransferUnitId?.toString()}
+              placeholder={i18n.t('choose_destination_unit')}
+              disabled={directTransferLoading}
+              viewStyle={styles.modalDropdown}
+            />
+
+            <View style={styles.modalButtonContainer}>
+              <CustomButton
+                text={directTransferLoading ? i18n.t('transferring') : i18n.t('confirm')}
+                onPress={handleDirectTransferConfirm}
+                viewStyle={styles.modalConfirmBtn}
+                disabled={directTransferLoading || !selectedTransferUnitId}
+              />
+              <CustomButton
+                text={i18n.t('cancel')}
+                onPress={() => setShowDirectTransferModal(false)}
+                viewStyle={styles.modalCancelBtn}
+                disabled={directTransferLoading}
+              />
+            </View>
+
+            {directTransferLoading && (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.sm }} />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Archive Reason Modal */}
+      <Modal
+        visible={showArchiveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowArchiveModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowArchiveModal(false)}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+
+            <UrduText style={styles.modalTitleError}>
+              {i18n.t('archive_person_title')}
+            </UrduText>
+
+            <UrduText style={styles.modalDescription}>
+              {i18n.t('archive_person_confirm', { name: displayPerson.name || '' })}
+            </UrduText>
+
+            <TextInput
+              style={styles.modalTextInput}
+              value={archiveReason}
+              onChangeText={(text) => {
+                setArchiveReason(text);
+                if (archiveError) setArchiveError('');
+              }}
+              placeholder={i18n.t('archive_reason_placeholder')}
+              placeholderTextColor={COLORS.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlign="right"
+            />
+
+            {archiveError ? (
+              <Text style={styles.modalErrorText}>{archiveError}</Text>
+            ) : null}
+
+            <View style={styles.modalButtonContainer}>
+              <CustomButton
+                text={i18n.t('confirm')}
+                onPress={handleArchiveConfirm}
+                viewStyle={[styles.modalConfirmBtn, styles.archiveButton]}
+              />
+              <CustomButton
+                text={i18n.t('cancel')}
+                onPress={() => setShowArchiveModal(false)}
+                viewStyle={styles.modalCancelBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -462,7 +716,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     fontSize: 20,
   },
-  
+
   /* additional sections */
   additionalPhonesSection: {
     marginTop: SPACING.lg,
@@ -498,22 +752,124 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
 
-  /* Rukun Update Section */
-  rukunUpdateSection: {
+  /* Action Section */
+  actionSection: {
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.md,
     gap: SPACING.md,
   },
-  rukunUpdateButton: {
+  actionButton: {
     backgroundColor: COLORS.primary,
-   
   },
-  rukunUpdateButtonText: {
+  actionButtonText: {
     color: COLORS.white,
     fontSize: 16,
   },
-  rukunTransferButton: {
-    backgroundColor: COLORS.tertiary 
+  transferButton: {
+    backgroundColor: COLORS.tertiary,
+  },
+  archiveButton: {
+    backgroundColor: COLORS.error,
+  },
+
+  /* Modal styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: COLORS.background || '#fff',
+    borderRadius: BORDER_RADIUS?.lg || 16,
+    padding: SPACING.lg,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.md,
+    zIndex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY?.fontSize?.xxl || 22,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  modalTitleError: {
+    fontSize: TYPOGRAPHY?.fontSize?.xxl || 22,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  modalDescription: {
+    fontSize: TYPOGRAPHY?.fontSize?.md || 16,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalInfo: {
+    backgroundColor: COLORS.lightGray,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS?.md || 8,
+    marginBottom: SPACING.lg,
+    alignItems: 'center',
+  },
+  modalInfoName: {
+    fontSize: TYPOGRAPHY?.fontSize?.lg || 18,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+    marginBottom: SPACING.xs,
+  },
+  modalInfoUnit: {
+    fontSize: TYPOGRAPHY?.fontSize?.sm || 14,
+    color: COLORS.textSecondary,
+    textAlign: 'left',
+  },
+  modalDropdown: {
+    marginBottom: SPACING.md,
+  },
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray2,
+    borderRadius: BORDER_RADIUS?.md || 8,
+    padding: SPACING.md,
+    fontSize: TYPOGRAPHY?.fontSize?.md || 16,
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.white,
+    textAlign: 'right',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  modalErrorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  modalButtonContainer: {
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  modalConfirmBtn: {
+    backgroundColor: COLORS.primary,
+  },
+  modalCancelBtn: {
+    backgroundColor: COLORS.lightGray2,
   },
 });

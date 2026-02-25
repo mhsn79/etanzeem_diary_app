@@ -7,6 +7,7 @@ import {
 import { RootState, AppDispatch } from '../../store/types';
 import apiRequest from '../../services/apiClient';
 import { TanzeemiUnit } from '../../models/TanzeemiUnit';
+import { reduxLogger } from '../../utils/logger';
 
 // Types
 export interface ReportTemplate {
@@ -49,7 +50,7 @@ export interface ReportData {
   managements: ReportManagement[];
 }
 
-export interface ReportsNewState {
+export interface ReportsState {
   reports: Record<number, ReportData>;
   reportSubmissions: ReportSubmission[];
   loading: boolean;
@@ -59,7 +60,7 @@ export interface ReportsNewState {
 }
 
 // Initial state
-const initialState: ReportsNewState = {
+const initialState: ReportsState = {
   reports: {},
   reportSubmissions: [],
   loading: false,
@@ -128,7 +129,7 @@ export const fetchReportSubmissions = createAsyncThunk<
       unitDetails: tanzeem.entities?.[submission.unit_id] ?? null,
     }));
   } catch (error: any) {
-    console.error('Error in fetchReportSubmissions:', error);
+    reduxLogger.error('Error in fetchReportSubmissions:', error);
     return rejectWithValue(error.message || 'Failed to fetch report submissions');
   }
 });
@@ -141,10 +142,10 @@ export const fetchReportsByUnitId = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('reports/fetchReportsByUnitId', async (unitId, { getState, rejectWithValue }) => {
   try {
-    console.log('[reportsSlice] Starting fetchReportsByUnitId for unitId:', unitId);
+    reduxLogger.debug('Starting fetchReportsByUnitId for unitId:', unitId);
     
     if (!unitId || typeof unitId !== 'number') {
-      console.error('[reportsSlice] Invalid unit ID provided:', unitId);
+      reduxLogger.error('Invalid unit ID provided:', unitId);
       return rejectWithValue('Invalid unit ID provided');
     }
 
@@ -164,7 +165,7 @@ export const fetchReportsByUnitId = createAsyncThunk<
     const templates = normalizeResponse<ReportTemplate[]>(templateResponse, 'Templates');
 
     if (!templates || templates.length === 0) {
-      console.warn('[reportsSlice] No templates found');
+      reduxLogger.warn('No templates found');
       return rejectWithValue('No templates found');
     }
 
@@ -188,17 +189,17 @@ export const fetchReportsByUnitId = createAsyncThunk<
       });
     }
 
-    console.log('[reportsSlice] fetchReportsByUnitId completed successfully with', result.length, 'templates');
+    reduxLogger.info('fetchReportsByUnitId completed successfully with', result.length, 'templates');
     return result;
   } catch (error: any) {
-    console.error('[reportsSlice] Error in fetchReportsByUnitId:', error);
+    reduxLogger.error('Error in fetchReportsByUnitId:', error);
     return rejectWithValue(error.message || 'Failed to fetch reports data');
   }
 });
 
 // Slice
-const reportsNewSlice = createSlice({
-  name: 'reportsNew',
+const reportsSlice = createSlice({
+  name: 'reports',
   initialState,
   reducers: {
     clearReports: (state) => {
@@ -215,17 +216,17 @@ const reportsNewSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchReportsByUnitId.pending, (state) => {
-        console.log('[reportsSlice] fetchReportsByUnitId.pending - setting loading to true');
+        reduxLogger.debug('fetchReportsByUnitId.pending - setting loading to true');
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchReportsByUnitId.fulfilled, (state, action) => {
-        console.log('[reportsSlice] fetchReportsByUnitId.fulfilled - setting loading to false, payload length:', action.payload.length);
+        reduxLogger.debug('fetchReportsByUnitId.fulfilled - setting loading to false, payload length:', action.payload.length);
         state.loading = false;
         
         // Check if payload is empty array
         if (action.payload.length === 0) {
-          console.warn('[reportsSlice] Empty payload received in fetchReportsByUnitId.fulfilled');
+          reduxLogger.warn('Empty payload received in fetchReportsByUnitId.fulfilled');
           state.reports = {};
           return;
         }
@@ -233,7 +234,7 @@ const reportsNewSlice = createSlice({
         const newReports = action.payload.reduce(
           (acc, reportData) => {
             if (!reportData.template || !reportData.template.id) {
-              console.error('[reportsSlice] Invalid report data in payload:', JSON.stringify(reportData));
+              reduxLogger.error('Invalid report data in payload:', JSON.stringify(reportData));
               return acc;
             }
             return {
@@ -247,8 +248,8 @@ const reportsNewSlice = createSlice({
         state.reports = newReports;
       })
       .addCase(fetchReportsByUnitId.rejected, (state, action) => {
-        console.error('[reportsSlice] fetchReportsByUnitId.rejected with error:', action.payload);
-        console.log('[reportsSlice] fetchReportsByUnitId.rejected - setting loading to false');
+        reduxLogger.error('fetchReportsByUnitId.rejected with error:', action.payload);
+        reduxLogger.debug('fetchReportsByUnitId.rejected - setting loading to false');
         state.loading = false;
         state.error = action.payload ?? 'Failed to fetch reports';
       })
@@ -269,13 +270,13 @@ const reportsNewSlice = createSlice({
 });
 
 // Selectors
-export const selectReportsState = (state: RootState) => state.reportsNew;
-export const selectReportsLoading = (state: RootState) => state.reportsNew.loading;
-export const selectReportsError = (state: RootState) => state.reportsNew.error;
-export const selectAllReports = (state: RootState) => state.reportsNew.reports;
-export const selectReportSubmissions = (state: RootState) => state.reportsNew.reportSubmissions;
-export const selectReportSubmissionsLoading = (state: RootState) => state.reportsNew.reportSubmissionsLoading;
-export const selectReportSubmissionsError = (state: RootState) => state.reportsNew.reportSubmissionsError;
+export const selectReportsState = (state: RootState) => state.reports;
+export const selectReportsLoading = (state: RootState) => state.reports.loading;
+export const selectReportsError = (state: RootState) => state.reports.error;
+export const selectAllReports = (state: RootState) => state.reports.reports;
+export const selectReportSubmissions = (state: RootState) => state.reports.reportSubmissions;
+export const selectReportSubmissionsLoading = (state: RootState) => state.reports.reportSubmissionsLoading;
+export const selectReportSubmissionsError = (state: RootState) => state.reports.reportSubmissionsError;
 
 export const selectReportIds = createSelector([selectAllReports], (reports) =>
   Object.keys(reports).map(Number)
@@ -319,5 +320,5 @@ export const selectSubmissionsByMgmtId = createSelector(
 );
 
 // Exports
-export const { clearReports, clearSubmissions } = reportsNewSlice.actions;
-export default reportsNewSlice.reducer;
+export const { clearReports, clearSubmissions } = reportsSlice.actions;
+export default reportsSlice.reducer;

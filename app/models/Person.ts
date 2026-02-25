@@ -51,6 +51,8 @@ export interface CreatePersonPayload {
   contact_type?: number;
   tanzeemi_unit?: number;
   status?: string;
+  notes?: string;
+  archived_at?: string;
   // Optional fields for backward compatibility
   parent?: string;
   dob?: string;

@@ -13,7 +13,7 @@ export default function StackLayout() {
       <Stack
         screenOptions={{
           header: ({ navigation, route }) => (
-            <Header 
+            <Header
               title="E-Tanzeem"
               onBack={navigationService.goBack}
               showBack={true}
@@ -124,36 +124,36 @@ export default function StackLayout() {
           options={{ 
             headerShown: true,
             header: ({ navigation }) => (
-              <Header 
-                title="رکن کی تفصیل"
+              <Header
+                title="فرد کی تفصیل"
                 onBack={navigationService.goBack}
                 showBack={true}
               />
             )
-          }} 
+          }}
         />
 
-        <Stack.Screen 
+        <Stack.Screen
           name={SCREENS.RUKUN_ADD_EDIT}
-          options={{ 
+          options={{
             headerShown: true,
             header: ({ navigation }) => (
-              <Header 
-                title="رکن شامل کریں/ترمیم کریں"
+              <Header
+                title="فرد شامل کریں/ترمیم کریں"
                 onBack={navigationService.goBack}
                 showBack={true}
               />
             )
-          }} 
+          }}
         />
 
-        <Stack.Screen 
+        <Stack.Screen
           name={SCREENS.RUKAN_DETAILS}
-          options={{ 
+          options={{
             headerShown: true,
             header: ({ navigation }) => (
-              <Header 
-                title="رکن کی تفصیل"
+              <Header
+                title="فرد کی تفصیل"
                 onBack={navigationService.goBack}
                 showBack={true}
               />

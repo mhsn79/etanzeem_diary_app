@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { getTokens, saveTokens } from './secureStorage';
 import { getStore, ensureStoreInitialized } from '../store/storeAccess';
 import { refreshOnce } from './refreshOrchestrator';
+import { apiLogger } from '../utils/logger';
 
 // Type for request options
 interface RequestOptions {
@@ -61,25 +62,33 @@ const processQueue = (error: Error | null) => {
 
 /**
  * Wait for token refresh to complete with timeout
- * This function checks if a refresh is in progress and waits for it to complete
+ * Uses exponential backoff instead of constant polling to prevent memory leaks
  */
 const waitForTokenRefresh = async (): Promise<void> => {
   ensureStoreInitialized();
   const state = getStore().getState() as { auth?: { isRefreshing?: boolean } };
-  
+
   if (state.auth?.isRefreshing) {
-    console.log(`[API] Token refresh in progress, waiting... (${Platform.OS})`);
-    
-    // Wait for refresh to complete with a timeout
+    apiLogger.debug(`Token refresh in progress, waiting... (${Platform.OS})`);
+
+    // Wait for refresh to complete with exponential backoff
     const timeout = 10000; // 10 seconds timeout
     const startTime = Date.now();
-    
-    while (getStore().getState().auth?.isRefreshing && (Date.now() - startTime) < timeout) {
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+    let delay = 100; // Start with 100ms
+    let iteration = 0;
+    const maxIterations = 20; // Maximum 20 iterations to prevent infinite loops
+
+    while (getStore().getState().auth?.isRefreshing &&
+           (Date.now() - startTime) < timeout &&
+           iteration < maxIterations) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      // Exponential backoff: 100ms -> 200ms -> 400ms -> max 1000ms
+      delay = Math.min(delay * 2, 1000);
+      iteration++;
     }
-    
+
     if (getStore().getState().auth?.isRefreshing) {
-      console.warn(`[API] Token refresh timeout after ${timeout}ms (${Platform.OS})`);
+      apiLogger.warn(`Token refresh timeout after ${timeout}ms (${iteration} iterations) (${Platform.OS})`);
       if (!refreshTimeoutLogoutTriggered) {
         refreshTimeoutLogoutTriggered = true;
         try {
@@ -91,8 +100,8 @@ const waitForTokenRefresh = async (): Promise<void> => {
       }
       throw new Error('Token refresh timeout');
     }
-    
-    console.log(`[API] Token refresh completed, proceeding with request (${Platform.OS})`);
+
+    apiLogger.debug(`Token refresh completed after ${iteration} iterations (${Platform.OS})`);
   }
 };
 
@@ -155,7 +164,7 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
       
       // Handle token errors
       if (isTokenError && retryCount < MAX_REQUEST_RETRIES) {
-        console.log(`[API] Token error during request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
+        apiLogger.warn(`Token error during request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
         
         try {
           // Let the auth middleware handle the token refresh
@@ -170,12 +179,12 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
             throw new Error('Failed to refresh token: No new token received');
           }
           
-          console.log(`[API] Token refreshed successfully. Retrying request... (${Platform.OS})`);
+          apiLogger.info(`Token refreshed successfully. Retrying request... (${Platform.OS})`);
           
           // Retry the request with the new token
           return await tryRequest(newToken, retryCount + 1);
         } catch (refreshError: any) {
-          console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
+          apiLogger.error(`Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           throw new Error('Authentication expired. Please log in again.');
         }
       }
@@ -183,7 +192,7 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
       // Handle network errors with exponential backoff
       if (isNetworkError && retryCount < MAX_REQUEST_RETRIES) {
         const delay = getBackoffDelay(retryCount);
-        console.log(`[API] Network error, retrying in ${delay}ms... (${Platform.OS})`);
+        apiLogger.warn(`Network error, retrying in ${delay}ms... (${Platform.OS})`);
         
         await new Promise(resolve => setTimeout(resolve, delay));
         return tryRequest(accessToken, retryCount + 1);
@@ -191,9 +200,9 @@ export const apiRequest = async <T>(requestFn: RequestFunction): Promise<T> => {
       
       // If it's not a token issue or we've exhausted retries, rethrow the original error
       if (retryCount > 0) {
-        console.error(`[API] Request failed after ${retryCount} retries: ${error.message} (${Platform.OS})`);
+        apiLogger.error(`Request failed after ${retryCount} retries: ${error.message} (${Platform.OS})`);
       } else {
-        console.error(`[API] Request failed: ${error.message} (${Platform.OS})`);
+        apiLogger.error(`Request failed: ${error.message} (${Platform.OS})`);
       }
       
       throw error;
@@ -271,7 +280,7 @@ export const directApiRequest = async <T>(
       
       // Handle token errors
       if (isTokenError && retryCount < MAX_REQUEST_RETRIES) {
-        console.log(`[API] Token error during direct request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
+        apiLogger.warn(`Token error during direct request (${retryCount + 1}/${MAX_REQUEST_RETRIES}). Refreshing... (${Platform.OS})`);
         
         try {
           // Let the auth middleware handle the token refresh
@@ -285,12 +294,12 @@ export const directApiRequest = async <T>(
             throw new Error('Failed to refresh token: No new token received');
           }
           
-          console.log(`[API] Token refreshed successfully. Retrying direct request... (${Platform.OS})`);
+          apiLogger.info(`Token refreshed successfully. Retrying direct request... (${Platform.OS})`);
           
           // Retry the request with the new token
           return await tryFetch(newToken, retryCount + 1);
         } catch (refreshError: any) {
-          console.error(`[API] Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
+          apiLogger.error(`Failed to refresh token: ${refreshError.message} (${Platform.OS})`);
           throw new Error('Authentication expired. Please log in again.');
         }
       }
@@ -298,7 +307,7 @@ export const directApiRequest = async <T>(
       // Handle network errors with exponential backoff
       if (isNetworkError && retryCount < MAX_REQUEST_RETRIES) {
         const delay = getBackoffDelay(retryCount);
-        console.log(`[API] Network error, retrying in ${delay}ms... (${Platform.OS})`);
+        apiLogger.warn(`Network error, retrying in ${delay}ms... (${Platform.OS})`);
         
         await new Promise(resolve => setTimeout(resolve, delay));
         return tryFetch(accessToken, retryCount + 1);
@@ -306,9 +315,9 @@ export const directApiRequest = async <T>(
       
       // If it's not a token issue or we've exhausted retries, rethrow the original error
       if (retryCount > 0) {
-        console.error(`[API] Direct request failed after ${retryCount} retries: ${error.message} (${Platform.OS})`);
+        apiLogger.error(`Direct request failed after ${retryCount} retries: ${error.message} (${Platform.OS})`);
       } else {
-        console.error(`[API] Direct request failed: ${error.message} (${Platform.OS})`);
+        apiLogger.error(`Direct request failed: ${error.message} (${Platform.OS})`);
       }
       
       throw error;
@@ -345,7 +354,7 @@ export const ensureFreshToken = async (): Promise<string> => {
 
     return accessToken;
   } catch (error: any) {
-    console.error(`[API] Failed to ensure fresh token: ${error.message} (${Platform.OS})`);
+    apiLogger.error(`Failed to ensure fresh token: ${error.message} (${Platform.OS})`);
     
     throw new Error('Authentication expired. Please log in again.');
   }
@@ -362,25 +371,25 @@ export const validateTokensOnStartup = async (): Promise<void> => {
     
     // If no tokens, nothing to validate
     if (!tokens) {
-      console.log(`[API] No tokens found in secure storage on startup (${Platform.OS})`);
+      apiLogger.debug(`No tokens found in secure storage on startup (${Platform.OS})`);
       return;
     }
     
     // Check if tokens are expired
     if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
-      console.log(`[API] Tokens in secure storage are expired on startup, attempting refresh... (${Platform.OS})`);
+      apiLogger.warn(`Tokens in secure storage are expired on startup, attempting refresh... (${Platform.OS})`);
       
       try {
         await refreshOnce('startup');
-        console.log(`[API] Tokens refreshed successfully on startup (${Platform.OS})`);
+        apiLogger.info(`Tokens refreshed successfully on startup (${Platform.OS})`);
       } catch (error: any) {
-        console.error(`[API] Failed to refresh tokens on startup: ${error.message} (${Platform.OS})`);
+        apiLogger.error(`Failed to refresh tokens on startup: ${error.message} (${Platform.OS})`);
       }
     } else {
-      console.log(`[API] Tokens in secure storage are valid on startup (${Platform.OS})`);
+      apiLogger.info(`Tokens in secure storage are valid on startup (${Platform.OS})`);
     }
   } catch (error: any) {
-    console.error(`[API] Error validating tokens on startup: ${error.message} (${Platform.OS})`);
+    apiLogger.error(`Error validating tokens on startup: ${error.message} (${Platform.OS})`);
   }
 };
 

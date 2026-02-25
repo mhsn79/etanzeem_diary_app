@@ -1,25 +1,24 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { 
-  KeyboardAvoidingView, 
-  Platform, 
-  StyleSheet, 
-  ScrollView, 
-  View, 
-  Text, 
-  Image, 
-  Pressable, 
-  ModalProps, 
+import {
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  ScrollView,
+  View,
+  Text,
+  Image,
+  Pressable,
   Dimensions,
   AccessibilityProps,
   useWindowDimensions,
   StatusBar,
   ActivityIndicator,
-  Animated,
   TextInput,
   InteractionManager
 } from 'react-native';
 import Modal from 'react-native-modal';
-import { Link, useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -28,8 +27,6 @@ import { Vibration } from 'react-native';
 
 // SVG Icons
 import EditIcon from '../../assets/images/edit-icon.svg';
-import PlusIcon from '../../assets/images/plus-icon.svg';
-import MinusIcon from '../../assets/images/minus-icon.svg';
 import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
 
 // Components
@@ -50,217 +47,152 @@ import {
 import {
   refreshStrengthData,
   setUserUnitId,
+  setCurrentPeriod,
   selectStrengthTypes,
   selectStrengthByCategory,
-  selectLatestStrengthRecordsByType,
-  createStrengthRecord,
-  selectUserUnitId
+  selectCurrentMonthRecordsByType,
+  upsertStrengthRecord,
+  selectUserUnitId,
+  selectCurrentYear,
+  selectCurrentMonth,
+  StrengthRecord,
 } from '@/app/features/strength/strengthSlice';
 import { AppDispatch, RootState } from '@/app/store/types';
+import { getUrduMonth } from '../constants/urduLocalization';
 
 // Theme and constants
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '../constants/theme';
 import i18n from '../i18n';
 
 // Types
-interface EditModalProps extends ModalProps {
+interface EditModalProps {
   visible: boolean;
   setVisible: React.Dispatch<React.SetStateAction<boolean>>;
   title: string;
-  type: string;
-  currentValue: number;
-  setValue: React.Dispatch<React.SetStateAction<number>>;
-  typeId?: number;
+  typeId: number;
+  existingRecord: StrengthRecord | null; // Current month's record if exists
+  previousTotal: number; // Carried forward from prior month
+  year: number;
+  month: number;
+  onSaved: () => void;
 }
 
 interface WorkforceItemProps extends AccessibilityProps {
   label: string;
   value: number;
   onEdit: () => void;
-  typeId?: number; // Kept for compatibility with existing code
+  typeId?: number;
+  editable?: boolean;
 }
 
 /**
  * EditModal Component
- * 
- * A modal for editing workforce numbers with direct input and change type selection
- * Redesigned for improved visual appeal and user experience
+ *
+ * Shows both اضافہ (increase) and کمی (decrease) inputs simultaneously
+ * with auto-calculated new total
  */
-function EditModal({ 
-  visible, 
-  setVisible, 
-  title, 
-  type, 
-  currentValue, 
-  setValue,
-  typeId
+function EditModal({
+  visible,
+  setVisible,
+  title,
+  typeId,
+  existingRecord,
+  previousTotal,
+  year,
+  month,
+  onSaved,
 }: EditModalProps) {
-  const [inputValue, setInputValue] = useState('');
-  const [changeType, setChangeType] = useState<'plus' | 'minus'>('plus');
+  const [plusInput, setPlusInput] = useState('');
+  const [minusInput, setMinusInput] = useState('');
+  const [notesInput, setNotesInput] = useState('');
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const userUnitId = useSelector(selectUserUnitId);
-  
-  // Animation values
-  const [scaleAnim] = useState(new Animated.Value(1));
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [inputRef, setInputRef] = useState<TextInput | null>(null);
-  
-  // Calculate numeric value from input
-  const numericValue = useMemo(() => {
-    const parsed = parseInt(inputValue, 10);
+  const [saving, setSaving] = useState(false);
+
+  const plusValue = useMemo(() => {
+    const parsed = parseInt(plusInput, 10);
     return isNaN(parsed) ? 0 : parsed;
-  }, [inputValue]);
-  
-  // Calculate total after changes
-  const totalValue = useMemo(() => {
-    if (changeType === 'plus') {
-      return currentValue + numericValue;
-    } else {
-      return Math.max(0, currentValue - numericValue);
-    }
-  }, [currentValue, numericValue, changeType]);
-  
-  // Handle input change with validation
-  const handleInputChange = useCallback((text: string) => {
-    // Only allow numeric input
+  }, [plusInput]);
+
+  const minusValue = useMemo(() => {
+    const parsed = parseInt(minusInput, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }, [minusInput]);
+
+  const newTotal = useMemo(() => {
+    return Math.max(0, previousTotal + plusValue - minusValue);
+  }, [previousTotal, plusValue, minusValue]);
+
+  // Handle numeric-only input
+  const handleNumericInput = useCallback((text: string, setter: (v: string) => void) => {
     if (/^\d*$/.test(text)) {
-      setInputValue(text);
-      
-      // Add vibration feedback on supported platforms
-      if (text && Platform.OS !== 'web') {
-        Vibration.vibrate(5); // Very short vibration
-      }
+      setter(text);
     }
   }, []);
-  
-  // Toggle change type between plus and minus
-  const toggleChangeType = useCallback((type: 'plus' | 'minus') => {
-    if (changeType !== type) {
-      setChangeType(type);
-      
-      // Add vibration feedback on supported platforms
-      if (Platform.OS !== 'web') {
-        Vibration.vibrate(10); // Short vibration
-      }
-      
-      // Animate the change
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: ANIMATION.duration.fast / 2,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: ANIMATION.duration.fast,
-          useNativeDriver: true,
-        })
-      ]).start();
+
+  // Spinner increment/decrement
+  const handleIncrement = useCallback((setter: (v: string) => void, currentVal: number) => {
+    setter(String(currentVal + 1));
+  }, []);
+
+  const handleDecrement = useCallback((setter: (v: string) => void, currentVal: number) => {
+    if (currentVal > 0) {
+      setter(String(currentVal - 1));
     }
-  }, [changeType, fadeAnim]);
-  
-  // Reset the form when modal becomes visible
+  }, []);
+
+  // Pre-populate from existing record when modal opens
   useEffect(() => {
     if (visible) {
-      setInputValue('');
-      setChangeType('plus');
-      
-      // Animate fade in
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: ANIMATION.duration.normal,
-        useNativeDriver: true,
-      }).start();
-      
-      // Focus the input field after a short delay
-      setTimeout(() => {
-        if (inputRef) {
-          inputRef.focus();
-        }
-      }, 300);
-    }
-  }, [visible, fadeAnim]);
-  
-  // Save changes and close modal
-  const handleUpdate = useCallback(() => {
-    // Only proceed if we have valid data
-    if (typeId && userUnitId && numericValue > 0) {
-      // Calculate the new total based on the change type
-      const newTotal = totalValue;
-      
-      // Update the local state with the new total immediately for responsive UI
-      setValue(newTotal);
-      
-      // Prepare the record data
-      const recordData = {
-        Type: typeId,
-        Value: numericValue,
-        change_type: changeType,
-        new_total: newTotal,
-        Reporting_Time: new Date().toISOString()
-      };
-      
-      console.log('Creating strength record with data:', JSON.stringify(recordData, null, 2));
-      
-      // Create a new strength record
-      dispatch(createStrengthRecord(recordData))
-        .unwrap() // Properly handle the Promise from createAsyncThunk
-        .then((result) => {
-          console.log('Strength record created successfully:', JSON.stringify(result, null, 2));
-          
-          // Refresh the data to show the updated values
-          dispatch(refreshStrengthData());
-          
-          // Show success feedback (could add a toast notification here)
-          console.log(`Successfully updated ${type} to ${newTotal}`);
-          
-          // Add success vibration feedback on supported platforms
-          if (Platform.OS !== 'web') {
-            Vibration.vibrate([0, 50, 50, 50]); // Success pattern
-          }
-        })
-        .catch(error => {
-          console.error('Failed to create strength record:', error);
-          
-          // Could add error handling UI feedback here
-          // For now, we'll keep the UI updated with the new value anyway
-          
-          // Add error vibration feedback on supported platforms
-          if (Platform.OS !== 'web') {
-            Vibration.vibrate([0, 100, 50, 100]); // Error pattern
-          }
-        });
-    } else {
-      // Log appropriate warnings
-      if (!typeId) {
-        console.warn('No type ID provided, cannot create strength record');
-      } else if (!userUnitId) {
-        console.warn('No user unit ID available, cannot create strength record');
-      } else if (numericValue === 0) {
-        console.log('No change in value, skipping record creation');
-      }
-      
-      // Still update the UI value if needed
-      if (numericValue > 0) {
-        setValue(totalValue);
+      if (existingRecord) {
+        setPlusInput(existingRecord.plus_value > 0 ? String(existingRecord.plus_value) : '');
+        setMinusInput(existingRecord.minus_value > 0 ? String(existingRecord.minus_value) : '');
+        setNotesInput(existingRecord.notes || '');
+      } else {
+        setPlusInput('');
+        setMinusInput('');
+        setNotesInput('');
       }
     }
-    
-    // Reset and close
-    setInputValue('');
-    setVisible(false);
-  }, [totalValue, setValue, setVisible, typeId, userUnitId, numericValue, changeType, dispatch, type]);
-  
-  // Close modal without saving
+  }, [visible, existingRecord]);
+
+  const handleSave = useCallback(async () => {
+    if (!typeId || !userUnitId) return;
+    if (plusValue === 0 && minusValue === 0) return;
+
+    setSaving(true);
+    try {
+      await dispatch(upsertStrengthRecord({
+        typeId,
+        plus_value: plusValue,
+        minus_value: minusValue,
+        year,
+        month,
+        notes: notesInput.trim() || undefined,
+      })).unwrap();
+
+      if (Platform.OS !== 'web') {
+        Vibration.vibrate([0, 50, 50, 50]);
+      }
+
+      onSaved();
+      setVisible(false);
+    } catch (error) {
+      console.error('Failed to save strength record:', error);
+      if (Platform.OS !== 'web') {
+        Vibration.vibrate([0, 100, 50, 100]);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [typeId, userUnitId, plusValue, minusValue, notesInput, year, month, dispatch, onSaved, setVisible]);
+
   const handleClose = useCallback(() => {
-    setInputValue('');
     setVisible(false);
   }, [setVisible]);
 
-  // Determine if update button should be disabled
-  const isUpdateDisabled = numericValue === 0;
+  const isDisabled = plusValue === 0 && minusValue === 0;
 
   return (
     <Modal
@@ -282,128 +214,114 @@ function EditModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ width: width * 0.9 }}
       >
-        <Animated.View 
-          style={[
-            styles.modalCard, 
-            { transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          {/* Header with title and close button */}
+        <View style={styles.modalCard}>
+          {/* Header with title and month/year */}
           <View style={styles.modalHeader}>
             <UrduText style={styles.modalTitle}>{title}</UrduText>
-            <Pressable 
-              onPress={handleClose} 
+            <UrduText style={styles.modalSubtitle}>
+              {getUrduMonth(month)} {year}
+            </UrduText>
+            <Pressable
+              onPress={handleClose}
               style={styles.modalCloseButton}
               accessibilityRole="button"
               accessibilityLabel={i18n.t('close')}
-              accessibilityHint={i18n.t('close_modal_without_saving')}
             >
-              <ModalCloseIcon height={30} width={30} color={COLORS.white} />
+              <ModalCloseIcon height={24} width={24} color={COLORS.white} />
             </Pressable>
           </View>
-          
+
           <View style={styles.modalContent}>
-            {/* Current Value */}
-            <View style={styles.fieldContainer}>
-              <UrduText style={styles.fieldLabel}>موجودہ {type}</UrduText>
-              <View style={styles.fieldValueContainer}>
-                <Text style={styles.currentValue}>{currentValue}</Text>
-              </View>
+            {/* Previous Total (read-only) */}
+            <View style={styles.fieldRow}>
+              <UrduText style={styles.fieldRowLabel}>پچھلی تعداد</UrduText>
+              <Text style={styles.fieldRowValue}>{previousTotal}</Text>
             </View>
-            
-            {/* Change Type Selection */}
-            <View style={styles.fieldContainer}>
-              <UrduText style={styles.fieldLabel}>تبدیلی کی قسم</UrduText>
-              <View style={styles.changeTypeContainer}>
-                <Pressable 
-                  onPress={() => toggleChangeType('plus')}
-                  style={({pressed}) => [
-                    styles.changeTypeButton,
-                    {
-                      backgroundColor: changeType === 'plus' ? COLORS.success : COLORS.white,
-                      borderColor: changeType === 'plus' ? COLORS.success : COLORS.lightGray2,
-                    },
-                    pressed && styles.buttonPressed
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: changeType === 'plus' }}
-                  accessibilityLabel={i18n.t('increase')}
+
+            {/* Increase Input (اضافہ) with spinner */}
+            <View style={styles.fieldRow}>
+              <UrduText style={[styles.fieldRowLabel, styles.positiveValue]}>اضافہ (+)</UrduText>
+              <View style={[styles.spinnerWrapper, { borderColor: COLORS.success }]}>
+                <Pressable
+                  style={[styles.spinnerBtn, { backgroundColor: COLORS.success }]}
+                  onPress={() => handleIncrement(setPlusInput, plusValue)}
+                  accessibilityLabel="اضافہ بڑھائیں"
                 >
-                  <View style={styles.changeTypeIcon}>
-                    <PlusIcon width={20} height={20} color={changeType === 'plus' ? COLORS.white : COLORS.success} />
-                  </View>
-                  <UrduText style={[
-                    styles.changeTypeText,
-                    { color: changeType === 'plus' ? COLORS.white : COLORS.textSecondary }
-                  ]}>اضافہ</UrduText>
+                  <Ionicons name="chevron-up" size={18} color={COLORS.white} />
                 </Pressable>
-                
-                <Pressable 
-                  onPress={() => toggleChangeType('minus')}
-                  style={({pressed}) => [
-                    styles.changeTypeButton,
-                    {
-                      backgroundColor: changeType === 'minus' ? COLORS.error : COLORS.white,
-                      borderColor: changeType === 'minus' ? COLORS.error : COLORS.lightGray2,
-                    },
-                    pressed && styles.buttonPressed
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: changeType === 'minus' }}
-                  accessibilityLabel={i18n.t('decrease')}
-                >
-                  <View style={styles.changeTypeIcon}>
-                    <MinusIcon width={20} height={20} color={changeType === 'minus' ? COLORS.white : COLORS.error} />
-                  </View>
-                  <UrduText style={[
-                    styles.changeTypeText,
-                    { color: changeType === 'minus' ? COLORS.white : COLORS.textSecondary }
-                  ]}>کمی</UrduText>
-                </Pressable>
-              </View>
-            </View>
-            
-            {/* Value Input */}
-            <View style={styles.fieldContainer}>
-              <UrduText style={styles.fieldLabel}>تعداد</UrduText>
-              <View style={styles.inputWrapper}>
-               
-                
                 <TextInput
-                  ref={ref => setInputRef(ref)}
-                  style={styles.valueInput}
-                  value={inputValue}
-                  onChangeText={handleInputChange}
+                  style={styles.spinnerInput}
+                  value={plusInput}
+                  onChangeText={(text) => handleNumericInput(text, setPlusInput)}
                   keyboardType="number-pad"
                   placeholder="0"
                   placeholderTextColor={COLORS.textSecondary}
-                  maxLength={4}
-                  accessibilityLabel={i18n.t('enter_value')}
-                  accessibilityHint={i18n.t('enter_numeric_value')}
+                  maxLength={6}
+                  accessibilityLabel="اضافہ"
                 />
-                 <Animated.View style={[
-                  styles.inputPrefix,
-                  { opacity: fadeAnim }
-                ]}>
-                  <Text style={[
-                    styles.inputPrefixText,
-                    changeType === 'plus' ? styles.positiveValue : styles.negativeValue
-                  ]}>
-                    {changeType === 'plus' ? '+' : '-'}
-                  </Text>
-                </Animated.View>
+                <Pressable
+                  style={[styles.spinnerBtn, { backgroundColor: COLORS.success, opacity: plusValue === 0 ? 0.4 : 1 }]}
+                  onPress={() => handleDecrement(setPlusInput, plusValue)}
+                  disabled={plusValue === 0}
+                  accessibilityLabel="اضافہ کم کریں"
+                >
+                  <Ionicons name="chevron-down" size={18} color={COLORS.white} />
+                </Pressable>
               </View>
             </View>
-            
-            {/* New Total */}
-            <View style={styles.fieldContainer}>
-              <UrduText style={styles.fieldLabel}>نیا کل {type}</UrduText>
-              <View style={styles.totalValueContainer}>
-                <Text style={styles.totalValue}>{totalValue}</Text>
+
+            {/* Decrease Input (کمی) with spinner */}
+            <View style={styles.fieldRow}>
+              <UrduText style={[styles.fieldRowLabel, styles.negativeValue]}>کمی (-)</UrduText>
+              <View style={[styles.spinnerWrapper, { borderColor: COLORS.error }]}>
+                <Pressable
+                  style={[styles.spinnerBtn, { backgroundColor: COLORS.error }]}
+                  onPress={() => handleIncrement(setMinusInput, minusValue)}
+                  accessibilityLabel="کمی بڑھائیں"
+                >
+                  <Ionicons name="chevron-up" size={18} color={COLORS.white} />
+                </Pressable>
+                <TextInput
+                  style={styles.spinnerInput}
+                  value={minusInput}
+                  onChangeText={(text) => handleNumericInput(text, setMinusInput)}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={COLORS.textSecondary}
+                  maxLength={6}
+                  accessibilityLabel="کمی"
+                />
+                <Pressable
+                  style={[styles.spinnerBtn, { backgroundColor: COLORS.error, opacity: minusValue === 0 ? 0.4 : 1 }]}
+                  onPress={() => handleDecrement(setMinusInput, minusValue)}
+                  disabled={minusValue === 0}
+                  accessibilityLabel="کمی کم کریں"
+                >
+                  <Ionicons name="chevron-down" size={18} color={COLORS.white} />
+                </Pressable>
               </View>
             </View>
+
+            {/* New Total (auto-calculated) */}
+            <View style={[styles.fieldRow, styles.totalRow]}>
+              <UrduText style={styles.totalLabel}>نئی تعداد</UrduText>
+              <Text style={styles.totalValue}>{newTotal}</Text>
+            </View>
+
+            {/* Notes Input (نوٹس) */}
+            <TextInput
+              style={styles.notesInput}
+              value={notesInput}
+              onChangeText={setNotesInput}
+              placeholder="تبصرہ یا نوٹ لکھیں (اختیاری)"
+              placeholderTextColor={COLORS.textSecondary}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+              accessibilityLabel="نوٹس"
+            />
           </View>
-          
+
           {/* Action Buttons */}
           <View style={styles.actionButtonsContainer}>
             <CustomButton
@@ -412,24 +330,21 @@ function EditModal({
               textStyle={styles.cancelButtonText}
               onPress={handleClose}
               accessibilityLabel={i18n.t('cancel')}
-              accessibilityHint={i18n.t('close_without_saving')}
             />
-            
+
             <CustomButton
-              text={'اپڈیٹ کریں'}
+              text={saving ? 'محفوظ ہو رہا ہے...' : 'محفوظ کریں'}
               viewStyle={[
                 styles.updateButton,
-                isUpdateDisabled && styles.updateButtonDisabled
+                (isDisabled || saving) && styles.updateButtonDisabled
               ]}
               textStyle={styles.updateButtonText}
-              onPress={handleUpdate}
-              disabled={isUpdateDisabled}
+              onPress={handleSave}
+              disabled={isDisabled || saving}
               accessibilityLabel={i18n.t('update')}
-              accessibilityHint={i18n.t('save_changes_and_close')}
-              accessibilityState={{ disabled: isUpdateDisabled }}
             />
           </View>
-        </Animated.View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -440,55 +355,51 @@ function EditModal({
  * 
  * A reusable component for displaying workforce items with edit functionality
  */
-const WorkforceItem = ({ label, value, onEdit, typeId, ...accessibilityProps }: WorkforceItemProps) => {
+const WorkforceItem = ({ label, value, onEdit, typeId, editable = true, ...accessibilityProps }: WorkforceItemProps) => {
   return (
     <View style={styles.detailBox}>
       <UrduText style={styles.detailText}>{label}</UrduText>
       <Text style={styles.detailNum}>{value}</Text>
-      <Pressable 
-        style={styles.editIcon} 
-        onPress={onEdit}
-        accessibilityRole="button"
-        accessibilityLabel={`${i18n.t('edit')} ${label}`}
-        {...accessibilityProps}
-      >
-        <EditIcon />
-      </Pressable>
+      {editable ? (
+        <Pressable
+          style={styles.editIcon}
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={`${i18n.t('edit')} ${label}`}
+          {...accessibilityProps}
+        >
+          <EditIcon />
+        </Pressable>
+      ) : (
+        <View style={[styles.editIcon, { opacity: 0.25 }]}>
+          <EditIcon />
+        </View>
+      )}
     </View>
   );
 };
 
 /**
  * StrengthTypeItem Component
- * 
- * A component for displaying and editing strength type items
  */
 interface StrengthTypeItemProps {
   type: any;
-  latestRecord: any | null;
-  latestStrengthRecordsByType: any;
-  showModal: (title: string, type: string, currentValue: number, setValue: React.Dispatch<React.SetStateAction<number>>, typeId?: number) => void;
+  monthlyRecord: StrengthRecord | null;
+  showModal: (title: string, typeId: number, record: StrengthRecord | null) => void;
+  editable: boolean;
 }
 
-const StrengthTypeItem = ({ type, latestRecord, latestStrengthRecordsByType, showModal }: StrengthTypeItemProps) => {
-  const currentValue = latestRecord?.new_total || latestStrengthRecordsByType[type.id]?.new_total || 0;
-  const [typeValue, setTypeValue] = useState(currentValue);
-  
-  // Update the local state when the latest record changes
-  useEffect(() => {
-    const newValue = latestRecord?.new_total || latestStrengthRecordsByType[type.id]?.new_total || 0;
-    if (newValue !== typeValue) {
-      setTypeValue(newValue);
-    }
-  }, [latestRecord, latestStrengthRecordsByType, type.id]);
-  
+const StrengthTypeItem = ({ type, monthlyRecord, showModal, editable }: StrengthTypeItemProps) => {
+  const currentValue = monthlyRecord?.new_total || 0;
+
   return (
-    <WorkforceItem 
+    <WorkforceItem
       key={type.id}
       label={type.Name_Plural}
-      value={typeValue}
-      typeId={type.id} // Pass the type ID for debugging
-      onEdit={() => showModal(type.Name_Plural, type.Name_Singular, typeValue, setTypeValue, type.id)}
+      value={currentValue}
+      typeId={type.id}
+      editable={editable}
+      onEdit={() => showModal(type.Name_Plural, type.id, monthlyRecord)}
     />
   );
 };
@@ -502,6 +413,10 @@ export default function Workforce() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+  const { preSelectedMonth, preSelectedYear } = useLocalSearchParams<{
+    preSelectedMonth?: string;
+    preSelectedYear?: string;
+  }>();
   
   // Redux state
   const persons = useSelector(selectAllPersons);
@@ -513,9 +428,11 @@ export default function Workforce() {
   
   // Strength slice state
   const strengthTypes = useSelector(selectStrengthTypes);
-
   const strengthByCategory = useSelector(selectStrengthByCategory);
-  const latestStrengthRecordsByType = useSelector(selectLatestStrengthRecordsByType);
+  const currentMonthRecords = useSelector(selectCurrentMonthRecordsByType);
+  const now = useMemo(() => new Date(), []);
+  const currentYear = useSelector(selectCurrentYear) || now.getFullYear();
+  const currentMonth = useSelector(selectCurrentMonth) || (now.getMonth() + 1);
   
   // Fetch persons and contact types on component mount
   useEffect(() => {
@@ -540,17 +457,25 @@ export default function Workforce() {
     // Refresh strength data (this will fetch types and records)
     dispatch(refreshStrengthData());
   }, [dispatch, userUnitDetails?.id]);
-  
-  // Modal state management
+
+  // Pre-select month/year from navigation params (e.g., from report auto-question)
+  useEffect(() => {
+    if (preSelectedMonth && preSelectedYear) {
+      const m = parseInt(preSelectedMonth, 10);
+      const y = parseInt(preSelectedYear, 10);
+      if (!isNaN(m) && !isNaN(y)) {
+        dispatch(setCurrentPeriod({ year: y, month: m }));
+        dispatch(refreshStrengthData({ year: y, month: m }));
+      }
+    }
+  }, [preSelectedMonth, preSelectedYear, dispatch]);
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({
-    title: "",
-    type: "",
-    currentValue: 0,
-    setValue: (() => {}) as React.Dispatch<React.SetStateAction<number>>,
-    typeId: undefined as number | undefined
+    title: '',
+    typeId: 0,
+    existingRecord: null as StrengthRecord | null,
   });
 
   // Calculate counts based on contact types (excluding archived persons)
@@ -645,30 +570,89 @@ export default function Workforce() {
 
   // Show modal with specific configuration
   const showModal = useCallback((
-    title: string, 
-    type: string, 
-    currentValue: number, 
-    setValue: React.Dispatch<React.SetStateAction<number>>,
-    typeId?: number
+    title: string,
+    typeId: number,
+    record: StrengthRecord | null,
   ) => {
-    setModalConfig({
-      title,
-      type,
-      currentValue,
-      setValue,
-      typeId
-    });
+    setModalConfig({ title, typeId, existingRecord: record });
     setModalVisible(true);
   }, []);
+
+  // Determine real current month for editability checks
+  const realNow = useMemo(() => new Date(), []);
+  const realYear = realNow.getFullYear();
+  const realMonth = realNow.getMonth() + 1; // 1-based
+
+  // Only current month and previous month are editable
+  const isCurrentMonthEditable = useMemo(() => {
+    // Convert to a comparable number: year*12 + month
+    const viewingPeriod = currentYear * 12 + currentMonth;
+    const currentPeriod = realYear * 12 + realMonth;
+    const prevPeriod = currentPeriod - 1;
+
+    return viewingPeriod === currentPeriod || viewingPeriod === prevPeriod;
+  }, [currentYear, currentMonth, realYear, realMonth]);
+
+  // Block forward navigation beyond current month
+  const canGoNext = useMemo(() => {
+    const viewingPeriod = currentYear * 12 + currentMonth;
+    const currentPeriod = realYear * 12 + realMonth;
+    return viewingPeriod < currentPeriod;
+  }, [currentYear, currentMonth, realYear, realMonth]);
+
+  // Month navigation
+  const handleMonthChange = useCallback((direction: 'prev' | 'next') => {
+    let newMonth = currentMonth;
+    let newYear = currentYear;
+
+    if (direction === 'next') {
+      if (!canGoNext) return; // Block future navigation
+      if (currentMonth === 12) {
+        newMonth = 1;
+        newYear = currentYear + 1;
+      } else {
+        newMonth = currentMonth + 1;
+      }
+    } else {
+      if (currentMonth === 1) {
+        newMonth = 12;
+        newYear = currentYear - 1;
+      } else {
+        newMonth = currentMonth - 1;
+      }
+    }
+
+    dispatch(setCurrentPeriod({ year: newYear, month: newMonth }));
+    dispatch(refreshStrengthData({ year: newYear, month: newMonth }));
+  }, [currentMonth, currentYear, canGoNext, dispatch]);
+
+  // Callback after modal save
+  const handleModalSaved = useCallback(() => {
+    dispatch(refreshStrengthData({ year: currentYear, month: currentMonth }));
+  }, [dispatch, currentYear, currentMonth]);
+
+  // Compute previousTotal for the modal from the record
+  const modalPreviousTotal = useMemo(() => {
+    if (modalConfig.existingRecord) {
+      return modalConfig.existingRecord.previous_total;
+    }
+    // If no record for this month, use the latest new_total as carry-forward
+    // (the upsertStrengthRecord thunk will fetch this from API)
+    return currentMonthRecords[modalConfig.typeId]?.new_total || 0;
+  }, [modalConfig, currentMonthRecords]);
 
   // Handle back navigation
   const handleBack = useCallback(() => {
     InteractionManager.runAfterInteractions(() => router.back());
   }, [router]);
 
-  // Handle navigation to Arkan screen
-  const handleNavigateToArkan = useCallback(() => {
-    router.push('/screens/(tabs)/Arkan');
+  // Handle navigation to Arkan screen with optional contact type filter
+  const handleNavigateToArkan = useCallback((contactTypeStr?: string) => {
+    if (contactTypeStr) {
+      router.push(`/screens/(tabs)/Arkan?contactType=${contactTypeStr}`);
+    } else {
+      router.push('/screens/(tabs)/Arkan');
+    }
   }, [router]);
 
   // Render loading state
@@ -743,19 +727,21 @@ export default function Workforce() {
           visible={modalVisible}
           setVisible={setModalVisible}
           title={modalConfig.title}
-          type={modalConfig.type}
-          currentValue={modalConfig.currentValue}
-          setValue={modalConfig.setValue}
           typeId={modalConfig.typeId}
+          existingRecord={modalConfig.existingRecord}
+          previousTotal={modalPreviousTotal}
+          year={currentYear}
+          month={currentMonth}
+          onSaved={handleModalSaved}
         />
         
         {/* Top Container with Stats */}
         <View style={styles.topContainer}>
           <View style={styles.quwatContainer}>
              {/* Karkun Count */}
-             <Pressable 
+             <Pressable
                style={styles.quwatBox}
-               onPress={handleNavigateToArkan}
+               onPress={() => handleNavigateToArkan('karkun')}
                accessibilityRole="button"
                accessibilityLabel={`${i18n.t('karkun')} - ${i18n.t('view_list')}`}
                accessibilityHint={i18n.t('navigate_to_arkan_screen')}
@@ -770,9 +756,9 @@ export default function Workforce() {
             </Pressable>
          
               {/* Umeedwar Count */}
-              <Pressable 
+              <Pressable
                 style={styles.quwatBox}
-                onPress={handleNavigateToArkan}
+                onPress={() => handleNavigateToArkan('umeedwar')}
                 accessibilityRole="button"
                 accessibilityLabel={`${i18n.t('umeedwar')} - ${i18n.t('view_list')}`}
                 accessibilityHint={i18n.t('navigate_to_arkan_screen')}
@@ -787,9 +773,9 @@ export default function Workforce() {
             </Pressable>
                        {/* Rukun Count */}
 
-            <Pressable 
+            <Pressable
               style={styles.quwatBox}
-              onPress={handleNavigateToArkan}
+              onPress={() => handleNavigateToArkan('rukun')}
               accessibilityRole="button"
               accessibilityLabel={`${i18n.t('rukun')} - ${i18n.t('view_list')}`}
               accessibilityHint={i18n.t('navigate_to_arkan_screen')}
@@ -812,28 +798,51 @@ export default function Workforce() {
 
       
         
+        {/* Month/Year Selector */}
+        <View style={styles.monthSelector}>
+          <Pressable
+            onPress={() => handleMonthChange('prev')}
+            style={styles.monthArrow}
+            accessibilityLabel="پچھلا مہینہ"
+          >
+            <Text style={styles.monthArrowText}>{'>'}</Text>
+          </Pressable>
+          <View style={{ alignItems: 'center' }}>
+            <UrduText style={styles.monthText}>
+              {getUrduMonth(currentMonth)} {currentYear}
+            </UrduText>
+            {!isCurrentMonthEditable && (
+              <UrduText style={styles.readOnlyBadge}>صرف مشاہدہ</UrduText>
+            )}
+          </View>
+          <Pressable
+            onPress={() => handleMonthChange('next')}
+            style={[styles.monthArrow, !canGoNext && styles.monthArrowDisabled]}
+            disabled={!canGoNext}
+            accessibilityLabel="اگلا مہینہ"
+          >
+            <Text style={[styles.monthArrowText, !canGoNext && { color: COLORS.textSecondary }]}>{'<'}</Text>
+          </Pressable>
+        </View>
+
         {/* Strength Data by Category */}
         {strengthTypes.length > 0 && (
           <View style={styles.strengthDataContainer}>
-            {/* Display categories in the specified order: workforce, place, magazine */}
             {Object.entries(strengthByCategory).map(([category, types]) => (
               <React.Fragment key={category}>
-                {/* Only render the category if it has types */}
                 {types.length > 0 && (
                   <>
-                    {/* Category Heading */}
                     <UrduText style={styles.blueHeading}>
                       {getCategoryLabel(category)}
                     </UrduText>
-                    
-                    {/* All Types Combined (regardless of gender) */}
-                    {types.map(type => (
+
+                    {types.map((type) => (
                       <StrengthTypeItem
                         key={`type-${type.id}`}
                         type={type}
-                        latestRecord={null} // We'll use latestStrengthRecordsByType instead
-                        latestStrengthRecordsByType={latestStrengthRecordsByType}
+                        monthlyRecord={currentMonthRecords[type.id] || null}
                         showModal={showModal}
+                        editable={isCurrentMonthEditable}
                       />
                     ))}
                   </>
@@ -918,11 +927,47 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.lg
   },
+  // Month selector
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.lightPrimary,
+    marginHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  monthArrow: {
+    padding: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  monthArrowText: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  monthText: {
+    textAlign: 'center',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+  },
+  monthArrowDisabled: {
+    opacity: 0.3,
+  },
+  readOnlyBadge: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    fontFamily: 'JameelNooriNastaleeq',
+    marginTop: 2,
+  },
   // Strength data container
   strengthDataContainer: {
     marginTop: SPACING.lg,
     marginBottom: SPACING.xxl,
-    paddingHorizontal: SPACING.md
+    paddingHorizontal: SPACING.md,
   },
   blueHeading: {
     fontSize: TYPOGRAPHY.fontSize.xl,
@@ -972,143 +1017,121 @@ const styles = StyleSheet.create({
     ...SHADOWS.large
   },
   modalHeader: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg + SPACING.xl,
     position: 'relative',
-    height: SPACING.xxl*2,
-    lineHeight:60,
   },
   modalTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     color: COLORS.white,
-    fontFamily: "JameelNooriNastaleeq",
+    fontFamily: 'JameelNooriNastaleeq',
     textAlign: 'center',
-    flex: 1,
+  },
+  modalSubtitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: 'JameelNooriNastaleeq',
+    textAlign: 'center',
+    marginTop: 2,
   },
   modalCloseButton: {
     position: "absolute",
-    right: SPACING.sm,
+    left: SPACING.sm,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
     padding: SPACING.sm,
     zIndex: Z_INDEX.modal,
   },
   modalContent: {
-    padding: SPACING.md,
+    padding: SPACING.sm,
+    paddingHorizontal: SPACING.md,
   },
-  fieldContainer: {
-    marginBottom: SPACING.md,
+  // Compact row layout: label on right, value on left (RTL)
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+    minHeight: 40,
   },
-  fieldLabel: {
+  fieldRowLabel: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontFamily: "JameelNooriNastaleeq",
-    marginBottom: SPACING.xs,
+    fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textSecondary,
     textAlign: 'right',
+    minWidth: 80,
   },
-  fieldValueContainer: {
-    height: 60,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray2,
-    ...SHADOWS.small
-  },
-  totalValueContainer: {
-    height: 60,
-    backgroundColor: COLORS.lightPrimary,
-    borderRadius: BORDER_RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    ...SHADOWS.small
-  },
-  currentValue: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+  fieldRowValue: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
     fontFamily: 'JameelNooriNastaleeq',
+    minWidth: 60,
+    textAlign: 'center',
+  },
+  // Spinner input with up/down buttons
+  spinnerWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    overflow: 'hidden',
+    height: 40,
+  },
+  spinnerBtn: {
+    width: 36,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinnerInput: {
+    width: 60,
+    height: '100%',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: COLORS.textPrimary,
+    paddingVertical: 0,
+  },
+  // Total row with highlight
+  totalRow: {
+    backgroundColor: COLORS.lightPrimary,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  totalLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   totalValue: {
-    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: 'bold',
     color: COLORS.primary,
     fontFamily: 'JameelNooriNastaleeq',
   },
-  changeTypeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 60,
-  },
-  changeTypeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.sm,
-    marginHorizontal: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray2,
-    height: '100%',
-    ...SHADOWS.small
-  },
-  changeTypeButtonSelected: {
-    borderColor: COLORS.primary,
-  },
-  changeTypeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginRight: SPACING.sm,
-  },
-  changeTypeText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontFamily: "JameelNooriNastaleeq",
-    color: COLORS.textSecondary,
-  },
-  changeTypeTextSelected: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  notesInput: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.lightGray2,
-    height: 60,
-    ...SHADOWS.small
-  },
-  inputPrefix: {
-    width: 50,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: 1,
-    borderRightColor: COLORS.lightGray,
-  },
-  inputPrefixText: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: 'bold',
-  },
-  valueInput: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.xxl,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    height: '100%',
-    color: COLORS.textPrimary,
+    padding: SPACING.sm,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.textPrimary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    minHeight: 44,
+    marginTop: SPACING.xs,
   },
   positiveValue: {
     color: COLORS.success,
@@ -1116,18 +1139,12 @@ const styles = StyleSheet.create({
   negativeValue: {
     color: COLORS.error,
   },
-  neutralValue: {
-    color: COLORS.textSecondary,
-  },
-  buttonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }]
-  },
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    padding: SPACING.md,
+    padding: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGray,
@@ -1136,24 +1153,25 @@ const styles = StyleSheet.create({
     flex: 2,
     backgroundColor: COLORS.primary,
     marginLeft: SPACING.sm,
-    height: 50,
+    height: 42,
   },
   updateButtonDisabled: {
     backgroundColor: COLORS.disabled,
   },
   updateButtonText: {
     color: COLORS.white,
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    lineHeight:30
+    fontSize: TYPOGRAPHY.fontSize.md,
+    lineHeight: 24,
   },
   cancelButton: {
     flex: 1,
     backgroundColor: COLORS.warning,
+    height: 42,
   },
   cancelButtonText: {
     color: COLORS.textSecondary,
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    lineHeight:30
+    fontSize: TYPOGRAPHY.fontSize.md,
+    lineHeight: 24,
   },
   // Loading and error styles
   centerContent: {

@@ -28,7 +28,7 @@ import CustomButton from '@/app/components/CustomButton';
 import CustomTextInput from '@/app/components/CustomTextInput';
 import UrduText from '@/app/components/UrduText';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from 'expo-router';
+import { useNavigation, router, useLocalSearchParams } from 'expo-router';
 import { TabGroup } from '@/app/components/Tab';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -37,6 +37,7 @@ export default function Arkan() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useDispatch<AppDispatch>();
+  const { contactType: contactTypeParam } = useLocalSearchParams<{ contactType?: string }>();
 
   // Redux state
   const persons = useSelector(selectAllPersons);
@@ -45,16 +46,16 @@ export default function Arkan() {
   const contactTypes = useSelector(selectContactTypes);
   const contactTypesStatus = useSelector(selectContactTypesStatus);
   const contactTypesError = useSelector(selectContactTypesError);
-  
+
   // Get selected unit for dashboard
   const selectedUnit = useSelector(selectDashboardSelectedUnit);
   const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
   const userUnit = useSelector(selectUserUnitDetails);
-  
+
   // Use selected unit if available, otherwise fall back to user unit
   const displayUnit = selectedUnit || userUnit;
   const displayUnitId = selectedUnitId || userUnit?.id;
-  
+
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,6 +98,16 @@ export default function Arkan() {
       dispatch(fetchContactTypes());
     }
   }, [dispatch, contactTypesStatus]);
+
+  // Set the selected tab when navigated with a contactType param (e.g. from Workforce)
+  useEffect(() => {
+    if (contactTypeParam && contactTypes.length > 0) {
+      const ct = contactTypes.find(type => type.type === contactTypeParam);
+      if (ct) {
+        setSelectedTab(ct.id);
+      }
+    }
+  }, [contactTypeParam, contactTypes]);
 
   // Fetch persons based on selected unit. Defer so we don't run in same frame as tab transition (avoids Fabric "Unable to find viewState for tag" when switching from Activities).
   useEffect(() => {
@@ -163,25 +174,33 @@ export default function Arkan() {
     }
   }, [dispatch, displayUnitId]);
 
-  // Handle adding a new person
+  // Check if the active tab is 'rukun' (rukun can only be added by admin)
+  const isRukunTab = useMemo(() => {
+    const activeContactType = contactTypes?.find(ct => ct.id === selectedTab);
+    return activeContactType?.type === 'rukun';
+  }, [selectedTab, contactTypes]);
+
+  // Handle adding a new person - pass current tab's contact type
   const handleAddNewRukun = useCallback(() => {
-    // Navigate to create mode by not passing any rukun parameter
-    navigation.navigate('screens/RukunAddEdit', {});
-  }, [navigation]);
+    const activeTab = tabs.find(tab => tab.value === selectedTab);
+    const activeContactType = activeTab ? contactTypes.find(ct => ct.id === activeTab.value) : null;
+    // Don't pre-select 'rukun' type (rukun can only be added by admin)
+    const contactTypeId = activeContactType && activeContactType.type !== 'rukun' ? activeContactType.id : undefined;
+    navigation.navigate('screens/RukunAddEdit', { contactTypeId });
+  }, [navigation, tabs, selectedTab, contactTypes]);
 
   // Get the contact type label for a person
   const getContactTypeLabel = useCallback((person: Person) => {
     if (!person.contact_type || !contactTypes.length) {
-      return 'رکن'; // Default fallback
+      return '';
     }
-    
+
     const contactType = contactTypes.find(type => type.id === person.contact_type);
     if (contactType) {
-      // Try to get translated label first, fallback to type name
-      return i18n.t(contactType.type) || contactType.type;
+      return contactType.label_singular || i18n.t(contactType.type) || contactType.type;
     }
-    
-    return 'رکن'; // Default fallback
+
+    return '';
   }, [contactTypes]);
 
   // Handle card press to show detailed view
@@ -286,13 +305,24 @@ export default function Arkan() {
                       : i18n.t((contactTypes || []).find(type => type.id === selectedTab)?.type || '')}
                   </UrduText>
                 </View>
-                <CustomButton
-                  text={i18n.t('add_new')}
-                  onPress={handleAddNewRukun}
-                  style={styles.addButton}
-                  viewStyle={styles.addButtonView}
-                  textStyle={styles.addButtonText}
-                />
+                <View style={styles.headerButtonsContainer}>
+                  <CustomButton
+                    text={i18n.t('initial_info')}
+                    onPress={() => router.push('/screens/Workforce')}
+                    style={styles.addButton}
+                    viewStyle={styles.workforceButtonView}
+                    textStyle={styles.workforceButtonText}
+                  />
+                  {!isRukunTab && (
+                    <CustomButton
+                      text={i18n.t('add_new')}
+                      onPress={handleAddNewRukun}
+                      style={styles.addButton}
+                      viewStyle={styles.addButtonView}
+                      textStyle={styles.addButtonText}
+                    />
+                  )}
+                </View>
               </View>
               <View style={styles.searchContainer}>
                 <Image
@@ -381,6 +411,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'JameelNooriNastaleeq',
   },
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   addButton: {
     borderRadius: 25,
   },
@@ -389,6 +424,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 25,
+  },
+  workforceButtonView: {
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  workforceButtonText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'JameelNooriNastaleeq',
   },
   addButtonText: {
     color: '#fff',

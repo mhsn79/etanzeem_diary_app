@@ -13,13 +13,13 @@ import ReportIcon2White from '../../assets/images/report-icon-2-white.svg';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
-const VALID_LABELS = ['صفحہ اول', 'ارکان', 'سرگرمیاں', 'رپورٹس'] as const;
+const VALID_LABELS = ['صفحہ اول', 'افراد', 'سرگرمیاں', 'رپورٹس'] as const;
 type ValidLabel = typeof VALID_LABELS[number];
 
 // Map label to tab screen name so we always navigate to the correct tab (state.routes order can differ in Expo Router)
 const LABEL_TO_TAB_NAME: Record<ValidLabel, string> = {
   'صفحہ اول': 'Dashboard',
-  'ارکان': 'Arkan',
+  'افراد': 'Arkan',
   'سرگرمیاں': 'Activities',
   'رپورٹس': 'Reports',
 };
@@ -30,7 +30,7 @@ function getIcon(label: ValidLabel, focused: boolean) {
 
   const icons = {
     'صفحہ اول': focused ? HomeIconWhite : HomeIconBlack,
-    'ارکان': focused ? ArkanIconWhite : ArkanIconBlack,
+    'افراد': focused ? ArkanIconWhite : ArkanIconBlack,
     'سرگرمیاں': focused ? ActivitiesIconWhite : ActivitiesIconBlack,
     'رپورٹس': focused ? ReportIcon2White : ReportIcon2Black,
   };

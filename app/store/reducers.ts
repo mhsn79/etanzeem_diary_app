@@ -4,7 +4,7 @@ import { RESET_STATE } from './_resetState';
 import activitiesReducer from '../features/activities/activitySlice';
 import activityTypesReducer from '../features/activityTypes/activityTypesSlice';
 import personsReducer from '../features/persons/personSlice';
-import reportsNewReducer from '../features/reports/reportsSlice_new';
+import reportsReducer from '../features/reports/reportsSlice';
 import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
 import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
@@ -16,7 +16,7 @@ const appReducer = combineReducers({
   activities: activitiesReducer,
   activityTypes: activityTypesReducer,
   persons: personsReducer,
-  reportsNew: reportsNewReducer, // Add the new reports slice
+  reports: reportsReducer, // Reports slice
   tanzeem: tanzeemReducer,
   tanzeemHierarchy: tanzeemHierarchyReducer, // Add the tanzeem hierarchy slice
   qa: qaReducer, // Add the QA slice

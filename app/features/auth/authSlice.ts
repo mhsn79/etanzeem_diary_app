@@ -11,6 +11,7 @@ import { getPersistor } from '../../store/storeAccess';
 import { directApiRequest } from '../../services/apiClient';
 import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
+import { authLogger } from '../../utils/logger';
 
 // Function to reset singleton variables (useful for testing or app restart)
 export const resetAuthSingletons = () => {
@@ -25,9 +26,9 @@ const loginApiRequest = async <T>(
 ): Promise<T> => {
   const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org';
   const url = `${baseUrl}${endpoint}`;
-  
-  console.log(`[DEBUG] 🔗 Making login API request to: ${url}`);
-  console.log(`[DEBUG] 🔑 Using token: ${accessToken.substring(0, 20)}...`);
+
+  authLogger.debug(`Making login API request to: ${url}`);
+  authLogger.debug('Using token: [REDACTED]');
   
   const options: RequestInit = {
     method,
@@ -44,46 +45,46 @@ const loginApiRequest = async <T>(
   }
   
   try {
-    console.log(`[DEBUG] 📡 Sending request with options:`, {
+    authLogger.debug('Sending request with options:', {
       method: options.method,
-      headers: options.headers,
+      headers: { ...options.headers, Authorization: '[REDACTED]' },
       hasBody: !!options.body
     });
-    
+
     const response = await fetch(url, options);
-    
-    console.log(`[DEBUG] 📥 Response status: ${response.status}`);
-    console.log(`[DEBUG] 📥 Response headers:`, Object.fromEntries(response.headers.entries()));
-    
+
+    authLogger.debug(`Response status: ${response.status}`);
+    authLogger.debug('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[DEBUG] ❌ Request failed with status ${response.status}: ${errorText}`);
+      authLogger.error(`Request failed with status ${response.status}: ${errorText}`);
       throw new Error(errorText || `Request failed with status ${response.status}`);
     }
-    
+
     const responseData = await response.json();
-    console.log(`[DEBUG] ✅ Request successful, data keys:`, Object.keys(responseData));
-    
+    authLogger.debug('Request successful, data keys:', Object.keys(responseData));
+
     return responseData as T;
   } catch (error: any) {
-    console.error(`[DEBUG] ❌ Network request failed for ${url}:`, error);
-    
+    authLogger.error(`Network request failed for ${url}:`, error);
+
     // Check if it's a DNS resolution error
     if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
-      console.error(`[DEBUG] ❌ DNS resolution failed for ${url}`);
+      authLogger.error(`DNS resolution failed for ${url}`);
       throw new Error('DNS resolution failed. Please check your internet connection and try again.');
     }
-    
+
     // Check if it's a timeout error
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
       throw new Error('Request timeout - please check your internet connection');
     }
-    
+
     // Check if it's a network error
     if (error.message.includes('Network') || error.message.includes('fetch')) {
       throw new Error('Network connection failed - please check your internet connection');
     }
-    
+
     // Re-throw the original error
     throw error;
   }
@@ -188,11 +189,11 @@ export const login = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
-    console.log('[DEBUG] 🚀 NEW LOGIN LOGIC STARTED for:', credentials.email);
-    console.log('[DEBUG] 🔄 Authenticating with Directus...');
+    authLogger.info('NEW LOGIN LOGIC STARTED for:', credentials.email);
+    authLogger.debug('Authenticating with Directus...');
     
     // Test basic network connectivity first
-    console.log('[DEBUG] 🧪 Testing basic network connectivity...');
+    authLogger.debug('Testing basic network connectivity...');
     try {
       const connectivityTest = await fetch('https://httpbin.org/get', {
         method: 'GET',
@@ -201,36 +202,36 @@ export const login = createAsyncThunk<
           'Accept': 'application/json'
         }
       });
-      console.log('[DEBUG] ✅ Basic network connectivity test passed');
+      authLogger.info('Basic network connectivity test passed');
     } catch (connectivityError: any) {
-      console.error('[DEBUG] ❌ Basic network connectivity test failed:', connectivityError.message);
-      console.error('[DEBUG] ❌ Error name:', connectivityError.name);
-      console.error('[DEBUG] ❌ Error stack:', connectivityError.stack);
+      authLogger.error('Basic network connectivity test failed:', connectivityError.message);
+      authLogger.error('Error name:', connectivityError.name);
+      authLogger.error('Error stack:', connectivityError.stack);
       
       // Try alternative test with IP address
       try {
-        console.log('[DEBUG] 🔄 Trying alternative network test with IP...');
+        authLogger.debug('Trying alternative network test with IP...');
         const altTest = await fetch('https://8.8.8.8', {
           method: 'GET',
           headers: {
             'User-Agent': 'E-Tanzeem-App/1.0'
           }
         });
-        console.log('[DEBUG] ✅ Alternative network test passed');
+        authLogger.info('Alternative network test passed');
       } catch (altError: any) {
-        console.error('[DEBUG] ❌ Alternative network test also failed:', altError.message);
+        authLogger.error('Alternative network test also failed:', altError.message);
         // Don't fail the login, just log the error and continue
-        console.log('[DEBUG] ⚠️ Network test failed, but continuing with login...');
+        authLogger.warn('Network test failed, but continuing with login...');
       }
     }
-    
+
     // Test connection to the specific API server
-    console.log('[DEBUG] 🧪 Testing API server connectivity...');
+    authLogger.debug('Testing API server connectivity...');
     try {
       const apiTest = await fetch('https://admin.jiislamabad.org');
-      console.log('[DEBUG] ✅ API server connectivity test passed, status:', apiTest.status);
+      authLogger.info('API server connectivity test passed, status:', apiTest.status);
     } catch (apiError: any) {
-      console.error('[DEBUG] ❌ API server connectivity test failed:', apiError.message);
+      authLogger.error('API server connectivity test failed:', apiError.message);
       // Continue anyway, as the issue might be specific to the auth endpoint
     }
     
@@ -238,16 +239,15 @@ export const login = createAsyncThunk<
     const authResponse = await directus.login(credentials.email, credentials.password, {
       mode: 'json',
     });
-    console.log('[DEBUG] ✅ Directus SDK authentication successful');
-
-    console.log('[DEBUG] ✅ Directus authentication successful');
-    console.log('[DEBUG] 📝 Auth response keys:', Object.keys(authResponse));
-    console.log('[DEBUG] 🌐 API Base URL:', process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org');
-    console.log('[DEBUG] 🔑 Access token received:', !!authResponse.access_token);
-    console.log('[DEBUG] 🔑 Refresh token received:', !!authResponse.refresh_token);
+    authLogger.info('Directus SDK authentication successful');
+    authLogger.info('Directus authentication successful');
+    authLogger.debug('Auth response keys:', Object.keys(authResponse));
+    authLogger.debug('API Base URL:', process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.jiislamabad.org');
+    authLogger.debug('Access token received:', !!authResponse.access_token);
+    authLogger.debug('Refresh token received:', !!authResponse.refresh_token);
 
     if (!authResponse.access_token || !authResponse.refresh_token) {
-      console.log('[DEBUG] ❌ Invalid authentication response - missing tokens');
+      authLogger.error('Invalid authentication response - missing tokens');
       return rejectWithValue('Invalid authentication response');
     }
 
@@ -267,26 +267,26 @@ export const login = createAsyncThunk<
       await saveTokens(authResult.tokens);
 
       // Test network connectivity first
-      console.log('[DEBUG] 🧪 Testing network connectivity...');
+      authLogger.debug('Testing network connectivity...');
       try {
         const testResponse = await fetch('https://httpbin.org/get', {
           method: 'GET'
         });
-        console.log('[DEBUG] ✅ Network connectivity test passed');
+        authLogger.info('Network connectivity test passed');
       } catch (testError: any) {
-        console.error('[DEBUG] ❌ Network connectivity test failed:', testError.message);
+        authLogger.error('Network connectivity test failed:', testError.message);
         // Continue anyway, as the issue might be specific to the API server
       }
 
       // Test direct connection to the API server
-      console.log('[DEBUG] 🧪 Testing direct API server connection...');
+      authLogger.debug('Testing direct API server connection...');
       try {
         const apiTestResponse = await fetch('https://admin.jiislamabad.org', {
           method: 'GET'
         });
-        console.log('[DEBUG] ✅ Direct API server connection test passed, status:', apiTestResponse.status);
+        authLogger.info('Direct API server connection test passed, status:', apiTestResponse.status);
       } catch (apiTestError: any) {
-        console.error('[DEBUG] ❌ Direct API server connection test failed:', apiTestError.message);
+        authLogger.error('Direct API server connection test failed:', apiTestError.message);
       }
 
       // Fetch user details from Directus to get the user ID
@@ -299,10 +299,10 @@ export const login = createAsyncThunk<
           authResponse.access_token
         );
       } catch (userError: any) {
-        console.error('[DEBUG] ❌ Primary user fetch failed:', userError.message);
+        authLogger.error('Primary user fetch failed:', userError.message);
         
         // Try fallback approach with different headers
-        console.log('[DEBUG] 🔄 Trying fallback user fetch...');
+        authLogger.debug('Trying fallback user fetch...');
         try {
           const fallbackResponse = await fetch('https://admin.jiislamabad.org/users/me?fields=*,role.*,avatar.*', {
             method: 'GET',
@@ -318,15 +318,15 @@ export const login = createAsyncThunk<
           }
           
           userData = await fallbackResponse.json();
-          console.log('[DEBUG] ✅ Fallback user fetch succeeded');
+          authLogger.info('Fallback user fetch succeeded');
         } catch (fallbackError: any) {
-          console.error('[DEBUG] ❌ Fallback user fetch also failed:', fallbackError.message);
+          authLogger.error('Fallback user fetch also failed:', fallbackError.message);
           throw userError; // Re-throw the original error
         }
       }
       const userId = userData.data.id;
       
-      console.log('[DEBUG] User authenticated with ID:', userId);
+      authLogger.info('User authenticated with ID:', userId);
       
       // Update the auth result with the actual user data
       authResult.user = {
@@ -342,30 +342,30 @@ export const login = createAsyncThunk<
 
       // Now fetch Tanzeemi_Unit using the user ID
       try {
-        console.log('[DEBUG] 🔍 Starting Tanzeemi_Unit fetch for user ID:', userId);
+        authLogger.debug('Starting Tanzeemi_Unit fetch for user ID:', userId);
         const tanzeemiData = await loginApiRequest<{ data: any[] }>(
           `/items/Tanzeemi_Unit?filter[user_id][_eq]=${userId}&fields=*`,
           'GET',
           authResponse.access_token
         );
         
-        console.log('[DEBUG] ✅ Tanzeemi_Unit data:', tanzeemiData);
+        authLogger.debug('Tanzeemi_Unit data:', tanzeemiData);
         
         if (tanzeemiData.data && tanzeemiData.data.length > 0) {
           const tanzeemiUnit = tanzeemiData.data[0];
           const nazimId = tanzeemiUnit.Nazim_id;
           
           // Note: The person slice will handle fetching the tanzeemi unit when it fetches person data
-          console.log('[DEBUG] Found tanzeemi unit ID:', tanzeemiUnit.id);
+          authLogger.debug('Found tanzeemi unit ID:', tanzeemiUnit.id);
           
           // Store Tanzeemi_Unit in tanzeem slice
-          console.log('[DEBUG] 🏪 Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
+          authLogger.debug('Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
           
           if (nazimId) {
-            console.log('[DEBUG] 🔍 Found Nazim_id:', nazimId);
+            authLogger.debug('Found Nazim_id:', nazimId);
             // Fetch Person record using Nazim_id and store as user details
-            console.log('[DEBUG] 🏪 Fetching Nazim details for Nazim_id:', nazimId);
+            authLogger.debug('Fetching Nazim details for Nazim_id:', nazimId);
             try {
               const nazimResponse = await loginApiRequest<{ data: any }>(
                 `/items/Person/${nazimId}?fields=*`,
@@ -374,28 +374,28 @@ export const login = createAsyncThunk<
               );
               
               if (nazimResponse.data) {
-                console.log('[DEBUG] ✅ Nazim details fetched successfully:', nazimResponse.data);
+                authLogger.info('Nazim details fetched successfully:', nazimResponse.data);
                 // Set user details in person slice (this is the logged-in user's details)
                 dispatch(setUserDetails(nazimResponse.data));
                 // Also set as nazim details for consistency
                 dispatch(setNazimDetails(nazimResponse.data));
               }
             } catch (nazimError: any) {
-              console.log('[DEBUG] ❌ Failed to fetch Nazim details:', nazimError.message);
+              authLogger.error('Failed to fetch Nazim details:', nazimError.message);
               // Continue with login even if Nazim details can't be fetched
             }
           }
         } else {
-          console.log('[DEBUG] No Tanzeemi_Unit found for user:', userId);
+          authLogger.warn('No Tanzeemi_Unit found for user:', userId);
         }
       } catch (tanzeemiError: any) {
-        console.log('[DEBUG] Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
+        authLogger.error('Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
         // Continue with login even if Tanzeemi_Unit is not found
       }
 
       return authResult;
     } catch (error: any) {
-      console.log('[DEBUG] 🔥 INNER CATCH BLOCK - Error in user/Tanzeemi_Unit/Person fetch:', error);
+      authLogger.error('INNER CATCH BLOCK - Error in user/Tanzeemi_Unit/Person fetch:', error);
       // If we can't check person data but have tokens, return minimal user info
       const authResult: AuthResponse = {
         tokens: {
@@ -412,7 +412,7 @@ export const login = createAsyncThunk<
       return authResult;
     }
   } catch (error: any) {
-    console.log('[DEBUG] 🔥 OUTER CATCH BLOCK - Error in Directus authentication:', error);
+    authLogger.error('OUTER CATCH BLOCK - Error in Directus authentication:', error);
     const directusErrors =
       error?.errors ||
       error?.response?.data?.errors ||
@@ -424,7 +424,7 @@ export const login = createAsyncThunk<
       JSON.stringify(directusErrors).includes('INVALID_CREDENTIALS');
 
     if (hasInvalidCredentials) {
-      console.log('[DEBUG] 🔥 Final error message: INVALID_CREDENTIALS');
+      authLogger.error('Final error message: INVALID_CREDENTIALS');
       return rejectWithValue('INVALID_CREDENTIALS');
     }
 
@@ -432,7 +432,7 @@ export const login = createAsyncThunk<
       error?.response?.data?.message ||
       error?.message ||
       'Authentication failed';
-    console.log('[DEBUG] 🔥 Final error message:', errorMessage);
+    authLogger.error('Final error message:', errorMessage);
     return rejectWithValue(errorMessage);
   }
 });
@@ -453,7 +453,7 @@ export const refresh = createAsyncThunk<
   try {
     // First try using the Directus SDK
     try {
-      console.log(`[Auth] Refreshing token using Directus SDK (${Platform.OS})`);
+      authLogger.info(`Refreshing token using Directus SDK (${Platform.OS})`);
       const response = await directus.refresh();
       
       if (!response.access_token || !response.refresh_token) {
@@ -481,7 +481,7 @@ export const refresh = createAsyncThunk<
       
       return authResult;
     } catch (sdkError: any) {
-      console.log(`[Auth] SDK refresh failed, trying manual refresh (${Platform.OS}): ${sdkError.message}`);
+      authLogger.warn(`SDK refresh failed, trying manual refresh (${Platform.OS}): ${sdkError.message}`);
       
       // If SDK refresh fails, try manual refresh using login-specific API request
       const refreshData = await loginApiRequest<{ data: { access_token: string; refresh_token: string; expires?: number } }>(
@@ -782,7 +782,7 @@ export const logout = createAsyncThunk(
   'auth/logoutComplete',
   async (message: string | undefined = undefined, { dispatch }) => {
     try {
-      console.log(`[Auth] Starting logout process (${Platform.OS})`);
+      authLogger.info(`Starting logout process (${Platform.OS})`);
       
       // Reset singleton variables
       
@@ -793,9 +793,9 @@ export const logout = createAsyncThunk(
       // First clear tokens from secure storage
       try {
         await clearTokens();
-        console.log(`[Auth] Tokens cleared from secure storage (${Platform.OS})`);
+        authLogger.info(`Tokens cleared from secure storage (${Platform.OS})`);
       } catch (clearTokensError) {
-        console.error(`[Auth] Error clearing tokens from secure storage: ${clearTokensError} (${Platform.OS})`);
+        authLogger.error(`Error clearing tokens from secure storage: ${clearTokensError} (${Platform.OS})`);
       }
       
       // Dispatch the auth logout action to clear auth state and log out from Directus
@@ -817,26 +817,26 @@ export const logout = createAsyncThunk(
         dispatch(clearSubmissions());
         
         // Clear reports state
-        const { clearReports, clearSubmissions: clearReportSubmissions } = await import('../reports/reportsSlice_new');
+        const { clearReports, clearSubmissions: clearReportSubmissions } = await import('../reports/reportsSlice');
         dispatch(clearReports());
         dispatch(clearReportSubmissions());
         
-        console.log(`[Auth] All slice states cleared (${Platform.OS})`);
+        authLogger.info(`All slice states cleared (${Platform.OS})`);
       } catch (clearStateError) {
-        console.error(`[Auth] Error clearing slice states: ${clearStateError} (${Platform.OS})`);
+        authLogger.error(`Error clearing slice states: ${clearStateError} (${Platform.OS})`);
       }
       
       // Then dispatch the reset action to reset all slices to their initial state
       dispatch({ type: RESET_STATE });
-      console.log(`[Auth] Redux state reset (${Platform.OS})`);
+      authLogger.info(`Redux state reset (${Platform.OS})`);
       
       try {
         // Finally, purge the persisted Redux data
         await getPersistor().purge();
-        console.log(`[Auth] Persisted data purged (${Platform.OS})`);
+        authLogger.info(`Persisted data purged (${Platform.OS})`);
       } catch (purgeError) {
         // If purge fails, log the error but continue with logout
-        console.error(`[Auth] Error purging persisted data: ${purgeError} (${Platform.OS})`);
+        authLogger.error(`Error purging persisted data: ${purgeError} (${Platform.OS})`);
       }
       
       // Set error message to show in our custom Toast component only when provided
@@ -849,33 +849,33 @@ export const logout = createAsyncThunk(
             dispatch(authSlice.actions.clearError());
           }, 4000);
         } catch (toastError) {
-          console.error(`[Auth] Error setting error message: ${toastError} (${Platform.OS})`);
+          authLogger.error(`Error setting error message: ${toastError} (${Platform.OS})`);
         }
       }
       
       // Navigate to login screen
       try {
         const { router } = await import('expo-router');
-        console.log(`[Auth] Navigating to login screen (${Platform.OS})`);
+        authLogger.info(`Navigating to login screen (${Platform.OS})`);
         // Use setTimeout to ensure navigation happens after the current render cycle
         setTimeout(() => {
           router.replace('/screens/LoginScreen');
         }, 100);
       } catch (navigationError) {
-        console.error(`[Auth] Error navigating to login screen: ${navigationError} (${Platform.OS})`);
+        authLogger.error(`Error navigating to login screen: ${navigationError} (${Platform.OS})`);
       }
       
-      console.log(`[Auth] Logout complete (${Platform.OS})`);
+      authLogger.info(`Logout complete (${Platform.OS})`);
       
       return true;
     } catch (error) {
-      console.error(`[Auth] Error during logout process: ${error} (${Platform.OS})`);
+      authLogger.error(`Error during logout process: ${error} (${Platform.OS})`);
       
       // Even if there's an error, we should still try to reset the state
       try {
         dispatch({ type: RESET_STATE });
       } catch (resetError) {
-        console.error(`[Auth] Failed to reset state during error recovery: ${resetError} (${Platform.OS})`);
+        authLogger.error(`Failed to reset state during error recovery: ${resetError} (${Platform.OS})`);
       }
       
       return true; // Return true anyway to allow navigation to continue
@@ -907,12 +907,12 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
 
   if (isTokenExpiredOrExpiring(tokens.expiresAt)) {
     try {
-      console.log('Token is expired or about to expire, refreshing in checkAndRefreshTokenIfNeeded');
+      authLogger.debug('Token is expired or about to expire, refreshing in checkAndRefreshTokenIfNeeded');
       const { refreshOnce } = require('../../services/refreshOrchestrator');
       await refreshOnce('checkAndRefreshTokenIfNeeded');
-      console.log('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
+      authLogger.info('Token refreshed successfully in checkAndRefreshTokenIfNeeded');
     } catch (error: any) {
-      console.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
+      authLogger.error('Failed to refresh token in checkAndRefreshTokenIfNeeded:', error);
       throw new Error('Authentication expired. Please log in again.');
     }
   }
@@ -928,7 +928,7 @@ export const initializeAuth = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/initialize', async (_, { dispatch, getState, rejectWithValue }) => {
   try {
-    console.log('[DEBUG] 🔄 Starting auth initialization...');
+    authLogger.debug('Starting auth initialization...');
     
     // First check if we need to refresh the token
     await dispatch(checkAndRefreshTokenIfNeeded()).unwrap();
@@ -956,16 +956,16 @@ export const initializeAuth = createAsyncThunk<
         now - stateAfterUser.auth.lastUnitFetchAt > UNIT_FETCH_TTL_MS;
       
       if (!shouldFetchUnit) {
-        console.log('[DEBUG] ✅ Skipping Tanzeemi_Unit fetch (cached)');
+        authLogger.debug('Skipping Tanzeemi_Unit fetch (cached)');
         return true;
       }
       
-      console.log('[DEBUG] 🔍 Fetching Tanzeemi_Unit for user ID:', userId);
+      authLogger.debug('Fetching Tanzeemi_Unit for user ID:', userId);
       
       try {
         const accessToken = stateAfterUser.auth.tokens?.accessToken;
         if (!accessToken) {
-          console.log('[DEBUG] ❌ No access token available for Tanzeemi_Unit fetch');
+          authLogger.warn('No access token available for Tanzeemi_Unit fetch');
           return true; // Continue without Tanzeemi_Unit data
         }
         
@@ -974,35 +974,35 @@ export const initializeAuth = createAsyncThunk<
           'GET'
         );
         
-        console.log('[DEBUG] ✅ Tanzeemi_Unit data:', tanzeemiData);
+        authLogger.debug('Tanzeemi_Unit data:', tanzeemiData);
         
         if (tanzeemiData.data && tanzeemiData.data.length > 0) {
           const tanzeemiUnit = tanzeemiData.data[0];
           const nazimId = tanzeemiUnit.Nazim_id;
           
-          console.log('[DEBUG] 🏪 Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
+          authLogger.debug('Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
           dispatch(setLastUnitFetchAt(Date.now()));
           
           if (nazimId) {
-            console.log('[DEBUG] 🔍 Found Nazim_id:', nazimId);
-            console.log('[DEBUG] 🏪 Dispatching fetchNazimDetails for Nazim_id:', nazimId);
+            authLogger.debug('Found Nazim_id:', nazimId);
+            authLogger.debug('Dispatching fetchNazimDetails for Nazim_id:', nazimId);
             await dispatch(fetchNazimDetails(nazimId));
           }
         } else {
-          console.log('[DEBUG] No Tanzeemi_Unit found for user:', userId);
+          authLogger.warn('No Tanzeemi_Unit found for user:', userId);
         }
       } catch (tanzeemiError: any) {
-        console.log('[DEBUG] Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
+        authLogger.error('Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
         // Continue without Tanzeemi_Unit data
       }
     } else {
-      console.log('[DEBUG] ❌ No user ID available for Tanzeemi_Unit fetch');
+      authLogger.warn('No user ID available for Tanzeemi_Unit fetch');
     }
     
     return true;
   } catch (error: any) {
-    console.log('Auth initialization failed:', error);
+    authLogger.error('Auth initialization failed:', error);
     // Don't reject, just return false to indicate initialization failed
     // This allows the app to continue in an unauthenticated state
     return false;
@@ -1034,7 +1034,7 @@ export const fetchUserMe = createAsyncThunk<
     // console.log('Fetched detailed user data:', userData.data);
     return userData.data as ExtendedUser;
   } catch (error: any) {
-    console.error('Fetch user me error:', error);
+    authLogger.error('Fetch user me error:', error);
     return rejectWithValue(error.message || 'Failed to fetch user data');
   }
 });
@@ -1088,7 +1088,7 @@ export default authSlice.reducer;
 
 // Simple network test function for debugging
 export const testNetworkConnectivity = async () => {
-  console.log('[DEBUG] 🧪 Testing network connectivity...');
+  authLogger.debug('Testing network connectivity...');
   
   const results = {
     timestamp: new Date().toISOString(),
@@ -1104,7 +1104,7 @@ export const testNetworkConnectivity = async () => {
   
   for (const test of tests) {
     try {
-      console.log(`[DEBUG] 🔍 Testing ${test.name}...`);
+      authLogger.debug(`Testing ${test.name}...`);
       const startTime = Date.now();
       const response = await fetch(test.url, { 
         method: 'GET',
@@ -1124,7 +1124,7 @@ export const testNetworkConnectivity = async () => {
       };
       
       results.tests.push(result);
-      console.log(`[DEBUG] ✅ ${test.name} test passed - Status: ${response.status} (${result.responseTime}ms)`);
+      authLogger.info(`${test.name} test passed - Status: ${response.status} (${result.responseTime}ms)`);
     } catch (error: any) {
       const result = {
         name: test.name,
@@ -1136,7 +1136,7 @@ export const testNetworkConnectivity = async () => {
       };
       
       results.tests.push(result);
-      console.error(`[DEBUG] ❌ ${test.name} test failed:`, error.message);
+      authLogger.error(`${test.name} test failed:`, error.message);
     }
   }
   
@@ -1147,18 +1147,18 @@ export const testNetworkConnectivity = async () => {
   const ipSuccess = ipTests.filter(t => t.success).length;
   const dnsSuccess = dnsTests.filter(t => t.success).length;
   
-  console.log(`[DEBUG] 📊 Network Test Summary:`);
-  console.log(`[DEBUG] 📊 IP connectivity: ${ipSuccess}/${ipTests.length} successful`);
-  console.log(`[DEBUG] 📊 DNS resolution: ${dnsSuccess}/${dnsTests.length} successful`);
+  authLogger.info('Network Test Summary:');
+  authLogger.info(`IP connectivity: ${ipSuccess}/${ipTests.length} successful`);
+  authLogger.info(`DNS resolution: ${dnsSuccess}/${dnsTests.length} successful`);
   
   if (ipSuccess > 0 && dnsSuccess === 0) {
-    console.log(`[DEBUG] ⚠️  DNS resolution issue detected - IP connectivity works but DNS fails`);
+    authLogger.warn('DNS resolution issue detected - IP connectivity works but DNS fails');
   } else if (ipSuccess === 0) {
-    console.log(`[DEBUG] ❌ No network connectivity detected`);
+    authLogger.error('No network connectivity detected');
   } else if (dnsSuccess === 0) {
-    console.log(`[DEBUG] ⚠️  DNS resolution issue - try restarting emulator or check DNS settings`);
+    authLogger.warn('DNS resolution issue - try restarting emulator or check DNS settings');
   } else {
-    console.log(`[DEBUG] ✅ Network connectivity appears normal`);
+    authLogger.info('Network connectivity appears normal');
   }
   
   return results;

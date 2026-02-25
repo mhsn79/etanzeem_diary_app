@@ -22,7 +22,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="Arkan"
           options={{
-            tabBarLabel: "ارکان"
+            tabBarLabel: "افراد"
           }}
         />
         <Tabs.Screen

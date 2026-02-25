@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../constants/theme';
+import { getUrduMonth } from '../constants/urduLocalization';
 import UrduText from './UrduText';
 import Dialog from './Dialog';
 import FormInput from './FormInput';
-import CustomButton from './CustomButton';
 import CustomDropdown from './CustomDropdown';
 
 interface ActivityCompletionDialogProps {
@@ -13,6 +14,8 @@ interface ActivityCompletionDialogProps {
   onConfirm: (data: { attendance: string; reportingMonth: string; reportingYear: string }) => void;
   activityDate: string;
   loading?: boolean;
+  presetMonth?: string;
+  presetYear?: string;
 }
 
 const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
@@ -21,11 +24,12 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
   onConfirm,
   activityDate,
   loading = false,
+  presetMonth,
+  presetYear,
 }) => {
   const [attendance, setAttendance] = useState('');
   const [reportingMonth, setReportingMonth] = useState('');
   const [reportingYear, setReportingYear] = useState('');
-  const [showForm, setShowForm] = useState(false);
 
   // Urdu month names
   const urduMonths = [
@@ -51,28 +55,27 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
     { id: String(currentYear), label: String(currentYear), value: String(currentYear) },
   ];
 
-  // Auto-fill reporting month and year from activity date or current date
+  // Auto-fill reporting month and year: preset takes priority, then activity date
   useEffect(() => {
+    if (presetMonth && presetYear) {
+      setReportingMonth(presetMonth);
+      setReportingYear(presetYear);
+      return;
+    }
+
     let date: Date;
-    
     if (activityDate) {
-      // Use activity date if available
       date = new Date(activityDate);
     } else {
-      // Fallback to current date
       date = new Date();
     }
-    
-    const month = date.getMonth() + 1; // getMonth() returns 0-11
+
+    const month = date.getMonth() + 1;
     const year = date.getFullYear();
-    
+
     setReportingMonth(String(month));
     setReportingYear(String(year));
-  }, [activityDate]);
-
-  const handleInitialConfirm = () => {
-    setShowForm(true);
-  };
+  }, [activityDate, presetMonth, presetYear]);
 
   const selectMonth = (option: { id: string; label: string; value: string }) => {
     setReportingMonth(option.value);
@@ -100,26 +103,9 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
   };
 
   const handleClose = () => {
-    setShowForm(false);
     setAttendance('');
     onClose();
   };
-
-  if (!showForm) {
-    return (
-      <Dialog
-        visible={visible}
-        onConfirm={handleInitialConfirm}
-        onClose={handleClose}
-        title="سرگرمی مکمل ہوئی؟"
-        description="کیا یہ سرگرمی مکمل ہو گئی ہے؟ اگر ہاں، تو براہ کرم حاضری اور رپورٹنگ کی تفصیلات درج کریں۔"
-        confirmText="ہاں، مکمل ہوئی"
-        cancelText="نہیں، ابھی نہیں"
-        showWarningIcon={false}
-        showSuccessIcon={false}
-      />
-    );
-  }
 
   return (
     <Dialog
@@ -127,7 +113,7 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
       onConfirm={handleFormSubmit}
       onClose={handleClose}
       title="سرگرمی کی رپورٹ"
-      description="براہ کرم سرگرمی کی تفصیلات درج کریں"
+      description="براہ کرم حاضری اور رپورٹنگ کی تفصیلات درج کریں"
       confirmText="محفوظ کریں"
       cancelText="منسوخ کریں"
       showWarningIcon={false}
@@ -135,6 +121,33 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
       loading={loading}
       customContent={
         <View style={styles.formContainer}>
+          {presetMonth && presetYear ? (
+            <View style={styles.periodInfoBar}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+              <UrduText style={styles.periodInfoText}>
+                رپورٹنگ مدت: {getUrduMonth(parseInt(presetMonth))} {presetYear}
+              </UrduText>
+            </View>
+          ) : (
+            <>
+              <CustomDropdown
+                options={urduMonths}
+                onSelect={selectMonth}
+                dropdownTitle="رپورٹنگ کا مہینہ"
+                placeholder="مہینہ منتخب کریں"
+                selectedValue={reportingMonth}
+                dropdownContainerStyle={styles.dropdownContainer}
+              />
+              <CustomDropdown
+                options={yearOptions}
+                onSelect={selectYear}
+                dropdownTitle="رپورٹنگ کا سال"
+                placeholder="سال منتخب کریں"
+                selectedValue={reportingYear}
+                dropdownContainerStyle={styles.dropdownContainer}
+              />
+            </>
+          )}
           <FormInput
             inputTitle="حاضری کی تعداد"
             value={attendance}
@@ -142,22 +155,6 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
             placeholder="حاضری کی تعداد درج کریں"
             keyboardType="numeric"
             required
-          />
-          <CustomDropdown
-            options={urduMonths}
-            onSelect={selectMonth}
-            dropdownTitle="رپورٹنگ کا مہینہ"
-            placeholder="مہینہ منتخب کریں"
-            selectedValue={reportingMonth}
-            dropdownContainerStyle={styles.dropdownContainer}
-          />
-          <CustomDropdown
-            options={yearOptions}
-            onSelect={selectYear}
-            dropdownTitle="رپورٹنگ کا سال"
-            placeholder="سال منتخب کریں"
-            selectedValue={reportingYear}
-            dropdownContainerStyle={styles.dropdownContainer}
           />
         </View>
       }
@@ -172,6 +169,21 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     marginBottom: SPACING.sm,
   },
+  periodInfoBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightPrimary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.xs,
+  },
+  periodInfoText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.primary,
+    fontFamily: 'JameelNooriNastaleeq',
+  },
 });
 
-export default ActivityCompletionDialog; 
+export default ActivityCompletionDialog;

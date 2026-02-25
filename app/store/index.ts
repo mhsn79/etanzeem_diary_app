@@ -21,8 +21,8 @@ const persistConfig: PersistConfig<RootState> = {
     STORAGE_KEYS.QA,
     STORAGE_KEYS.STRENGTH
   ],
-  // Add version control for migrations
-  version: 1,
+  // Bumped to v2: StrengthRecord schema changed (plus_value/minus_value/previous_total replaces Value/change_type/Reporting_Time)
+  version: 2,
   // Add state reconciler for better state management
   stateReconciler: (inboundState, originalState) => ({
     ...originalState,
@@ -67,6 +67,7 @@ import { AppDispatch } from './types';
 
 // Export store, persistor, and types
 export { store, persistor, AppDispatch };
+export type { RootState } from './types';
 // Default export to prevent Expo Router from treating this as a route
 export default {
   store,

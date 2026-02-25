@@ -7,6 +7,7 @@ import { uploadImage } from '@/app/utils/imageUpload';
 import { Platform } from 'react-native';
 import { TanzeemiUnit } from '@/app/models/TanzeemiUnit';
 import apiRequest, { directApiRequest } from '../../services/apiClient';
+import { reduxLogger } from '../../utils/logger';
 
 interface ContactType {
   id: number;
@@ -29,6 +30,8 @@ interface PersonsExtraState {
   createError: string | null;
   updateStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   updateError: string | null;
+  archiveStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+  archiveError: string | null;
   userDetails: Person | null;
   userDetailsStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
   userDetailsError: string | null;
@@ -64,6 +67,8 @@ const initialState: PersonsState = personsAdapter.getInitialState<PersonsExtraSt
   createError: null,
   updateStatus: 'idle',
   updateError: null,
+  archiveStatus: 'idle',
+  archiveError: null,
   userDetails: null,
   userDetailsStatus: 'idle',
   userDetailsError: null,
@@ -105,49 +110,57 @@ export const fetchPersonsByUnitId = createAsyncThunk<
     // Check if user is authenticated before making API call
     const auth = getState().auth;
     if (!auth.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping fetch persons by unit ID (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping fetch persons by unit ID (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
     if (!unitId) {
-      console.log('No Tanzeemi Unit ID provided');
+      reduxLogger.debug('No Tanzeemi Unit ID provided');
       return [];
     }
 
     // Create a more explicit URLSearchParams object to ensure consistent behavior across platforms
     const params = new URLSearchParams();
     params.append('filter[Tanzeemi_Unit][_eq]', unitId.toString());
+    params.append('filter[status][_neq]', 'archived');
     params.append('sort', 'id');
-    params.append('fields', '*');
-    
-    console.log(`[Persons] Fetching persons by unit ID (${Platform.OS}), Unit ID:`, unitId);
+    // Include nested unit data to avoid N+1 query problem
+    params.append('fields', '*,Tanzeemi_Unit.*');
+
+    reduxLogger.debug(`[Persons] Fetching persons by unit ID (${Platform.OS}), Unit ID:`, unitId);
 
     // Construct the URL with proper encoding
     const url = `/items/Person`;
     const queryString = params.toString();
-    
-    console.log(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
-    
+
+    reduxLogger.debug(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<PersonResponse>(
       `${url}?${queryString}`,
       'GET'
     );
-    
+
     if (!response.data) throw new Error('Failed to fetch persons');
     const transformedData = normalizePersonDataArray(response.data);
 
-    // Fetch unit details for each person
+    // Batch fetch unit details for unique units only (fixes N+1 query problem)
+    const uniqueUnitIds = new Set<number>();
     transformedData.forEach(person => {
       const personUnitId = person.Tanzeemi_Unit || person.unit;
       if (typeof personUnitId === 'number') {
-        dispatch(fetchUserTanzeemiUnit(personUnitId));
+        uniqueUnitIds.add(personUnitId);
       }
+    });
+
+    // Dispatch fetches for unique units only (typically 1-5 units instead of 50+ persons)
+    uniqueUnitIds.forEach(uniqueUnitId => {
+      dispatch(fetchUserTanzeemiUnit(uniqueUnitId));
     });
 
     return transformedData;
   } catch (error: any) {
-    console.error(`[Persons] Fetch persons by unit ID error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Fetch persons by unit ID error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch persons');
   }
 });
@@ -162,51 +175,59 @@ export const fetchPersonsByUnit = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping fetch persons by unit (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping fetch persons by unit (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
     const { tanzeem } = getState();
     const tanzeemiUnitIds = tanzeem?.userUnitHierarchyIds ?? [];
     if (!tanzeemiUnitIds.length) {
-      console.log('No Tanzeemi Unit IDs found');
+      reduxLogger.debug('No Tanzeemi Unit IDs found');
       return [];
     }
 
     // Create a more explicit URLSearchParams object to ensure consistent behavior across platforms
     const params = new URLSearchParams();
     params.append('filter[Tanzeemi_Unit][_in]', tanzeemiUnitIds.join(','));
+    params.append('filter[status][_neq]', 'archived');
     params.append('sort', 'id');
-    params.append('fields', '*');
-    
-    console.log(`[Persons] Fetching persons by unit (${Platform.OS}), Unit IDs:`, tanzeemiUnitIds);
+    // Include nested unit data to avoid N+1 query problem
+    params.append('fields', '*,Tanzeemi_Unit.*');
+
+    reduxLogger.debug(`[Persons] Fetching persons by unit (${Platform.OS}), Unit IDs:`, tanzeemiUnitIds);
 
     // Construct the URL with proper encoding
     const url = `/items/Person`;
     const queryString = params.toString();
-    
-    console.log(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
-    
+
+    reduxLogger.debug(`[Persons] API request URL: ${url}?${queryString} (${Platform.OS})`);
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<PersonResponse>(
       `${url}?${queryString}`,
       'GET'
     );
-    
+
     if (!response.data) throw new Error('Failed to fetch persons');
     const transformedData = normalizePersonDataArray(response.data);
 
-    // Fetch unit details for each person
+    // Batch fetch unit details for unique units only (fixes N+1 query problem)
+    const uniqueUnitIds = new Set<number>();
     transformedData.forEach(person => {
       const unitId = person.Tanzeemi_Unit || person.unit;
       if (typeof unitId === 'number') {
-        dispatch(fetchUserTanzeemiUnit(unitId));
+        uniqueUnitIds.add(unitId);
       }
+    });
+
+    // Dispatch fetches for unique units only (typically 1-5 units instead of 50+ persons)
+    uniqueUnitIds.forEach(uniqueUnitId => {
+      dispatch(fetchUserTanzeemiUnit(uniqueUnitId));
     });
 
     return transformedData;
   } catch (error: any) {
-    console.error(`[Persons] Fetch persons error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Fetch persons error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch persons');
   }
 });
@@ -230,11 +251,11 @@ export const createPerson = createAsyncThunk<
       Phone_Number: personData.phone,
       contact_type: personData.contact_type,
       status: personData.status || 'draft',
-      // Add some default values that might be required
-      Address: '',
-      Father_Name: '',
-      CNIC: '',
-      Date_of_birth: null,
+      Address: personData.address || '',
+      Father_Name: personData.parent || '',
+      additional_phones: personData.whatsApp || '',
+      CNIC: personData.cnic || '',
+      Date_of_birth: personData.dob || null,
       Tanzeemi_Unit: personData.tanzeemi_unit || null,
       Education: null,
       Profession: null,
@@ -247,8 +268,8 @@ export const createPerson = createAsyncThunk<
       }
     });
 
-    console.log(`[Persons][CreatePerson] API payload (${Platform.OS}):`, apiPersonData);
-    console.log(`[Persons][CreatePerson] API request details - URL: /items/Person, Method: POST (${Platform.OS})`);
+    reduxLogger.debug(`[Persons][CreatePerson] API payload (${Platform.OS}):`, apiPersonData);
+    reduxLogger.debug(`[Persons][CreatePerson] API request details - URL: /items/Person, Method: POST (${Platform.OS})`);
 
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SinglePersonResponse>(
@@ -257,11 +278,11 @@ export const createPerson = createAsyncThunk<
       apiPersonData
     );
     
-    console.log(`[Persons][CreatePerson] API response (${Platform.OS}):`, response);
+    reduxLogger.debug(`[Persons][CreatePerson] API response (${Platform.OS}):`, response);
     
     if (!response) {
       const errorMsg = 'Failed to create person - no response';
-      console.error(`[Persons][CreatePerson] Error: ${errorMsg} (${Platform.OS})`);
+      reduxLogger.error(`[Persons][CreatePerson] Error: ${errorMsg} (${Platform.OS})`);
       throw new Error(errorMsg);
     }
 
@@ -269,7 +290,7 @@ export const createPerson = createAsyncThunk<
     if (!response.data || !response.data.id) {
       const errorMsg = 'Failed to create person - response missing data or ID';
       if (response.data) {
-        console.error(`[Persons][CreatePerson] Data structure:`, Object.keys(response.data));
+        reduxLogger.error(`[Persons][CreatePerson] Data structure:`, Object.keys(response.data));
       }
       throw new Error(errorMsg);
     }
@@ -307,6 +328,9 @@ export const updatePerson = createAsyncThunk<
     if (updateData.dob !== undefined) apiPersonData.Date_of_birth = updateData.dob;
     if (updateData.cnic !== undefined) apiPersonData.CNIC = updateData.cnic;
     if (updateData.unit !== undefined) apiPersonData.Tanzeemi_Unit = updateData.unit;
+    if (updateData.whatsApp !== undefined) apiPersonData.additional_phones = updateData.whatsApp;
+    if (updateData.notes !== undefined) apiPersonData.notes = updateData.notes;
+    if (updateData.archived_at !== undefined) apiPersonData.archived_at = updateData.archived_at;
 
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SinglePersonResponse>(
@@ -318,7 +342,7 @@ export const updatePerson = createAsyncThunk<
     if (!response.data) throw new Error(`Failed to update person with ID ${id}`);
     return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error(`[Persons] Update person error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Update person error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to update person with ID ${personData.id}`);
   }
 });
@@ -358,7 +382,7 @@ export const updatePersonImage = createAsyncThunk<
     if (!response.data) throw new Error(`Failed to update person image with ID ${id}`);
     return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error(`[Persons] Update person image error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Update person image error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to update image for person with ID ${id}`);
   }
 });
@@ -379,7 +403,7 @@ export const fetchPersonById = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchById', async (personId, { getState, dispatch, rejectWithValue }) => {
   try {
-    console.log(`[Persons] Fetching person details for ID: ${personId} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Fetching person details for ID: ${personId} (${Platform.OS})`);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SinglePersonResponse>(
@@ -390,7 +414,7 @@ export const fetchPersonById = createAsyncThunk<
     if (!response.data) throw new Error(`Failed to fetch person with ID ${personId}`);
     return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error(`[Persons] Fetch person by ID error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Fetch person by ID error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || `Failed to fetch person with ID ${personId}`);
   }
 });
@@ -404,11 +428,11 @@ export const fetchNazimDetails = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping fetch Nazim details (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping fetch Nazim details (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
-    console.log(`[Persons] Fetching Nazim details... (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Fetching Nazim details... (${Platform.OS})`);
     
     // Extract Nazim_id from the unit object or use the provided ID directly
     let nazimId: number;
@@ -421,7 +445,7 @@ export const fetchNazimDetails = createAsyncThunk<
       }
     }
     
-    console.log(`[Persons] Fetching Nazim details for Nazim_id: ${nazimId} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Fetching Nazim details for Nazim_id: ${nazimId} (${Platform.OS})`);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SinglePersonResponse>(
@@ -434,7 +458,7 @@ export const fetchNazimDetails = createAsyncThunk<
     // Transform the API response to match our expected format
     return normalizePersonData(response.data);
   } catch (error: any) {
-    console.error(`[Persons] Fetch Nazim details error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Fetch Nazim details error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch Nazim details');
   }
 });
@@ -449,11 +473,11 @@ export const fetchContactTypes = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping fetch contact types (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping fetch contact types (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
-    console.log(`[Persons] Fetching contact types... (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Fetching contact types... (${Platform.OS})`);
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ContactType[] }>(
@@ -461,12 +485,12 @@ export const fetchContactTypes = createAsyncThunk<
       'GET'
     );
     
-    console.log(`[Persons] Fetching contact types response (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Fetching contact types response (${Platform.OS})`);
     
     if (!response.data) throw new Error('Failed to fetch contact types');
     return response.data;
   } catch (error: any) {
-    console.error(`[Persons] Fetch contact types error: ${error.message} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Fetch contact types error: ${error.message} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to fetch contact types');
   }
 });
@@ -536,11 +560,11 @@ export const transferRukun = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping transfer rukun (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping transfer rukun (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
-    console.log(`[Persons] Transferring Rukun ID ${transferData.id} to unit ${transferData.contact_id} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Transferring Rukun ID ${transferData.id} to unit ${transferData.contact_id} (${Platform.OS})`);
     
     // First, get the current person data to capture the previous unit
     let previousUnit = null;
@@ -550,9 +574,9 @@ export const transferRukun = createAsyncThunk<
         'GET'
       );
       previousUnit = currentPersonResponse.data?.Tanzeemi_Unit || null;
-      console.log(`[Persons] Previous unit: ${previousUnit} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] Previous unit: ${previousUnit} (${Platform.OS})`);
     } catch (error) {
-      console.warn(`[Persons] Could not fetch current person data: ${error} (${Platform.OS})`);
+      reduxLogger.warn(`[Persons] Could not fetch current person data: ${error} (${Platform.OS})`);
     }
     
     // Step 1: Update the Person record with the new Tanzeemi_Unit
@@ -560,19 +584,19 @@ export const transferRukun = createAsyncThunk<
       Tanzeemi_Unit: transferData.contact_id
     };
     
-    console.log('Updating Person record:', updatePersonPayload);
+    reduxLogger.debug('Updating Person record:', updatePersonPayload);
     
     const updateResponse = await directApiRequest<SinglePersonResponse>(
       `/items/Person/${transferData.id}`,
       'PATCH',
       updatePersonPayload
     );
-    console.log('----->>>>>>',updateResponse);
+    reduxLogger.debug('----->>>>>>',updateResponse);
     
     
     if (!updateResponse.data) throw new Error(`Failed to update person with ID ${transferData.id}`);
     
-    console.log(`[Persons] Person update successful (${Platform.OS}):`, updateResponse.data);
+    reduxLogger.debug(`[Persons] Person update successful (${Platform.OS}):`, updateResponse.data);
     
     // Step 2: Log the transfer in Rukun_Update collection (optional)
     try {
@@ -599,7 +623,7 @@ export const transferRukun = createAsyncThunk<
 
       };
       
-      console.log('Logging transfer:', transferLogPayload);
+      reduxLogger.debug('Logging transfer:', transferLogPayload);
       
       await directApiRequest<any>(
         '/items/Rukn_Update',
@@ -607,16 +631,16 @@ export const transferRukun = createAsyncThunk<
         transferLogPayload
       );
       
-      console.log(`[Persons] Transfer logged successfully (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] Transfer logged successfully (${Platform.OS})`);
     } catch (logError) {
-      console.warn(`[Persons] Failed to log transfer, but person update was successful (${Platform.OS}):`, logError);
+      reduxLogger.warn(`[Persons] Failed to log transfer, but person update was successful (${Platform.OS}):`, logError);
       // Don't throw error here as the main operation (person update) was successful
     }
     
     // Return the normalized updated person data
     return normalizePersonData(updateResponse.data);
   } catch (error: any) {
-    console.error(`[Persons] Transfer rukun error: ${error.message || error} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Transfer rukun error: ${error.message || error} (${Platform.OS})`);
     
     // Handle specific API errors
     if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
@@ -646,11 +670,11 @@ export const checkExistingTransfer = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping check existing transfer (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping check existing transfer (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
-    console.log(`[Persons] Checking existing transfers for contact ID ${contactId} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Checking existing transfers for contact ID ${contactId} (${Platform.OS})`);
     
     // Only check for active transfer requests (pending or draft status)
     const response = await directApiRequest<CheckExistingTransferResponse>(
@@ -662,7 +686,7 @@ export const checkExistingTransfer = createAsyncThunk<
       throw new Error('Failed to check existing transfer requests');
     }
     
-    console.log(`[Persons] Found ${response.data.length} existing transfers for contact ID ${contactId}:`, response.data);
+    reduxLogger.debug(`[Persons] Found ${response.data.length} existing transfers for contact ID ${contactId}:`, response.data);
     
     // If there are no active transfers, return an empty array
     if (response.data.length === 0) {
@@ -671,7 +695,7 @@ export const checkExistingTransfer = createAsyncThunk<
     
     return response.data;
   } catch (error: any) {
-    console.error(`[Persons] Check existing transfer error: ${error.message || error} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Check existing transfer error: ${error.message || error} (${Platform.OS})`);
     return rejectWithValue(error.message || 'Failed to check existing transfer requests');
   }
 });
@@ -686,11 +710,11 @@ export const createRukunTransfer = createAsyncThunk<
     // Check if user is authenticated before making API call
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] User not authenticated, skipping create transfer (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] User not authenticated, skipping create transfer (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
     
-    console.log(`[Persons] Creating transfer request for contact ID ${transferData.contact_id} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Creating transfer request for contact ID ${transferData.contact_id} (${Platform.OS})`);
     
     // Set default status if not provided
     const payload = {
@@ -708,10 +732,10 @@ export const createRukunTransfer = createAsyncThunk<
       throw new Error('Failed to create transfer request');
     }
     
-    console.log(`[Persons] Transfer request created successfully (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] Transfer request created successfully (${Platform.OS})`);
     return response.data;
   } catch (error: any) {
-    console.error(`[Persons] Create transfer error: ${error.message || error} (${Platform.OS})`);
+    reduxLogger.error(`[Persons] Create transfer error: ${error.message || error} (${Platform.OS})`);
     
     // Handle specific API errors
     if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
@@ -756,15 +780,15 @@ export const fetchRukunUpdateRequest = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchRukunUpdateRequest', async (contactId, { getState, rejectWithValue }) => {
   try {
-    console.log(`[Persons] 🚀 Starting fetchRukunUpdateRequest for contact_id: ${contactId} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] 🚀 Starting fetchRukunUpdateRequest for contact_id: ${contactId} (${Platform.OS})`);
     
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] ❌ User not authenticated for contact_id: ${contactId} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] ❌ User not authenticated for contact_id: ${contactId} (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
 
-    console.log(`[Persons] ✅ Authentication verified for contact_id: ${contactId} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] ✅ Authentication verified for contact_id: ${contactId} (${Platform.OS})`);
 
     const params = new URLSearchParams();
     params.append('filter[contact_id][_eq]', contactId.toString());
@@ -772,27 +796,27 @@ export const fetchRukunUpdateRequest = createAsyncThunk<
     params.append('sort', '-date_created'); // Get the latest request
 
     const apiUrl = `/items/Rukn_Update?${params.toString()}`;
-    console.log(`[Persons] 📡 Making API request to: ${apiUrl} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] 📡 Making API request to: ${apiUrl} (${Platform.OS})`);
 
     const response = await directApiRequest<{ data: RukunUpdateRequest[] }>(
       apiUrl,
       'GET'
     );
 
-    console.log(`[Persons] 📥 API Response received for contact_id: ${contactId} (${Platform.OS}):`, {
+    reduxLogger.debug(`[Persons] 📥 API Response received for contact_id: ${contactId} (${Platform.OS}):`, {
       hasData: !!response.data,
       dataLength: response.data?.length || 0,
       responseKeys: Object.keys(response)
     });
 
     if (!response.data || response.data.length === 0) {
-      console.log(`[Persons] 📭 No Rukun Update Request found for contact_id: ${contactId} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 📭 No Rukun Update Request found for contact_id: ${contactId} (${Platform.OS})`);
       return null;
     }
 
     // Return the latest request
     const latestRequest = response.data[0];
-    console.log(`[Persons] ✅ Found Rukun Update Request for contact_id: ${contactId} (${Platform.OS}):`, {
+    reduxLogger.debug(`[Persons] ✅ Found Rukun Update Request for contact_id: ${contactId} (${Platform.OS}):`, {
       id: latestRequest.id,
       status: latestRequest.status,
       contact_id: latestRequest.contact_id,
@@ -803,7 +827,7 @@ export const fetchRukunUpdateRequest = createAsyncThunk<
     
     return latestRequest;
   } catch (error: any) {
-    console.error(`[Persons] ❌ Fetch Rukun Update Request error for contact_id: ${contactId} (${Platform.OS}):`, {
+    reduxLogger.error(`[Persons] ❌ Fetch Rukun Update Request error for contact_id: ${contactId} (${Platform.OS}):`, {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -819,8 +843,8 @@ export const submitRukunUpdateRequest = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/submitRukunUpdateRequest', async (requestData, { getState, rejectWithValue }) => {
   try {
-    console.log(`[Persons] 🚀 Starting submitRukunUpdateRequest for contact_id: ${requestData.contact_id} (${Platform.OS})`);
-    console.log(`[Persons] 📝 Request data:`, {
+    reduxLogger.debug(`[Persons] 🚀 Starting submitRukunUpdateRequest for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] 📝 Request data:`, {
       contact_id: requestData.contact_id,
       status: requestData.status,
       hasId: !!requestData.id,
@@ -831,11 +855,11 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      console.log(`[Persons] ❌ User not authenticated for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] ❌ User not authenticated for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       return rejectWithValue('User not authenticated');
     }
 
-    console.log(`[Persons] ✅ Authentication verified for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] ✅ Authentication verified for contact_id: ${requestData.contact_id} (${Platform.OS})`);
 
     // Prepare payload matching the successful API format
     const apiPayload: any = {
@@ -915,7 +939,7 @@ export const submitRukunUpdateRequest = createAsyncThunk<
       }
     }
 
-    console.log(`[Persons] 📋 Validation summary for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+    reduxLogger.debug(`[Persons] 📋 Validation summary for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
       hasName: !!apiPayload.Name,
       hasPhone: !!apiPayload.Phone_Number,
       hasEmail: !!apiPayload.Email,
@@ -924,8 +948,8 @@ export const submitRukunUpdateRequest = createAsyncThunk<
       fieldCount: Object.keys(apiPayload).length
     });
 
-    console.log(`[Persons] 📋 Prepared API payload for contact_id: ${requestData.contact_id} (${Platform.OS}):`, apiPayload);
-    console.log(`[Persons] 🔍 Payload field types:`, {
+    reduxLogger.debug(`[Persons] 📋 Prepared API payload for contact_id: ${requestData.contact_id} (${Platform.OS}):`, apiPayload);
+    reduxLogger.debug(`[Persons] 🔍 Payload field types:`, {
       contact_id: typeof apiPayload.contact_id,
       status: typeof apiPayload.status,
       Phone_Number: typeof apiPayload.Phone_Number,
@@ -937,7 +961,7 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     let existingRecordId = null;
     
     // Step 1: Check if a Rukun Update record already exists for this contact_id
-    console.log(`[Persons] 🔍 Checking for existing Rukun Update record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+    reduxLogger.debug(`[Persons] 🔍 Checking for existing Rukun Update record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
     
     try {
       const checkUrl = `/items/Rukn_Update`;
@@ -951,7 +975,7 @@ export const submitRukunUpdateRequest = createAsyncThunk<
         'GET'
       );
       
-      console.log(`[Persons] 📋 Existing record check result for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+      reduxLogger.debug(`[Persons] 📋 Existing record check result for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
         found: checkResponse.data && checkResponse.data.length > 0,
         recordCount: checkResponse.data ? checkResponse.data.length : 0,
         firstRecord: checkResponse.data && checkResponse.data.length > 0 ? checkResponse.data[0] : null
@@ -959,12 +983,12 @@ export const submitRukunUpdateRequest = createAsyncThunk<
       
       if (checkResponse.data && checkResponse.data.length > 0) {
         existingRecordId = checkResponse.data[0].id;
-        console.log(`[Persons] ✅ Found existing Rukun Update record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+        reduxLogger.debug(`[Persons] ✅ Found existing Rukun Update record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       } else {
-        console.log(`[Persons] 🆕 No existing Rukun Update record found for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+        reduxLogger.debug(`[Persons] 🆕 No existing Rukun Update record found for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       }
     } catch (checkError) {
-      console.log(`[Persons] ⚠️ Error checking for existing record for contact_id: ${requestData.contact_id} (${Platform.OS}):`, checkError);
+      reduxLogger.debug(`[Persons] ⚠️ Error checking for existing record for contact_id: ${requestData.contact_id} (${Platform.OS}):`, checkError);
       // Continue with creation if check fails
       existingRecordId = null;
     }
@@ -972,10 +996,10 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     // Step 2: Decide whether to UPDATE (PATCH) or CREATE (POST)
     if (existingRecordId) {
       // Update existing record using PATCH
-      console.log(`[Persons] 🔄 Updating existing Rukun Update Request ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🔄 Updating existing Rukun Update Request ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       const updateUrl = `/items/Rukn_Update/${existingRecordId}`;
-      console.log(`[Persons] 📡 PATCH request to: ${updateUrl} (${Platform.OS})`);
-      console.log(`[Persons] 📤 PATCH payload:`, apiPayload);
+      reduxLogger.debug(`[Persons] 📡 PATCH request to: ${updateUrl} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 📤 PATCH payload:`, apiPayload);
       
       response = await directApiRequest<{ data: RukunUpdateRequest }>(
         updateUrl,
@@ -983,13 +1007,13 @@ export const submitRukunUpdateRequest = createAsyncThunk<
         apiPayload
       );
       
-      console.log(`[Persons] ✅ Successfully updated existing record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] ✅ Successfully updated existing record ID: ${existingRecordId} for contact_id: ${requestData.contact_id} (${Platform.OS})`);
     } else {
       // Create new record using POST
-      console.log(`[Persons] 🆕 Creating new Rukun Update Request for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🆕 Creating new Rukun Update Request for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       const createUrl = '/items/Rukn_Update';
-      console.log(`[Persons] 📡 POST request to: ${createUrl} (${Platform.OS})`);
-      console.log(`[Persons] 📤 POST payload:`, apiPayload);
+      reduxLogger.debug(`[Persons] 📡 POST request to: ${createUrl} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 📤 POST payload:`, apiPayload);
       
       response = await directApiRequest<{ data: RukunUpdateRequest }>(
         createUrl,
@@ -997,20 +1021,20 @@ export const submitRukunUpdateRequest = createAsyncThunk<
         apiPayload
       );
       
-      console.log(`[Persons] ✅ Successfully created new record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] ✅ Successfully created new record for contact_id: ${requestData.contact_id} (${Platform.OS})`);
     }
 
-    console.log(`[Persons] 📥 API Response received for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+    reduxLogger.debug(`[Persons] 📥 API Response received for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
       hasData: !!response.data,
       responseKeys: Object.keys(response)
     });
 
     if (!response.data) {
-      console.log(`[Persons] ❌ No response data for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] ❌ No response data for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       throw new Error('Failed to submit Rukun Update Request - no response data');
     }
 
-    console.log(`[Persons] ✅ Rukun Update Request submitted successfully for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+    reduxLogger.debug(`[Persons] ✅ Rukun Update Request submitted successfully for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
       id: response.data.id,
       status: response.data.status,
       contact_id: response.data.contact_id
@@ -1018,7 +1042,7 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     
     return response.data;
   } catch (error: any) {
-    console.error(`[Persons] ❌ Submit Rukun Update Request error for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
+    reduxLogger.error(`[Persons] ❌ Submit Rukun Update Request error for contact_id: ${requestData.contact_id} (${Platform.OS}):`, {
       message: error.message,
       stack: error.stack,
       name: error.name,
@@ -1028,23 +1052,23 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     
     // Handle specific API errors
     if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-      console.log(`[Persons] 🔐 Authentication error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🔐 Authentication error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       return rejectWithValue('Authentication error. Please log in again.');
     }
     if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
-      console.log(`[Persons] 🚫 Permission error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🚫 Permission error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       return rejectWithValue('You do not have permission to submit this request.');
     }
     if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-      console.log(`[Persons] 🔍 Not found error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🔍 Not found error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       return rejectWithValue('Contact not found.');
     }
     if (error.message?.includes('500')) {
-      console.log(`[Persons] 🔥 Server error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
+      reduxLogger.debug(`[Persons] 🔥 Server error for contact_id: ${requestData.contact_id} (${Platform.OS})`);
       return rejectWithValue('Server error. Please try again later.');
     }
     
-    console.log(`[Persons] ⚠️ Generic error for contact_id: ${requestData.contact_id} (${Platform.OS}): ${error.message}`);
+    reduxLogger.debug(`[Persons] ⚠️ Generic error for contact_id: ${requestData.contact_id} (${Platform.OS}): ${error.message}`);
     return rejectWithValue(error.message || 'Failed to submit Rukun Update Request');
   }
 });
@@ -1056,8 +1080,8 @@ export const fetchPersonCount = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/fetchCount', async ({ linkedToId, questionId }, { rejectWithValue, getState }) => {
   try {
-    console.log(`[PERSON_COUNT] 🚀 Starting person count fetch for question ${questionId}`);
-    console.log(`[PERSON_COUNT] 🔗 Using linked_to_id:`, linkedToId);
+    reduxLogger.debug(`[PERSON_COUNT] 🚀 Starting person count fetch for question ${questionId}`);
+    reduxLogger.debug(`[PERSON_COUNT] 🔗 Using linked_to_id:`, linkedToId);
     
     // Get the current user ID from auth state
     const state = getState();
@@ -1067,60 +1091,118 @@ export const fetchPersonCount = createAsyncThunk<
     // Get user's unit hierarchy IDs from tanzeem state
     const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
     
-    console.log(`[PERSON_COUNT] 👤 User ID: ${userId}`);
-    console.log(`[PERSON_COUNT] 🔑 Token available: ${!!userToken}`);
-    console.log(`[PERSON_COUNT] 🏢 User unit hierarchy IDs:`, userUnitHierarchyIds);
+    reduxLogger.debug(`[PERSON_COUNT] 👤 User ID: ${userId}`);
+    reduxLogger.debug(`[PERSON_COUNT] 🔑 Token available: ${!!userToken}`);
+    reduxLogger.debug(`[PERSON_COUNT] 🏢 User unit hierarchy IDs:`, userUnitHierarchyIds);
     
     if (!userId) {
-      console.error(`[PERSON_COUNT] ❌ No user ID found in auth state`);
+      reduxLogger.error(`[PERSON_COUNT] ❌ No user ID found in auth state`);
       return rejectWithValue('User not authenticated. Please log in again.');
     }
 
     if (!linkedToId) {
-      console.warn('[PERSON_COUNT] ⚠️ No linked_to_id provided');
+      reduxLogger.warn('[PERSON_COUNT] ⚠️ No linked_to_id provided');
       return 0;
     }
 
     if (!userUnitHierarchyIds.length) {
-      console.warn('[PERSON_COUNT] ⚠️ No user unit hierarchy IDs found');
+      reduxLogger.warn('[PERSON_COUNT] ⚠️ No user unit hierarchy IDs found');
       return 0;
     }
 
-    // Build the filter with both contact_type and Tanzeemi_Unit conditions
+    // Build the filter with contact_type, Tanzeemi_Unit, and exclude archived
     const contactTypeFilter = `filter[contact_type][_eq]=${linkedToId}`;
     const unitFilter = `filter[Tanzeemi_Unit][_in]=${userUnitHierarchyIds.join(',')}`;
-    const queryString = `/items/Person?${contactTypeFilter}&${unitFilter}`;
+    const statusFilter = `filter[status][_neq]=archived`;
+    const queryString = `/items/Person?${contactTypeFilter}&${unitFilter}&${statusFilter}`;
     
-    console.log(`[PERSON_COUNT] 🔗 Query string: ${queryString}`);
+    reduxLogger.debug(`[PERSON_COUNT] 🔗 Query string: ${queryString}`);
 
     // Use directApiRequest to fetch the persons (with limit=0 to get count)
     const response = await directApiRequest<{ data: any[], meta?: { filter_count?: number } }>(
       queryString,
       'GET'
     );
-    console.log(`[PERSON_COUNT] 📥 Response received:`, response);
+    reduxLogger.debug(`[PERSON_COUNT] 📥 Response received:`, response);
 
     let personCount = 0;
     if (response.meta?.filter_count !== undefined) {
       personCount = response.meta.filter_count;
-      console.log(`[PERSON_COUNT] ✅ Success! Person count from meta: ${personCount}`);
+      reduxLogger.debug(`[PERSON_COUNT] ✅ Success! Person count from meta: ${personCount}`);
     } else if (response.data) {
       personCount = response.data.length;
-      console.log(`[PERSON_COUNT] ✅ Success! Person count from data length: ${personCount}`);
+      reduxLogger.debug(`[PERSON_COUNT] ✅ Success! Person count from data length: ${personCount}`);
     } else {
       throw new Error('No count information in response');
     }
 
-    console.log(`[PERSON_COUNT] 🎯 Final person count result: ${personCount}`);
+    reduxLogger.debug(`[PERSON_COUNT] 🎯 Final person count result: ${personCount}`);
     return personCount;
   } catch (error: any) {
-    console.error('[PERSON_COUNT] 💥 Critical error in fetchPersonCount:', error);
-    console.error('[PERSON_COUNT] 📋 Error details:', {
+    reduxLogger.error('[PERSON_COUNT] 💥 Critical error in fetchPersonCount:', error);
+    reduxLogger.error('[PERSON_COUNT] 📋 Error details:', {
       message: error.message,
       stack: error.stack,
       name: error.name
     });
     return rejectWithValue(error.message || 'Failed to fetch person count');
+  }
+});
+
+// Check if phone number already exists
+export const checkPhoneExists = createAsyncThunk<
+  boolean,
+  { phone: string; excludeId?: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/checkPhoneExists', async ({ phone, excludeId }, { getState, rejectWithValue }) => {
+  try {
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      return rejectWithValue('User not authenticated');
+    }
+
+    let queryString = `/items/Person?filter[Phone_Number][_eq]=${encodeURIComponent(phone)}&filter[status][_neq]=archived&fields=id&limit=1`;
+    if (excludeId) {
+      queryString += `&filter[id][_neq]=${excludeId}`;
+    }
+
+    const response = await directApiRequest<PersonResponse>(queryString, 'GET');
+    return !!(response.data && response.data.length > 0);
+  } catch (error: any) {
+    reduxLogger.error(`[Persons] Check phone exists error: ${error.message} (${Platform.OS})`);
+    return rejectWithValue(error.message || 'Failed to check phone number');
+  }
+});
+
+// Archive (soft-delete) a person
+export const archivePerson = createAsyncThunk<
+  Person,
+  { id: number; reason: string },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/archive', async ({ id, reason }, { getState, rejectWithValue }) => {
+  try {
+    const authState = getState().auth;
+    if (!authState.tokens?.accessToken) {
+      return rejectWithValue('User not authenticated');
+    }
+
+    const apiPayload = {
+      status: 'archived',
+      archived_at: new Date().toISOString(),
+      notes: reason,
+    };
+
+    const response = await directApiRequest<SinglePersonResponse>(
+      `/items/Person/${id}`,
+      'PATCH',
+      apiPayload
+    );
+
+    if (!response.data) throw new Error(`Failed to archive person with ID ${id}`);
+    return normalizePersonData(response.data);
+  } catch (error: any) {
+    reduxLogger.error(`[Persons] Archive person error: ${error.message} (${Platform.OS})`);
+    return rejectWithValue(error.message || 'Failed to archive person');
   }
 });
 
@@ -1160,6 +1242,10 @@ const personsSlice = createSlice({
       state.createTransferError = null;
       // Also clear existing transfers to start with a fresh state
       state.existingTransfers = [];
+    },
+    resetArchiveStatus(state) {
+      state.archiveStatus = 'idle';
+      state.archiveError = null;
     },
     resetRukunUpdateStatus(state) {
       state.rukunUpdateStatus = 'idle';
@@ -1321,13 +1407,13 @@ const personsSlice = createSlice({
         state.checkTransferStatus = 'succeeded';
         
         // Ensure we're setting a valid array and log for debugging
-        console.log('[PersonsSlice] Saving existing transfers:', action.payload);
+        reduxLogger.debug('[PersonsSlice] Saving existing transfers:', action.payload);
         
         // Only set existingTransfers if we got a valid array
         if (Array.isArray(action.payload)) {
           state.existingTransfers = action.payload;
         } else {
-          console.warn('[PersonsSlice] Invalid existingTransfers data:', action.payload);
+          reduxLogger.warn('[PersonsSlice] Invalid existingTransfers data:', action.payload);
           state.existingTransfers = [];
         }
       })
@@ -1351,12 +1437,12 @@ const personsSlice = createSlice({
       })
       // Fetch Rukun Update Request
       .addCase(fetchRukunUpdateRequest.pending, (state, action) => {
-        console.log(`[PersonsSlice] 🔄 fetchRukunUpdateRequest.pending for contact_id: ${action.meta.arg}`);
+        reduxLogger.debug(`[PersonsSlice] 🔄 fetchRukunUpdateRequest.pending for contact_id: ${action.meta.arg}`);
         state.rukunUpdateStatus = 'loading';
         state.rukunUpdateError = null;
       })
       .addCase(fetchRukunUpdateRequest.fulfilled, (state, action) => {
-        console.log(`[PersonsSlice] ✅ fetchRukunUpdateRequest.fulfilled for contact_id: ${action.meta.arg}`, {
+        reduxLogger.debug(`[PersonsSlice] ✅ fetchRukunUpdateRequest.fulfilled for contact_id: ${action.meta.arg}`, {
           hasPayload: !!action.payload,
           payloadStatus: action.payload?.status,
           payloadId: action.payload?.id
@@ -1364,13 +1450,13 @@ const personsSlice = createSlice({
         state.rukunUpdateStatus = 'succeeded';
         if (action.payload && action.meta.arg) {
           state.rukunUpdateRequests[action.meta.arg] = action.payload;
-          console.log(`[PersonsSlice] 💾 Stored Rukun Update Request in state for contact_id: ${action.meta.arg}`);
+          reduxLogger.debug(`[PersonsSlice] 💾 Stored Rukun Update Request in state for contact_id: ${action.meta.arg}`);
         } else {
-          console.log(`[PersonsSlice] 📭 No Rukun Update Request to store for contact_id: ${action.meta.arg}`);
+          reduxLogger.debug(`[PersonsSlice] 📭 No Rukun Update Request to store for contact_id: ${action.meta.arg}`);
         }
       })
       .addCase(fetchRukunUpdateRequest.rejected, (state, action) => {
-        console.log(`[PersonsSlice] ❌ fetchRukunUpdateRequest.rejected for contact_id: ${action.meta.arg}`, {
+        reduxLogger.debug(`[PersonsSlice] ❌ fetchRukunUpdateRequest.rejected for contact_id: ${action.meta.arg}`, {
           error: action.payload,
           errorMessage: action.error?.message
         });
@@ -1379,12 +1465,12 @@ const personsSlice = createSlice({
       })
       // Submit Rukun Update Request
       .addCase(submitRukunUpdateRequest.pending, (state, action) => {
-        console.log(`[PersonsSlice] 🔄 submitRukunUpdateRequest.pending for contact_id: ${action.meta.arg.contact_id}`);
+        reduxLogger.debug(`[PersonsSlice] 🔄 submitRukunUpdateRequest.pending for contact_id: ${action.meta.arg.contact_id}`);
         state.rukunUpdateStatus = 'loading';
         state.rukunUpdateError = null;
       })
       .addCase(submitRukunUpdateRequest.fulfilled, (state, action) => {
-        console.log(`[PersonsSlice] ✅ submitRukunUpdateRequest.fulfilled for contact_id: ${action.payload.contact_id}`, {
+        reduxLogger.debug(`[PersonsSlice] ✅ submitRukunUpdateRequest.fulfilled for contact_id: ${action.payload.contact_id}`, {
           requestId: action.payload.id,
           status: action.payload.status,
           hasName: !!action.payload.Name
@@ -1392,11 +1478,11 @@ const personsSlice = createSlice({
         state.rukunUpdateStatus = 'succeeded';
         if (action.payload && action.payload.contact_id) {
           state.rukunUpdateRequests[action.payload.contact_id] = action.payload;
-          console.log(`[PersonsSlice] 💾 Updated Rukun Update Request in state for contact_id: ${action.payload.contact_id}`);
+          reduxLogger.debug(`[PersonsSlice] 💾 Updated Rukun Update Request in state for contact_id: ${action.payload.contact_id}`);
         }
       })
       .addCase(submitRukunUpdateRequest.rejected, (state, action) => {
-        console.log(`[PersonsSlice] ❌ submitRukunUpdateRequest.rejected for contact_id: ${action.meta.arg.contact_id}`, {
+        reduxLogger.debug(`[PersonsSlice] ❌ submitRukunUpdateRequest.rejected for contact_id: ${action.meta.arg.contact_id}`, {
           error: action.payload,
           errorMessage: action.error?.message
         });
@@ -1415,14 +1501,28 @@ const personsSlice = createSlice({
       .addCase(fetchPersonCount.rejected, (state, action) => {
         state.personCountStatus = 'failed';
         state.personCountError = action.payload ?? 'Failed to fetch person count';
+      })
+      // Archive person
+      .addCase(archivePerson.pending, state => {
+        state.archiveStatus = 'loading';
+        state.archiveError = null;
+      })
+      .addCase(archivePerson.fulfilled, (state, action: PayloadAction<Person>) => {
+        state.archiveStatus = 'succeeded';
+        personsAdapter.removeOne(state, action.payload.id);
+      })
+      .addCase(archivePerson.rejected, (state, action) => {
+        state.archiveStatus = 'failed';
+        state.archiveError = action.payload ?? 'Failed to archive person';
       });
   },
 });
 
-export const { 
-  clearPersons, 
-  resetCreateStatus, 
+export const {
+  clearPersons,
+  resetCreateStatus,
   resetUpdateStatus,
+  resetArchiveStatus,
   resetTransferStatus,
   resetRukunUpdateStatus,
   setUserDetails,
@@ -1435,7 +1535,7 @@ const selectPersonsState = (state: RootState): PersonsState => {
   try {
     return (state as any).persons ?? (initialState as PersonsState);
   } catch (error) {
-    console.error('Error selecting persons state:', error);
+    reduxLogger.error('Error selecting persons state:', error);
     return initialState as PersonsState;
   }
 };
@@ -1484,7 +1584,7 @@ export const selectRukunUpdateStatus = (state: RootState) => {
   try {
     return selectPersonsState(state).rukunUpdateStatus;
   } catch (error) {
-    console.error('Error selecting rukun update status:', error);
+    reduxLogger.error('Error selecting rukun update status:', error);
     return 'idle';
   }
 };
@@ -1493,7 +1593,7 @@ export const selectRukunUpdateError = (state: RootState) => {
   try {
     return selectPersonsState(state).rukunUpdateError;
   } catch (error) {
-    console.error('Error selecting rukun update error:', error);
+    reduxLogger.error('Error selecting rukun update error:', error);
     return null;
   }
 };
@@ -1502,18 +1602,18 @@ export const selectRukunUpdateRequests = (state: RootState) => {
   try {
     return selectPersonsState(state).rukunUpdateRequests;
   } catch (error) {
-    console.error('Error selecting rukun update requests:', error);
+    reduxLogger.error('Error selecting rukun update requests:', error);
     return {};
   }
 };
 
 export const selectRukunUpdateRequestByContactId = (state: RootState, contactId: number) => {
   try {
-    console.log(`[PersonsSlice] 🔍 selectRukunUpdateRequestByContactId called for contact_id: ${contactId}`);
+    reduxLogger.debug(`[PersonsSlice] 🔍 selectRukunUpdateRequestByContactId called for contact_id: ${contactId}`);
     const requests = selectPersonsState(state).rukunUpdateRequests;
     const request = requests ? requests[contactId] : null;
     
-    console.log(`[PersonsSlice] 📋 Rukun Update Request selector result for contact_id: ${contactId}:`, {
+    reduxLogger.debug(`[PersonsSlice] 📋 Rukun Update Request selector result for contact_id: ${contactId}:`, {
       found: !!request,
       status: request?.status,
       requestId: request?.id,
@@ -1523,7 +1623,7 @@ export const selectRukunUpdateRequestByContactId = (state: RootState, contactId:
     
     return request;
   } catch (error) {
-    console.error(`[PersonsSlice] ❌ Error selecting rukun update request by contact ID ${contactId}:`, error);
+    reduxLogger.error(`[PersonsSlice] ❌ Error selecting rukun update request by contact ID ${contactId}:`, error);
     return null;
   }
 };
@@ -1532,5 +1632,9 @@ export const selectRukunUpdateRequestByContactId = (state: RootState, contactId:
 export const selectPersonCountStatus = (state: RootState) => selectPersonsState(state).personCountStatus;
 export const selectPersonCountError = (state: RootState) => selectPersonsState(state).personCountError;
 export const selectPersonCount = (state: RootState) => selectPersonsState(state).personCount;
+
+// Archive selectors
+export const selectArchiveStatus = (state: RootState) => selectPersonsState(state).archiveStatus;
+export const selectArchiveError = (state: RootState) => selectPersonsState(state).archiveError;
 
 export default personsSlice.reducer;

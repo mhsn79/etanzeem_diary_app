@@ -25,7 +25,7 @@ import {
   selectReportsError,
   selectReportsLoading,
   fetchReportSubmissions,
-} from '@/app/features/reports/reportsSlice_new';
+} from '@/app/features/reports/reportsSlice';
 import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store/types';
 import { formatExpectedCompletion, getUrduMonth } from '@/app/constants/urduLocalization';
@@ -549,8 +549,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // Step 3: Check if we need to initialize QA data
       // Get current template and management from the updated state
       const currentState = (dispatch as any).getState?.() || {};
-      const currentReportMgmtDetails = currentState.reportsNew?.reports || [];
-      const currentSubmissions = currentState.reportsNew?.reportSubmissions || [];
+      const currentReportMgmtDetails = currentState.reports?.reports || [];
+      const currentSubmissions = currentState.reports?.reportSubmissions || [];
       
       // Find the current template and management
       const currentTemplate = currentReportMgmtDetails.find((report: any) => 

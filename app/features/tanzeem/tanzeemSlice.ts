@@ -3,6 +3,7 @@ import { RootState, AppDispatch } from '../../store/types';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { TanzeemiUnit, TanzeemiUnitResponse, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
 import { normalizeTanzeemiUnitData, normalizeTanzeemiUnitDataArray } from '@/app/utils/apiNormalizer';
+import { reduxLogger } from '../../utils/logger';
 
 // Define the TanzeemLevel interface
 export interface TanzeemLevel {
@@ -113,7 +114,7 @@ export const fetchTanzeemiUnits = createAsyncThunk<
     
     return transformedData;
   } catch (error: any) {
-    console.error('Fetch tanzeemi units error:', error);
+    reduxLogger.error('Fetch tanzeemi units error:', error);
     return rejectWithValue(error.message || 'Failed to fetch tanzeemi units');
   }
 });
@@ -148,7 +149,7 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
     
     return transformedUnit;
   } catch (error: any) {
-    console.error('Fetch tanzeemi unit error:', error);
+    reduxLogger.error('Fetch tanzeemi unit error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi unit with ID ${unitId}`);
   }
 });
@@ -177,7 +178,7 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
     const transformedUnits = normalizeTanzeemiUnitDataArray(response.data);
     return { units: transformedUnits, levelId };
   } catch (error: any) {
-    console.error('Fetch tanzeemi units by level error:', error);
+    reduxLogger.error('Fetch tanzeemi units by level error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi units with level ID ${levelId}`);
   }
 });
@@ -212,7 +213,7 @@ export const fetchUnitHierarchy = createAsyncThunk<
     
     return unitsByLevel;
   } catch (error: any) {
-    console.error('Fetch unit hierarchy error:', error);
+    reduxLogger.error('Fetch unit hierarchy error:', error);
     return rejectWithValue(error.message || 'Failed to fetch unit hierarchy');
   }
 });
@@ -261,91 +262,96 @@ const fetchAndProcessHierarchy = async (
     
     // If the unit has a Nazim_id, fetch the Nazim details
     if (unit.Nazim_id) {
-      // console.log(`Unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
+      // reduxLogger.debug(`Unit ${unitId} has Nazim_id: ${unit.Nazim_id}, fetching Nazim details...`);
       // dispatch(fetchNazimDetails(unit.Nazim_id));
     }
     
-    // Fetch parent unit if it exists
+    // Collect all IDs to fetch in batch (parent + zaili hierarchy)
+    const idsToFetch: number[] = [];
     const parentId = unit.parent_id || unit.Parent_id;
+
     if (parentId && typeof parentId === 'number' && !processedIds.has(parentId)) {
+      idsToFetch.push(parentId);
+    }
+
+    // Add zaili_unit_hierarchy IDs if they exist
+    if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
+      const hierarchyIds = unit.zaili_unit_hierarchy as number[];
+      idsToFetch.push(...hierarchyIds.filter(id => typeof id === 'number' && !processedIds.has(id)));
+      allHierarchyIds.push(...hierarchyIds);
+    }
+
+    // Batch fetch all units in a single API call (fixes cascading waterfall)
+    if (idsToFetch.length > 0) {
       try {
-        const parentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
-          `/items/Tanzeemi_Unit/${parentId}?fields=*`,
+        const batchResponse = await directApiRequest<{ data: any[] }>(
+          `/items/Tanzeemi_Unit?filter[id][_in]=${idsToFetch.join(',')}&fields=*`,
           'GET'
         );
-        
-        if (parentResponse.data) {
-          const parentUnit = normalizeTanzeemiUnitData(parentResponse.data);
-          allUnits.push(parentUnit);
-          allHierarchyIds.push(parentId);
-          
-          // If the parent unit has a level_id, fetch the level details
-          if (parentUnit.Level_id || parentUnit.level_id) {
-            const parentLevelId = parentUnit.Level_id || parentUnit.level_id;
-            if (typeof parentLevelId === 'number') {
-              dispatch(fetchTanzeemLevelById(parentLevelId));
+
+        if (batchResponse.data && batchResponse.data.length > 0) {
+          const batchedUnits = batchResponse.data.map(normalizeTanzeemiUnitData);
+          allUnits.push(...batchedUnits);
+
+          // Mark all fetched IDs as processed
+          batchedUnits.forEach(u => processedIds.add(u.id));
+
+          // Collect unique level IDs for batch dispatch
+          const levelIds = new Set<number>();
+          batchedUnits.forEach(u => {
+            const levelId = u.Level_id || u.level_id;
+            if (typeof levelId === 'number') {
+              levelIds.add(levelId);
             }
-          }
-          
-          // Recursively fetch grandparent unit if it exists
-          const grandparentId = parentUnit.parent_id || parentUnit.Parent_id;
-          if (grandparentId && typeof grandparentId === 'number' && !processedIds.has(grandparentId)) {
-            try {
-              const grandparentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
-                `/items/Tanzeemi_Unit/${grandparentId}?fields=*`,
-                'GET'
-              );
-              
-              if (grandparentResponse.data) {
-                const grandparentUnit = normalizeTanzeemiUnitData(grandparentResponse.data);
-                allUnits.push(grandparentUnit);
-                allHierarchyIds.push(grandparentId);
-                
-                // If the grandparent unit has a level_id, fetch the level details
-                if (grandparentUnit.Level_id || grandparentUnit.level_id) {
+          });
+
+          // Dispatch level fetches for unique level IDs only
+          levelIds.forEach(levelId => {
+            dispatch(fetchTanzeemLevelById(levelId));
+          });
+
+          // Find parent unit and check for grandparent
+          const parentUnit = batchedUnits.find(u => u.id === parentId);
+          if (parentUnit) {
+            allHierarchyIds.push(parentId as number);
+
+            // Fetch grandparent if needed (most hierarchies are 2-3 levels)
+            const grandparentId = parentUnit.parent_id || parentUnit.Parent_id;
+            if (grandparentId && typeof grandparentId === 'number' && !processedIds.has(grandparentId)) {
+              try {
+                const grandparentResponse = await directApiRequest<SingleTanzeemiUnitResponse>(
+                  `/items/Tanzeemi_Unit/${grandparentId}?fields=*`,
+                  'GET'
+                );
+
+                if (grandparentResponse.data) {
+                  const grandparentUnit = normalizeTanzeemiUnitData(grandparentResponse.data);
+                  allUnits.push(grandparentUnit);
+                  allHierarchyIds.push(grandparentId);
+                  processedIds.add(grandparentId);
+
+                  // Add grandparent level ID
                   const grandparentLevelId = grandparentUnit.Level_id || grandparentUnit.level_id;
                   if (typeof grandparentLevelId === 'number') {
                     dispatch(fetchTanzeemLevelById(grandparentLevelId));
                   }
                 }
+              } catch (grandparentError) {
+                reduxLogger.error(`Error fetching grandparent unit ${grandparentId}:`, grandparentError);
               }
-            } catch (grandparentError) {
-              console.error(`Error fetching grandparent unit ${grandparentId}:`, grandparentError);
             }
           }
         }
-      } catch (parentError) {
-        console.error(`Error fetching parent unit ${parentId}:`, parentError);
+      } catch (batchError) {
+        reduxLogger.error(`Error batch fetching units:`, batchError);
       }
     }
-    
-    // Process zaili_unit_hierarchy if it exists and is an array
-    if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
-      // Add all hierarchy IDs to our tracking array
-      const hierarchyIds = unit.zaili_unit_hierarchy as number[];
-      allHierarchyIds.push(...hierarchyIds);
-      
-      // Recursively fetch each unit in the hierarchy
-      for (const childId of hierarchyIds) {
-        if (typeof childId === 'number' && !processedIds.has(childId)) {
-          const result = await fetchAndProcessHierarchy(
-            childId, 
-            dispatch, 
-            getState, 
-            processedIds,
-            allHierarchyIds,
-            allUnits
-          );
-          
-          // Merge any new IDs found in nested hierarchies
-          allHierarchyIds.push(...result.allIds.filter(id => !allHierarchyIds.includes(id)));
-        }
-      }
-    }
+
+    // zaili_unit_hierarchy is now processed in the batch fetch above
     
     return { unit, allIds: allHierarchyIds, hierarchyUnits: allUnits };
   } catch (error) {
-    console.error(`Error fetching unit ${unitId} in hierarchy:`, error);
+    reduxLogger.error(`Error fetching unit ${unitId} in hierarchy:`, error);
     return { unit: null, allIds: allHierarchyIds, hierarchyUnits: allUnits };
   }
 };
@@ -372,7 +378,7 @@ export const fetchTanzeemLevelById = createAsyncThunk<
     
     return response.data;
   } catch (error: any) {
-    console.error('Fetch tanzeem level error:', error);
+    reduxLogger.error('Fetch tanzeem level error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeem level with ID ${levelId}`);
   }
 });
@@ -399,7 +405,7 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
     
     return response.data;
   } catch (error: any) {
-    console.error('Fetch all tanzeem levels error:', error);
+    reduxLogger.error('Fetch all tanzeem levels error:', error);
     return rejectWithValue(error.message || 'Failed to fetch tanzeem levels');
   }
 });
@@ -449,7 +455,7 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
     
     return { unit, hierarchyIds: uniqueHierarchyIds, hierarchyUnits };
   } catch (error: any) {
-    console.error('Fetch user tanzeemi unit error:', error);
+    reduxLogger.error('Fetch user tanzeemi unit error:', error);
     return rejectWithValue(error.message || `Failed to fetch tanzeemi unit with ID ${unitId}`);
   }
 });
@@ -514,7 +520,7 @@ const tanzeemSlice = createSlice({
         state.dashboardSelectedUnitId = selectedUnitId;
       } else {
         // Invalid selection (parent or sibling), reset to user unit
-        console.warn('Invalid unit selection (parent/sibling), resetting to user unit');
+        reduxLogger.warn('Invalid unit selection (parent/sibling), resetting to user unit');
         state.dashboardSelectedUnitId = userUnitId;
       }
     }
@@ -528,7 +534,7 @@ const tanzeemSlice = createSlice({
       })
       .addCase(fetchTanzeemiUnits.fulfilled, (state, action: PayloadAction<TanzeemiUnit[]>) => {
         state.status = 'succeeded';
-        // console.log('Setting tanzeemi units:', action.payload);
+        // reduxLogger.debug('Setting tanzeemi units:', action.payload);
         tanzeemAdapter.setAll(state, action.payload);
       })
       .addCase(fetchTanzeemiUnits.rejected, (state, action) => {
