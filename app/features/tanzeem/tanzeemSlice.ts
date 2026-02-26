@@ -55,8 +55,10 @@ interface TanzeemExtraState {
   userTanzeemiLevelError: string | null;
   // Store levels by their ID to support multiple levels
   levelsById: Record<number, TanzeemLevel>;
-  // Dashboard selected unit (can only be userUnit or its children)
+  // Dashboard selected unit (can be any accessible unit)
   dashboardSelectedUnitId: number | null;
+  // All units where user_id = current user (multi-unit support)
+  userAssignedUnits: TanzeemiUnit[];
 }
 
 export type TanzeemState = ReturnType<typeof tanzeemAdapter.getInitialState<TanzeemExtraState>>;
@@ -79,6 +81,7 @@ const initialState: TanzeemState = tanzeemAdapter.getInitialState<TanzeemExtraSt
   userTanzeemiLevelError: null,
   levelsById: {},
   dashboardSelectedUnitId: null,
+  userAssignedUnits: [],
 });
 
 /**
@@ -462,6 +465,147 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────
+ * Thunk to fetch hierarchies for ALL assigned units at once (multi-unit support)
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+export const fetchAllAssignedUnitHierarchies = createAsyncThunk<
+  { primaryUnit: TanzeemiUnit | null; allHierarchyIds: number[]; allUnits: TanzeemiUnit[] },
+  number[],
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('tanzeem/fetchAllAssignedHierarchies', async (unitIds, { dispatch, rejectWithValue }) => {
+  try {
+    if (!unitIds || unitIds.length === 0) {
+      return { primaryUnit: null, allHierarchyIds: [], allUnits: [] };
+    }
+
+    const allCollectedIds = new Set<number>();
+    const allCollectedUnits: TanzeemiUnit[] = [];
+    const processedIds = new Set<number>();
+    let primaryUnit: TanzeemiUnit | null = null;
+
+    // 1. Fetch all assigned units in one batch
+    const assignedResponse = await directApiRequest<{ data: any[] }>(
+      `/items/Tanzeemi_Unit?filter[id][_in]=${unitIds.join(',')}&filter[status][_neq]=archived&fields=*`,
+      'GET'
+    );
+
+    if (!assignedResponse.data || assignedResponse.data.length === 0) {
+      return { primaryUnit: null, allHierarchyIds: [], allUnits: [] };
+    }
+
+    const assignedUnits = assignedResponse.data.map(normalizeTanzeemiUnitData);
+    primaryUnit = assignedUnits[0];
+
+    assignedUnits.forEach(u => {
+      allCollectedIds.add(u.id);
+      allCollectedUnits.push(u);
+      processedIds.add(u.id);
+    });
+
+    // 2. Collect all child IDs from zaili_unit_hierarchy of each assigned unit
+    const childIdsToFetch: number[] = [];
+    assignedUnits.forEach(unit => {
+      if (unit.zaili_unit_hierarchy && Array.isArray(unit.zaili_unit_hierarchy)) {
+        (unit.zaili_unit_hierarchy as number[]).forEach(childId => {
+          if (typeof childId === 'number' && !processedIds.has(childId)) {
+            childIdsToFetch.push(childId);
+            allCollectedIds.add(childId);
+          }
+        });
+      }
+    });
+
+    // 3. Also collect parent IDs for display context
+    const parentIdsToFetch: number[] = [];
+    assignedUnits.forEach(unit => {
+      const parentId = unit.parent_id || unit.Parent_id;
+      if (parentId && typeof parentId === 'number' && !processedIds.has(parentId)) {
+        parentIdsToFetch.push(parentId);
+      }
+    });
+
+    // 4. Batch fetch all children + parents in one call
+    const allIdsToFetch = [...new Set([...childIdsToFetch, ...parentIdsToFetch])];
+    if (allIdsToFetch.length > 0) {
+      try {
+        const batchResponse = await directApiRequest<{ data: any[] }>(
+          `/items/Tanzeemi_Unit?filter[id][_in]=${allIdsToFetch.join(',')}&filter[status][_neq]=archived&fields=*`,
+          'GET'
+        );
+
+        if (batchResponse.data && batchResponse.data.length > 0) {
+          const batchedUnits = batchResponse.data.map(normalizeTanzeemiUnitData);
+          batchedUnits.forEach(u => {
+            if (!processedIds.has(u.id)) {
+              allCollectedUnits.push(u);
+              processedIds.add(u.id);
+            }
+          });
+
+          // Fetch grandparents if any parent has a parent
+          const grandparentIds: number[] = [];
+          batchedUnits.forEach(u => {
+            // Only check parent units (not children)
+            if (parentIdsToFetch.includes(u.id)) {
+              const gpId = u.parent_id || u.Parent_id;
+              if (gpId && typeof gpId === 'number' && !processedIds.has(gpId)) {
+                grandparentIds.push(gpId);
+              }
+            }
+          });
+
+          if (grandparentIds.length > 0) {
+            try {
+              const gpResponse = await directApiRequest<{ data: any[] }>(
+                `/items/Tanzeemi_Unit?filter[id][_in]=${grandparentIds.join(',')}&filter[status][_neq]=archived&fields=*`,
+                'GET'
+              );
+              if (gpResponse.data) {
+                gpResponse.data.map(normalizeTanzeemiUnitData).forEach(u => {
+                  if (!processedIds.has(u.id)) {
+                    allCollectedUnits.push(u);
+                    allCollectedIds.add(u.id);
+                    processedIds.add(u.id);
+                  }
+                });
+              }
+            } catch (gpError) {
+              reduxLogger.error('Error fetching grandparent units:', gpError);
+            }
+          }
+        }
+      } catch (batchError) {
+        reduxLogger.error('Error batch fetching hierarchy units:', batchError);
+      }
+    }
+
+    // 5. Dispatch level fetches for all unique level IDs
+    const levelIds = new Set<number>();
+    allCollectedUnits.forEach(u => {
+      const levelId = u.Level_id || u.level_id;
+      if (typeof levelId === 'number') {
+        levelIds.add(levelId);
+      }
+    });
+    levelIds.forEach(levelId => {
+      dispatch(fetchTanzeemLevelById(levelId));
+    });
+
+    // 6. Add all units to the store
+    if (allCollectedUnits.length > 0) {
+      dispatch(addMultipleTanzeemiUnits(allCollectedUnits));
+    }
+
+    const allHierarchyIds = Array.from(allCollectedIds);
+    return { primaryUnit, allHierarchyIds, allUnits: allCollectedUnits };
+  } catch (error: any) {
+    reduxLogger.error('Fetch all assigned unit hierarchies error:', error);
+    return rejectWithValue(error.message || 'Failed to fetch unit hierarchies');
+  }
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────────
  * Slice
  * ────────────────────────────────────────────────────────────────────────────────
  */
@@ -488,6 +632,7 @@ const tanzeemSlice = createSlice({
       state.userTanzeemiLevelError = null;
       state.levelsById = {};
       state.dashboardSelectedUnitId = null;
+      state.userAssignedUnits = [];
       // Clear module-level selector caches
       parentUnitWithLevelSelectors.clear();
     },
@@ -507,38 +652,35 @@ const tanzeemSlice = createSlice({
     setUserUnitDetails(state, action: PayloadAction<TanzeemiUnit | null>) {
       state.userUnitDetails = action.payload;
     },
+    setUserAssignedUnits(state, action: PayloadAction<TanzeemiUnit[]>) {
+      state.userAssignedUnits = action.payload;
+      // Also upsert all into entity adapter so they're available via selectTanzeemiUnitById
+      tanzeemAdapter.upsertMany(state, action.payload);
+    },
     setDashboardSelectedUnit(state, action: PayloadAction<number | null>) {
       const selectedUnitId = action.payload;
-      
+
       // If no selection, reset to user unit
       if (!selectedUnitId) {
         state.dashboardSelectedUnitId = state.userUnitDetails?.id || null;
         return;
       }
-      
-      // Validate that selected unit is either user unit or its child
-      const userUnitId = state.userUnitDetails?.id;
-      if (!userUnitId) {
-        state.dashboardSelectedUnitId = null;
-        return;
+
+      // Build set of all accessible unit IDs (assigned units + hierarchy)
+      const accessibleIds = new Set<number>();
+      state.userAssignedUnits.forEach(u => accessibleIds.add(u.id));
+      state.userUnitHierarchyIds.forEach(id => accessibleIds.add(id));
+      // Also include the primary user unit
+      if (state.userUnitDetails?.id) {
+        accessibleIds.add(state.userUnitDetails.id);
       }
-      
-      // Check if selected unit is the user unit itself (allowed)
-      if (selectedUnitId === userUnitId) {
-        state.dashboardSelectedUnitId = selectedUnitId;
-        return;
-      }
-      
-      // Check if selected unit is a child of user unit (allowed)
-      const allUnits = tanzeemAdapter.getSelectors().selectAll(state);
-      const selectedUnit = allUnits.find(unit => unit.id === selectedUnitId);
-      
-      if (selectedUnit && selectedUnit.Parent_id === userUnitId) {
+
+      if (accessibleIds.has(selectedUnitId)) {
         state.dashboardSelectedUnitId = selectedUnitId;
       } else {
-        // Invalid selection (parent or sibling), reset to user unit
-        reduxLogger.warn('Invalid unit selection (parent/sibling), resetting to user unit');
-        state.dashboardSelectedUnitId = userUnitId;
+        // Fallback to primary unit
+        reduxLogger.warn('Invalid unit selection, resetting to user unit');
+        state.dashboardSelectedUnitId = state.userUnitDetails?.id || null;
       }
     }
   },
@@ -638,6 +780,23 @@ const tanzeemSlice = createSlice({
         state.userUnitHierarchyIds = [];
       })
       
+      // Fetch all assigned unit hierarchies (multi-unit)
+      .addCase(fetchAllAssignedUnitHierarchies.pending, state => {
+        state.userUnitStatus = 'loading';
+        state.userUnitError = null;
+      })
+      .addCase(fetchAllAssignedUnitHierarchies.fulfilled, (state, action) => {
+        state.userUnitStatus = 'succeeded';
+        state.userUnitHierarchyIds = action.payload.allHierarchyIds;
+        if (action.payload.primaryUnit) {
+          state.userUnitDetails = action.payload.primaryUnit;
+        }
+      })
+      .addCase(fetchAllAssignedUnitHierarchies.rejected, (state, action) => {
+        state.userUnitStatus = 'failed';
+        state.userUnitError = action.payload ?? 'Failed to fetch unit hierarchies';
+      })
+
       // Fetch tanzeem level by ID
       .addCase(fetchTanzeemLevelById.pending, (state) => {
         state.userTanzeemiLevelStatus = 'loading';
@@ -664,6 +823,7 @@ export const {
   addTanzeemiUnit,
   addMultipleTanzeemiUnits,
   setUserUnitDetails,
+  setUserAssignedUnits,
   setDashboardSelectedUnit,
 } = tanzeemSlice.actions;
 
@@ -712,6 +872,20 @@ export const selectDashboardSelectedUnit = createSelector(
   [selectDashboardSelectedUnitId, state => state],
   (unitId, state) => {
     return unitId ? selectTanzeemiUnitById(state, unitId) : null;
+  }
+);
+
+// Multi-unit selectors
+export const selectUserAssignedUnits = (state: RootState) => selectTanzeemState(state).userAssignedUnits;
+
+// All accessible unit IDs (assigned units + their children from hierarchy)
+export const selectAllAccessibleUnitIds = createSelector(
+  [selectUserAssignedUnits, selectUserUnitHierarchyIds],
+  (assignedUnits, hierarchyIds) => {
+    const ids = new Set<number>();
+    assignedUnits.forEach(u => ids.add(u.id));
+    hierarchyIds.forEach(id => ids.add(id));
+    return Array.from(ids);
   }
 );
 

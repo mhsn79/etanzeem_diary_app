@@ -325,6 +325,17 @@ export const selectSubmissionsByMgmtId = createSelector(
     reportSubmissions.filter((submission) => submission.mgmt_id === mgmtId)
 );
 
+// Count of draft/pending submissions for a given unit
+export const selectPendingSubmissionCountByUnitId = createSelector(
+  [selectReportSubmissions, (_state: RootState, unitId: number | undefined) => unitId],
+  (reportSubmissions, unitId) => {
+    if (!unitId) return 0;
+    return reportSubmissions.filter(
+      (s) => s.unit_id === unitId && (s.status === 'draft' || s.status === 'pending')
+    ).length;
+  }
+);
+
 // Exports
 export const { clearReports, clearSubmissions } = reportsSlice.actions;
 export default reportsSlice.reducer;

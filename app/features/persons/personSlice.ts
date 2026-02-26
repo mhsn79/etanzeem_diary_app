@@ -124,6 +124,7 @@ export const fetchPersonsByUnitId = createAsyncThunk<
     params.append('filter[Tanzeemi_Unit][_eq]', unitId.toString());
     params.append('filter[status][_neq]', 'archived');
     params.append('sort', 'id');
+    params.append('limit', '500');
     // Include nested unit data to avoid N+1 query problem
     params.append('fields', '*,Tanzeemi_Unit.*');
 
@@ -165,6 +166,58 @@ export const fetchPersonsByUnitId = createAsyncThunk<
   }
 });
 
+// Fetch persons from multiple units at once (for multi-unit collective view)
+export const fetchPersonsByMultipleUnits = createAsyncThunk<
+  Person[],
+  number[],
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('persons/fetchByMultipleUnits', async (unitIds, { getState, dispatch, rejectWithValue }) => {
+  try {
+    const auth = getState().auth;
+    if (!auth.tokens?.accessToken) {
+      return rejectWithValue('User not authenticated');
+    }
+
+    if (!unitIds || unitIds.length === 0) {
+      return [];
+    }
+
+    const params = new URLSearchParams();
+    params.append('filter[Tanzeemi_Unit][_in]', unitIds.join(','));
+    params.append('filter[status][_neq]', 'archived');
+    params.append('sort', 'id');
+    params.append('limit', '500');
+    params.append('fields', '*,Tanzeemi_Unit.*');
+
+    reduxLogger.debug(`[Persons] Fetching persons for ${unitIds.length} units (${Platform.OS})`);
+
+    const response = await directApiRequest<PersonResponse>(
+      `/items/Person?${params.toString()}`,
+      'GET'
+    );
+
+    if (!response.data) throw new Error('Failed to fetch persons');
+    const transformedData = normalizePersonDataArray(response.data);
+
+    // Batch fetch unit details for unique units
+    const uniqueUnitIds = new Set<number>();
+    transformedData.forEach(person => {
+      const personUnitId = person.Tanzeemi_Unit || person.unit;
+      if (typeof personUnitId === 'number') {
+        uniqueUnitIds.add(personUnitId);
+      }
+    });
+    uniqueUnitIds.forEach(id => {
+      dispatch(fetchUserTanzeemiUnit(id));
+    });
+
+    return transformedData;
+  } catch (error: any) {
+    reduxLogger.error(`[Persons] Fetch persons by multiple units error: ${error.message} (${Platform.OS})`);
+    return rejectWithValue(error.message || 'Failed to fetch persons');
+  }
+});
+
 // Fetch persons by Tanzeemi Unit IDs (for backward compatibility)
 export const fetchPersonsByUnit = createAsyncThunk<
   Person[],
@@ -191,6 +244,7 @@ export const fetchPersonsByUnit = createAsyncThunk<
     params.append('filter[Tanzeemi_Unit][_in]', tanzeemiUnitIds.join(','));
     params.append('filter[status][_neq]', 'archived');
     params.append('sort', 'id');
+    params.append('limit', '500');
     // Include nested unit data to avoid N+1 query problem
     params.append('fields', '*,Tanzeemi_Unit.*');
 
@@ -1286,6 +1340,19 @@ const personsSlice = createSlice({
         personsAdapter.setAll(state, action.payload);
       })
       .addCase(fetchPersonsByUnitId.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload ?? 'Failed to fetch persons';
+      })
+      // Fetch persons by multiple units (collective view)
+      .addCase(fetchPersonsByMultipleUnits.pending, state => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(fetchPersonsByMultipleUnits.fulfilled, (state, action: PayloadAction<Person[]>) => {
+        state.status = 'succeeded';
+        personsAdapter.setAll(state, action.payload);
+      })
+      .addCase(fetchPersonsByMultipleUnits.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload ?? 'Failed to fetch persons';
       })

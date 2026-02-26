@@ -39,11 +39,12 @@ interface ProfileHeaderProps {
   showCamera?: boolean;
   showEditIcon?: boolean;
   avatarSize?: number;
+  headerHeight?: number;
   personId?: number;
   isUploading?: boolean;
 }
 
-const HEADER_HEIGHT = 260;
+const DEFAULT_HEADER_HEIGHT = 260;
 const AVATAR_SIZE = 120;
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -57,6 +58,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   showSettings = true,
   showCamera = false,
   showEditIcon,
+  headerHeight: HEADER_HEIGHT = DEFAULT_HEADER_HEIGHT,
   personId,
   isUploading = false,
 }) => {

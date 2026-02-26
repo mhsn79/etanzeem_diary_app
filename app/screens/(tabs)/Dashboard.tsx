@@ -24,12 +24,15 @@ import {
   selectUserUnitDetails,
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
+  selectUserAssignedUnits,
   setDashboardSelectedUnit,
+  fetchAllAssignedUnitHierarchies,
+  fetchUserTanzeemiUnit,
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectParentUnitWithLevel } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectUserDetails } from '@/app/features/persons/personSlice';
-import { fetchUserTanzeemiUnit } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectUserDetails, selectNazimDetails, fetchNazimDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store/types';
+import { selectPendingSubmissionCountByUnitId, fetchReportSubmissions } from '@/app/features/reports/reportsSlice';
 import UnitSelectionModal from './components/UnitSelectionModal';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 
@@ -71,7 +74,24 @@ const Dashboard = () => {
   const displayUnitId = selectedUnitId || userUnit?.id;
   const parentUnitWithLevel = useSelector(selectParentUnitWithLevel(displayUnitId || -1));
   const userDetails = useSelector(selectUserDetails);
+  const nazimDetails = useSelector(selectNazimDetails);
   const dispatch = useDispatch<AppDispatch>();
+  const pendingReportCount = useSelector((state: any) => selectPendingSubmissionCountByUnitId(state, displayUnitId));
+
+  // Fetch report submissions so badge stays up-to-date
+  useEffect(() => {
+    dispatch(fetchReportSubmissions());
+  }, [dispatch, displayUnitId]);
+
+  // Fetch Nazim details when selected unit changes
+  useEffect(() => {
+    if (displayUnit?.Nazim_id) {
+      dispatch(fetchNazimDetails(displayUnit.Nazim_id));
+    }
+  }, [dispatch, displayUnit?.Nazim_id]);
+
+  // Show Nazim name from the selected unit's Nazim, fallback to logged-in user
+  const displayNazimName = nazimDetails?.Name || userDetails?.Name || '';
 
   const displayUnitWithLevel = useSelector((state: any) => {
     if (!displayUnit) return '';
@@ -88,15 +108,21 @@ const Dashboard = () => {
   });
 
   const [showUnitSelectionModal, setShowUnitSelectionModal] = React.useState(false);
+  const userAssignedUnits = useSelector(selectUserAssignedUnits);
 
+  // Fetch hierarchies for all assigned units (multi-unit support)
   useEffect(() => {
-    if (userDetails && (userDetails.Tanzeemi_Unit || userDetails.unit)) {
+    const assignedIds = userAssignedUnits.map(u => u.id);
+    if (assignedIds.length > 0) {
+      dispatch(fetchAllAssignedUnitHierarchies(assignedIds));
+    } else if (userDetails && (userDetails.Tanzeemi_Unit || userDetails.unit)) {
+      // Fallback for legacy/single-unit case (assigned units not yet loaded)
       const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
       if (typeof unitId === 'number') {
         dispatch(fetchUserTanzeemiUnit(unitId));
       }
     }
-  }, [userDetails?.id, userDetails?.Tanzeemi_Unit, userDetails?.unit]);
+  }, [dispatch, userAssignedUnits, userDetails]);
 
   useEffect(() => {
     if (userUnit && !selectedUnitId) {
@@ -127,7 +153,7 @@ const Dashboard = () => {
             </View>
             <TouchableOpacity style={styles.headerRow} onPress={() => router.push('/screens/ProfileView')} activeOpacity={0.8}>
               <UserIcon style={styles.headerIcon} />
-              <UrduText style={styles.headerText} numberOfLines={1}>{'ناظم: ' + (userDetails?.Name || '')}</UrduText>
+              <UrduText style={styles.headerText} numberOfLines={1}>{'ناظم: ' + displayNazimName}</UrduText>
             </TouchableOpacity>
           </View>
 
@@ -144,6 +170,13 @@ const Dashboard = () => {
                   activeOpacity={0.85}
                 >
                   <UrduText style={styles.dashboardButtonText}>{i18n.t('reports')}</UrduText>
+                  {pendingReportCount > 0 && (
+                    <View style={styles.pendingBadge}>
+                      <UrduText style={styles.pendingBadgeText}>
+                        {pendingReportCount} جمع کرنا باقی ہے
+                      </UrduText>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -274,6 +307,19 @@ const getStyles = (
       fontSize: 30,
       includeFontPadding: false,
       textAlign: 'center',
+    },
+    pendingBadge: {
+      position: 'absolute',
+      bottom: 12,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      paddingHorizontal: 12,
+      paddingVertical: 3,
+      borderRadius: 12,
+    },
+    pendingBadgeText: {
+      color: COLORS.white,
+      fontSize: 14,
+      includeFontPadding: false,
     },
   });
 };

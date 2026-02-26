@@ -1,23 +1,19 @@
 import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
-import { View, TouchableOpacity, Modal, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, Modal, StyleSheet, Text, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { AntDesign } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
 import UrduText from '@/app/components/UrduText';
 import Spacer from '@/app/components/Spacer';
 import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
-import DropdownSection from './DropdownSection';
-import { Option } from './types';
 import {
   selectUserUnitDetails,
   selectAllTanzeemiUnits,
-  selectTanzeemiUnitById,
   selectLevelsById,
+  selectUserAssignedUnits,
+  selectDashboardSelectedUnitId,
   setDashboardSelectedUnit,
 } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectUserDetails } from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store';
-import { logout } from '@/app/features/auth/authSlice';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
 
 interface UnitSelectionModalProps {
@@ -27,139 +23,132 @@ interface UnitSelectionModalProps {
   colorScheme?: string | null | undefined;
 }
 
+interface UnitGroup {
+  unit: any;
+  children: any[];
+}
+
 const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitSelectionModalProps) => {
   const styles = getStyles(colorScheme);
   const dispatch = useDispatch<AppDispatch>();
-  
-  // Get current user unit and all units
+
   const userUnit = useSelector(selectUserUnitDetails);
   const allUnits = useSelector(selectAllTanzeemiUnits);
   const levelsById = useAppSelector(selectLevelsById);
-  const userDetails = useSelector(selectUserDetails);
+  const userAssignedUnits = useSelector(selectUserAssignedUnits);
+  const currentSelectedUnitId = useSelector(selectDashboardSelectedUnitId);
 
-  // State for selected unit
-  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
-  const [selectableOptions, setSelectableOptions] = useState<Option[]>([]);
+  // Local selection state (tracks which unit is tapped before confirm)
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
 
-  // Get parent unit of current user unit
-  const parentUnit = useMemo(() => {
-    if (!userUnit?.Parent_id) return null;
-    return allUnits.find(unit => unit.id === userUnit.Parent_id);
-  }, [userUnit, allUnits]);
+  // Sync local selection with Redux when modal opens
+  useEffect(() => {
+    if (visible) {
+      setSelectedUnitId(currentSelectedUnitId || userUnit?.id || null);
+    }
+  }, [visible, currentSelectedUnitId, userUnit?.id]);
 
-  // Get grandparent unit of current user unit
-  const grandparentUnit = useMemo(() => {
-    if (!parentUnit?.Parent_id) return null;
-    return allUnits.find(unit => unit.id === parentUnit.Parent_id);
-  }, [parentUnit, allUnits]);
-
-  // Get children units of current user unit
-  const childrenUnits = useMemo(() => {
-    if (!userUnit) return [];
-    return allUnits.filter(unit => unit.Parent_id === userUnit.id);
-  }, [userUnit, allUnits]);
-
-  // Check if user unit is a leaf (has no children)
-  const isUserUnitLeaf = useMemo(() => {
-    return childrenUnits.length === 0;
-  }, [childrenUnits]);
-
-  // Helper function to format unit name with description
-  const formatUnitName = (unit: any) => {
+  // Helper: format unit name with description
+  const formatUnitName = useCallback((unit: any) => {
     const name = unit.Name || unit.name || '';
     const description = unit.Description || unit.description || '';
-    
-    // If description exists and is different from name, append it
     if (description && description !== name) {
       return `${name} (${description})`;
     }
-    
     return name;
-  };
+  }, []);
 
-  // Format unit display with level name
+  // Helper: format unit display with level name
   const formatUnitDisplay = useCallback((unit: any) => {
     if (!unit) return '';
-    
     const levelId = unit.Level_id;
     let levelName = '';
-    
     if (levelId && typeof levelId === 'number' && levelsById[levelId]) {
       levelName = levelsById[levelId].Name || '';
     }
-    
     return levelName ? `${levelName}: ${formatUnitName(unit)}` : formatUnitName(unit) || '';
-  }, [levelsById]);
+  }, [levelsById, formatUnitName]);
 
-  // Set up selectable options when user unit changes
-  useEffect(() => {
-    if (userUnit) {
-      const options = [];
-      
-      // Add user unit as first option (user can select their own unit)
-      options.push({
-        id: `user-${userUnit.id}`,
-        label: formatUnitDisplay(userUnit),
-        value: userUnit.id.toString(),
-      });
-      
-      // Add children units (user can select any of their children)
-      if (childrenUnits.length > 0) {
-        childrenUnits.forEach(unit => {
-          options.push({
-            id: `child-${unit.id}`,
-            label: formatUnitDisplay(unit),
-            value: unit.id.toString(),
-          });
-        });
-      }
-      
-      setSelectableOptions(options);
-      
-      // Set user unit as default selection if no current selection
-      if (!selectedUnit && options.length > 0) {
-        setSelectedUnit(options[0].value);
-      }
-    } else {
-      setSelectableOptions([]);
-      setSelectedUnit(null);
-    }
-  }, [userUnit, childrenUnits, formatUnitDisplay, selectedUnit]);
+  // Build grouped list: assigned units with their children
+  const groupedUnits = useMemo((): UnitGroup[] => {
+    // Use assigned units if available, otherwise fall back to user unit
+    const assignedUnits = userAssignedUnits.length > 0
+      ? userAssignedUnits
+      : (userUnit ? [userUnit] : []);
 
-  // Handle unit selection
-  const handleUnitSelection = useCallback((option: Option) => {
-    setSelectedUnit(option.value);
-  }, []);
+    if (assignedUnits.length === 0) return [];
 
-  // Handle confirmation
+    return assignedUnits.map(assignedUnit => ({
+      unit: assignedUnit,
+      children: allUnits.filter(u => u.Parent_id === assignedUnit.id),
+    }));
+  }, [userAssignedUnits, userUnit, allUnits]);
+
+  // Total accessible units count
+  const totalAccessibleUnits = useMemo(() => {
+    return groupedUnits.reduce((sum, g) => sum + 1 + g.children.length, 0);
+  }, [groupedUnits]);
+
+  // Check if there's only one unit with no children (leaf-only user)
+  const isLeafOnly = totalAccessibleUnits === 1 && groupedUnits.length === 1 && groupedUnits[0].children.length === 0;
+
+  // Get parent unit of primary assigned unit (for context display)
+  const parentUnit = useMemo(() => {
+    if (groupedUnits.length === 0) return null;
+    const primaryUnit = groupedUnits[0].unit;
+    if (!primaryUnit?.Parent_id) return null;
+    return allUnits.find(unit => unit.id === primaryUnit.Parent_id) || null;
+  }, [groupedUnits, allUnits]);
+
   const handleConfirm = useCallback(() => {
-    if (selectedUnit) {
-      // Update the dashboard selected unit
-      dispatch(setDashboardSelectedUnit(parseInt(selectedUnit)));
-      console.log('Selected unit:', selectedUnit);
-    } else {
-      // If no unit selected, reset to user unit
-      dispatch(setDashboardSelectedUnit(userUnit?.id || null));
+    if (selectedUnitId) {
+      dispatch(setDashboardSelectedUnit(selectedUnitId));
     }
     onClose();
-  }, [selectedUnit, userUnit?.id, dispatch, onClose]);
+  }, [selectedUnitId, dispatch, onClose]);
 
-  // Render fixed unit display (for parent, current, or grandparent)
-  const renderFixedUnit = useCallback((unit: any, label: string) => {
-    if (!unit) return null;
-    
+  // Render a single unit row with radio button
+  const renderUnitRow = useCallback((unit: any, isChild: boolean) => {
+    const isSelected = selectedUnitId === unit.id;
+    const isDark = colorScheme === 'dark';
+
     return (
-      <View style={styles.fixedUnitContainer}>
-        <Text style={styles.fixedUnitLabel}>{label}</Text>
-        <Text style={styles.fixedUnitText}>{formatUnitDisplay(unit)}</Text>
-      </View>
+      <TouchableOpacity
+        key={unit.id}
+        style={[
+          styles.unitRow,
+          isChild && styles.unitRowChild,
+          isSelected && styles.unitRowSelected,
+        ]}
+        onPress={() => setSelectedUnitId(unit.id)}
+        activeOpacity={0.7}
+      >
+        <MaterialCommunityIcons
+          name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+          size={22}
+          color={isSelected ? (isDark ? '#FFB30F' : COLORS.primary) : (isDark ? '#888' : '#999')}
+        />
+        <View style={styles.unitRowTextContainer}>
+          <Text
+            style={[
+              styles.unitRowText,
+              isSelected && styles.unitRowTextSelected,
+              isChild && styles.unitRowTextChild,
+            ]}
+            numberOfLines={2}
+          >
+            {formatUnitDisplay(unit)}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
-  }, [formatUnitDisplay, styles]);
+  }, [selectedUnitId, colorScheme, styles, formatUnitDisplay]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
+          {/* Header */}
           <View style={styles.modalHeader}>
             <UrduText style={styles.modalTitle}>یونٹ منتخب کریں</UrduText>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -168,46 +157,62 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
           </View>
 
           <View style={styles.modalBody}>
-            {isUserUnitLeaf ? (
-              // Scenario 2: User unit is leaf - show grandparent, parent, current (all fixed)
+            {/* Parent context (read-only) */}
+            {parentUnit && (
+              <View style={styles.fixedUnitContainer}>
+                <Text style={styles.fixedUnitLabel}>بالائی یونٹ</Text>
+                <Text style={styles.fixedUnitText}>{formatUnitDisplay(parentUnit)}</Text>
+              </View>
+            )}
+
+            {isLeafOnly ? (
+              // Leaf-only: show read-only current unit
               <>
-                {renderFixedUnit(grandparentUnit, "بالائی یونٹ")}
-                {renderFixedUnit(parentUnit, "بالائی یونٹ")}
-                {renderFixedUnit(userUnit, "موجودہ یونٹ")}
-                
+                <View style={styles.fixedUnitContainer}>
+                  <Text style={styles.fixedUnitLabel}>موجودہ یونٹ</Text>
+                  <Text style={styles.fixedUnitText}>{formatUnitDisplay(groupedUnits[0]?.unit)}</Text>
+                </View>
                 <View style={styles.infoContainer}>
                   <UrduText style={styles.infoText}>
-                   کوئی ذیلی یونٹ رجسٹرڈ نہیں ہے۔
+                    کوئی ذیلی یونٹ رجسٹرڈ نہیں ہے۔
                   </UrduText>
                 </View>
               </>
             ) : (
-              // Scenario 1: User unit has children - show parent (fixed), current (selectable), children (selectable)
+              // Scrollable radio list of all accessible units
               <>
-                {renderFixedUnit(parentUnit, "بالائی یونٹ")}
-                
-                <DropdownSection
-                  options={selectableOptions}
-                  selectedValue={selectedUnit}
-                  onSelect={handleUnitSelection}
-                  placeholder="یونٹ منتخب کریں"
-                  disabled={selectableOptions.length === 0}
-                  colorScheme={colorScheme}
-                />
-                
+                <ScrollView
+                  style={styles.unitListScroll}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
+                  {groupedUnits.map((group, groupIndex) => (
+                    <View key={group.unit.id}>
+                      {/* Divider between groups (not before first) */}
+                      {groupIndex > 0 && <View style={styles.groupDivider} />}
+
+                      {/* Assigned unit (parent-level row) */}
+                      {renderUnitRow(group.unit, false)}
+
+                      {/* Children (indented rows) */}
+                      {group.children.map(child => renderUnitRow(child, true))}
+                    </View>
+                  ))}
+                </ScrollView>
+
                 <View style={styles.infoContainer}>
                   <UrduText style={styles.infoText}>
-                    آپ اپنی یونٹ یا اس کی نیچے کی یونٹس میں سے کوئی ایک منتخب کر سکتے ہیں
+                    آپ کی {groupedUnits.reduce((s, g) => s + 1 + g.children.length, 0)} یونٹس تک رسائی ہے
                   </UrduText>
                 </View>
               </>
             )}
 
-            <Spacer height={20} />
+            <Spacer height={16} />
 
             <TouchableOpacity
-              style={[styles.confirmButtonStyle, (isUserUnitLeaf || selectableOptions.length === 0) && styles.disabledButton]}
-              disabled={isUserUnitLeaf || selectableOptions.length === 0}
+              style={[styles.confirmButtonStyle, isLeafOnly && styles.disabledButton]}
+              disabled={isLeafOnly}
               onPress={handleConfirm}
             >
               <UrduText style={styles.confirmTextStyle}>تصدیق کریں</UrduText>
@@ -284,6 +289,46 @@ const getStyles = (colorScheme: string | null | undefined) => {
       fontSize: 16,
       fontWeight: '500',
       fontFamily: TYPOGRAPHY.fontFamily.regular,
+    },
+    unitListScroll: {
+      maxHeight: 280,
+      marginBottom: 10,
+    },
+    unitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      marginBottom: 4,
+      gap: 10,
+    },
+    unitRowChild: {
+      paddingLeft: 36,
+    },
+    unitRowSelected: {
+      backgroundColor: isDark ? '#2A3040' : '#EBF3FF',
+    },
+    unitRowTextContainer: {
+      flex: 1,
+    },
+    unitRowText: {
+      color: isDark ? COLORS.white : COLORS.black,
+      fontSize: 16,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
+    },
+    unitRowTextSelected: {
+      color: isDark ? '#FFB30F' : COLORS.primary,
+      fontFamily: TYPOGRAPHY.fontFamily.bold,
+    },
+    unitRowTextChild: {
+      fontSize: 15,
+    },
+    groupDivider: {
+      height: 1,
+      backgroundColor: isDark ? '#373842' : '#EBEBEB',
+      marginVertical: 8,
+      marginHorizontal: 12,
     },
     infoContainer: {
       backgroundColor: isDark ? '#2A2A2A' : '#F0F8FF',

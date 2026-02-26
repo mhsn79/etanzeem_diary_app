@@ -388,23 +388,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
 
 
-  // Only show موجودہ رپورٹ for current user's unit (not when a child unit is selected)
-  const isCurrentUserUnit = displayUnitId === userUnitDetails?.id;
+  // Show موجودہ رپورٹ for any selected unit that has a submission
   const shouldShowCurrentReport = useMemo(() => {
     const shouldShow = Boolean(
       existingSubmission &&
-      displayUnitId &&
-      isCurrentUserUnit
+      displayUnitId
     );
     console.log('[ReportsView] shouldShowCurrentReport check:', {
       existingSubmission: existingSubmission?.id,
       displayUnitId,
-      userUnitId: userUnitDetails?.id,
-      isCurrentUserUnit,
       shouldShow
     });
     return shouldShow;
-  }, [existingSubmission?.id, displayUnitId, isCurrentUserUnit, userUnitDetails?.id]);
+  }, [existingSubmission?.id, displayUnitId]);
 
   // Memoized filtered submissions - exclude active submission from the list
   const filteredSubmissions = useMemo(() => {

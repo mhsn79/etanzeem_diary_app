@@ -59,7 +59,8 @@ import {
   selectCurrentMonth,
   StrengthRecord,
 } from '@/app/features/strength/strengthSlice';
-import { AppDispatch, RootState } from '@/app/store/types';
+import { AppDispatch } from '@/app/store/types';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { getUrduMonth } from '../constants/urduLocalization';
 
 // Theme and constants
@@ -474,19 +475,21 @@ export default function Workforce() {
     }
   }, [dispatch, status, contactTypesStatus]);
   
-  // Get the user's unit details from the tanzeem slice
-  const userUnitDetails = useSelector((state: RootState) => state.tanzeem.userUnitDetails);
-  
+  // Get the selected unit from dashboard (or fall back to user's own unit)
+  const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
+  const userUnitDetails = useSelector(selectUserUnitDetails);
+  const displayUnitId = selectedUnitId || userUnitDetails?.id;
+
   // Fetch strength data
   useEffect(() => {
-    // Set the user's unit ID in the strength slice if available
-    if (userUnitDetails?.id) {
-      dispatch(setUserUnitId(userUnitDetails.id));
+    // Set the display unit ID in the strength slice
+    if (displayUnitId) {
+      dispatch(setUserUnitId(displayUnitId));
     }
-    
+
     // Refresh strength data (this will fetch types and records)
     dispatch(refreshStrengthData());
-  }, [dispatch, userUnitDetails?.id]);
+  }, [dispatch, displayUnitId]);
 
   // Pre-select month/year from navigation params (e.g., from report auto-question)
   useEffect(() => {

@@ -36,7 +36,7 @@ import {
   editActivity,
 } from '@/app/features/activities/activitySlice';
 import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
-import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById, selectDashboardSelectedUnitId } from '@/app/features/tanzeem/tanzeemSlice';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
@@ -111,17 +111,11 @@ export default function Activities() {
 
   // Tanzeem selectors for location conversion and filtering
   const userUnitDetails = useAppSelector(selectUserUnitDetails);
+  const selectedUnitId = useAppSelector(selectDashboardSelectedUnitId);
+  const displayUnitId = selectedUnitId || userUnitDetails?.id;
   const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
   const levelsById = useAppSelector(selectLevelsById);
 
-  // Memoize child units to prevent infinite re-renders
-  const childUnits = useMemo(() => {
-    if (!userUnitDetails?.id) return [];
-    return allTanzeemiUnits.filter(unit => {
-      const parentId = unit.parent_id || unit.Parent_id;
-      return parentId === userUnitDetails.id;
-    });
-  }, [userUnitDetails?.id, allTanzeemiUnits]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -248,13 +242,12 @@ export default function Activities() {
     return d;
   }, []);
 
-  // Memoize allowed unit IDs
+  // Allowed unit IDs — only the selected unit (not its children)
   const allowedUnitIds = useMemo(() => {
     const ids = new Set<number>();
-    if (userUnitDetails?.id) ids.add(userUnitDetails.id);
-    if (childUnits) childUnits.forEach(unit => ids.add(unit.id));
+    if (displayUnitId) ids.add(displayUnitId);
     return ids;
-  }, [userUnitDetails?.id, childUnits]);
+  }, [displayUnitId]);
 
   // Filter activities by unit
   const filteredByUnit = useMemo(() => {

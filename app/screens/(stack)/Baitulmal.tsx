@@ -36,6 +36,7 @@ import {
   deleteBaitulmalRecord,
 } from '@/app/features/baitulmal/baitulmalSlice';
 import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 interface ScreenWrapperProps {
@@ -82,6 +83,21 @@ export default function Baitulmal() {
   const status = useAppSelector(selectBaitulmalStatus);
   const error = useAppSelector(selectBaitulmalError);
   const currentUser = useAppSelector(selectCurrentUser);
+
+  // Unit filtering: show records for selected unit + its children
+  const selectedUnitId = useAppSelector(selectDashboardSelectedUnitId);
+  const userUnitDetails = useAppSelector(selectUserUnitDetails);
+  const displayUnitId = selectedUnitId || userUnitDetails?.id;
+  const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
+
+  const allowedUnitIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (displayUnitId) ids.add(displayUnitId);
+    allTanzeemiUnits
+      .filter(u => u.Parent_id === displayUnitId)
+      .forEach(u => ids.add(u.id));
+    return ids;
+  }, [displayUnitId, allTanzeemiUnits]);
 
   // Toast state
   const [showDeleteToast, setShowDeleteToast] = useState(false);
@@ -171,17 +187,19 @@ export default function Baitulmal() {
     { label: 'اخراجات', value: 1 },
   ], []);
 
-  // Filter records by month/year and category
+  // Filter records by unit, month/year and category
   const filteredRecords = useMemo(() => {
     const categoryFilter = selectedTab === 0 ? 'income' : 'expense';
     return allRecords.filter(r => {
+      // Filter by allowed units
+      if (allowedUnitIds.size > 0 && !allowedUnitIds.has(r.Tanzeemi_Unit)) return false;
       if (r.report_month !== selectedMonth || r.report_year !== selectedYear) return false;
       if (r.status === 'archived') return false;
       const typeInfo = typesById[r.Type];
       if (!typeInfo) return false;
       return typeInfo.main_category === categoryFilter;
     });
-  }, [allRecords, selectedMonth, selectedYear, selectedTab, typesById]);
+  }, [allRecords, selectedMonth, selectedYear, selectedTab, typesById, allowedUnitIds]);
 
   // Calculate total for active tab
   const totalAmount = useMemo(() => {

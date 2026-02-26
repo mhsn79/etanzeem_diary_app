@@ -212,6 +212,7 @@ export default function ProfileView() {
         backgroundSource={COMMON_IMAGES.profileBackground}
         avatarSource={require('@/assets/images/avatar.png')}
         showCamera={false}
+        headerHeight={200}
       />
 
       {/*──────────── Content ────────────*/}
@@ -273,13 +274,13 @@ const styles = StyleSheet.create({
   },
   
   scrollWrapper: {
-    marginTop: AVATAR_SIZE / 2 + 20, // ensures list starts below the avatar
+    marginTop: AVATAR_SIZE / 2, // ensures list starts below the avatar
   },
-  
+
   /* scroll area */
   scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: 16,
   },
 
   /* text */
@@ -287,12 +288,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: '#008CFF',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
 
   /* buttons */
   logoutContainer: {
-    marginVertical: 32,
+    marginVertical: 16,
   },
   logoutBtn: {
     backgroundColor: COLORS.error,
@@ -302,8 +303,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 8,
   },
 
   /* loading state */

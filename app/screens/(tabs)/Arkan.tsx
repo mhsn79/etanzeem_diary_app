@@ -5,11 +5,12 @@ import i18n from '../../i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
 import { COLORS } from '@/app/constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  fetchPersonsByUnit, 
+import {
+  fetchPersonsByUnit,
   fetchPersonsByUnitId,
-  selectAllPersons, 
-  selectPersonsStatus, 
+  fetchPersonsByMultipleUnits,
+  selectAllPersons,
+  selectPersonsStatus,
   selectPersonsError,
   fetchContactTypes,
   selectContactTypes,
@@ -18,10 +19,11 @@ import {
 } from '@/app/features/persons/personSlice';
 import { Person } from '@/app/models/Person';
 import { AppDispatch } from '@/app/store';
-import { 
+import {
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
-  selectUserUnitDetails
+  selectUserUnitDetails,
+  selectAllAccessibleUnitIds,
 } from '@/app/features/tanzeem/tanzeemSlice';
 import RukunCard from '@/app/components/RukunCard';
 import CustomButton from '@/app/components/CustomButton';
@@ -55,6 +57,9 @@ export default function Arkan() {
   // Use selected unit if available, otherwise fall back to user unit
   const displayUnit = selectedUnit || userUnit;
   const displayUnitId = selectedUnitId || userUnit?.id;
+
+  // All accessible unit IDs (for collective persons view)
+  const allAccessibleUnitIds = useSelector(selectAllAccessibleUnitIds);
 
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
@@ -109,17 +114,26 @@ export default function Arkan() {
     }
   }, [contactTypeParam, contactTypes]);
 
-  // Fetch persons based on selected unit. Defer so we don't run in same frame as tab transition (avoids Fabric "Unable to find viewState for tag" when switching from Activities).
+  // Fetch persons from ALL accessible units (collective view).
+  // Defer so we don't run in same frame as tab transition (avoids Fabric viewState crash).
   useEffect(() => {
-    if (!displayUnitId || typeof displayUnitId !== 'number') return;
+    if (allAccessibleUnitIds.length === 0 && (!displayUnitId || typeof displayUnitId !== 'number')) return;
     const id = setTimeout(() => {
       InteractionManager.runAfterInteractions(() => {
-        console.log('Arkan: Fetching persons for unit ID:', displayUnitId);
-        dispatch(fetchPersonsByUnitId(displayUnitId));
+        if (allAccessibleUnitIds.length > 1) {
+          console.log('Arkan: Fetching persons for', allAccessibleUnitIds.length, 'accessible units');
+          dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds));
+        } else {
+          const unitId = allAccessibleUnitIds[0] || displayUnitId;
+          if (unitId && typeof unitId === 'number') {
+            console.log('Arkan: Fetching persons for single unit:', unitId);
+            dispatch(fetchPersonsByUnitId(unitId));
+          }
+        }
       });
     }, 120);
     return () => clearTimeout(id);
-  }, [displayUnitId, dispatch]);
+  }, [allAccessibleUnitIds, displayUnitId, dispatch]);
 
   // Filter persons based on search query and selected tab
   const filteredPersons = useMemo(() => {
@@ -161,18 +175,20 @@ export default function Arkan() {
     setRefreshing(true);
     try {
       const promises: Promise<any>[] = [dispatch(fetchContactTypes()).unwrap()];
-      
-      if (displayUnitId && typeof displayUnitId === 'number') {
+
+      if (allAccessibleUnitIds.length > 1) {
+        promises.push(dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds)).unwrap());
+      } else if (displayUnitId && typeof displayUnitId === 'number') {
         promises.push(dispatch(fetchPersonsByUnitId(displayUnitId)).unwrap());
       }
-      
+
       await Promise.all(promises);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch, displayUnitId]);
+  }, [dispatch, allAccessibleUnitIds, displayUnitId]);
 
   // Check if the active tab is 'rukun' (rukun can only be added by admin)
   const isRukunTab = useMemo(() => {
@@ -245,7 +261,9 @@ export default function Arkan() {
           <CustomButton
             text={i18n.t('try_again')}
             onPress={() => {
-              if (displayUnitId && typeof displayUnitId === 'number') {
+              if (allAccessibleUnitIds.length > 1) {
+                dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds));
+              } else if (displayUnitId && typeof displayUnitId === 'number') {
                 dispatch(fetchPersonsByUnitId(displayUnitId));
               }
               dispatch(fetchContactTypes());

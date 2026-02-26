@@ -329,13 +329,14 @@ const Question = memo(({
 });
 
 // Memoized Accordion Section component
-const AccordionSection = memo(({ 
-  section, 
-  questions, 
+const AccordionSection = memo(({
+  section,
+  questions,
   answers,
   submissionId,
   disabled,
-  currentUnitId
+  currentUnitId,
+  initiallyExpanded
 }: {
   section: ReportSection & { progress: number };
   questions: ReportQuestion[];
@@ -343,8 +344,9 @@ const AccordionSection = memo(({
   submissionId: number | null;
   disabled?: boolean;
   currentUnitId?: number | null;
+  initiallyExpanded?: boolean;
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(initiallyExpanded ?? false);
 
   const handleToggleSection = useCallback(() => {
     setIsOpen(prev => !prev);
@@ -440,10 +442,10 @@ const SectionList: React.FC<SectionListProps> = ({
 
   // Memoize the section components to avoid unnecessary re-renders
   const sectionComponents = useMemo(() => {
-    return sections.map((section) => {
+    return sections.map((section, index) => {
       // Filter questions for this section
       const sectionQuestions = questions.filter((q) => q.section_id === section.id);
-      
+
       return (
         <AccordionSection
           key={section.id}
@@ -453,6 +455,7 @@ const SectionList: React.FC<SectionListProps> = ({
           submissionId={finalSubmissionId}
           disabled={disabled}
           currentUnitId={currentUnitId}
+          initiallyExpanded={index === 0}
         />
       );
     });

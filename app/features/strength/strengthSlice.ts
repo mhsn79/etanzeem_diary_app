@@ -120,17 +120,19 @@ export const fetchStrengthTypes = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('strength/fetchStrengthTypes', async (_, { getState, rejectWithValue }) => {
   try {
-    // Get the user's unit details from the tanzeem slice
-    const userUnitDetails = getState().tanzeem.userUnitDetails;
-    const userUnitId = getState().strength.userUnitId;
-    
-    // If we don't have the user's unit details, return an empty array
-    if (!userUnitDetails && !userUnitId) {
-      console.warn('No user unit details available, cannot fetch strength types');
+    // Get the currently active unit (selected unit takes priority over user's own unit)
+    const state = getState();
+    const userUnitDetails = state.tanzeem.userUnitDetails;
+    const activeUnitId = state.strength.userUnitId || state.tanzeem.dashboardSelectedUnitId || userUnitDetails?.id;
+
+    if (!activeUnitId) {
+      console.warn('No unit available, cannot fetch strength types');
       return [];
     }
 
-    const unitLevelId = userUnitDetails?.Level_id || userUnitDetails?.level_id;
+    // Look up the active unit from the tanzeem entity adapter to get its Level_id
+    const activeUnit = state.tanzeem.entities[activeUnitId] as any;
+    const unitLevelId = activeUnit?.Level_id || activeUnit?.level_id || userUnitDetails?.Level_id || userUnitDetails?.level_id;
 
     if (!unitLevelId) {
       console.warn('No unit level available, cannot fetch strength types');
@@ -481,10 +483,12 @@ export const refreshStrengthData = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('strength/refreshStrengthData', async (params, { getState, dispatch }) => {
   const state = getState();
+  // Use the already-set userUnitId (set by Workforce/screen to the selected unit)
+  // Fall back to dashboard selected unit, then to user's own unit
   const userUnitDetails = state.tanzeem.userUnitDetails;
-  const unitId = userUnitDetails?.id || null;
+  const unitId = state.strength.userUnitId || state.tanzeem.dashboardSelectedUnitId || userUnitDetails?.id || null;
 
-  if (unitId) {
+  if (unitId && state.strength.userUnitId !== unitId) {
     dispatch(setUserUnitId(unitId));
   }
 

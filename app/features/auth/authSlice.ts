@@ -9,7 +9,7 @@ import { RESET_STATE } from '../../store/_resetState';
 import { saveTokens, clearTokens } from '../../services/secureStorage';
 import { getPersistor } from '../../store/storeAccess';
 import { directApiRequest } from '../../services/apiClient';
-import { setUserUnitDetails } from '../tanzeem/tanzeemSlice';
+import { setUserUnitDetails, setUserAssignedUnits } from '../tanzeem/tanzeemSlice';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { authLogger } from '../../utils/logger';
 
@@ -364,10 +364,13 @@ export const login = createAsyncThunk<
           // Note: The person slice will handle fetching the tanzeemi unit when it fetches person data
           authLogger.debug('Found tanzeemi unit ID:', tanzeemiUnit.id);
           
-          // Store Tanzeemi_Unit in tanzeem slice
+          // Store Tanzeemi_Unit in tanzeem slice (primary unit for backward compat)
           authLogger.debug('Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
-          
+          // Store ALL assigned units (multi-unit support)
+          authLogger.debug('Found', tanzeemiData.data.length, 'assigned unit(s) for user');
+          dispatch(setUserAssignedUnits(tanzeemiData.data));
+
           if (nazimId) {
             authLogger.debug('Found Nazim_id:', nazimId);
             // Fetch Person record using Nazim_id and store as user details
@@ -1018,8 +1021,11 @@ export const initializeAuth = createAsyncThunk<
           
           authLogger.debug('Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
+          // Store ALL assigned units (multi-unit support)
+          authLogger.debug('Found', tanzeemiData.data.length, 'assigned unit(s) for user');
+          dispatch(setUserAssignedUnits(tanzeemiData.data));
           dispatch(setLastUnitFetchAt(Date.now()));
-          
+
           if (nazimId) {
             authLogger.debug('Found Nazim_id:', nazimId);
             authLogger.debug('Dispatching fetchNazimDetails for Nazim_id:', nazimId);
