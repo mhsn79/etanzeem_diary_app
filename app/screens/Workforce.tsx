@@ -913,24 +913,22 @@ const styles = StyleSheet.create({
   // Top section with stats
   topContainer: {
     backgroundColor: COLORS.primary,
-    height: "15%",
     borderBottomLeftRadius: BORDER_RADIUS.lg,
-    borderBottomRightRadius:BORDER_RADIUS.lg,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
     padding: SPACING.md,
     gap: SPACING.md,
     ...SHADOWS.medium
   },
   quwatContainer: {
-    height: "75%",
     flexDirection: "row-reverse",
-    gap: SPACING.lg,  },
+    gap: SPACING.lg,
+  },
   quwatBox: {
     padding: SPACING.sm,
     alignItems: 'center',
     backgroundColor: COLORS.white,
     width: "30%",
-    height:160,
     borderRadius: BORDER_RADIUS.md,
     ...SHADOWS.small
   },

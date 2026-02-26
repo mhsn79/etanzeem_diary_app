@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   urduText: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     writingDirection: 'rtl',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   kasheedaText: {
     fontFamily: TYPOGRAPHY.fontFamily.kasheeda,

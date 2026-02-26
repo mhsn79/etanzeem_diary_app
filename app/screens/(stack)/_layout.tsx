@@ -73,6 +73,16 @@ export default function StackLayout() {
           }} 
         />
 
+        {/* Baitulmal (Treasury) Screens */}
+        <Stack.Screen
+          name={SCREENS.BAITULMAL}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name={SCREENS.BAITULMAL_SCREEN}
+          options={{ headerShown: false }}
+        />
+
         {/* Meetings Related Screens */}
         <Stack.Screen 
           name={SCREENS.MEETINGS}

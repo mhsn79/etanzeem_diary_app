@@ -9,6 +9,7 @@ import tanzeemReducer from '../features/tanzeem/tanzeemSlice';
 import tanzeemHierarchyReducer from '../features/tanzeem/tanzeemHierarchySlice';
 import qaReducer from '../features/qa/qaSlice';
 import strengthReducer from '../features/strength/strengthSlice';
+import baitulmalReducer from '../features/baitulmal/baitulmalSlice';
 
 // Combine reducers
 const appReducer = combineReducers({
@@ -21,6 +22,7 @@ const appReducer = combineReducers({
   tanzeemHierarchy: tanzeemHierarchyReducer, // Add the tanzeem hierarchy slice
   qa: qaReducer, // Add the QA slice
   strength: strengthReducer, // Add the strength slice
+  baitulmal: baitulmalReducer,
 });
 
 // Root reducer with state reset capability

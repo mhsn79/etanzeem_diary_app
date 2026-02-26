@@ -108,7 +108,7 @@ const Dashboard = () => {
     { key: 'initial_info', label: i18n.t('initial_info'), color: DASHBOARD_BUTTON_COLORS.initialInfo, onPress: () => router.push('/screens/Workforce') },
     { key: 'activities', label: i18n.t('activities'), color: DASHBOARD_BUTTON_COLORS.activities, onPress: () => (navigation as any).navigate('Activities') },
     { key: 'contacts', label: i18n.t('contacts'), color: DASHBOARD_BUTTON_COLORS.contacts, onPress: () => (navigation as any).navigate('Arkan') },
-    { key: 'money', label: i18n.t('money'), color: DASHBOARD_BUTTON_COLORS.baitulMal, onPress: () => router.push('/screens/Income') },
+    { key: 'money', label: i18n.t('money'), color: DASHBOARD_BUTTON_COLORS.baitulMal, onPress: () => router.push('/screens/Baitulmal') },
   ] as const;
 
   return (

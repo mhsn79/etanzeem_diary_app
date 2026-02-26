@@ -19,10 +19,11 @@ const persistConfig: PersistConfig<RootState> = {
     STORAGE_KEYS.TANZEEM, 
     STORAGE_KEYS.TANZEEM_HIERARCHY,
     STORAGE_KEYS.QA,
-    STORAGE_KEYS.STRENGTH
+    STORAGE_KEYS.STRENGTH,
+    STORAGE_KEYS.BAITULMAL
   ],
-  // Bumped to v2: StrengthRecord schema changed (plus_value/minus_value/previous_total replaces Value/change_type/Reporting_Time)
-  version: 2,
+  // Bumped to v3: Added baitulmal slice
+  version: 3,
   // Add state reconciler for better state management
   stateReconciler: (inboundState, originalState) => ({
     ...originalState,

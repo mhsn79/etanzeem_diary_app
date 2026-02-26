@@ -61,6 +61,8 @@ export async function fetchAutoValueForQuestion(
       result = await fetchContactsCount(question, context);
     } else if (question.linked_to_type === 'activity') {
       result = await fetchActivitiesCount(question, context);
+    } else if (question.linked_to_type === 'baitulmal') {
+      result = await fetchBaitulmalValue(question, context);
     } else {
       return { questionId: question.id, value: 0, success: false, error: 'Unknown linked_to_type' };
     }
@@ -239,6 +241,47 @@ async function fetchActivitiesCount(
   }
 
   return activities.length;
+}
+
+/**
+ * Fetch baitulmal records value based on aggregate_func (sum of amounts for a specific type)
+ */
+async function fetchBaitulmalValue(
+  question: ReportQuestion,
+  context: AutoFillContext
+): Promise<number> {
+  const { unitId, month, year } = context;
+
+  const filter = {
+    _and: [
+      { Type: { _eq: question.linked_to_id } },
+      { Tanzeemi_Unit: { _eq: unitId } },
+      { report_month: { _eq: month } },
+      { report_year: { _eq: year } },
+      { status: { _neq: 'archived' } },
+    ],
+  };
+
+  const params = new URLSearchParams();
+  params.append('filter', JSON.stringify(filter));
+  params.append('fields', 'id,amount');
+  params.append('limit', '-1');
+
+  const response = await directApiRequest<{ data: { id: number; amount: number }[] }>(
+    `/items/baitulmal_records?${params.toString()}`,
+    'GET'
+  );
+
+  const records = response.data ?? [];
+
+  switch (question.aggregate_func) {
+    case 'count':
+      return records.length;
+    case 'sum':
+    case 'total':
+    default:
+      return records.reduce((sum, r) => sum + (r.amount || 0), 0);
+  }
 }
 
 export default {};

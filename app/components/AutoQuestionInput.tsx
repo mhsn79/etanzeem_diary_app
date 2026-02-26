@@ -22,6 +22,10 @@ import {
 } from '@/app/features/strength/strengthSlice';
 import { fetchActivityCount } from '@/app/features/activities/activitySlice';
 import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
+import {
+  fetchBaitulmalTypes,
+  selectBaitulmalTypes
+} from '@/app/features/baitulmal/baitulmalSlice';
 import { directApiRequest } from '@/app/services/apiClient';
 import { router } from 'expo-router';
 import i18n from '@/app/i18n';
@@ -80,6 +84,17 @@ interface StrengthRecord {
   report_month: number;
 }
 
+interface BaitulmalRecord {
+  id: number;
+  Type: number;
+  amount: number;
+  notes?: string | null;
+  status: string;
+  report_month: number;
+  report_year: number;
+  Tanzeemi_Unit: number;
+}
+
 const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   question,
   value,
@@ -97,6 +112,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const activityTypesStatus = useAppSelector(selectActivityTypesStatus);
   const strengthTypes = useAppSelector(selectStrengthTypes);
   const strengthState = useAppSelector(selectStrengthState);
+  const baitulmalTypes = useAppSelector(selectBaitulmalTypes);
   
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
@@ -127,6 +143,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
+  // Popup state for baitulmal
+  const [showBaitulmalPopup, setShowBaitulmalPopup] = useState(false);
+  const [baitulmalList, setBaitulmalList] = useState<BaitulmalRecord[]>([]);
+  const [baitulmalLoading, setBaitulmalLoading] = useState(false);
+  const [baitulmalError, setBaitulmalError] = useState<string | null>(null);
+
   // Fetch contact types, activity types, and strength types on component mount
   useEffect(() => {
     if (contactTypes.length === 0) {
@@ -138,7 +160,10 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     if (strengthTypes.length === 0) {
       dispatch(fetchStrengthTypes());
     }
-  }, [dispatch, contactTypes.length, activityTypes.length, strengthTypes.length]);
+    if (baitulmalTypes.length === 0) {
+      dispatch(fetchBaitulmalTypes());
+    }
+  }, [dispatch, contactTypes.length, activityTypes.length, strengthTypes.length, baitulmalTypes.length]);
 
   // Update local state when prop value changes
   useEffect(() => {
@@ -225,6 +250,20 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
     return 'قوت'; // Default fallback
   }, [question.linked_to_id, strengthTypes]);
+
+  // Get baitulmal type label for the current question
+  const getBaitulmalTypeLabel = useCallback(() => {
+    if (!question.linked_to_id || !baitulmalTypes.length) {
+      return 'بیت المال'; // Default fallback
+    }
+
+    const baitulmalType = baitulmalTypes.find(type => type.id === question.linked_to_id);
+    if (baitulmalType) {
+      return baitulmalType.Name || 'بیت المال';
+    }
+
+    return 'بیت المال'; // Default fallback
+  }, [question.linked_to_id, baitulmalTypes]);
 
   // Fetch contacts for popup
   const fetchContactsForPopup = useCallback(async (): Promise<Person[]> => {
@@ -394,6 +433,58 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     }
   }, [question.linked_to_id, getCurrentReportingPeriod, currentUnitId, userUnitDetails?.id]);
 
+  // Fetch baitulmal records for popup
+  const fetchBaitulmalForPopup = useCallback(async (): Promise<BaitulmalRecord[]> => {
+    if (!question.linked_to_id) {
+      setBaitulmalError('سوال درست طریقے سے ترتیب نہیں دیا گیا');
+      return [];
+    }
+
+    setBaitulmalLoading(true);
+    setBaitulmalError(null);
+
+    try {
+      const reportingPeriod = getCurrentReportingPeriod();
+      const unitId = currentUnitId || userUnitDetails?.id;
+
+      const filter = {
+        _and: [
+          { Type: { _eq: question.linked_to_id } },
+          { Tanzeemi_Unit: { _eq: unitId } },
+          { report_month: { _eq: reportingPeriod.month } },
+          { report_year: { _eq: reportingPeriod.year } },
+          { status: { _neq: 'archived' } },
+        ],
+      };
+
+      const params = new URLSearchParams();
+      params.append('filter', JSON.stringify(filter));
+      params.append('fields', 'id,Type,amount,notes,status,report_month,report_year,Tanzeemi_Unit');
+      params.append('limit', '-1');
+
+      const url = `/items/baitulmal_records?${params.toString()}`;
+
+      const response = await directApiRequest<{ data: BaitulmalRecord[] }>(
+        url,
+        'GET'
+      );
+
+      if (response.data) {
+        setBaitulmalList(response.data);
+        return response.data;
+      } else {
+        setBaitulmalList([]);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('Error fetching baitulmal records:', error);
+      setBaitulmalError(`${getBaitulmalTypeLabel()} حاصل کرنے میں ناکامی`);
+      return [];
+    } finally {
+      setBaitulmalLoading(false);
+    }
+  }, [question.linked_to_id, getCurrentReportingPeriod, currentUnitId, userUnitDetails?.id, getBaitulmalTypeLabel]);
+
   // Fetch single monthly strength record for a given type/unit/month
   const fetchMonthlyStrengthRecord = useCallback(async (): Promise<StrengthRecord | null> => {
     if (!question.linked_to_id) return null;
@@ -430,14 +521,23 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     fetchActivitiesForPopup();
   }, [fetchActivitiesForPopup]);
 
+  // Handle popup open for baitulmal
+  const handleBaitulmalPopupOpen = useCallback(() => {
+    setShowBaitulmalPopup(true);
+    fetchBaitulmalForPopup();
+  }, [fetchBaitulmalForPopup]);
+
   // Handle popup close
   const handlePopupClose = useCallback(() => {
     setShowContactsPopup(false);
     setShowActivitiesPopup(false);
+    setShowBaitulmalPopup(false);
     setContactsList([]);
     setActivitiesList([]);
+    setBaitulmalList([]);
     setContactsError(null);
     setActivitiesError(null);
+    setBaitulmalError(null);
   }, []);
 
   // Fetch count based on linked_to_type and update input value
@@ -451,6 +551,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     // For activities, show popup
     if (question.linked_to_type === 'activity') {
       handleActivitiesPopupOpen();
+      return;
+    }
+
+    // For baitulmal, show popup
+    if (question.linked_to_type === 'baitulmal') {
+      handleBaitulmalPopupOpen();
       return;
     }
 
@@ -577,7 +683,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     } finally {
       setIsCalculating(false);
     }
-  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleActivitiesPopupOpen, fetchMonthlyStrengthRecord, getCurrentReportingPeriod, fetchContactsForPopup, fetchActivitiesForPopup, getStrengthTypeLabel, getContactTypeLabel, getActivityTypeLabel]);
+  }, [dispatch, question, onValueChange, handleContactsPopupOpen, handleActivitiesPopupOpen, handleBaitulmalPopupOpen, fetchMonthlyStrengthRecord, getCurrentReportingPeriod, fetchContactsForPopup, fetchActivitiesForPopup, getStrengthTypeLabel, getContactTypeLabel, getActivityTypeLabel]);
 
   // Navigate to the source screen for this question's linked data
   const handleNavigateToSource = useCallback(() => {
@@ -603,6 +709,15 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
           pathname: '/screens/(tabs)/Activities',
           params: {
             preSelectedTab: '1',
+            preSelectedMonth: String(period.month),
+            preSelectedYear: String(period.year),
+          },
+        });
+        break;
+      case 'baitulmal':
+        router.push({
+          pathname: '/screens/Baitulmal',
+          params: {
             preSelectedMonth: String(period.month),
             preSelectedYear: String(period.year),
           },
@@ -658,10 +773,12 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return getActivityTypeLabel();
       case 'strength':
         return getStrengthTypeLabel();
+      case 'baitulmal':
+        return getBaitulmalTypeLabel();
       default:
         return '';
     }
-  }, [question.linked_to_type, getContactTypeLabel, getActivityTypeLabel, getStrengthTypeLabel]);
+  }, [question.linked_to_type, getContactTypeLabel, getActivityTypeLabel, getStrengthTypeLabel, getBaitulmalTypeLabel]);
 
   // Get the appropriate singular label based on linked_to_type
   const getTypeSingularLabel = useCallback(() => {
@@ -672,16 +789,19 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return getActivityTypeLabel(); // Use same for activity
       case 'strength':
         return getStrengthTypeSingularLabel();
+      case 'baitulmal':
+        return getBaitulmalTypeLabel();
       default:
         return '';
     }
-  }, [question.linked_to_type, getContactTypeLabel, getActivityTypeLabel, getStrengthTypeSingularLabel]);
+  }, [question.linked_to_type, getContactTypeLabel, getActivityTypeLabel, getStrengthTypeSingularLabel, getBaitulmalTypeLabel]);
 
   // Urdu labels for linked_to_type (fallback)
   const linkedTypeUrdu: Record<string, string> = {
     activity: 'سرگرمی',
     contacts: 'رابطہ',
     strength: 'قوت',
+    baitulmal: 'بیت المال',
   };
 
   // Memoize published activities count to avoid repeated filtering in JSX
@@ -728,6 +848,29 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     setCalculationSuccess(`${buttonText} (${getTypeLabel()}): ${activitiesPopupValue}`);
     setTimeout(() => setCalculationSuccess(null), 3000);
   }, [activitiesPopupValue, onValueChange, getTypeLabel, buttonText]);
+
+  // Compute the baitulmal popup result value based on aggregate_func
+  const baitulmalPopupValue = useMemo(() => {
+    if (question.aggregate_func === 'count') {
+      return baitulmalList.length;
+    }
+    // sum/total - sum all amounts
+    return baitulmalList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  }, [baitulmalList, question.aggregate_func]);
+
+  // Handle OK button in baitulmal popup
+  const handleBaitulmalPopupOK = useCallback(() => {
+    setInputValue(String(baitulmalPopupValue));
+    if (onValueChange) {
+      onValueChange(baitulmalPopupValue);
+    }
+    setShowBaitulmalPopup(false);
+    const label = question.aggregate_func === 'count'
+      ? `${getBaitulmalTypeLabel()} کی کل تعداد: ${baitulmalPopupValue}`
+      : `${getBaitulmalTypeLabel()} کی کل رقم: ${baitulmalPopupValue.toLocaleString('en-US')}`;
+    setCalculationSuccess(label);
+    setTimeout(() => setCalculationSuccess(null), 3000);
+  }, [baitulmalPopupValue, onValueChange, getBaitulmalTypeLabel, question.aggregate_func]);
 
   // Check if this question has auto-calculate capability
   const hasAutoCalculateCapability = Boolean(question.linked_to_type && question.linked_to_id);
@@ -825,6 +968,24 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       </View>
     );
   }, [activityTypes]);
+
+  // Render baitulmal item for popup
+  const renderBaitulmalItem = useCallback(({ item }: { item: BaitulmalRecord }) => {
+    const typeName = baitulmalTypes.find(t => t.id === item.Type)?.Name || 'نامعلوم';
+    const formattedAmount = Number(item.amount).toLocaleString('en-US');
+
+    return (
+      <View style={styles.baitulmalItem}>
+        <View style={styles.baitulmalItemLeft}>
+          <UrduText style={styles.baitulmalTypeName}>{typeName}</UrduText>
+          {item.notes ? (
+            <UrduText style={styles.baitulmalNotes} numberOfLines={1}>{item.notes}</UrduText>
+          ) : null}
+        </View>
+        <UrduText style={styles.baitulmalAmount}>{formattedAmount} روپے</UrduText>
+      </View>
+    );
+  }, [baitulmalTypes]);
 
   // Determine if input should be editable based on category only
   const isEditable = question.category === 'manual';
@@ -1023,6 +1184,85 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                     onPress={handleActivitiesPopupOK}
                   >
                     <UrduText style={styles.okButtonText}>ٹھیک ہے ({activitiesPopupValue})</UrduText>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Baitulmal Popup Modal */}
+      <Modal
+        visible={showBaitulmalPopup}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handlePopupClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <UrduText style={styles.modalTitle}>
+                {getBaitulmalTypeLabel()}
+              </UrduText>
+              <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {baitulmalLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
+              </View>
+            ) : baitulmalError ? (
+              <View style={styles.errorContainer}>
+                <UrduText style={styles.errorText}>{baitulmalError}</UrduText>
+              </View>
+            ) : (
+              <>
+                <View style={styles.listHeader}>
+                  <UrduText style={styles.listHeaderText}>
+                    {question.aggregate_func === 'count'
+                      ? `کل ${baitulmalList.length} اندراجات`
+                      : `کل رقم: ${baitulmalPopupValue.toLocaleString('en-US')} روپے (${baitulmalList.length} اندراجات)`}
+                  </UrduText>
+                </View>
+
+                <FlatList
+                  data={baitulmalList}
+                  renderItem={renderBaitulmalItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.contactsList}
+                  contentContainerStyle={styles.contactsListContent}
+                  showsVerticalScrollIndicator={true}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <UrduText style={styles.emptyText}>کوئی {getBaitulmalTypeLabel()} کا اندراج نہیں ملا</UrduText>
+                    </View>
+                  }
+                  getItemLayout={(data, index) => ({
+                    length: 50,
+                    offset: 50 * index,
+                    index,
+                  })}
+                />
+
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handlePopupClose}
+                  >
+                    <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.okButton}
+                    onPress={handleBaitulmalPopupOK}
+                  >
+                    <UrduText style={styles.okButtonText}>
+                      ٹھیک ہے ({question.aggregate_func === 'count' ? baitulmalList.length : baitulmalPopupValue.toLocaleString('en-US')})
+                    </UrduText>
                   </TouchableOpacity>
                 </View>
               </>
@@ -1282,6 +1522,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
     textAlign: 'right',
+  },
+  // Baitulmal item styles
+  baitulmalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+    minHeight: 50,
+  },
+  baitulmalItemLeft: {
+    flex: 1,
+    marginRight: SPACING.sm,
+  },
+  baitulmalTypeName: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textAlign: 'left',
+    writingDirection: 'rtl',
+  },
+  baitulmalNotes: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  baitulmalAmount: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.tertiary,
   },
 });
 
