@@ -798,44 +798,74 @@ export const logout = createAsyncThunk(
         authLogger.error(`Error clearing tokens from secure storage: ${clearTokensError} (${Platform.OS})`);
       }
       
-      // Dispatch the auth logout action to clear auth state and log out from Directus
+      // Step 1: Pause persistor FIRST to prevent rehydration of stale data
+      try {
+        getPersistor().pause();
+        authLogger.info(`Persistor paused (${Platform.OS})`);
+      } catch (pauseError) {
+        authLogger.error(`Error pausing persistor: ${pauseError} (${Platform.OS})`);
+      }
+
+      // Step 2: Clear all persisted data from MMKV BEFORE resetting Redux state
+      // This prevents stale data from being rehydrated after logout
+      try {
+        const { clearAllPersistedState } = await import('../../store/mmkvStorage');
+        await clearAllPersistedState();
+        authLogger.info(`MMKV storage cleared (${Platform.OS})`);
+      } catch (clearStorageError) {
+        authLogger.error(`Error clearing MMKV storage: ${clearStorageError} (${Platform.OS})`);
+      }
+
+      // Step 3: Dispatch the auth logout action to clear auth state
       dispatch(logoutAction());
-      
-      // Clear state from all relevant slices
+
+      // Step 4: Clear state from all relevant slices
       try {
         // Clear persons state
         const { clearPersons, clearUserDetails } = await import('../persons/personSlice');
         dispatch(clearUserDetails());
         dispatch(clearPersons());
-        
+
         // Clear activities state
         const { clearActivities } = await import('../activities/activitySlice');
         dispatch(clearActivities());
-        
+
         // Clear QA state
         const { clearSubmissions } = await import('../qa/qaSlice');
         dispatch(clearSubmissions());
-        
+
         // Clear reports state
         const { clearReports, clearSubmissions: clearReportSubmissions } = await import('../reports/reportsSlice');
         dispatch(clearReports());
         dispatch(clearReportSubmissions());
-        
+
+        // Clear tanzeem state
+        const { clearTanzeemiUnits } = await import('../tanzeem/tanzeemSlice');
+        dispatch(clearTanzeemiUnits());
+
+        // Clear tanzeem hierarchy state
+        const { clearHierarchy } = await import('../tanzeem/tanzeemHierarchySlice');
+        dispatch(clearHierarchy());
+
+        // Clear strength state
+        const { clearStrengthTypes, clearStrengthRecords } = await import('../strength/strengthSlice');
+        dispatch(clearStrengthTypes());
+        dispatch(clearStrengthRecords());
+
         authLogger.info(`All slice states cleared (${Platform.OS})`);
       } catch (clearStateError) {
         authLogger.error(`Error clearing slice states: ${clearStateError} (${Platform.OS})`);
       }
-      
-      // Then dispatch the reset action to reset all slices to their initial state
+
+      // Step 5: Reset ALL reducers to initial state
       dispatch({ type: RESET_STATE });
       authLogger.info(`Redux state reset (${Platform.OS})`);
-      
+
+      // Step 6: Purge persistor (belt and suspenders — MMKV already cleared)
       try {
-        // Finally, purge the persisted Redux data
         await getPersistor().purge();
         authLogger.info(`Persisted data purged (${Platform.OS})`);
       } catch (purgeError) {
-        // If purge fails, log the error but continue with logout
         authLogger.error(`Error purging persisted data: ${purgeError} (${Platform.OS})`);
       }
       

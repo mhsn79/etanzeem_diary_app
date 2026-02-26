@@ -103,10 +103,10 @@ export const fetchTanzeemiUnits = createAsyncThunk<
   try {
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
-      '/items/Tanzeemi_Unit?fields=*',
+      '/items/Tanzeemi_Unit?fields=*&filter[status][_neq]=archived',
       'GET'
     );
-    
+
     if (!response.data) throw new Error('Failed to fetch tanzeemi units');
     
     // Transform the API response to match our expected format
@@ -168,10 +168,10 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
     
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
-      `/items/Tanzeemi_Unit?filter[Level_id][_eq]=${levelId}&fields=*`,
+      `/items/Tanzeemi_Unit?filter[Level_id][_eq]=${levelId}&filter[status][_neq]=archived&fields=*`,
       'GET'
     );
-    
+
     if (!response.data) throw new Error(`Failed to fetch tanzeemi units with level ID ${levelId}`);
     
     // Transform the API response to match our expected format
@@ -285,7 +285,7 @@ const fetchAndProcessHierarchy = async (
     if (idsToFetch.length > 0) {
       try {
         const batchResponse = await directApiRequest<{ data: any[] }>(
-          `/items/Tanzeemi_Unit?filter[id][_in]=${idsToFetch.join(',')}&fields=*`,
+          `/items/Tanzeemi_Unit?filter[id][_in]=${idsToFetch.join(',')}&filter[status][_neq]=archived&fields=*`,
           'GET'
         );
 
@@ -473,6 +473,23 @@ const tanzeemSlice = createSlice({
       tanzeemAdapter.removeAll(state);
       state.status = 'idle';
       state.error = null;
+      state.selectedUnitId = null;
+      state.selectedUnitStatus = 'idle';
+      state.selectedUnitError = null;
+      state.userUnitDetails = null;
+      state.userUnitStatus = 'idle';
+      state.userUnitError = null;
+      state.hierarchyStatus = 'idle';
+      state.hierarchyError = null;
+      state.unitsByLevel = {};
+      state.userUnitHierarchyIds = [];
+      state.userTanzeemiLevelDetails = null;
+      state.userTanzeemiLevelStatus = 'idle';
+      state.userTanzeemiLevelError = null;
+      state.levelsById = {};
+      state.dashboardSelectedUnitId = null;
+      // Clear module-level selector caches
+      parentUnitWithLevelSelectors.clear();
     },
     setSelectedUnitId(state, action: PayloadAction<number | null>) {
       state.selectedUnitId = action.payload;

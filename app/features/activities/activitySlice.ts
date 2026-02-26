@@ -438,6 +438,7 @@ const activitiesSlice = createSlice({
       activitiesAdapter.removeAll(state);
       state.status = 'idle';
       state.error = null;
+      state.lastFetchTime = 0;
     },
   },
   extraReducers: builder => {

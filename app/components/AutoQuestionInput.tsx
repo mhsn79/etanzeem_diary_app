@@ -448,7 +448,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       return;
     }
 
-    // For activities, show popup instead of direct calculation
+    // For activities, show popup
     if (question.linked_to_type === 'activity') {
       handleActivitiesPopupOpen();
       return;
@@ -528,6 +528,35 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         } else if (question.aggregate_func === 'sum') {
           result = activitiesCount;
           setCalculationSuccess(`${getActivityTypeLabel()} کی کل تعداد کامیابی سے حاصل ہو گئی`);
+        } else if (question.aggregate_func === 'avg') {
+          // Calculate average attendance of published activities
+          const publishedWithAttendance = activities.filter(
+            (a: any) => a.status === 'published' && a.attendance != null && a.attendance > 0
+          );
+          if (publishedWithAttendance.length > 0) {
+            const totalAttendance = publishedWithAttendance.reduce(
+              (sum: number, a: any) => sum + Number(a.attendance), 0
+            );
+            result = Math.round(totalAttendance / publishedWithAttendance.length);
+          } else {
+            result = 0;
+          }
+          setCalculationSuccess(`${getActivityTypeLabel()} کی اوسط حاضری کامیابی سے حاصل ہو گئی`);
+        } else if (question.aggregate_func === 'array') {
+          // Comma-separated list of attendance values from published activities
+          const publishedWithAttendance = activities.filter(
+            (a: any) => a.status === 'published' && a.attendance != null
+          );
+          const attendanceList = publishedWithAttendance.map((a: any) => String(a.attendance)).join(', ');
+          // Set as string value directly (bypass numeric result)
+          setInputValue(attendanceList);
+          if (onValueChange) {
+            onValueChange(attendanceList);
+          }
+          setCalculationSuccess(`${getActivityTypeLabel()} کی حاضری کی فہرست کامیابی سے حاصل ہو گئی`);
+          setTimeout(() => setCalculationSuccess(null), 3000);
+          setIsCalculating(false);
+          return;
         } else {
           result = 0;
           setCalculationSuccess(`${getActivityTypeLabel()} کے لیے کوئی اندراج نہیں ملا`);
@@ -599,6 +628,8 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return 'add-circle-outline';
       case 'minus':
         return 'remove-circle-outline';
+      case 'array':
+        return 'list-outline';
       default:
         return 'calculator-outline';
     }
@@ -659,6 +690,22 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     [activitiesList]
   );
 
+  // Compute the popup result value based on aggregate_func
+  const activitiesPopupValue = useMemo(() => {
+    const published = activitiesList.filter(a => a.status === 'published');
+    if (question.aggregate_func === 'avg') {
+      const withAttendance = published.filter((a: any) => a.attendance != null && a.attendance > 0);
+      if (withAttendance.length === 0) return 0;
+      const total = withAttendance.reduce((sum: number, a: any) => sum + Number(a.attendance), 0);
+      return Math.round(total / withAttendance.length);
+    }
+    if (question.aggregate_func === 'array') {
+      const withAttendance = published.filter((a: any) => a.attendance != null);
+      return withAttendance.map((a: any) => String(a.attendance)).join(', ');
+    }
+    return published.length;
+  }, [activitiesList, question.aggregate_func]);
+
   // Handle OK button in contacts popup
   const handleContactsPopupOK = useCallback(() => {
     const count = contactsList.length;
@@ -673,14 +720,14 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Handle OK button in activities popup
   const handleActivitiesPopupOK = useCallback(() => {
-    setInputValue(String(publishedActivitiesCount));
+    setInputValue(String(activitiesPopupValue));
     if (onValueChange) {
-      onValueChange(publishedActivitiesCount);
+      onValueChange(activitiesPopupValue);
     }
     setShowActivitiesPopup(false);
-    setCalculationSuccess(`کل ${publishedActivitiesCount} ${getTypeLabel()}`);
+    setCalculationSuccess(`${buttonText} (${getTypeLabel()}): ${activitiesPopupValue}`);
     setTimeout(() => setCalculationSuccess(null), 3000);
-  }, [publishedActivitiesCount, onValueChange, getTypeLabel]);
+  }, [activitiesPopupValue, onValueChange, getTypeLabel, buttonText]);
 
   // Check if this question has auto-calculate capability
   const hasAutoCalculateCapability = Boolean(question.linked_to_type && question.linked_to_id);
@@ -975,7 +1022,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
                     style={styles.okButton}
                     onPress={handleActivitiesPopupOK}
                   >
-                    <UrduText style={styles.okButtonText}>ٹھیک ہے ({publishedActivitiesCount})</UrduText>
+                    <UrduText style={styles.okButtonText}>ٹھیک ہے ({activitiesPopupValue})</UrduText>
                   </TouchableOpacity>
                 </View>
               </>

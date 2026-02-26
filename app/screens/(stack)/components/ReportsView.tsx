@@ -108,6 +108,27 @@ const findCurrentlyOpenManagement = (managements: any[]): any => {
   return sortedManagements.find(management => isManagementPeriodOpen(management)) || null;
 };
 
+// Helper function to check if the deadline (reporting_end_date + extended_days) has passed
+const isDeadlinePassed = (management: any): boolean => {
+  if (!management || !management.reporting_end_date) {
+    return true; // No deadline info = treat as passed (read-only)
+  }
+
+  const now = new Date();
+  const endDate = new Date(management.reporting_end_date);
+
+  // Add extended days to end date if available
+  if (management.extended_days && management.extended_days > 0) {
+    endDate.setDate(endDate.getDate() + management.extended_days);
+  }
+
+  // Normalize dates to start of day for comparison
+  const nowNormalized = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endDateNormalized = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+  return nowNormalized > endDateNormalized;
+};
+
 // Helper function to find existing draft submission for a management period
 const findDraftSubmissionForManagement = (submissions: any[], mgmtId: number): any => {
   return submissions.find(submission => 
@@ -460,7 +481,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     ensureFreshTokenBeforeOperation()
       .then(() => {
         if (existingSubmission && existingSubmission.id) {
-          const mode = existingSubmission.status === 'draft' ? 'edit' : 'view';
+          // Allow edit for draft reports, or for published reports if deadline hasn't passed
+          const submissionMgmt = submissionManagementAndTemplate.management;
+          const canEdit = existingSubmission.status === 'draft' ||
+            (existingSubmission.status === 'published' && !isDeadlinePassed(submissionMgmt));
+          const mode = canEdit ? 'edit' : 'view';
           const params = {
             submissionId: existingSubmission.id.toString(),
             templateId: existingSubmission.template_id.toString(),
@@ -481,7 +506,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
               templateId: existingSubmission.template_id,
               managementId: existingSubmission.mgmt_id,
               unitId: existingSubmission.unit_id,
-              mode: existingSubmission.status === 'draft' ? 'edit' : 'view',
+              mode,
               status: existingSubmission.status
             });
             return;
@@ -514,7 +539,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       .catch(error => {
         console.error('[ReportsView] Error before opening report:', error);
       });
-  }, [router, existingSubmission, currentlyOpenManagement?.id, displayUnit?.id, ensureFreshTokenBeforeOperation, currentTemplate?.id]);
+  }, [router, existingSubmission, currentlyOpenManagement?.id, displayUnit?.id, ensureFreshTokenBeforeOperation, currentTemplate?.id, submissionManagementAndTemplate.management]);
 
   // Combined function to fetch all necessary data with token refresh
   const fetchAllData = useCallback(async (forceQARefresh = false) => {
@@ -853,11 +878,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                   <View style={styles.reportSummaryItemValueContainerItem}>
                     <UrduText style={styles.reportSummaryItemValue}>اسٹیٹس</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>
-                      {existingSubmission ? 
-                        (existingSubmission.status === 'published' ? 'جمع شدہ' : 
-                         existingSubmission.status === 'draft' || existingSubmission.status === 'pending' ? 'زیرِ تکمیل' : 
-                         'نئی رپورٹ') : 
+                    <UrduText style={[
+                      styles.reportSummaryItemValue,
+                      existingSubmission?.status === 'published' && { color: COLORS.success },
+                    ]}>
+                      {existingSubmission ?
+                        (existingSubmission.status === 'published' ? 'جمع شدہ' :
+                         existingSubmission.status === 'draft' || existingSubmission.status === 'pending' ? 'زیرِ تکمیل' :
+                         'نئی رپورٹ') :
                        'نئی رپورٹ'}
                     </UrduText>
                   </View>
@@ -865,15 +893,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <UrduText
                       style={[
                         styles.reportSummaryItemValue,
-                        { color: daysRemaining < 5 ? '#E63946' : COLORS.success },
+                        existingSubmission?.status === 'published'
+                          ? { color: COLORS.success }
+                          : { color: daysRemaining < 5 ? '#E63946' : COLORS.success },
                       ]}
                     >
-                      {currentManagement?.reporting_end_date
-                        ? (daysRemaining > 0
-                            ? `${daysRemaining} دن باقی ہیں`
-                            : `${Math.abs(daysRemaining)} دن گزر چکے ہیں`)
-                        : existingSubmission?.status === 'published'
-                          ? 'جمع شدہ'
+                      {existingSubmission?.status === 'published'
+                        ? 'جمع شدہ'
+                        : currentManagement?.reporting_end_date
+                          ? (daysRemaining > 0
+                              ? `${daysRemaining} دن باقی ہیں`
+                              : `${Math.abs(daysRemaining)} دن گزر چکے ہیں`)
                           : existingSubmission?.status === 'draft' || existingSubmission?.status === 'pending'
                             ? 'زیرِ تکمیل'
                             : 'تاریخ دستیاب نہیں'
@@ -888,17 +918,27 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
                   </View>
                   <View style={[styles.reportSummaryItemValueContainerItem, styles.reportSummaryItemRight]}>
-                    <UrduText style={styles.reportSummaryItemValue}>آخری تاریخ</UrduText>
+                    <UrduText style={styles.reportSummaryItemValue}>
+                      {existingSubmission?.status === 'published' ? 'جمع کرنے کی تاریخ' : 'آخری تاریخ'}
+                    </UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
                     <UrduText style={styles.reportSummaryItemValue}>
-                      {currentManagement?.reporting_end_date
-                        ? formatExpectedCompletion(currentManagement.reporting_end_date, { label: '' })
-                        : existingSubmission?.date_created
-                          ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                            })
+                      {existingSubmission?.status === 'published'
+                        ? (existingSubmission.date_updated
+                            ? new Date(existingSubmission.date_updated).toLocaleDateString('ur-PK', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                              })
+                            : existingSubmission.date_created
+                              ? new Date(existingSubmission.date_created).toLocaleDateString('ur-PK', {
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                })
+                              : 'تاریخ دستیاب نہیں')
+                        : currentManagement?.reporting_end_date
+                          ? formatExpectedCompletion(currentManagement.reporting_end_date, { label: '' })
                           : 'تاریخ دستیاب نہیں'}
                     </UrduText>
                   </View>
@@ -1033,8 +1073,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 ? `ماہانہ کارکردگی رپورٹ ۔ ماہ ${getUrduMonth(management.month)} ${management.year}ء`
                 : `ماہانہ رپورٹ`;
 
+              // Allow edit for draft reports, or for published reports if deadline hasn't passed
+              const canEditSubmission = submission.status === 'draft' ||
+                (submission.status === 'published' && !isDeadlinePassed(management));
+
               return (
-                <Animated.View 
+                <Animated.View
                   key={`submission-container-${submission.id}`}
                   style={[
                     isLatestSubmission && styles.highlightedCard,
@@ -1048,10 +1092,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     location={unitNameWithLevel}
                     status={submission.status === 'published' ? 'جمع شدہ' : 'ڈرافٹ'}
                     statusColor={submission.status === 'published' ? COLORS.success : COLORS.error}
-                    showEdit={submission.status === 'draft'} // Only show edit button for draft reports
+                    showEdit={canEditSubmission}
                     onEdit={() => {
-                      // Navigate to CREATE_REPORT in edit mode for draft reports
-                      const mode = submission.status === 'draft' ? 'edit' : 'view';
+                      const mode = canEditSubmission ? 'edit' : 'view';
                       router.push({
                         pathname: ROUTES.CREATE_REPORT,
                         params: {
@@ -1065,8 +1108,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                       });
                     }}
                     onView={() => {
-                      // Navigate to CREATE_REPORT in view mode for published/submitted reports
-                      const mode = submission.status === 'draft' ? 'edit' : 'view';
+                      const mode = canEditSubmission ? 'edit' : 'view';
                       router.push({
                         pathname: ROUTES.CREATE_REPORT,
                         params: {

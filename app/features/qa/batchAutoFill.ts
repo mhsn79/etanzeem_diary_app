@@ -21,7 +21,7 @@ export interface AutoFillContext {
 
 export interface AutoFillResult {
   questionId: number;
-  value: number;
+  value: number | string;
   success: boolean;
   error?: string;
 }
@@ -53,7 +53,7 @@ export async function fetchAutoValueForQuestion(
       return { questionId: question.id, value: 0, success: false, error: 'Missing linked_to config' };
     }
 
-    let result = 0;
+    let result: number | string = 0;
 
     if (question.linked_to_type === 'strength') {
       result = await fetchStrengthValue(question, context, dispatch);
@@ -195,13 +195,14 @@ async function fetchContactsCount(
 }
 
 /**
- * Fetch published activities count
+ * Fetch published activities value based on aggregate_func
  */
 async function fetchActivitiesCount(
   question: ReportQuestion,
   context: AutoFillContext
-): Promise<number> {
+): Promise<number | string> {
   const { unitId, month, year } = context;
+  const needsAttendance = question.aggregate_func === 'avg' || question.aggregate_func === 'array';
 
   const filter = {
     _and: [
@@ -215,7 +216,7 @@ async function fetchActivitiesCount(
 
   const params = new URLSearchParams();
   params.append('filter', JSON.stringify(filter));
-  params.append('fields', 'id');
+  params.append('fields', needsAttendance ? 'id,attendance' : 'id');
   params.append('limit', '-1');
 
   const response = await directApiRequest<{ data: any[] }>(
@@ -223,7 +224,21 @@ async function fetchActivitiesCount(
     'GET'
   );
 
-  return response.data?.length ?? 0;
+  const activities = response.data ?? [];
+
+  if (question.aggregate_func === 'avg') {
+    const withAttendance = activities.filter((a: any) => a.attendance != null && a.attendance > 0);
+    if (withAttendance.length === 0) return 0;
+    const total = withAttendance.reduce((sum: number, a: any) => sum + Number(a.attendance), 0);
+    return Math.round(total / withAttendance.length);
+  }
+
+  if (question.aggregate_func === 'array') {
+    const withAttendance = activities.filter((a: any) => a.attendance != null);
+    return withAttendance.map((a: any) => String(a.attendance)).join(', ');
+  }
+
+  return activities.length;
 }
 
 export default {};

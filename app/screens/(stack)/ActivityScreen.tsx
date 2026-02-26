@@ -45,7 +45,7 @@ const ActivityScreen = () => {
   const params = useLocalSearchParams();
   const dispatch = useAppDispatch();
   const mode = (params.mode || 'schedule') as 'report' | 'schedule' | 'edit';
-  const activityId = params.id ? Number(params.id) : undefined;
+  const activityId = (params.activityId || params.id) ? Number(params.activityId || params.id) : undefined;
   const isEditMode = mode === 'edit' && activityId !== undefined;
   const presetMonth = params.reportMonth ? String(params.reportMonth) : '';
   const presetYear = params.reportYear ? String(params.reportYear) : '';
@@ -187,7 +187,7 @@ const ActivityScreen = () => {
     // If preset values provided from Activities screen, use them (already set in initial state)
     if (presetMonth && presetYear) return;
     // Otherwise fall back to date-based auto-fill for report mode
-    if ((mode === 'report' || (isEditMode && activity && isPastActivity(activity) && activity.status === 'published')) && selectedActivityDate) {
+    if ((mode === 'report' || (isEditMode && activity && activity.status === 'published')) && selectedActivityDate) {
       const month = selectedActivityDate.getMonth() + 1;
       const year = selectedActivityDate.getFullYear();
       setActivityDetails(prev => ({
@@ -738,7 +738,7 @@ const ActivityScreen = () => {
     }
     
     // Additional validation for report mode or past published activities
-    if (mode === 'report' || (isEditMode && activity && isPastActivity(activity) && activity.status === 'published')) {
+    if (mode === 'report' || (isEditMode && activity && activity.status === 'published')) {
       if (!activityDetails.attendance) {
         return 'براہ کرم حاضری کی تعداد درج کریں۔';
       }
@@ -795,10 +795,8 @@ const ActivityScreen = () => {
       attendance = parseInt(activityDetails.attendance);
     } else if (isEditMode) {
       status = activity?.status || 'draft';
-      // For past published activities, include completion fields
-      if (activity && isPastActivity(activity) && activity.status === 'published') {
-        reportMonth = parseInt(activityDetails.reportingMonth);
-        reportYear = parseInt(activityDetails.reportingYear);
+      // For published activities, include attendance (month/year already set from activity data)
+      if (activity && activity.status === 'published') {
         attendance = parseInt(activityDetails.attendance);
       }
     }
@@ -959,40 +957,38 @@ const ActivityScreen = () => {
               numberOfLines={3}
             />
             
-            {/* Completion fields for report mode or past published activities */}
-            {(mode === 'report' || (isEditMode && activity && isPastActivity(activity) && activity.status === 'published')) && (
+            {/* Attendance field for report mode or published activities in edit mode */}
+            {(mode === 'report' || (isEditMode && activity && activity.status === 'published')) && (
+              <FormInput
+                inputTitle="حاضری کی تعداد"
+                value={activityDetails.attendance}
+                onChange={selectAttendance}
+                placeholder="حاضری کی تعداد درج کریں"
+                keyboardType="numeric"
+                required
+              />
+            )}
+
+            {/* Month/year dropdowns only in report mode when no preset values */}
+            {mode === 'report' && !presetMonth && !presetYear && (
               <>
-                <FormInput
-                  inputTitle="حاضری کی تعداد"
-                  value={activityDetails.attendance}
-                  onChange={selectAttendance}
-                  placeholder="حاضری کی تعداد درج کریں"
-                  keyboardType="numeric"
-                  required
+                <CustomDropdown
+                  options={urduMonths}
+                  onSelect={selectReportingMonth}
+                  dropdownTitle="رپورٹنگ کا مہینہ"
+                  placeholder="مہینہ منتخب کریں"
+                  selectedValue={activityDetails.reportingMonth}
+                  dropdownContainerStyle={styles.dropdownContainer}
                 />
 
-                {/* Show month/year dropdowns only when no preset values (fallback for edit mode) */}
-                {!presetMonth && !presetYear && (
-                  <>
-                    <CustomDropdown
-                      options={urduMonths}
-                      onSelect={selectReportingMonth}
-                      dropdownTitle="رپورٹنگ کا مہینہ"
-                      placeholder="مہینہ منتخب کریں"
-                      selectedValue={activityDetails.reportingMonth}
-                      dropdownContainerStyle={styles.dropdownContainer}
-                    />
-
-                    <CustomDropdown
-                      options={yearOptions}
-                      onSelect={selectReportingYear}
-                      dropdownTitle="رپورٹنگ کا سال"
-                      placeholder="سال منتخب کریں"
-                      selectedValue={activityDetails.reportingYear}
-                      dropdownContainerStyle={styles.dropdownContainer}
-                    />
-                  </>
-                )}
+                <CustomDropdown
+                  options={yearOptions}
+                  onSelect={selectReportingYear}
+                  dropdownTitle="رپورٹنگ کا سال"
+                  placeholder="سال منتخب کریں"
+                  selectedValue={activityDetails.reportingYear}
+                  dropdownContainerStyle={styles.dropdownContainer}
+                />
               </>
             )}
             

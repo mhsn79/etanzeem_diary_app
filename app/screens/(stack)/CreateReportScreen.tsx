@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpacity, Clipboard, Alert, Platform, InteractionManager } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { ROUTES } from '@/app/constants/navigation';
@@ -9,6 +10,7 @@ import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
 import Dialog from '@/app/components/Dialog';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
+import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import {
   initializeReportData,
   selectOverallProgress,
@@ -59,6 +61,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   // Log mount immediately to confirm CreateReportScreen ever renders
   console.log('[CreateReportScreen] MOUNT/RE-RENDER', { hasInitialParams: !!initialParamsProp, hasOnBackOverride: !!onBackOverride, submissionId: initialParamsProp?.submissionId });
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const params = useLocalSearchParams();
   const fromRouter = params.submissionId != null || params.templateId != null;
@@ -485,9 +488,9 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
       onBack={handleBack}
     >
       <View style={styles.container}>
-        <ScrollView 
-          style={styles.scrollContainer} 
-          contentContainerStyle={{ paddingBottom: SPACING.xl * 2 }}
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
         >
           {__DEV__ && (
             <TouchableOpacity
@@ -550,10 +553,16 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
         </ScrollView>
 
         {!isViewMode && (
-          <Animated.View 
+          <Animated.View
             style={[
               styles.buttonContainer,
-              { transform: [{ scale: scaleAnim }] }
+              {
+                // When rendered in-tab (onBackOverride), the TabBar is position:absolute
+                // so we need extra bottom margin to clear it (paddingTop + button height + bottom padding)
+                marginBottom: onBackOverride ? (hp(2) + SPACING.xs + Math.max(insets.bottom, SPACING.sm)) : 0,
+                paddingBottom: Math.max(insets.bottom, SPACING.sm),
+                transform: [{ scale: scaleAnim }],
+              }
             ]}
           >
             <CustomButton
@@ -661,8 +670,9 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-
-
+  },
+  scrollContent: {
+    paddingBottom: SPACING.md,
   },
   headerInfoContainer: {
     paddingVertical: SPACING.sm,
@@ -675,10 +685,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     padding: SPACING.sm,
     backgroundColor: COLORS.background,

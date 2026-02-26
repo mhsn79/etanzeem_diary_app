@@ -113,7 +113,12 @@ export const fetchReportSubmissions = createAsyncThunk<
     }
 
     const params = {
-      filter: { unit_id: { _in: unitIds } },
+      filter: {
+        _and: [
+          { unit_id: { _in: unitIds } },
+          { status: { _neq: 'archived' } }
+        ]
+      },
       sort: 'id',
     };
 
@@ -177,7 +182,14 @@ export const fetchReportsByUnitId = createAsyncThunk<
       const managementResponse = await apiRequest<ReportManagement[]>(() => ({
         path: '/items/reports_mgmt',
         method: 'GET',
-        params: { filter: { report_template_id: { _eq: template.id } } }
+        params: {
+          filter: {
+            _and: [
+              { report_template_id: { _eq: template.id } },
+              { status: { _neq: 'archived' } }
+            ]
+          }
+        }
       }));
 
       const managements = normalizeResponse<ReportManagement[]>(managementResponse, 'Managements');

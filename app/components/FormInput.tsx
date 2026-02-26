@@ -77,6 +77,7 @@ const FormInput: React.FC<FormInputProps> = ({
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
+                multiline ? { minHeight: 80, paddingTop: SPACING.xs } : null,
               ]}
               value={value}
               onChangeText={onChange}
@@ -85,7 +86,7 @@ const FormInput: React.FC<FormInputProps> = ({
               placeholderTextColor={COLORS.textSecondary}
               keyboardType={keyboardType}
               maxLength={maxLength}
-              textAlignVertical="center"
+              textAlignVertical={multiline ? "top" : "center"}
               editable={editable && !disabled && !loading}
               multiline={multiline}
               numberOfLines={numberOfLines || (multiline ? 3 : 1)}
@@ -129,6 +130,7 @@ const FormInput: React.FC<FormInputProps> = ({
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
+                multiline ? { minHeight: 80, paddingTop: SPACING.xs } : null,
               ]}
               value={value}
               onChangeText={onChange}
@@ -137,7 +139,7 @@ const FormInput: React.FC<FormInputProps> = ({
               placeholderTextColor={COLORS.textSecondary}
               keyboardType={keyboardType}
               maxLength={maxLength}
-              textAlignVertical="center"
+              textAlignVertical={multiline ? "top" : "center"}
               editable={editable && !disabled && !loading}
               multiline={multiline}
               numberOfLines={numberOfLines || (multiline ? 3 : 1)}

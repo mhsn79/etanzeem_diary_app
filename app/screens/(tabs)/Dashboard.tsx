@@ -123,7 +123,7 @@ const Dashboard = () => {
             </TouchableOpacity>
             <View style={styles.headerRow}>
               <LocationIcon style={styles.headerIcon} />
-              <UrduText style={styles.headerText} numberOfLines={1}>{typeof parentUnitWithLevel === 'string' ? parentUnitWithLevel : i18n.t('zone')}</UrduText>
+              <UrduText style={styles.headerText} numberOfLines={1}>{(typeof parentUnitWithLevel === 'string' && parentUnitWithLevel) ? parentUnitWithLevel : i18n.t('zone')}</UrduText>
             </View>
             <TouchableOpacity style={styles.headerRow} onPress={() => router.push('/screens/ProfileView')} activeOpacity={0.8}>
               <UserIcon style={styles.headerIcon} />

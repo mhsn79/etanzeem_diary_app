@@ -256,20 +256,19 @@ export const initializeReportData = createAsyncThunk<
       }
     } else {
       // Step 1b: Check for existing submission if no specific ID was provided
-      const filter = {
+      const filter = JSON.stringify({
         _and: [
           { template_id: { _eq: params.template_id } },
           { unit_id: { _eq: params.unit_id } },
           { mgmt_id: { _eq: params.mgmt_id } }
         ]
-      };
-      
+      });
+
       reduxLogger.debug('[QA] Searching for existing submission with filter:', filter);
-      
+
       const existingSubmissionsResponse = await directApiRequest<{ data: ReportSubmission[] }>(
-        '/items/reports_submissions',
-        'GET',
-        { filter }
+        `/items/reports_submissions?filter=${encodeURIComponent(filter)}`,
+        'GET'
       );
       
       reduxLogger.debug('[QA] Found submissions:', existingSubmissionsResponse?.data?.map(s => ({
@@ -296,12 +295,16 @@ export const initializeReportData = createAsyncThunk<
       }
     }
     
-    // Step 3: Fetch sections for the template
-    const sectionsFilter = { template_id: { _eq: params.template_id } };
+    // Step 3: Fetch sections for the template (exclude archived)
+    const sectionsFilter = JSON.stringify({
+      _and: [
+        { template_id: { _eq: params.template_id } },
+        { status: { _neq: 'archived' } }
+      ]
+    });
     const sectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
-      '/items/report_sections',
-      'GET',
-      { filter: sectionsFilter, sort: 'sort' }
+      `/items/report_sections?filter=${encodeURIComponent(sectionsFilter)}&sort=sort`,
+      'GET'
     );
     
     // Handle both response formats: direct array or {data: array}
@@ -323,11 +326,15 @@ export const initializeReportData = createAsyncThunk<
       return rejectWithValue('اس رپورٹ میں کوئی سیکشن نہیں ملا');
     }
     
-    const questionsFilter = { section_id: { _in: sectionIds } };
+    const questionsFilter = JSON.stringify({
+      _and: [
+        { section_id: { _in: sectionIds } },
+        { status: { _neq: 'archived' } }
+      ]
+    });
     const questionsResponse = await directApiRequest<{ data: ReportQuestion[] }>(
-      '/items/report_questions',
-      'GET',
-      { filter: questionsFilter, sort: 'sort' }
+      `/items/report_questions?filter=${encodeURIComponent(questionsFilter)}&sort=sort&limit=-1`,
+      'GET'
     );
     
     // Handle both response formats: direct array or {data: array}
@@ -344,13 +351,12 @@ export const initializeReportData = createAsyncThunk<
     // Step 5: Fetch answers for the submission if it exists
     let answers: ReportAnswer[] = [];
     if (submission.id) {
-      const answersFilter = { submission_id: { _eq: submission.id } };
-      
+      const answersFilter = JSON.stringify({ submission_id: { _eq: submission.id } });
+
       try {
         const answersResponse = await directApiRequest<{ data: ReportAnswer[] }>(
-          '/items/report_answers',
-          'GET',
-          { filter: answersFilter }
+          `/items/report_answers?filter=${encodeURIComponent(answersFilter)}&limit=-1`,
+          'GET'
         );
         
         // Handle both response formats: direct array or {data: array}
@@ -663,12 +669,13 @@ export const batchAutoFillAnswers = createAsyncThunk<
         const result = await fetchAutoValueForQuestion(question, context, dispatch);
 
         if (result.success) {
-          // Save the answer
+          // Save the answer — string results (e.g. array) always go to string_value
+          const isStringResult = typeof result.value === 'string';
           await dispatch(saveAnswer({
             submission_id: submissionId,
             question_id: question.id,
-            string_value: question.input_type === 'number' ? null : String(result.value),
-            number_value: question.input_type === 'number' ? result.value : null,
+            string_value: isStringResult ? result.value as string : (question.input_type === 'number' ? null : String(result.value)),
+            number_value: isStringResult ? null : (question.input_type === 'number' ? result.value as number : null),
           })).unwrap();
           filled++;
         } else if (result.error) {
@@ -723,6 +730,8 @@ const qaSlice = createSlice({
       state.saveError = null;
       state.submitStatus = 'idle';
       state.submitError = null;
+      state.batchFillStatus = 'idle';
+      state.batchFillProgress = { current: 0, total: 0 };
     },
     
     // Update progress manually

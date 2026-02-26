@@ -69,5 +69,21 @@ export const mmkvStorage: Storage = {
   },
 };
 
+/**
+ * Clear all persisted Redux data from MMKV/AsyncStorage.
+ * Call this on logout to prevent stale data from rehydrating for the next user.
+ */
+export const clearAllPersistedState = async (): Promise<void> => {
+  try {
+    if (mmkv) {
+      mmkv.clearAll();
+    } else {
+      await AsyncStorage.clear();
+    }
+  } catch (error) {
+    console.error('[storage] Error clearing persisted state:', error);
+  }
+};
+
 // Default export to satisfy Expo Router
-export default {}; 
+export default {};

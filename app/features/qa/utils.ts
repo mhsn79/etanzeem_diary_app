@@ -221,6 +221,8 @@ export const getCalculationButtonText = (aggregateFunc: string | null): string =
       return 'اضافہ';
     case 'minus':
       return 'کمی';
+    case 'array':
+      return 'فہرست';
     default:
       return 'تعداد';
   }
