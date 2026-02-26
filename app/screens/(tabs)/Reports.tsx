@@ -3,11 +3,12 @@ import { StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import ReportsView from '../(stack)/components/ReportsView';
 import CreateReportScreen, { CreateReportInitialParams } from '../(stack)/CreateReportScreen';
-import { 
+import {
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
   selectUserUnitDetails
 } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectIsAuthenticated } from '@/app/features/auth/authSlice';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 
 // Persist in-tab report params across remounts (tab/focus can unmount Reports and clear state)
@@ -53,6 +54,15 @@ const Reports: React.FC = () => {
     console.log('[Reports] onBackOverride called, clearing params. mountId:', mountIdRef.current);
     setOpenReportParams(null);
   };
+
+  // Clear persisted report params on logout to prevent stale data for next user
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      persistedOpenReportParams = null;
+      setOpenReportParamsState(null);
+    }
+  }, [isAuthenticated]);
 
   // Get selected unit for dashboard
   const selectedUnit = useSelector(selectDashboardSelectedUnit);

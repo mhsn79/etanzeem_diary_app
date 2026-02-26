@@ -51,7 +51,9 @@ import {
   selectStrengthTypes,
   selectStrengthByCategory,
   selectCurrentMonthRecordsByType,
+  selectCarryForwardTotals,
   upsertStrengthRecord,
+  fetchPreviousTotalForType,
   selectUserUnitId,
   selectCurrentYear,
   selectCurrentMonth,
@@ -97,7 +99,7 @@ function EditModal({
   title,
   typeId,
   existingRecord,
-  previousTotal,
+  previousTotal: previousTotalProp,
   year,
   month,
   onSaved,
@@ -109,6 +111,8 @@ function EditModal({
   const dispatch = useDispatch<AppDispatch>();
   const userUnitId = useSelector(selectUserUnitId);
   const [saving, setSaving] = useState(false);
+  const [livePreviousTotal, setLivePreviousTotal] = useState(previousTotalProp);
+  const [loadingPrevTotal, setLoadingPrevTotal] = useState(false);
 
   const plusValue = useMemo(() => {
     const parsed = parseInt(plusInput, 10);
@@ -121,8 +125,8 @@ function EditModal({
   }, [minusInput]);
 
   const newTotal = useMemo(() => {
-    return Math.max(0, previousTotal + plusValue - minusValue);
-  }, [previousTotal, plusValue, minusValue]);
+    return Math.max(0, livePreviousTotal + plusValue - minusValue);
+  }, [livePreviousTotal, plusValue, minusValue]);
 
   // Handle numeric-only input
   const handleNumericInput = useCallback((text: string, setter: (v: string) => void) => {
@@ -142,6 +146,23 @@ function EditModal({
     }
   }, []);
 
+  // Fetch fresh previousTotal from API every time modal opens
+  useEffect(() => {
+    if (visible && typeId) {
+      setLoadingPrevTotal(true);
+      setLivePreviousTotal(previousTotalProp); // Show prop value immediately as fallback
+      dispatch(fetchPreviousTotalForType({ typeId, year, month }))
+        .unwrap()
+        .then(result => {
+          setLivePreviousTotal(result.previousTotal);
+        })
+        .catch(() => {
+          // Keep the prop fallback
+        })
+        .finally(() => setLoadingPrevTotal(false));
+    }
+  }, [visible, typeId, year, month, dispatch, previousTotalProp]);
+
   // Pre-populate from existing record when modal opens
   useEffect(() => {
     if (visible) {
@@ -159,7 +180,6 @@ function EditModal({
 
   const handleSave = useCallback(async () => {
     if (!typeId || !userUnitId) return;
-    if (plusValue === 0 && minusValue === 0) return;
 
     setSaving(true);
     try {
@@ -192,7 +212,10 @@ function EditModal({
     setVisible(false);
   }, [setVisible]);
 
-  const isDisabled = plusValue === 0 && minusValue === 0;
+  // Allow saving if there's any change (plus/minus) OR if notes are provided
+  const hasChanges = plusValue > 0 || minusValue > 0;
+  const hasNotes = notesInput.trim().length > 0;
+  const isDisabled = !hasChanges && !hasNotes;
 
   return (
     <Modal
@@ -232,10 +255,14 @@ function EditModal({
           </View>
 
           <View style={styles.modalContent}>
-            {/* Previous Total (read-only) */}
+            {/* Previous Total (read-only, freshly fetched) */}
             <View style={styles.fieldRow}>
               <UrduText style={styles.fieldRowLabel}>پچھلی تعداد</UrduText>
-              <Text style={styles.fieldRowValue}>{previousTotal}</Text>
+              {loadingPrevTotal ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Text style={styles.fieldRowValue}>{livePreviousTotal}</Text>
+              )}
             </View>
 
             {/* Increase Input (اضافہ) with spinner */}
@@ -385,12 +412,14 @@ const WorkforceItem = ({ label, value, onEdit, typeId, editable = true, ...acces
 interface StrengthTypeItemProps {
   type: any;
   monthlyRecord: StrengthRecord | null;
+  carryForwardTotal?: number;
   showModal: (title: string, typeId: number, record: StrengthRecord | null) => void;
   editable: boolean;
 }
 
-const StrengthTypeItem = ({ type, monthlyRecord, showModal, editable }: StrengthTypeItemProps) => {
-  const currentValue = monthlyRecord?.new_total || 0;
+const StrengthTypeItem = ({ type, monthlyRecord, carryForwardTotal, showModal, editable }: StrengthTypeItemProps) => {
+  // If a record exists for this month, show its new_total; otherwise show the carry-forward from the latest previous month
+  const currentValue = monthlyRecord?.new_total ?? (carryForwardTotal ?? 0);
 
   return (
     <WorkforceItem
@@ -430,6 +459,7 @@ export default function Workforce() {
   const strengthTypes = useSelector(selectStrengthTypes);
   const strengthByCategory = useSelector(selectStrengthByCategory);
   const currentMonthRecords = useSelector(selectCurrentMonthRecordsByType);
+  const carryForwardTotals = useSelector(selectCarryForwardTotals);
   const now = useMemo(() => new Date(), []);
   const currentYear = useSelector(selectCurrentYear) || now.getFullYear();
   const currentMonth = useSelector(selectCurrentMonth) || (now.getMonth() + 1);
@@ -631,15 +661,16 @@ export default function Workforce() {
     dispatch(refreshStrengthData({ year: currentYear, month: currentMonth }));
   }, [dispatch, currentYear, currentMonth]);
 
-  // Compute previousTotal for the modal from the record
+  // Always use carry-forward total (latest previous month's new_total) as previousTotal.
+  // This ensures that if a prior month's record was updated, subsequent months reflect it.
   const modalPreviousTotal = useMemo(() => {
-    if (modalConfig.existingRecord) {
-      return modalConfig.existingRecord.previous_total;
+    const carryForward = carryForwardTotals[modalConfig.typeId];
+    if (carryForward != null) {
+      return carryForward;
     }
-    // If no record for this month, use the latest new_total as carry-forward
-    // (the upsertStrengthRecord thunk will fetch this from API)
-    return currentMonthRecords[modalConfig.typeId]?.new_total || 0;
-  }, [modalConfig, currentMonthRecords]);
+    // Fallback to existing record's previous_total if carry-forward hasn't loaded yet
+    return modalConfig.existingRecord?.previous_total ?? 0;
+  }, [modalConfig, carryForwardTotals]);
 
   // Handle back navigation
   const handleBack = useCallback(() => {
@@ -841,6 +872,7 @@ export default function Workforce() {
                         key={`type-${type.id}`}
                         type={type}
                         monthlyRecord={currentMonthRecords[type.id] || null}
+                        carryForwardTotal={carryForwardTotals[type.id]}
                         showModal={showModal}
                         editable={isCurrentMonthEditable}
                       />

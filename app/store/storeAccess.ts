@@ -1,7 +1,7 @@
 import type { Store } from '@reduxjs/toolkit';
 
 type StoreLike = Pick<Store, 'getState' | 'dispatch'>;
-type PersistorLike = { purge: () => Promise<any>; pause: () => void; flush: () => Promise<any> };
+type PersistorLike = { purge: () => Promise<any>; pause: () => void; resume: () => void; flush: () => Promise<any> };
 
 let storeRef: StoreLike | null = null;
 let persistorRef: PersistorLike | null = null;
@@ -17,8 +17,8 @@ export const getStore = (): StoreLike => {
   return storeRef;
 };
 
-export const setPersistor = (persistor: PersistorLike) => {
-  persistorRef = persistor;
+export const setPersistor = (persistor: any) => {
+  persistorRef = persistor as PersistorLike;
 };
 
 export const getPersistor = (): PersistorLike => {

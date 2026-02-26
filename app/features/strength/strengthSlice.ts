@@ -5,7 +5,7 @@ import {
   createSelector,
 } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store/types';
-import apiRequest, { directApiRequest } from '../../services/apiClient';
+import { directApiRequest } from '../../services/apiClient';
 
 // Types
 export interface StrengthType {
@@ -34,6 +34,7 @@ export interface StrengthRecord {
 export interface StrengthState {
   strengthTypes: StrengthType[];
   strengthRecords: StrengthRecord[];
+  carryForwardTotals: Record<number, number>; // typeId → latest new_total from previous months (for types without a current month record)
   loading: boolean;
   error: string | null;
   recordsLoading: boolean;
@@ -52,6 +53,7 @@ const now = new Date();
 const initialState: StrengthState = {
   strengthTypes: [],
   strengthRecords: [],
+  carryForwardTotals: {},
   loading: false,
   error: null,
   recordsLoading: false,
@@ -127,62 +129,24 @@ export const fetchStrengthTypes = createAsyncThunk<
       console.warn('No user unit details available, cannot fetch strength types');
       return [];
     }
-    
-    // // Get the unit level from the user's unit details
-    // const unitLevelId = userUnitDetails?.level_id || userUnitDetails?.Level_id;
-    
-    // // If we don't have the unit level, return an empty array
-    // if (!unitLevelId) {
-    //   console.warn('No unit level available, cannot fetch strength types');
-    //   return [];
-    // }
-    
-    // Filter to include only types where Reporting_Unit_Level matches the user's unit level
-    const params = {
-      filter: { 
-        // Reporting_Unit_Level: { _eq: unitLevelId }
-      },
-      sort: ['Category', 'id'] // Sort by Category first, then by ID
-    };
 
-    console.log(`[STRENGTH_DEBUG] Fetching ALL strength types (not filtered by unit level)`);
-    console.log(`[STRENGTH_DEBUG] Request params:`, JSON.stringify(params, null, 2));
+    const unitLevelId = userUnitDetails?.Level_id || userUnitDetails?.level_id;
 
-    // The centralized API client handles token refresh automatically
-    const response = await apiRequest<StrengthType[] | { data: StrengthType[] }>(() => ({
-      path: '/items/Strength_Type',
-      method: 'GET',
-      params,
-    }));
-    
-    console.log('[STRENGTH_DEBUG] ===================== API RESPONSE ================');
-    console.log('[STRENGTH_DEBUG] Response structure:', Object.keys(response));
-    
-    // Check if response has data property
-    if ('data' in response && response.data) {
-      console.log('[STRENGTH_DEBUG] Response has data property');
-      console.log('[STRENGTH_DEBUG] Response data type:', Array.isArray(response.data) ? 'Array' : typeof response.data);
-      console.log('[STRENGTH_DEBUG] Response data length:', Array.isArray(response.data) ? response.data.length : 'N/A');
-      
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log('[STRENGTH_DEBUG] First item sample:', JSON.stringify(response.data[0], null, 2));
-      }
-    } else {
-      console.log('[STRENGTH_DEBUG] Response is direct data (no data property)');
-      console.log('[STRENGTH_DEBUG] Response type:', Array.isArray(response) ? 'Array' : typeof response);
-      console.log('[STRENGTH_DEBUG] Response length:', Array.isArray(response) ? response.length : 'N/A');
-      
-      if (Array.isArray(response) && response.length > 0) {
-        console.log('[STRENGTH_DEBUG] First item sample:', JSON.stringify(response[0], null, 2));
-      }
+    if (!unitLevelId) {
+      console.warn('No unit level available, cannot fetch strength types');
+      return [];
     }
 
-    const strengthTypes = normalizeResponse<StrengthType[]>(response, 'Strength Types');
-    
-    // Log the categories found
-    const categories = [...new Set(strengthTypes.map(type => type.Category))];
-    console.log(`Found ${strengthTypes.length} strength types in categories: ${categories.join(', ')}`);
-    
+    const filter = JSON.stringify({
+      Reporting_Unit_Level: { _eq: unitLevelId },
+    });
+
+    const response = await directApiRequest<{ data: StrengthType[] }>(
+      `/items/Strength_Type?filter=${encodeURIComponent(filter)}&sort=Category,id`,
+      'GET'
+    );
+
+    const strengthTypes = response.data || [];
     return strengthTypes;
   } catch (error: any) {
     console.error('Error in fetchStrengthTypes:', error);
@@ -231,6 +195,59 @@ export const fetchStrengthRecords = createAsyncThunk<
   } catch (error: any) {
     console.error('Error in fetchStrengthRecords:', error);
     return rejectWithValue(error.message || 'Failed to fetch strength records');
+  }
+});
+
+/**
+ * Fetch the latest new_total for each strength type from previous months.
+ * Used to display carry-forward values when no record exists for the selected month.
+ */
+export const fetchCarryForwardTotals = createAsyncThunk<
+  Record<number, number>,
+  { year: number; month: number },
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('strength/fetchCarryForwardTotals', async ({ year, month }, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const unitId = state.strength.userUnitId || state.tanzeem.userUnitDetails?.id;
+
+    if (!unitId) return {};
+
+    // Fetch the latest record per type before the selected month for this unit
+    const filter = JSON.stringify({
+      _and: [
+        { Tanzeemi_Unit: { _eq: unitId } },
+        {
+          _or: [
+            { report_year: { _lt: year } },
+            {
+              _and: [
+                { report_year: { _eq: year } },
+                { report_month: { _lt: month } },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const response = await directApiRequest<{ data: StrengthRecord[] }>(
+      `/items/Strength_Records?filter=${encodeURIComponent(filter)}&sort=-report_year,-report_month&limit=-1`,
+      'GET'
+    );
+
+    const records = response.data || [];
+    // Group by Type, keep only the first (latest) record for each type
+    const totals: Record<number, number> = {};
+    for (const record of records) {
+      if (!(record.Type in totals)) {
+        totals[record.Type] = record.new_total;
+      }
+    }
+    return totals;
+  } catch (error: any) {
+    console.error('[STRENGTH] Error fetching carry-forward totals:', error);
+    return rejectWithValue(error.message || 'Failed to fetch carry-forward totals');
   }
 });
 
@@ -342,6 +359,26 @@ async function cascadeSubsequentMonths(
   }
 }
 
+/**
+ * Fetch fresh previous_total for a single type when the modal opens.
+ * Returns the latest previous month's new_total for the given (unit, type, year, month).
+ */
+export const fetchPreviousTotalForType = createAsyncThunk<
+  { typeId: number; previousTotal: number },
+  { typeId: number; year: number; month: number },
+  { state: RootState; rejectValue: string }
+>('strength/fetchPreviousTotalForType', async ({ typeId, year, month }, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const unitId = state.strength.userUnitId || state.tanzeem.userUnitDetails?.id;
+    if (!unitId) return { typeId, previousTotal: 0 };
+    const previousTotal = await fetchPreviousTotal(unitId, typeId, year, month);
+    return { typeId, previousTotal };
+  } catch (error: any) {
+    return rejectWithValue(error.message || 'Failed to fetch previous total');
+  }
+});
+
 export const upsertStrengthRecord = createAsyncThunk<
   StrengthRecord,
   {
@@ -382,13 +419,9 @@ export const upsertStrengthRecord = createAsyncThunk<
 
     const existingRecord = existingResponse.data?.[0];
 
-    // Determine previous_total
-    let previous_total: number;
-    if (existingRecord) {
-      previous_total = existingRecord.previous_total;
-    } else {
-      previous_total = await fetchPreviousTotal(unitId, params.typeId, params.year, params.month);
-    }
+    // Always fetch fresh previous_total from the latest previous record
+    // (don't rely on existing record's previous_total which may be stale)
+    const previous_total = await fetchPreviousTotal(unitId, params.typeId, params.year, params.month);
 
     const new_total = Math.max(0, previous_total + params.plus_value - params.minus_value);
 
@@ -467,6 +500,9 @@ export const refreshStrengthData = createAsyncThunk<
     ]);
 
     console.log(`[STRENGTH_REFRESH] Types: ${(typesResult.payload as any[])?.length || 0}, Records: ${(recordsResult.payload as any[])?.length || 0}`);
+
+    // Fetch carry-forward totals from previous months (for types without a current month record)
+    dispatch(fetchCarryForwardTotals({ year, month }));
   } catch (error) {
     console.error('[STRENGTH_REFRESH] Error:', error);
   }
@@ -536,6 +572,7 @@ const strengthSlice = createSlice({
     },
     clearStrengthRecords: (state) => {
       state.strengthRecords = [];
+      state.carryForwardTotals = {};
       state.recordsLoading = false;
       state.recordsError = null;
     },
@@ -582,6 +619,11 @@ const strengthSlice = createSlice({
         state.recordsError = action.payload ?? 'Failed to save strength record';
       })
       
+      // fetchCarryForwardTotals
+      .addCase(fetchCarryForwardTotals.fulfilled, (state, action) => {
+        state.carryForwardTotals = action.payload;
+      })
+
       // fetchStrengthCountAndTotals
       .addCase(fetchStrengthCountAndTotals.fulfilled, (state, action) => {
         state.strengthCount = action.payload.count;
@@ -607,6 +649,7 @@ export const selectStrengthSum = (state: RootState) => state.strength.strengthSu
 export const selectStrengthAvg = (state: RootState) => state.strength.strengthAvg;
 export const selectCurrentYear = (state: RootState) => state.strength.currentYear;
 export const selectCurrentMonth = (state: RootState) => state.strength.currentMonth;
+export const selectCarryForwardTotals = (state: RootState) => state.strength.carryForwardTotals;
 
 // Memoized selectors
 export const selectStrengthByGender = createSelector(

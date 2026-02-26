@@ -145,19 +145,13 @@ export const fetchReportsByUnitId = createAsyncThunk<
   ReportData[],
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportsByUnitId', async (unitId, { getState, rejectWithValue }) => {
+>('reports/fetchReportsByUnitId', async (unitId, { rejectWithValue }) => {
   try {
     reduxLogger.debug('Starting fetchReportsByUnitId for unitId:', unitId);
     
     if (!unitId || typeof unitId !== 'number') {
       reduxLogger.error('Invalid unit ID provided:', unitId);
       return rejectWithValue('Invalid unit ID provided');
-    }
-
-    // Get user unit details from state
-    const userUnitDetails = getState().tanzeem.userUnitDetails;
-    if (!userUnitDetails) {
-      return rejectWithValue('User unit details not available');
     }
 
     // Fetch ALL report templates (no level filtering)

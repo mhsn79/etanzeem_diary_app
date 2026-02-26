@@ -38,12 +38,11 @@ import { COMMON_IMAGES } from '@/app/constants/images';
 import { TabGroup } from '@/app/components/Tab';
 import ReportCard from './ReportCard';
 import { logout } from '@/app/features/auth/authSlice';
-import { 
-  initializeReportData, 
-  selectOverallProgress, 
+import {
+  initializeReportData,
   selectOverallProgressForSubmission,
   selectCurrentSubmissionId,
-  selectQAState 
+  selectQAState
 } from '@/app/features/qa/qaSlice';
 
 export type OpenReportParams = {
@@ -191,7 +190,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   
   // QA module state
   const qaState = useSelector(selectQAState);
-  const overallProgress = useSelector(selectOverallProgress);
   const currentSubmissionId = useSelector(selectCurrentSubmissionId);
   
   // Debug loading state
@@ -732,12 +730,24 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // Use the selected submission's own management for card title and days (never mix with open mgmt)
   const currentManagement = submissionManagementAndTemplate.management ?? currentlyOpenManagement;
 
-  // Calculate progress for the active submission
-  // Prioritize currentSubmissionId from QA state, fallback to existingSubmission.id
-  const activeSubmissionId = currentSubmissionId || existingSubmission?.id || null;
-  const completionPercentage = useSelector((state: any) => 
-    activeSubmissionId ? (selectOverallProgressForSubmission(state, activeSubmissionId) || 0) : 0
+  // Calculate progress for the موجودہ رپورٹ card ONLY when QA state belongs to the current report.
+  // When the user opens a different report (old/overdue), QA state gets overwritten with that
+  // report's data. We cache the current report's progress so it doesn't get corrupted.
+  const currentReportSubmissionId = existingSubmission?.id || null;
+  const [cachedCurrentReportProgress, setCachedCurrentReportProgress] = useState(0);
+
+  const qaProgressForCurrentReport = useSelector((state: any) =>
+    currentReportSubmissionId ? (selectOverallProgressForSubmission(state, currentReportSubmissionId) || 0) : 0
   );
+
+  useEffect(() => {
+    // Only update cached progress when QA state actually contains the current report's data
+    if (currentReportSubmissionId && currentSubmissionId === currentReportSubmissionId) {
+      setCachedCurrentReportProgress(qaProgressForCurrentReport);
+    }
+  }, [currentSubmissionId, currentReportSubmissionId, qaProgressForCurrentReport]);
+
+  const completionPercentage = cachedCurrentReportProgress;
 
   // Determine progress color based on completion percentage
   const getProgressColor = (percentage: number) => {
@@ -962,7 +972,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     onPress={() => {
                       const submissionMgmtId = existingSubmission?.mgmt_id ?? 'NULL';
                       const submissionTemplateId = existingSubmission?.template_id ?? 'NULL';
-                      const debugStr = `[ReportsView] Submission ID: ${existingSubmission?.id ?? 'NULL'}, Mgmt ID (submission): ${submissionMgmtId}, Template ID (submission): ${submissionTemplateId}, Unit: ${displayUnitId}, QA Current: ${currentSubmissionId ?? 'NULL'}, Active: ${activeSubmissionId ?? 'NULL'}, Progress: ${completionPercentage}%`;
+                      const debugStr = `[ReportsView] Submission ID: ${existingSubmission?.id ?? 'NULL'}, Mgmt ID (submission): ${submissionMgmtId}, Template ID (submission): ${submissionTemplateId}, Unit: ${displayUnitId}, QA Current: ${currentSubmissionId ?? 'NULL'}, CurrentReport: ${currentReportSubmissionId ?? 'NULL'}, Progress: ${completionPercentage}%`;
                       Clipboard.setString(debugStr);
                       if (Platform.OS === 'ios' || Platform.OS === 'android') {
                         Alert.alert('کاپی ہو گیا', 'ڈیبگ معلومات کاپی ہو گئی۔');

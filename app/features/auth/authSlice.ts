@@ -190,8 +190,14 @@ export const login = createAsyncThunk<
 >('auth/login', async (credentials, { rejectWithValue, dispatch }) => {
   try {
     authLogger.info('NEW LOGIN LOGIC STARTED for:', credentials.email);
+
+    // Resume persistor in case it was paused during a previous logout
+    try {
+      getPersistor().resume();
+    } catch (_) { /* persistor may not be initialized yet */ }
+
     authLogger.debug('Authenticating with Directus...');
-    
+
     // Test basic network connectivity first
     authLogger.debug('Testing basic network connectivity...');
     try {
