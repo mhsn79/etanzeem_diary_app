@@ -44,8 +44,8 @@ function getIcon(label: ValidLabel, focused: boolean) {
   return <IconComponent style={iconStyle} />;
 }
 
-// Delay so Fabric can finish layout before tab switch (avoids "Unable to find viewState for tag" when leaving Activities).
-const TAB_SWITCH_DELAY_MS = 280;
+// Keep a short delay so tab switches stay smooth without feeling sluggish.
+const TAB_SWITCH_DELAY_MS = 120;
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -88,18 +88,17 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
           if (!isFocused && !event.defaultPrevented && !pendingRef.current) {
             pendingRef.current = true;
             const tabName = LABEL_TO_TAB_NAME[validLabel];
-            // Defer tab switch + short delay so Fabric can finish layout (avoids "Unable to find viewState for tag" on quick Activities -> Reports)
+            const releaseGuard = setTimeout(() => {
+              pendingRef.current = false;
+            }, 900);
+
+            // Defer only once to let ongoing interactions finish, then switch quickly.
             InteractionManager.runAfterInteractions(() => {
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  navigation.navigate(tabName);
-                  pendingRef.current = false;
-                }, TAB_SWITCH_DELAY_MS);
-                // Safety: unblock after 500ms if something goes wrong
-                setTimeout(() => {
-                  pendingRef.current = false;
-                }, 500);
-              });
+              setTimeout(() => {
+                navigation.navigate(tabName);
+                pendingRef.current = false;
+                clearTimeout(releaseGuard);
+              }, TAB_SWITCH_DELAY_MS);
             });
           }
         };

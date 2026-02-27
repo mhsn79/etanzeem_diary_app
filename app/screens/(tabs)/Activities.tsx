@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import {
@@ -122,10 +122,6 @@ export default function Activities() {
     dispatch(fetchActivities()).finally(() => {
       setRefreshing(false);
     });
-  }, [dispatch]);
-
-  useLayoutEffect(() => {
-    dispatch(fetchActivities());
   }, [dispatch]);
 
   // Refetch on focus. Abort on blur to avoid state updates during transitions.

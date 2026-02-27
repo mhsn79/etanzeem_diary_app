@@ -1,0 +1,35 @@
+# EAS Build ignore file
+# When .easignore exists, EAS uses it INSTEAD of .gitignore for uploads
+
+# dependencies (EAS installs these on the server)
+node_modules/
+
+# iOS (not needed for Android builds)
+ios/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Build caches
+android/build/
+android/.gradle/
+android/app/build/
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# env
+.env
+
+# claude
+.claude/
+
+# git
+.git/

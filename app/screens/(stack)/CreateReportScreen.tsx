@@ -443,7 +443,21 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
       console.log('[CreateReportScreen] Back: calling onBackOverride (in-tab)');
       onBackOverride();
     } else {
+      let navigated = false;
+      const fallbackTimer = setTimeout(() => {
+        if (navigated) return;
+        navigated = true;
+        if (router.canGoBack()) {
+          navigation.goBack();
+        } else {
+          router.replace(ROUTES.DASHBOARD);
+        }
+      }, 450);
+
       InteractionManager.runAfterInteractions(() => {
+        if (navigated) return;
+        navigated = true;
+        clearTimeout(fallbackTimer);
         if (router.canGoBack()) {
           navigation.goBack();
         } else {

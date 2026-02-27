@@ -677,7 +677,27 @@ export default function Workforce() {
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    InteractionManager.runAfterInteractions(() => router.back());
+    let navigated = false;
+    const fallbackTimer = setTimeout(() => {
+      if (navigated) return;
+      navigated = true;
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/screens/(tabs)/Dashboard');
+      }
+    }, 450);
+
+    InteractionManager.runAfterInteractions(() => {
+      if (navigated) return;
+      navigated = true;
+      clearTimeout(fallbackTimer);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/screens/(tabs)/Dashboard');
+      }
+    });
   }, [router]);
 
   // Handle navigation to Arkan screen with optional contact type filter

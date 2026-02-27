@@ -758,6 +758,28 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       )
     : 0;
 
+  // Keep a visible fallback state while unit context is restoring after navigation.
+  if (!displayUnitId) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <UrduText style={styles.loadingText}>یونٹ ڈیٹا بحال ہو رہا ہے...</UrduText>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            refreshTokenIfNeeded()
+              .then(() => fetchAllData(true))
+              .catch((retryError) => {
+                console.error('[ReportsView] Retry failed while unit context missing:', retryError);
+              });
+          }}
+        >
+          <UrduText style={styles.retryButtonText}>دوبارہ کوشش کریں</UrduText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // Render loading state
   if (loading) {
     return (

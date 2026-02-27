@@ -19,7 +19,7 @@
         "EXPO_NO_TELEMETRY": "1"
       },
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       },
       "ios": {
         "image": "latest"

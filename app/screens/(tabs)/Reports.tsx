@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import ReportsView from '../(stack)/components/ReportsView';
 import CreateReportScreen, { CreateReportInitialParams } from '../(stack)/CreateReportScreen';
@@ -9,15 +9,13 @@ import {
   selectUserUnitDetails
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectIsAuthenticated } from '@/app/features/auth/authSlice';
-import { useTokenRefresh } from '@/app/utils/tokenRefresh';
+import UrduText from '@/app/components/UrduText';
+import { COLORS } from '@/app/constants/theme';
 
 // Persist in-tab report params across remounts (tab/focus can unmount Reports and clear state)
 let persistedOpenReportParams: CreateReportInitialParams | null = null;
 
 const Reports: React.FC = () => {
-  // Initialize automatic token refresh
-  const { getTokenInfo } = useTokenRefresh();
-  
   // When set, show CreateReportScreen in-tab (avoids stack navigation / immediate back)
   const [openReportParams, setOpenReportParamsState] = useState<CreateReportInitialParams | null>(
     () => persistedOpenReportParams
@@ -35,7 +33,7 @@ const Reports: React.FC = () => {
       });
       setOpenReportParamsState(persistedOpenReportParams);
     }
-  }, []);
+  }, [openReportParams]);
 
   const setOpenReportParams = (value: CreateReportInitialParams | null) => {
     persistedOpenReportParams = value;
@@ -83,6 +81,15 @@ const Reports: React.FC = () => {
     );
   }
 
+  if (!displayUnitId) {
+    return (
+      <View style={styles.fallbackContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <UrduText style={styles.fallbackText}>یونٹ ڈیٹا لوڈ ہو رہا ہے...</UrduText>
+      </View>
+    );
+  }
+
   return (
     <ReportsView 
       showHeader={false}
@@ -92,5 +99,20 @@ const Reports: React.FC = () => {
     />
   );
 };
+
+const styles = StyleSheet.create({
+  fallbackContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 24,
+  },
+  fallbackText: {
+    marginTop: 12,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+});
 
 export default Reports;
