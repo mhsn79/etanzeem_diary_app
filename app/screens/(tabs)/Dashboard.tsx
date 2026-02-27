@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  useColorScheme,
   useWindowDimensions,
 } from 'react-native';
 import i18n from '@/app/i18n';
@@ -54,7 +53,7 @@ const BUTTON_SIZE_SCALE = 0.9;
 const Dashboard = () => {
   const router = useRouter();
   const navigation = useNavigation();
-  const colorScheme = useColorScheme();
+  const colorScheme = 'light';
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = screenWidth - 2 * SIDE_MARGIN;
   const fullSquare = Math.floor((contentWidth - GRID_GAP) / 2);
@@ -173,7 +172,7 @@ const Dashboard = () => {
                   {pendingReportCount > 0 && (
                     <View style={styles.pendingBadge}>
                       <UrduText style={styles.pendingBadgeText}>
-                        {pendingReportCount} جمع کرنا باقی ہے
+                        {pendingReportCount} جمع کروانا باقی ہے
                       </UrduText>
                     </View>
                   )}

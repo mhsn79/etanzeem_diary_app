@@ -375,6 +375,7 @@ export default function RukunView() {
           showCamera={false}
           personId={rukun.id}
           isUploading={false}
+          headerHeight={180}
         />
 
         {/* Content */}
@@ -662,8 +663,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#fff' },
 
   /* scroll */
-  scrollWrapper: { marginTop: AVATAR_SIZE / 2 + 20 },
-  scrollContent: { paddingBottom: 40 },
+  scrollWrapper: { marginTop: AVATAR_SIZE / 2 },
+  scrollContent: { paddingBottom: 24 },
 
   /* centered view */
   center: { justifyContent: 'center', alignItems: 'center' },
@@ -754,10 +755,10 @@ const styles = StyleSheet.create({
 
   /* Action Section */
   actionSection: {
-    marginTop: SPACING.lg,
+    marginTop: SPACING.md,
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
-    gap: SPACING.md,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.xs,
   },
   actionButton: {
     backgroundColor: COLORS.primary,

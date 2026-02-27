@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
-import Constants from 'expo-constants';
+import { version as appVersion } from '../../package.json';
 import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
@@ -19,18 +19,16 @@ import { AppDispatch } from '@/app/store/types';
 
 // Import components
 import CustomButton from '@/app/components/CustomButton';
-import CustomDropdown from '@/app/components/CustomDropdown';
-import FormInput from '@/app/components/FormInput';
 import UrduText from '@/app/components/UrduText';
 import ProfileHeader from '@/app/components/ProfileHeader';
 import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS } from '../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../constants/theme';
 
 // Selectors for person data
-import { 
-  selectUserDetails, 
-  selectUserDetailsStatus, 
-  selectUserDetailsError 
+import {
+  selectUserDetails,
+  selectUserDetailsStatus,
+  selectUserDetailsError
 } from '@/app/features/persons/personSlice';
 
 // Selectors for tanzeem level data
@@ -44,22 +42,42 @@ import {
 } from '@/app/features/tanzeem/tanzeemSlice';
 
 /* ──────────────────────
-   Helper for read-only text fields
+   Compact read-only field row
    ────────────────────── */
-const StaticField = (label: string, value: string | undefined | null) => (
-  <FormInput
-    key={label}
-    inputTitle={label}
-    value={value || 'N/A'}
-    onChange={() => {}}
-    editable={false}
-  />
+const InfoRow = ({ label, value }: { label: string; value: string }) => (
+  <View style={infoRowStyles.row}>
+    <UrduText style={infoRowStyles.label}>{label}</UrduText>
+    <UrduText style={infoRowStyles.value}>{value}</UrduText>
+  </View>
 );
 
-/* ──────────────────────
-   Constants
-   ────────────────────── */
-const AVATAR_SIZE = 120;         // keep in sync with styles.avatar
+const infoRowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  label: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  value: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.black,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+    marginLeft: SPACING.sm,
+  },
+});
+
+const AVATAR_SIZE = 120; // must match ProfileHeader's internal AVATAR_SIZE
 
 export default function ProfileView() {
   const insets = useSafeAreaInsets();
@@ -212,7 +230,7 @@ export default function ProfileView() {
         backgroundSource={COMMON_IMAGES.profileBackground}
         avatarSource={require('@/assets/images/avatar.png')}
         showCamera={false}
-        headerHeight={200}
+        headerHeight={160}
       />
 
       {/*──────────── Content ────────────*/}
@@ -231,22 +249,12 @@ export default function ProfileView() {
       >
         <UrduText style={styles.personName}>{displayData.name || ''}</UrduText>
 
-        {/* Only show required fields: Name, Father's name, Address, Email, Phone number, WhatsApp Number */}
-        {displayData.parent && StaticField(i18n.t('parent'), displayData.parent)}
-        {displayData.address && StaticField(i18n.t('address'), displayData.address)}
-        {displayData.email && StaticField(i18n.t('email'), displayData.email)}
-        {displayData.phone && StaticField(i18n.t('phone_number'), displayData.phone)}
-        {displayData.whatsApp && StaticField(i18n.t('whatsapp_number'), displayData.whatsApp)}
-
-        {/* <CustomDropdown
-          dropdownTitle={i18n.t('language')}
-          placeholder={i18n.t('language')}
-          onSelect={() => {}}
-          options={[
-            { id: 'ur', label: 'اردو', value: 'ur' },
-            { id: 'en', label: 'English', value: 'en' },
-          ]}
-        /> */}
+        {displayData.parent && <InfoRow label={i18n.t('parent')} value={displayData.parent} />}
+        {displayData.phone && <InfoRow label={i18n.t('phone_number')} value={displayData.phone} />}
+        {displayData.whatsApp && <InfoRow label={i18n.t('whatsapp_number')} value={displayData.whatsApp} />}
+        {displayData.email && <InfoRow label={i18n.t('email')} value={displayData.email} />}
+        {displayData.address && <InfoRow label={i18n.t('address')} value={displayData.address} />}
+        {displayData.unit && <InfoRow label={i18n.t('unit')} value={displayData.unit} />}
 
         <View style={styles.logoutContainer}>
           <CustomButton
@@ -257,7 +265,7 @@ export default function ProfileView() {
         </View>
 
         <Text style={styles.versionText}>
-          Version {Constants.expoConfig?.version ?? require('../../package.json').version}
+          Version {appVersion}
         </Text>
       </ScrollView>
     </View>
@@ -268,32 +276,30 @@ export default function ProfileView() {
    Styles
    ────────────────────── */
 const styles = StyleSheet.create({
-  root: { 
-    flex: 1, 
-    backgroundColor: '#fff' 
-  },
-  
-  scrollWrapper: {
-    marginTop: AVATAR_SIZE / 2, // ensures list starts below the avatar
+  root: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
 
-  /* scroll area */
+  scrollWrapper: {
+    marginTop: AVATAR_SIZE / 2,
+  },
+
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: 16,
   },
 
-  /* text */
   personName: {
-    fontSize: 28,
+    fontSize: 24,
     color: '#008CFF',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
-  /* buttons */
   logoutContainer: {
-    marginVertical: 16,
+    marginTop: SPACING.sm,
   },
   logoutBtn: {
     backgroundColor: COLORS.error,
@@ -307,7 +313,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  /* loading state */
   centerContainer: {
     flex: 1,
     justifyContent: 'center',

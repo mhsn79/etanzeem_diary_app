@@ -148,7 +148,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerWrapper: {
-    paddingTop: 30,
+    paddingTop: 0,
   },
   headerBg: {
     ...StyleSheet.absoluteFillObject,

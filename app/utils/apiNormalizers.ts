@@ -116,10 +116,14 @@ const personFieldMappings: FieldMappings = {
 // Person-specific special cases
 const personSpecialCases = (normalized: Record<string, any>, apiField: string, apiValue: any) => {
   try {
-    // Special case for phone number - also map to whatsApp and sms
+    // Special case for phone number - also map to sms
     if (apiField === 'Phone_Number' && apiValue) {
-      normalized['whatsApp'] = apiValue;
       normalized['sms'] = apiValue;
+    }
+    // Normalize additional_phones from JSON array to string for display
+    if (apiField === 'additional_phones' && apiValue) {
+      normalized['additional_phones'] = Array.isArray(apiValue) ? apiValue[0] || '' : apiValue;
+      normalized['whatsApp'] = normalized['additional_phones'];
     }
   } catch (error) {
     // Silently handle errors in special cases to prevent app crashes

@@ -12,6 +12,7 @@ import {
   Text,
   TouchableWithoutFeedback,
   View,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -141,14 +142,15 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <ScrollView
           contentContainerStyle={[styles.scrollContainer, styles.scrollContainerPadding]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
@@ -161,11 +163,11 @@ export default function LoginScreen() {
               style={styles.pattern}
             >
               <View style={styles.overlay}>
+                <Text style={[styles.title, { marginTop: titleTop }]}>{i18n.t('appname')}</Text>
                 <Image
                   source={require('../../assets/images/jamat-logo.png')}
                   style={styles.logo}
                 />
-                <Text style={[styles.title, { top: titleTop }]}>{i18n.t('appname')}</Text>
               </View>
             </ImageBackground>
           </View>
@@ -176,6 +178,7 @@ export default function LoginScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('email')}</Text>
               <CustomTextInput
+                style={styles.ltrInput}
                 placeholder={i18n.t('enter_your_email')}
                 placeholderTextColor="#2D2327"
                 onChangeText={(v) => {
@@ -214,6 +217,7 @@ export default function LoginScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('password')}</Text>
               <CustomTextInput
+                style={styles.ltrInput}
                 placeholder="********"
                 placeholderTextColor="#2D2327"
                 secureTextEntry
@@ -287,6 +291,8 @@ export default function LoginScreen() {
 /* ------------------------------------------------------------------ */
 /*                                STYLES                              */
 /* ------------------------------------------------------------------ */
+const { height: screenHeight } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -295,15 +301,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   scrollContainerPadding: {
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 80,
   },
   background: {
     flex: 1,
+    backgroundColor: '#0077ff',
   },
   logoContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 260,
+    width: '100%',
+    height: screenHeight * 0.45,
   },
   pattern: {
     width: '100%',
@@ -311,44 +317,50 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: '#0077ff',
-    opacity: 0.8,
+    backgroundColor: 'rgba(0, 119, 255, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 40, // Space for the rounded overlap
   },
   logo: {
-    position: 'absolute',
-    width: 120, // Added explicit width
-    height: 120, // Added explicit height
+    width: 140,
+    height: 140,
     resizeMode: 'contain',
+    marginTop: 15,
   },
   title: {
-    position: 'absolute',
     color: 'white',
-    fontSize: 30,
+    fontSize: 34,
     fontFamily: 'JameelNooriNastaleeq',
-    lineHeight: 60,
     textAlign: 'center',
   },
   loginContainer: {
     flexGrow: 1,
     backgroundColor: COLORS.lightGray,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    justifyContent: 'center',
-    minHeight: 420,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+    marginTop: -40,
+    minHeight: screenHeight * 0.55 + 40,
   },
   inputContainer: {
     width: '100%',
-    marginBottom: 12,
-    minHeight: 96,
+    marginBottom: 16,
+    minHeight: 90,
   },
   inputText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'JameelNooriNastaleeq',
     color: '#2D2327',
     alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  ltrInput: {
+    textAlign: 'right',
+    writingDirection: 'ltr',
+    backgroundColor: '#FFFFFF',
   },
   errText: {
     alignSelf: 'flex-start',
@@ -361,9 +373,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   resetPassText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'JameelNooriNastaleeq',
-    lineHeight:30,
+    lineHeight: 30,
     marginBottom: 30,
   },
   buttonContainer: {

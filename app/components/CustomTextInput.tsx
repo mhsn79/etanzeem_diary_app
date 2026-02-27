@@ -21,17 +21,24 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
   const inputStyle = useMemo(() => [
     styles.inputField,
     focused && styles.focused,
-    error && styles.error
-  ], [focused, error]);
+    error && styles.error,
+    rest.style
+  ], [focused, error, rest.style]);
 
   return (
     <TextInput
-      style={inputStyle}
       autoCapitalize="none"
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      {...rest}>
-    </TextInput>
+      {...rest}
+      style={inputStyle}
+      onFocus={(e) => {
+        handleFocus();
+        if (rest.onFocus) rest.onFocus(e);
+      }}
+      onBlur={(e) => {
+        handleBlur();
+        if (rest.onBlur) rest.onBlur(e);
+      }}
+    />
   );
 }
 

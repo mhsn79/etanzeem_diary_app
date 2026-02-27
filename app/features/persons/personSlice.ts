@@ -301,13 +301,13 @@ export const createPerson = createAsyncThunk<
     const apiPersonData: Record<string, any> = {
       Name: personData.name,
       Email: personData.email || '',
-      Gender: personData.gender || 'male',
+      Gender: personData.gender || 'm',
       Phone_Number: personData.phone,
       contact_type: personData.contact_type,
       status: personData.status || 'draft',
       Address: personData.address || '',
       Father_Name: personData.parent || '',
-      additional_phones: personData.whatsApp || '',
+      additional_phones: personData.whatsApp ? [personData.whatsApp] : null,
       CNIC: personData.cnic || '',
       Date_of_birth: personData.dob || null,
       Tanzeemi_Unit: personData.tanzeemi_unit || null,
@@ -382,7 +382,7 @@ export const updatePerson = createAsyncThunk<
     if (updateData.dob !== undefined) apiPersonData.Date_of_birth = updateData.dob;
     if (updateData.cnic !== undefined) apiPersonData.CNIC = updateData.cnic;
     if (updateData.unit !== undefined) apiPersonData.Tanzeemi_Unit = updateData.unit;
-    if (updateData.whatsApp !== undefined) apiPersonData.additional_phones = updateData.whatsApp;
+    if (updateData.whatsApp !== undefined) apiPersonData.additional_phones = updateData.whatsApp ? [updateData.whatsApp] : null;
     if (updateData.notes !== undefined) apiPersonData.notes = updateData.notes;
     if (updateData.archived_at !== undefined) apiPersonData.archived_at = updateData.archived_at;
 

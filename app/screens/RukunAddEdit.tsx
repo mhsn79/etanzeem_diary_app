@@ -59,17 +59,11 @@ import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
 import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
 import UrduText from '@/app/components/UrduText';
-import ProfileHeader from '@/app/components/ProfileHeader';
 import TransferRukunModal from '@/app/components/TransferRukunModal';
-import { COMMON_IMAGES } from '@/app/constants/images';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../constants/theme';
+import { FontAwesome6 } from '@expo/vector-icons';
 
 type RukunAddEditRouteProp = RouteProp<RootStackParamList, 'screens/RukunAddEdit'>;
-
-/* ──────────────────────
-   Constants
-   ────────────────────── */
-const AVATAR_SIZE = 120;
 
 export default function RukunAddEdit() {
   const insets = useSafeAreaInsets();
@@ -165,7 +159,6 @@ export default function RukunAddEdit() {
 
   // Image upload state
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -274,9 +267,21 @@ export default function RukunAddEdit() {
     });
   }, [navigation, headerTitle]);
 
+  // Track whether user has manually edited WhatsApp field
+  const [whatsAppManuallyEdited, setWhatsAppManuallyEdited] = useState(
+    isEditMode && initialRukun?.additional_phones ? true : false
+  );
+
   // Handle form input changes
   const handleChange = (field: keyof typeof formData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      // Auto-fill WhatsApp when phone changes (if user hasn't manually edited it)
+      if (field === 'phone' && !whatsAppManuallyEdited) {
+        updated.whatsApp = value as string;
+      }
+      return updated;
+    });
 
     // Clear error for this field if it exists
     if (errors[field]) {
@@ -286,6 +291,12 @@ export default function RukunAddEdit() {
         return newErrors;
       });
     }
+  };
+
+  // Handle WhatsApp field changes separately to track manual edits
+  const handleWhatsAppChange = (value: string) => {
+    setWhatsAppManuallyEdited(true);
+    handleChange('whatsApp', value);
   };
 
   // Handle dropdown selections
@@ -500,12 +511,6 @@ export default function RukunAddEdit() {
     InteractionManager.runAfterInteractions(() => navigation.goBack());
   };
 
-  // Image upload disabled
-  const handleImageUpload = async (_imageUri: string) => {
-    return;
-  };
-
-
   // Show loading indicator during API operations
   const isLoading = updateStatus === 'loading' || createStatus === 'loading' || isUploading;
 
@@ -515,21 +520,20 @@ export default function RukunAddEdit() {
       style={styles.flex1}
     >
       <View style={styles.root}>
-        {/*──────────── Header (wave + avatar) ────────────*/}
-        <ProfileHeader
-          title={headerTitle}
-          backgroundSource={COMMON_IMAGES.profileBackground}
-          avatarSource={require('@/assets/images/avatar.png')}
-          onBackPress={handleBackPress}
-          showSettings={false}
-          showCamera={false}
-        />
+        {/*──────────── Compact Header ────────────*/}
+        <View style={[styles.compactHeader, { paddingTop: insets.top }]}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <FontAwesome6 name="arrow-right-long" size={20} color={COLORS.black} />
+          </TouchableOpacity>
+          <UrduText style={styles.headerTitle}>{headerTitle}</UrduText>
+          <View style={{ width: 36 }} />
+        </View>
 
         {/*──────────── Content ────────────*/}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
-          style={styles.scrollWrapper}
+          keyboardShouldPersistTaps="handled"
         >
           <FormInput
             inputTitle={i18n.t('name')}
@@ -538,6 +542,7 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_name')}
             error={errors.name}
             required
+            layout="one-line"
           />
 
           <FormInput
@@ -546,6 +551,7 @@ export default function RukunAddEdit() {
             onChange={(value) => handleChange('parent', value)}
             placeholder={i18n.t('enter_parent_name')}
             error={errors.parent}
+            layout="one-line"
           />
 
           <FormInput
@@ -554,7 +560,7 @@ export default function RukunAddEdit() {
             onChange={(value) => handleChange('address', value)}
             placeholder={i18n.t('enter_address')}
             multiline={true}
-            numberOfLines={3}
+            numberOfLines={2}
             error={errors.address}
           />
 
@@ -566,17 +572,9 @@ export default function RukunAddEdit() {
               onChange={(value) => setRukinatDate(value)}
               placeholder="YYYY-MM-DD"
               error={errors.rukinat_date}
+              layout="one-line"
             />
           )}
-
-          <FormInput
-            inputTitle={i18n.t('email')}
-            value={formData.email || ''}
-            onChange={(value) => handleChange('email', value)}
-            placeholder={i18n.t('enter_email')}
-            keyboardType="email-address"
-            error={errors.email}
-          />
 
           <FormInput
             inputTitle={i18n.t('phone_number')}
@@ -586,15 +584,27 @@ export default function RukunAddEdit() {
             keyboardType="phone-pad"
             error={errors.phone}
             required
+            layout="one-line"
           />
 
           <FormInput
             inputTitle={i18n.t('whatsapp_number')}
             value={formData.whatsApp || ''}
-            onChange={(value) => handleChange('whatsApp', value)}
+            onChange={handleWhatsAppChange}
             placeholder={i18n.t('enter_phone')}
             keyboardType="phone-pad"
             error={errors.whatsApp}
+            layout="one-line"
+          />
+
+          <FormInput
+            inputTitle={i18n.t('email')}
+            value={formData.email || ''}
+            onChange={(value) => handleChange('email', value)}
+            placeholder={i18n.t('enter_email')}
+            keyboardType="email-address"
+            error={errors.email}
+            layout="one-line"
           />
 
           <CustomDropdown
@@ -611,19 +621,14 @@ export default function RukunAddEdit() {
           {errors.contact_type && (
             <Text style={styles.fieldErrorText}>{errors.contact_type}</Text>
           )}
-          <CustomDropdown
-            dropdownTitle={i18n.t('unit')}
-            options={tanzeemiUnitOptions}
-            onSelect={handleTanzeemiUnitSelect}
-            selectedValue={formData.tanzeemi_unit?.toString()}
-            placeholder={currentUnitName || i18n.t('select_unit')}
-            disabled={true}
-            viewStyle={styles.dropdownContainer}
-          />
 
-          {errors.tanzeemi_unit && (
-            <Text style={styles.fieldErrorText}>{errors.tanzeemi_unit}</Text>
-          )}
+          {/* Unit - show as read-only label */}
+          <View style={styles.unitRow}>
+            <UrduText style={styles.unitLabel}>{i18n.t('unit')}</UrduText>
+            <UrduText style={styles.unitValue}>
+              {currentUnitName || tanzeemiUnitOptions.find(u => u.value === formData.tanzeemi_unit?.toString())?.label || i18n.t('select_unit')}
+            </UrduText>
+          </View>
 
           {/* Error messages */}
           {(updateError || createError) && (
@@ -819,24 +824,43 @@ export default function RukunAddEdit() {
    ────────────────────── */
 const styles = StyleSheet.create({
   flex1: {
-    flex: 1
+    flex: 1,
   },
   root: {
     flex: 1,
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
   },
 
-  scrollWrapper: {
-    marginTop: AVATAR_SIZE / 2 + 20,
+  // Compact header
+  compactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.primary,
+  },
+  backButton: {
+    padding: SPACING.xs,
+    backgroundColor: COLORS.background,
+    borderRadius: 7,
+  },
+  headerTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    color: '#fff',
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
   },
 
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
 
   buttonContainer: {
-    marginTop: 32,
+    marginTop: SPACING.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -855,7 +879,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
   },
   dropdownContainer: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.xs,
   },
   fieldErrorText: {
     color: COLORS.error,
@@ -865,9 +889,34 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
   },
 
+  // Unit read-only row
+  unitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  unitLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  unitValue: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.black,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+    marginLeft: SPACING.sm,
+  },
+
   // Transfer styles
   transferContainer: {
-    marginTop: SPACING.lg,
+    marginTop: SPACING.xs,
     alignItems: 'center',
   },
   transferBtn: {
@@ -880,7 +929,7 @@ const styles = StyleSheet.create({
 
   // Archive styles
   archiveContainer: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.xs,
     alignItems: 'center',
   },
   archiveBtn: {
@@ -888,7 +937,7 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
 
-  // Archive Modal styles
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
