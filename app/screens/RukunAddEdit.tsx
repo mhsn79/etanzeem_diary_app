@@ -542,7 +542,6 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_name')}
             error={errors.name}
             required
-            layout="one-line"
           />
 
           <FormInput
@@ -551,7 +550,6 @@ export default function RukunAddEdit() {
             onChange={(value) => handleChange('parent', value)}
             placeholder={i18n.t('enter_parent_name')}
             error={errors.parent}
-            layout="one-line"
           />
 
           <FormInput
@@ -572,8 +570,7 @@ export default function RukunAddEdit() {
               onChange={(value) => setRukinatDate(value)}
               placeholder="YYYY-MM-DD"
               error={errors.rukinat_date}
-              layout="one-line"
-            />
+              />
           )}
 
           <FormInput
@@ -584,7 +581,6 @@ export default function RukunAddEdit() {
             keyboardType="phone-pad"
             error={errors.phone}
             required
-            layout="one-line"
           />
 
           <FormInput
@@ -594,7 +590,6 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_phone')}
             keyboardType="phone-pad"
             error={errors.whatsApp}
-            layout="one-line"
           />
 
           <FormInput
@@ -604,7 +599,6 @@ export default function RukunAddEdit() {
             placeholder={i18n.t('enter_email')}
             keyboardType="email-address"
             error={errors.email}
-            layout="one-line"
           />
 
           <CustomDropdown
@@ -854,9 +848,9 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xl * 2,
   },
 
   buttonContainer: {

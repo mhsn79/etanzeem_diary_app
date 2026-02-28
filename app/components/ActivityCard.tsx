@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   greyedOutCard: {
-    opacity: 0.4,
+    opacity: 0.65,
     backgroundColor: '#E5E5E5',
   },
   greyedOutText: {

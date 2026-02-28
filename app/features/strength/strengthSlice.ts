@@ -120,8 +120,12 @@ export const fetchStrengthTypes = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('strength/fetchStrengthTypes', async (_, { getState, rejectWithValue }) => {
   try {
-    // Get the currently active unit (selected unit takes priority over user's own unit)
     const state = getState();
+    if (!state.auth.tokens?.accessToken) {
+      return [];
+    }
+
+    // Get the currently active unit (selected unit takes priority over user's own unit)
     const userUnitDetails = state.tanzeem.userUnitDetails;
     const activeUnitId = state.strength.userUnitId || state.tanzeem.dashboardSelectedUnitId || userUnitDetails?.id;
 
@@ -163,6 +167,10 @@ export const fetchStrengthRecords = createAsyncThunk<
 >('strength/fetchStrengthRecords', async (params, { getState, rejectWithValue }) => {
   try {
     const state = getState();
+    if (!state.auth.tokens?.accessToken) {
+      return [];
+    }
+
     const userUnitId = state.strength.userUnitId;
     const userUnitDetails = state.tanzeem.userUnitDetails;
     const unitId = userUnitId || (userUnitDetails?.id || null);
@@ -211,6 +219,10 @@ export const fetchCarryForwardTotals = createAsyncThunk<
 >('strength/fetchCarryForwardTotals', async ({ year, month }, { getState, rejectWithValue }) => {
   try {
     const state = getState();
+    if (!state.auth.tokens?.accessToken) {
+      return {};
+    }
+
     const unitId = state.strength.userUnitId || state.tanzeem.userUnitDetails?.id;
 
     if (!unitId) return {};

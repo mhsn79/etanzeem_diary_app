@@ -101,7 +101,10 @@ export const fetchReportSubmissions = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('reports/fetchReportSubmissions', async (_, { getState, rejectWithValue }) => {
   try {
-    const { tanzeem } = getState();
+    const state = getState();
+    if (!state.auth.tokens?.accessToken) return [];
+
+    const { tanzeem } = state;
     const userUnitId = tanzeem?.userUnitDetails?.id;
     const hierarchyIds = tanzeem?.userUnitHierarchyIds ?? [];
     const unitIds = userUnitId != null
@@ -145,8 +148,10 @@ export const fetchReportsByUnitId = createAsyncThunk<
   ReportData[],
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportsByUnitId', async (unitId, { rejectWithValue }) => {
+>('reports/fetchReportsByUnitId', async (unitId, { getState, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     reduxLogger.debug('Starting fetchReportsByUnitId for unitId:', unitId);
     
     if (!unitId || typeof unitId !== 'number') {

@@ -104,6 +104,8 @@ export const fetchTanzeemiUnits = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchAll', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return [];
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
       '/items/Tanzeemi_Unit?fields=*&filter[status][_neq]=archived',
@@ -133,7 +135,8 @@ export const fetchTanzeemiUnitById = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchById', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<SingleTanzeemiUnitResponse>(
       `/items/Tanzeemi_Unit/${unitId}?fields=*`,
@@ -168,7 +171,8 @@ export const fetchTanzeemiUnitsByLevel = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchByLevel', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemiUnitResponse>(
       `/items/Tanzeemi_Unit?filter[Level_id][_eq]=${levelId}&filter[status][_neq]=archived&fields=*`,
@@ -197,7 +201,8 @@ export const fetchUnitHierarchy = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchHierarchy', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     // First, fetch all units
     const units = await dispatch(fetchTanzeemiUnits()).unwrap();
     
@@ -370,7 +375,8 @@ export const fetchTanzeemLevelById = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchLevelById', async (levelId, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemLevelResponse>(
       `/items/Tanzeemi_Level/${levelId}?fields=*`,
@@ -397,7 +403,8 @@ export const fetchAllTanzeemLevels = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchAllLevels', async (_, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return [];
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<TanzeemLevelsResponse>(
       '/items/Tanzeemi_Level?fields=*',
@@ -419,7 +426,8 @@ export const fetchUserTanzeemiUnit = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('tanzeem/fetchUserUnit', async (unitId, { getState, dispatch, rejectWithValue }) => {
   try {
-    
+    if (!getState().auth.tokens?.accessToken) return { unit: null, hierarchyIds: [], hierarchyUnits: [] };
+
     if (!unitId) {
       return { unit: null, hierarchyIds: [], hierarchyUnits: [] };
     }
@@ -472,8 +480,10 @@ export const fetchAllAssignedUnitHierarchies = createAsyncThunk<
   { primaryUnit: TanzeemiUnit | null; allHierarchyIds: number[]; allUnits: TanzeemiUnit[] },
   number[],
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('tanzeem/fetchAllAssignedHierarchies', async (unitIds, { dispatch, rejectWithValue }) => {
+>('tanzeem/fetchAllAssignedHierarchies', async (unitIds, { getState, dispatch, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return { primaryUnit: null, allHierarchyIds: [], allUnits: [] };
+
     if (!unitIds || unitIds.length === 0) {
       return { primaryUnit: null, allHierarchyIds: [], allUnits: [] };
     }

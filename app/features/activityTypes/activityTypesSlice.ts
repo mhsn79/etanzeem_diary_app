@@ -43,8 +43,10 @@ export const fetchActivityTypes = createAsyncThunk<
   ActivityType[],
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('activityTypes/fetch', async (_, { rejectWithValue }) => {
+>('activityTypes/fetch', async (_, { getState, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return [];
+
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ActivityType[] }>(
       '/items/Activity_Type?fields=id,Name,Name_plural,Level_id',

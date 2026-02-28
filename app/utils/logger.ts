@@ -56,7 +56,13 @@ class Logger {
 
   error(message: string, ...args: any[]): void {
     if (this.shouldLog('error')) {
-      console.error(this.formatMessage('error', message), ...args);
+      // Use console.warn in dev to avoid triggering React Native's red error overlay.
+      // The [ERROR] prefix in the formatted message still clearly marks it as an error.
+      if (__DEV__) {
+        console.warn(this.formatMessage('error', message), ...args);
+      } else {
+        console.error(this.formatMessage('error', message), ...args);
+      }
     }
   }
 

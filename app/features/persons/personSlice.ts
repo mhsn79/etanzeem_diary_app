@@ -19,7 +19,7 @@ interface ContactType {
 // Entity adapter for persons
 const personsAdapter = createEntityAdapter<Person>({
   selectId: person => person.id,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
+  sortComparer: (a, b) => (a.name || a.Name || '').localeCompare(b.name || b.Name || ''),
 });
 
 // Initial state setup
@@ -296,6 +296,7 @@ export const createPerson = createAsyncThunk<
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('persons/create', async (personData, { getState, dispatch, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
 
     // Map form fields to API payload structure
     const apiPersonData: Record<string, any> = {
@@ -363,8 +364,10 @@ export const updatePerson = createAsyncThunk<
   Person,
   UpdatePersonPayload,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('persons/update', async (personData, { getState, dispatch, rejectWithValue }) => {
+>('persons/update', async (personData, { getState, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     const { id, ...updateData } = personData;
     const apiPersonData: Record<string, any> = {};
     
@@ -455,8 +458,10 @@ export const fetchPersonById = createAsyncThunk<
   Person,
   number,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('persons/fetchById', async (personId, { getState, dispatch, rejectWithValue }) => {
+>('persons/fetchById', async (personId, { getState, rejectWithValue }) => {
   try {
+    if (!getState().auth.tokens?.accessToken) return rejectWithValue('Not authenticated');
+
     reduxLogger.debug(`[Persons] Fetching person details for ID: ${personId} (${Platform.OS})`);
     
     // Use directApiRequest which uses fetch directly for more reliable results

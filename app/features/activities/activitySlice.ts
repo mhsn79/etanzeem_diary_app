@@ -480,8 +480,9 @@ const activitiesSlice = createSlice({
       })
       .addCase(deleteActivity.fulfilled, (state, action: PayloadAction<number>) => {
         state.deleteStatus = 'succeeded';
-        // We don't need to remove the activity from the state here
-        // as fetchActivities will be called after archiving to refresh the list
+        // Remove the archived activity from local state immediately
+        // so it disappears from the UI without waiting for a re-fetch
+        activitiesAdapter.removeOne(state, action.payload);
       })
       .addCase(deleteActivity.rejected, (state, action) => {
         state.deleteStatus = 'failed';

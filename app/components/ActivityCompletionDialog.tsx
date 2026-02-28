@@ -87,7 +87,7 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
 
   const handleFormSubmit = () => {
     if (!attendance.trim()) {
-      Alert.alert('غلطی', 'براہ کرم حاضری کی تعداد درج کریں');
+      Alert.alert('غلطی', 'براہ کرم حاضری درج کریں');
       return;
     }
     if (!reportingMonth.trim() || !reportingYear.trim()) {
@@ -149,10 +149,10 @@ const ActivityCompletionDialog: React.FC<ActivityCompletionDialogProps> = ({
             </>
           )}
           <FormInput
-            inputTitle="حاضری کی تعداد"
+            inputTitle="حاضری"
             value={attendance}
             onChange={setAttendance}
-            placeholder="حاضری کی تعداد درج کریں"
+            placeholder="حاضری درج کریں"
             keyboardType="numeric"
             required
           />

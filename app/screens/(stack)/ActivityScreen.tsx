@@ -37,6 +37,8 @@ import {
   selectAllTanzeemiUnits,
   selectChildUnits,
   selectLevelsById,
+  selectDashboardSelectedUnit,
+  selectDashboardSelectedUnitId,
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 
@@ -50,40 +52,6 @@ const ActivityScreen = () => {
   const presetMonth = params.reportMonth ? String(params.reportMonth) : '';
   const presetYear = params.reportYear ? String(params.reportYear) : '';
   
-  // Compute date bounds for the reporting period
-  const dateBounds = React.useMemo(() => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    if (presetMonth && presetYear) {
-      const m = parseInt(presetMonth, 10);
-      const y = parseInt(presetYear, 10);
-      const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
-      const monthEnd = new Date(y, m, 0, 23, 59, 59, 999); // Last day of month
-
-      if (mode === 'report') {
-        // Report: start of month → min(end of month, today)
-        return {
-          minimumDate: monthStart,
-          maximumDate: monthEnd < today ? monthEnd : today,
-        };
-      } else if (mode === 'schedule') {
-        // Schedule: max(start of month, today) → end of month
-        return {
-          minimumDate: monthStart > todayStart ? monthStart : todayStart,
-          maximumDate: monthEnd,
-        };
-      }
-    }
-
-    // Fallback: no preset period
-    if (mode === 'schedule') return { minimumDate: todayStart, maximumDate: undefined };
-    if (mode === 'report') return { minimumDate: undefined, maximumDate: today };
-    return { minimumDate: undefined, maximumDate: undefined };
-  }, [presetMonth, presetYear, mode]);
-
   // Get initial date based on mode and preset period
   const getInitialDate = () => {
     if (presetMonth && presetYear) {
@@ -131,8 +99,12 @@ const ActivityScreen = () => {
   const userUnitDetails = useAppSelector(selectUserUnitDetails);
   const userTanzeemiLevelDetails = useAppSelector(selectUserTanzeemiLevelDetails);
   const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
-  const childUnits = useAppSelector(selectChildUnits(userUnitDetails?.id || 0));
   const levelsById = useAppSelector(selectLevelsById);
+  const selectedUnit = useAppSelector(selectDashboardSelectedUnit);
+  const selectedUnitId = useAppSelector(selectDashboardSelectedUnitId);
+  const displayUnit = selectedUnit || userUnitDetails;
+  const displayUnitId = selectedUnitId || userUnitDetails?.id;
+  const childUnits = useAppSelector(selectChildUnits(displayUnitId || 0));
   
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [showCustomLocationInput, setShowCustomLocationInput] = useState(false);
@@ -151,7 +123,48 @@ const ActivityScreen = () => {
   
   // If in edit mode, get the activity from the store
   const activity = isEditMode && activityId ? useAppSelector(getActivityById(activityId)) : null;
-  
+
+  // Determine effective mode for date bounds:
+  // In edit mode, use the activity's status to decide (published = report rules, draft = schedule rules)
+  const effectiveDateMode = React.useMemo(() => {
+    if (isEditMode && activity) {
+      return activity.status === 'published' ? 'report' : 'schedule';
+    }
+    return mode === 'edit' ? 'schedule' : mode;
+  }, [isEditMode, activity, mode]);
+
+  // Compute date bounds for the reporting period
+  const dateBounds = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    if (presetMonth && presetYear && !isEditMode) {
+      const m = parseInt(presetMonth, 10);
+      const y = parseInt(presetYear, 10);
+      const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      const monthEnd = new Date(y, m, 0, 23, 59, 59, 999); // Last day of month
+
+      if (effectiveDateMode === 'report') {
+        return {
+          minimumDate: monthStart,
+          maximumDate: monthEnd < today ? monthEnd : today,
+        };
+      } else if (effectiveDateMode === 'schedule') {
+        return {
+          minimumDate: monthStart > todayStart ? monthStart : todayStart,
+          maximumDate: monthEnd,
+        };
+      }
+    }
+
+    // Fallback / edit mode: apply rules without month restriction
+    if (effectiveDateMode === 'schedule') return { minimumDate: todayStart, maximumDate: undefined };
+    if (effectiveDateMode === 'report') return { minimumDate: undefined, maximumDate: today };
+    return { minimumDate: undefined, maximumDate: undefined };
+  }, [presetMonth, presetYear, effectiveDateMode, isEditMode]);
+
   // Debug log to track activity data - only log when important values change
   useEffect(() => {
     if (isEditMode) {
@@ -172,15 +185,15 @@ const ActivityScreen = () => {
     }
   }, [dispatch, activityTypesStatus]);
 
-  // Set initial tanzeemi unit to current user's unit
+  // Set initial tanzeemi unit to currently selected unit (or fallback to user's unit)
   useEffect(() => {
-    if (userUnitDetails?.id && !isEditMode) {
+    if (displayUnitId && !isEditMode) {
       setActivityDetails(prev => ({
         ...prev,
-        tanzeemiUnit: String(userUnitDetails.id)
+        tanzeemiUnit: String(displayUnitId)
       }));
     }
-  }, [userUnitDetails, isEditMode]);
+  }, [displayUnitId, isEditMode]);
 
   // Auto-fill reporting month and year — preset from Activities screen takes priority
   useEffect(() => {
@@ -258,96 +271,49 @@ const ActivityScreen = () => {
       let locationLabelValue = '';
       let shouldShowCustomInput = false;
       let customText = '';
-      
+
       if (activity.location) {
-        // Check if the location is a unit ID (numeric) or custom text
         const isUnitId = !isNaN(Number(activity.location)) && activity.location !== '';
-        
-        console.log('Location analysis:', {
-          location: activity.location,
-          isUnitId: isUnitId,
-          numericValue: Number(activity.location)
-        });
-        
+
         if (isUnitId) {
-          // It's a unit ID, find the corresponding label
-          locationValue = String(activity.location); // Convert to string to match dropdown values
+          locationValue = String(activity.location);
           const unitId = Number(activity.location);
-          
-          console.log('Looking for unit ID:', unitId);
-          
-          // Check if it's the current user's unit
-          if (userUnitDetails && userUnitDetails.id === unitId) {
-            const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
-            const unitName = formatUnitName(userUnitDetails);
+
+          // Check if it's the currently selected (display) unit
+          if (displayUnit && displayUnit.id === unitId) {
+            const lvlId = displayUnit.Level_id || displayUnit.level_id;
+            const levelName = (lvlId && levelsById[lvlId]) ? levelsById[lvlId].Name || '' : '';
+            const unitName = formatUnitName(displayUnit);
             locationLabelValue = levelName ? `${levelName}: ${unitName}` : unitName;
-            console.log('Found as user unit:', locationLabelValue);
           } else {
-            // Check if it's a child unit
+            // Check child units
             const childUnit = childUnits?.find(unit => unit.id === unitId);
             if (childUnit) {
               const childLevelId = childUnit.level_id || childUnit.Level_id;
-              let childLevelName = '';
-              
-              if (childLevelId && levelsById[childLevelId]) {
-                childLevelName = levelsById[childLevelId].Name || '';
-              } else if (childLevelId) {
-                // Use fallback level names
-                switch (childLevelId) {
-                  case 7:
-                    childLevelName = 'وارڈ';
-                    break;
-                  case 6:
-                    childLevelName = 'یوسی';
-                    break;
-                  case 4:
-                    childLevelName = 'زون';
-                    break;
-                  case 3:
-                    childLevelName = 'حلقہ';
-                    break;
-                  default:
-                    childLevelName = `${childLevelId}`;
-                }
-              }
-              
+              const childLevelName = (childLevelId && levelsById[childLevelId])
+                ? levelsById[childLevelId].Name || ''
+                : '';
               const unitName = formatUnitName(childUnit);
               locationLabelValue = childLevelName ? `${childLevelName}: ${unitName}` : unitName;
-              console.log('Found as child unit:', locationLabelValue);
             } else {
-              // Unit not found in current data, but it's still a unit ID
-              // Don't treat it as custom, just use the ID as fallback
               locationLabelValue = `Unit ${unitId}`;
-              console.log('Unit not found, using fallback:', locationLabelValue);
             }
           }
         } else {
-          // It's not a numeric ID, but it might be a unit label that was saved as text
-          // Check if it matches any of the available unit labels
+          // Check if it matches any available unit label
           const matchingUnit = locationOptions.find(option => option.label === activity.location);
-          
+
           if (matchingUnit && matchingUnit.value !== 'custom') {
-            // It matches a unit label, treat it as a unit selection
             locationValue = matchingUnit.value;
             locationLabelValue = matchingUnit.label;
-            console.log('Found matching unit label:', locationLabelValue);
           } else {
-            // It's a custom location
             locationValue = 'custom';
             locationLabelValue = activity.location;
             shouldShowCustomInput = true;
             customText = activity.location;
-            console.log('Treating as custom location:', customText);
           }
         }
       }
-      
-      console.log('Final location state:', {
-        locationValue,
-        locationLabelValue,
-        shouldShowCustomInput,
-        customText
-      });
       
       // Set activity details
       setActivityDetails({
@@ -437,36 +403,39 @@ const ActivityScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredActivityTypeOptions]);
 
-  // Create tanzeemi unit options
+  // Create tanzeemi unit options using currently selected unit and its level
   const tanzeemiUnitOptions = React.useMemo(() => {
     const options = [];
-    
-    // Add current unit
-    if (userUnitDetails) {
-      const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
-      const unitName = formatUnitName(userUnitDetails);
+
+    // Add currently selected (or user's) unit
+    if (displayUnit) {
+      const displayLevelId = displayUnit.Level_id || displayUnit.level_id;
+      const levelName = displayLevelId && levelsById[displayLevelId]
+        ? levelsById[displayLevelId].Name || ''
+        : (userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '');
+      const unitName = formatUnitName(displayUnit);
       const label = levelName ? `${levelName}: ${unitName}` : unitName;
-      
+
       options.push({
-        id: String(userUnitDetails.id),
+        id: String(displayUnit.id),
         label: label,
-        value: String(userUnitDetails.id),
+        value: String(displayUnit.id),
       });
     }
-    
+
     // Add child units if they exist
     if (childUnits && childUnits.length > 0) {
       childUnits.forEach(unit => {
         const childLevelId = unit.level_id || unit.Level_id;
         let childLevelName = '';
-        
+
         if (childLevelId && levelsById[childLevelId]) {
           childLevelName = levelsById[childLevelId].Name || '';
         }
-        
+
         const unitName = formatUnitName(unit);
         const label = childLevelName ? `${childLevelName}: ${unitName}` : unitName;
-        
+
         options.push({
           id: String(unit.id),
           label: label,
@@ -474,9 +443,9 @@ const ActivityScreen = () => {
         });
       });
     }
-    
+
     return options;
-  }, [userUnitDetails, childUnits, userTanzeemiLevelDetails, levelsById]);
+  }, [displayUnit, childUnits, userTanzeemiLevelDetails, levelsById]);
 
   // Urdu month names for reporting
   const urduMonths = [
@@ -502,70 +471,37 @@ const ActivityScreen = () => {
     { id: String(currentYear), label: String(currentYear), value: String(currentYear) },
   ];
 
-  // Create location options with current and child units
+  // Create location options with currently selected (or user's) unit and child units
   const locationOptions = React.useMemo(() => {
-    console.log('Location options creation:', {
-      userUnitDetails: userUnitDetails ? { id: userUnitDetails.id, name: formatUnitName(userUnitDetails), level_id: userUnitDetails.level_id || userUnitDetails.Level_id } : null,
-      childUnitsCount: childUnits?.length || 0,
-      childUnits: childUnits?.map(unit => ({ id: unit.id, name: formatUnitName(unit), level_id: unit.level_id || unit.Level_id })) || [],
-      userTanzeemiLevelDetails: userTanzeemiLevelDetails ? { id: userTanzeemiLevelDetails.id, name: userTanzeemiLevelDetails.Name } : null,
-      levelsById: Object.keys(levelsById).length,
-      availableLevelIds: Object.keys(levelsById),
-      levelsByIdData: levelsById
-    });
-    
     const options = [];
-    
-    // Add current unit
-    if (userUnitDetails) {
-      const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
-      const unitName = formatUnitName(userUnitDetails);
+
+    // Add currently selected unit
+    if (displayUnit) {
+      const displayLevelId = displayUnit.Level_id || displayUnit.level_id;
+      const levelName = displayLevelId && levelsById[displayLevelId]
+        ? levelsById[displayLevelId].Name || ''
+        : (userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '');
+      const unitName = formatUnitName(displayUnit);
       const label = levelName ? `${levelName}: ${unitName}` : unitName;
-      
+
       options.push({
-        id: String(userUnitDetails.id),
+        id: String(displayUnit.id),
         label: label,
-        value: String(userUnitDetails.id),
+        value: String(displayUnit.id),
       });
     }
-    
+
     // Add child units with their respective level names
     if (childUnits && childUnits.length > 0) {
       childUnits.forEach(unit => {
-        // Get the level details for this specific child unit
         const childLevelId = unit.level_id || unit.Level_id;
-        let childLevelName = '';
-        
-        if (childLevelId && levelsById[childLevelId]) {
-          childLevelName = levelsById[childLevelId].Name || '';
-        } else if (childLevelId) {
-          // If level is not in levelsById, try to get it from the API or use a fallback
-          console.log(`Level ID ${childLevelId} not found in levelsById, using fallback`);
-          // For now, we'll use a fallback based on the level ID
-          switch (childLevelId) {
-            case 7:
-              childLevelName = 'وارڈ';
-              break;
-            case 6:
-              childLevelName = 'یوسی';
-              break;
-            case 4:
-              childLevelName = 'زون';
-              break;
-            case 3:
-              childLevelName = 'حلقہ';
-              break;
-            default:
-              childLevelName = `${childLevelId}`;
-          }
-        }
-        
+        const childLevelName = (childLevelId && levelsById[childLevelId])
+          ? levelsById[childLevelId].Name || ''
+          : '';
+
         const unitName = formatUnitName(unit);
-        // If level name is not available, just show the unit name
         const label = childLevelName ? `${childLevelName}: ${unitName}` : unitName;
-        
-        console.log(`Child unit ${unitName} (ID: ${unit.id}) - Level ID: ${childLevelId}, Level Name: "${childLevelName}", Final Label: "${label}"`);
-        
+
         options.push({
           id: String(unit.id),
           label: label,
@@ -573,33 +509,50 @@ const ActivityScreen = () => {
         });
       });
     }
-    
+
     // Add custom location option
     options.push({
       id: 'custom',
       label: 'دیگر',
       value: 'custom',
     });
-    
-    console.log('Final location options:', options.length);
-    return options;
-  }, [userUnitDetails, childUnits, userTanzeemiLevelDetails, levelsById]);
 
-  // Auto-populate activity details when activity type changes
+    return options;
+  }, [displayUnit, childUnits, userTanzeemiLevelDetails, levelsById]);
+
+  // Memoize the level name for the currently selected unit in the form
+  // Returns a string primitive so useEffect comparisons won't cause infinite loops
+  const selectedUnitLevelName = React.useMemo(() => {
+    const formUnitId = activityDetails.tanzeemiUnit ? Number(activityDetails.tanzeemiUnit) : null;
+    if (formUnitId) {
+      if (displayUnit && displayUnit.id === formUnitId) {
+        const lvlId = displayUnit.Level_id || displayUnit.level_id;
+        if (lvlId && levelsById[lvlId]) return levelsById[lvlId].Name || '';
+      } else {
+        const childUnit = childUnits?.find(u => u.id === formUnitId);
+        if (childUnit) {
+          const lvlId = childUnit.level_id || childUnit.Level_id;
+          if (lvlId && levelsById[lvlId]) return levelsById[lvlId].Name || '';
+        }
+      }
+    }
+    return userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
+  }, [activityDetails.tanzeemiUnit, displayUnit, childUnits, levelsById, userTanzeemiLevelDetails]);
+
+  // Auto-populate activity details when activity type or unit changes
   useEffect(() => {
     if (activityDetails.activityType && activityDetails.activityType !== 'other') {
       const selectedType = activityTypes.find(type => String(type.id) === activityDetails.activityType);
-      const levelName = userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name;
-      
-      if (selectedType && levelName) {
-        const activityDetailsText = `${selectedType.Name} - ${levelName}`;
+
+      if (selectedType && selectedUnitLevelName) {
+        const activityDetailsText = `${selectedType.Name} - ${selectedUnitLevelName}`;
         setActivityDetails(prev => ({
           ...prev,
           notes: activityDetailsText,
         }));
       }
     }
-  }, [activityDetails.activityType, activityTypes, userTanzeemiLevelDetails]);
+  }, [activityDetails.activityType, activityTypes, selectedUnitLevelName]);
 
   const navigateBack = () => {
     // Defer to avoid Fabric "Unable to find viewState for tag" when going back
@@ -619,10 +572,10 @@ const ActivityScreen = () => {
     // Always set seconds and milliseconds to 0
     newDate.setSeconds(0, 0);
     
-    if (mode === 'report' && newDate > new Date()) {
+    if (effectiveDateMode === 'report' && newDate > new Date()) {
       // For report mode, don't allow future dates
       newDate.setHours(today.getHours(), 0, 0, 0);
-    } else if (mode === 'schedule' && isSameDay(newDate, today) && newDate.getHours() <= today.getHours()) {
+    } else if (effectiveDateMode === 'schedule' && isSameDay(newDate, today) && newDate.getHours() <= today.getHours()) {
       // For schedule mode, ensure time is in the future if date is today
       newDate.setHours(today.getHours() + 1, 0, 0, 0);
     }
@@ -740,7 +693,7 @@ const ActivityScreen = () => {
     // Additional validation for report mode or past published activities
     if (mode === 'report' || (isEditMode && activity && activity.status === 'published')) {
       if (!activityDetails.attendance) {
-        return 'براہ کرم حاضری کی تعداد درج کریں۔';
+        return 'براہ کرم حاضری درج کریں۔';
       }
       if (!activityDetails.reportingMonth) {
         return 'براہ کرم رپورٹنگ کا مہینہ منتخب کریں۔';
@@ -779,23 +732,20 @@ const ActivityScreen = () => {
     
     // Determine status and reporting details based on mode
     let status = 'draft';
-    // Use preset month/year if available, otherwise derive from activity date
-    let reportMonth = activityDetails.reportingMonth
-      ? parseInt(activityDetails.reportingMonth)
-      : activityDate.getMonth() + 1;
-    let reportYear = activityDetails.reportingYear
-      ? parseInt(activityDetails.reportingYear)
-      : activityDate.getFullYear();
+    // Always derive report month/year from the selected activity date
+    // so changing the date moves the activity to the correct reporting month
+    let reportMonth = activityDate.getMonth() + 1;
+    let reportYear = activityDate.getFullYear();
     let attendance = null;
 
     if (mode === 'report') {
       status = 'published';
-      reportMonth = parseInt(activityDetails.reportingMonth);
-      reportYear = parseInt(activityDetails.reportingYear);
+      // For new reports, use preset month/year (reporting period from Activities screen)
+      if (activityDetails.reportingMonth) reportMonth = parseInt(activityDetails.reportingMonth);
+      if (activityDetails.reportingYear) reportYear = parseInt(activityDetails.reportingYear);
       attendance = parseInt(activityDetails.attendance);
     } else if (isEditMode) {
       status = activity?.status || 'draft';
-      // For published activities, include attendance (month/year already set from activity data)
       if (activity && activity.status === 'published') {
         attendance = parseInt(activityDetails.attendance);
       }
@@ -883,10 +833,9 @@ const ActivityScreen = () => {
               mode="datetime"
               initialDate={selectedActivityDate || undefined}
               onDateChange={handleDateTimeChange}
-              minimumDate={isEditMode ? undefined : dateBounds.minimumDate}
-              maximumDate={isEditMode ? undefined : dateBounds.maximumDate}
-              // In edit mode, don't restrict dates
-              disabled={isEditMode && activity?.status !== 'draft'}
+              minimumDate={dateBounds.minimumDate}
+              maximumDate={dateBounds.maximumDate}
+              disabled={false}
               useUrduText={true}
               confirmText="منتخب کریں"
               cancelText="منسوخ"
@@ -960,10 +909,10 @@ const ActivityScreen = () => {
             {/* Attendance field for report mode or published activities in edit mode */}
             {(mode === 'report' || (isEditMode && activity && activity.status === 'published')) && (
               <FormInput
-                inputTitle="حاضری کی تعداد"
+                inputTitle="حاضری"
                 value={activityDetails.attendance}
                 onChange={selectAttendance}
-                placeholder="حاضری کی تعداد درج کریں"
+                placeholder="حاضری درج کریں"
                 keyboardType="numeric"
                 required
               />
@@ -1122,16 +1071,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xl * 4,
+    paddingBottom: SPACING.xl * 2,
   },
   content: {
     // Content styling if needed
   },
   datePickerContainer: {
-    marginBottom: SPACING.sm,
   },
   dropdownContainer: {
-    marginBottom: SPACING.sm,
   },
   errorContainer: {
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
@@ -1192,7 +1139,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
   },
   bottomSpacer: {
-    height: SPACING.xl * 2,
+    height: SPACING.xl,
   },
   // --- Inline overlay styles (replaces Modal-based Dialog) ---
   overlayBackdrop: {

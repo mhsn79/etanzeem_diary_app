@@ -93,6 +93,8 @@ export default function Activities() {
   // Refs for cleanup of toast timers
   const deleteToastTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const completionToastTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasAutoScrolled = useRef(false);
 
   // Current user for creator check (single selector for all cards)
   const currentUser = useAppSelector(selectCurrentUser);
@@ -276,7 +278,7 @@ export default function Activities() {
           : 'غير متعين',
         rawDateTime: activity.activity_date_and_time,
         user_created: activity.user_created,
-        shouldBeGreyedOut: Boolean(isPast && isDraft),
+        shouldBeGreyedOut: Boolean(isPast),
         isPast,
         isDraft,
       };
@@ -291,27 +293,33 @@ export default function Activities() {
       return selectedTab === 0 ? dateA - dateB : dateB - dateA;
     });
 
-    // Schedule tab on current month: group into "next 3 days" / "upcoming"
+    // Schedule tab on current month: group into "past" / "next 3 days" / "upcoming"
     if (selectedTab === 0 && selectedMonth === realMonth && selectedYear === realYear) {
       const result: { type: 'separator' | 'activity'; data: any }[] = [];
+      const past: any[] = [];
       const next3: any[] = [];
-      const rest: any[] = [];
+      const upcoming: any[] = [];
 
       sorted.forEach(a => {
         if (a.rawDateTime) {
           const d = new Date(a.rawDateTime);
-          if (d >= currentDate && d <= threeDaysFromNow) { next3.push(a); return; }
+          if (d < currentDate) { past.push(a); return; }
+          if (d <= threeDaysFromNow) { next3.push(a); return; }
         }
-        rest.push(a);
+        upcoming.push(a);
       });
 
+      if (past.length > 0) {
+        result.push({ type: 'separator', data: { title: 'گزشتہ شیڈول', id: 'past-activities' } });
+        past.forEach(a => result.push({ type: 'activity', data: a }));
+      }
       if (next3.length > 0) {
         result.push({ type: 'separator', data: { title: 'اگلے تین دن میں', id: 'next-three-days' } });
         next3.forEach(a => result.push({ type: 'activity', data: a }));
       }
-      if (rest.length > 0) {
+      if (upcoming.length > 0) {
         result.push({ type: 'separator', data: { title: 'آنے والی سرگرمیاں', id: 'future-activities' } });
-        rest.forEach(a => result.push({ type: 'activity', data: a }));
+        upcoming.forEach(a => result.push({ type: 'activity', data: a }));
       }
       return result;
     }
@@ -322,6 +330,9 @@ export default function Activities() {
   // Ref for looking up activity data in handlers
   const activityDataRef = useRef(formattedActivities);
   useEffect(() => { activityDataRef.current = formattedActivities; }, [formattedActivities]);
+
+  // Reset auto-scroll flag when activities list changes (tab switch, month change)
+  useEffect(() => { hasAutoScrolled.current = false; }, [formattedActivities]);
 
   // --- Action handlers ---
 
@@ -383,7 +394,7 @@ export default function Activities() {
   const handleCompletionSubmit = useCallback(async () => {
     if (!completionTarget) return;
     if (!attendanceValue.trim()) {
-      Alert.alert('غلطی', 'براہ کرم حاضری کی تعداد درج کریں');
+      Alert.alert('غلطی', 'براہ کرم حاضری درج کریں');
       return;
     }
     setIsCompleting(true);
@@ -464,6 +475,7 @@ export default function Activities() {
 
         {/* ScrollView + map — no FlatList recycling, no stale viewState tags */}
         <ScrollView
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={formattedActivities.length === 0 ? styles.center : styles.listContent}
           refreshControl={
@@ -482,8 +494,23 @@ export default function Activities() {
           ) : (
             formattedActivities.map((item) => {
               if (item.type === 'separator') {
+                // Auto-scroll target: prefer "next 3 days", fall back to "upcoming"
+                const isScrollTarget = item.data.id === 'next-three-days' || item.data.id === 'future-activities';
                 return (
-                  <View key={`sep-${item.data.id}`} style={styles.separatorContainer}>
+                  <View
+                    key={`sep-${item.data.id}`}
+                    style={styles.separatorContainer}
+                    onLayout={isScrollTarget ? (e) => {
+                      // Only scroll to the first non-past separator
+                      if (!hasAutoScrolled.current) {
+                        hasAutoScrolled.current = true;
+                        const y = e.nativeEvent.layout.y;
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y, animated: true });
+                        }, 300);
+                      }
+                    } : undefined}
+                  >
                     <Text style={styles.separatorText}>{item.data.title}</Text>
                   </View>
                 );
@@ -570,12 +597,12 @@ export default function Activities() {
                 </UrduText>
               </View>
               {/* Attendance input */}
-              <UrduText style={styles.inputLabel}>حاضری کی تعداد</UrduText>
+              <UrduText style={styles.inputLabel}>حاضری</UrduText>
               <TextInput
                 style={styles.textInput}
                 value={attendanceValue}
                 onChangeText={setAttendanceValue}
-                placeholder="حاضری کی تعداد درج کریں"
+                placeholder="حاضری درج کریں"
                 placeholderTextColor={COLORS.textSecondary}
                 keyboardType="numeric"
                 autoFocus
