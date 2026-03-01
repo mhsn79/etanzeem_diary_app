@@ -36,7 +36,7 @@ import {
   deleteBaitulmalRecord,
 } from '@/app/features/baitulmal/baitulmalSlice';
 import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
-import { selectDashboardSelectedUnitId, selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 interface ScreenWrapperProps {
@@ -84,20 +84,17 @@ export default function Baitulmal() {
   const error = useAppSelector(selectBaitulmalError);
   const currentUser = useAppSelector(selectCurrentUser);
 
-  // Unit filtering: show records for selected unit + its children
+  // Unit filtering: show only current unit's records
   const selectedUnitId = useAppSelector(selectDashboardSelectedUnitId);
   const userUnitDetails = useAppSelector(selectUserUnitDetails);
   const displayUnitId = selectedUnitId || userUnitDetails?.id;
-  const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
 
+  // Only show current unit's records, not children's
   const allowedUnitIds = useMemo(() => {
     const ids = new Set<number>();
     if (displayUnitId) ids.add(displayUnitId);
-    allTanzeemiUnits
-      .filter(u => u.Parent_id === displayUnitId)
-      .forEach(u => ids.add(u.id));
     return ids;
-  }, [displayUnitId, allTanzeemiUnits]);
+  }, [displayUnitId]);
 
   // Toast state
   const [showDeleteToast, setShowDeleteToast] = useState(false);

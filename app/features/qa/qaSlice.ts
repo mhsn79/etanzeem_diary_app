@@ -295,13 +295,14 @@ export const initializeReportData = createAsyncThunk<
       }
     }
     
-    // Step 3: Fetch sections for the template (exclude archived)
-    const sectionsFilter = JSON.stringify({
-      _and: [
-        { template_id: { _eq: params.template_id } },
-        { status: { _neq: 'archived' } }
-      ]
-    });
+    // Step 3: Fetch sections for the template
+    // For published/submitted reports, include all sections (even archived) to show historical answers.
+    // For draft reports, exclude archived sections.
+    const isPublished = submission.status === 'published' || submission.status === 'submitted';
+    const sectionsFilterObj: any = { template_id: { _eq: params.template_id } };
+    const sectionsFilter = isPublished
+      ? JSON.stringify(sectionsFilterObj)
+      : JSON.stringify({ _and: [sectionsFilterObj, { status: { _neq: 'archived' } }] });
     const sectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
       `/items/report_sections?filter=${encodeURIComponent(sectionsFilter)}&sort=sort`,
       'GET'
@@ -326,12 +327,12 @@ export const initializeReportData = createAsyncThunk<
       return rejectWithValue('اس رپورٹ میں کوئی سیکشن نہیں ملا');
     }
     
-    const questionsFilter = JSON.stringify({
-      _and: [
-        { section_id: { _in: sectionIds } },
-        { status: { _neq: 'archived' } }
-      ]
-    });
+    // For published reports, include all questions (even archived) to show historical answers.
+    // For draft reports, exclude archived questions.
+    const questionsFilterObj: any = { section_id: { _in: sectionIds } };
+    const questionsFilter = isPublished
+      ? JSON.stringify(questionsFilterObj)
+      : JSON.stringify({ _and: [questionsFilterObj, { status: { _neq: 'archived' } }] });
     const questionsResponse = await directApiRequest<{ data: ReportQuestion[] }>(
       `/items/report_questions?filter=${encodeURIComponent(questionsFilter)}&sort=sort&limit=-1`,
       'GET'

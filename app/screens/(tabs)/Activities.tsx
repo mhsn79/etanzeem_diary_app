@@ -278,7 +278,7 @@ export default function Activities() {
           : 'غير متعين',
         rawDateTime: activity.activity_date_and_time,
         user_created: activity.user_created,
-        shouldBeGreyedOut: Boolean(isPast),
+        shouldBeGreyedOut: Boolean(isPast && selectedTab === 0),
         isPast,
         isDraft,
       };
