@@ -42,6 +42,7 @@ app/
 │   ├── tanzeemHierarchy/
 │   ├── qa/              # Q&A for reports
 │   ├── strength/        # Workforce statistics
+│   ├── baitulmal/       # Financial records (income/expense)
 │   ├── activityTypes/
 │   └── notifications/
 ├── models/              # TypeScript interfaces and types
@@ -148,6 +149,20 @@ app/
 - `Category` - Category type
 - `Reporting_Unit_Level` - FK to Tanzeemi_Level
 
+**baitulmal_type Table** (`baitulmal_type`):
+- `Name` - Type name (Urdu)
+- `Name_en` - Type name (English)
+- `main_category` - `'income'` or `'expense'`
+- `Reporting_Unit_Level` - FK to Tanzeemi_Level
+
+**baitulmal_records Table** (`baitulmal_records`):
+- `Tanzeemi_Unit` - FK to Tanzeemi_Unit
+- `Type` - FK to baitulmal_type
+- `amount` - Amount (integer, default 0)
+- `notes` - Optional notes
+- `report_year` - Year
+- `report_month` - Month (1-12)
+
 **Strength_Records Table** (`Strength_Records`):
 - `Tanzeemi_Unit` - FK to unit
 - `Type` - FK to Strength_Type
@@ -179,6 +194,8 @@ Collections in Directus match table names exactly:
 - `report_answers`
 - `rukun_transfers`
 - `strength_targets`
+- `baitulmal_type`
+- `baitulmal_records`
 
 ### Important Notes
 
@@ -1735,13 +1752,17 @@ The backend database contains the following tables:
 14. `reports_submissions` - Submitted reports
 15. `report_answers` - Individual answers
 
+**Baitulmal (Financial)**:
+16. `baitulmal_type` - Income/expense type definitions
+17. `baitulmal_records` - Financial records per unit per month
+
 **Supporting Tables**:
-16. `Person_files` - File attachments for persons
-17. `Rukn_Update` - Update requests (pending approval)
-18. `rukun_transfers` - Member transfer tracking
-19. `directus_users` - User accounts (Directus system table)
-20. `directus_files` - File storage (Directus system table)
-21. `directus_roles` - User roles (Directus system table)
+18. `Person_files` - File attachments for persons
+19. `Rukn_Update` - Update requests (pending approval)
+20. `rukun_transfers` - Member transfer tracking
+21. `directus_users` - User accounts (Directus system table)
+22. `directus_files` - File storage (Directus system table)
+23. `directus_roles` - User roles (Directus system table)
 
 ### Foreign Key Relationships
 
@@ -1769,6 +1790,13 @@ Strength_Records
   └─→ Strength_Type (Type field)
 
 Strength_Type
+  └─→ Tanzeemi_Level (Reporting_Unit_Level field)
+
+baitulmal_records
+  ├─→ Tanzeemi_Unit (Tanzeemi_Unit field)
+  └─→ baitulmal_type (Type field)
+
+baitulmal_type
   └─→ Tanzeemi_Level (Reporting_Unit_Level field)
 
 report_sections
@@ -1809,8 +1837,83 @@ For the actual SQL schema, refer to [datamodel.sql](datamodel.sql) at the projec
 
 ---
 
-**Last Updated**: 2026-02-11
-**Version**: 1.0.0
+**Last Updated**: 2026-03-01
+**Version**: 1.1.0
+
+---
+
+## Business Logic Rules
+
+### Activity Date Rules
+
+**File**: `app/screens/(stack)/ActivityScreen.tsx`
+
+When creating or editing activities, date selection is restricted based on mode:
+
+| Mode | Minimum Date | Maximum Date |
+|------|-------------|-------------|
+| Schedule (new) | Today (or preset month start if later) | Preset month end (or unlimited) |
+| Report (new) | Preset month start (or unlimited) | Today (or preset month end if earlier) |
+| Edit (draft/schedule) | Today | Unlimited |
+| Edit (published/report) | Unlimited | Today |
+
+- `effectiveDateMode` determines rules: in edit mode, activity `status` decides (`published` → report rules, `draft` → schedule rules)
+- When editing an activity and changing its date, `report_month` and `report_year` are always derived from the selected date, so the activity automatically moves to the correct reporting month
+
+### Activity Schedule Display
+
+**File**: `app/screens/(tabs)/Activities.tsx`
+
+- Schedule tab (tab 0) splits activities into 3 groups: **گزشتہ شیڈول** (past) → **اگلے تین دن** (next 3 days) → **آنے والی سرگرمیاں** (upcoming)
+- Auto-scrolls to the first non-past group on load
+- Past activities are greyed out (opacity 0.65) **only in the schedule tab** — reported activities in the report tab are never greyed out
+- Published activities are filtered out of the schedule tab (they appear in the report tab only)
+- Deleting (archiving) an activity immediately removes it from the entity adapter via `activitiesAdapter.removeOne`
+
+### Report Questions & Archived Content
+
+**File**: `app/features/qa/qaSlice.ts`
+
+- **Published/submitted reports**: Fetch ALL sections and questions (including archived) so all historical answers are visible
+- **Draft reports**: Exclude archived sections and questions (`status: { _neq: 'archived' }`)
+- Answers are always fetched regardless of question status
+
+### Baitulmal (Financial Records)
+
+**Files**: `app/screens/(stack)/Baitulmal.tsx`, `app/features/baitulmal/baitulmalSlice.ts`
+
+- Shows only the **currently selected unit's** records — does NOT include children's records
+- Records are filtered by: unit, report month/year, status (excludes archived), and category (income/expense tabs)
+- Uses `selectDashboardSelectedUnitId` with fallback to `selectUserUnitDetails`
+- Auto-question calculation (`linked_to_type === 'baitulmal'`) is supported in the report Q&A system
+
+### Logging
+
+**File**: `app/utils/logger.ts`
+
+- `Logger.error()` uses `console.warn` in dev mode to avoid triggering React Native's red error overlay
+- The `[ERROR]` prefix in the formatted message still clearly marks it as an error
+- In production builds, `console.error` is used as normal
+- All Redux slices and API client use the Logger utility (`reduxLogger`, `apiLogger`, `authLogger`) instead of raw `console.error`
+
+### Dashboard Unit Selection
+
+Multiple screens use the dashboard-selected unit pattern:
+```typescript
+const selectedUnitId = useAppSelector(selectDashboardSelectedUnitId);
+const userUnitDetails = useAppSelector(selectUserUnitDetails);
+const displayUnitId = selectedUnitId || userUnitDetails?.id;
+```
+
+Screens using this pattern: Activities, ActivityScreen, Baitulmal, Workforce, Reports
+
+### Unit-Level Display in Activity Forms
+
+**File**: `app/screens/(stack)/ActivityScreen.tsx`
+
+- Uses `displayUnit` (dashboard-selected or user's unit) with `levelsById` lookup for level name resolution
+- Three places resolve unit level: dropdown options, auto-fill details, edit mode location
+- `selectedUnitLevelName` is extracted as a `useMemo` returning a string primitive to avoid infinite useEffect loops (prevents new array references from `selectChildUnits`)
 
 ---
 

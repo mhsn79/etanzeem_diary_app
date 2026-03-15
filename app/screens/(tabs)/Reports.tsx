@@ -1,66 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import ReportsView from '../(stack)/components/ReportsView';
-import CreateReportScreen, { CreateReportInitialParams } from '../(stack)/CreateReportScreen';
+import { OpenReportParams } from '../(stack)/components/ReportsView';
 import {
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
   selectUserUnitDetails
 } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectIsAuthenticated } from '@/app/features/auth/authSlice';
 import UrduText from '@/app/components/UrduText';
 import { COLORS } from '@/app/constants/theme';
-
-// Persist in-tab report params across remounts (tab/focus can unmount Reports and clear state)
-let persistedOpenReportParams: CreateReportInitialParams | null = null;
+import { useRouter } from 'expo-router';
+import { ROUTES } from '@/app/constants/navigation';
 
 const Reports: React.FC = () => {
-  // When set, show CreateReportScreen in-tab (avoids stack navigation / immediate back)
-  const [openReportParams, setOpenReportParamsState] = useState<CreateReportInitialParams | null>(
-    () => persistedOpenReportParams
-  );
-  const mountIdRef = useRef(Math.random().toString(36).slice(2, 8));
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
+  const router = useRouter();
 
-  // Restore from persisted when component mounts (e.g. after tab remount)
-  useEffect(() => {
-    if (persistedOpenReportParams && !openReportParams) {
-      console.log('[Reports] Restoring openReportParams after mount:', {
-        mountId: mountIdRef.current,
-        submissionId: persistedOpenReportParams.submissionId
-      });
-      setOpenReportParamsState(persistedOpenReportParams);
-    }
-  }, [openReportParams]);
-
-  const setOpenReportParams = (value: CreateReportInitialParams | null) => {
-    persistedOpenReportParams = value;
-    setOpenReportParamsState(value);
-  };
-
-  const handleOpenReport = (params: CreateReportInitialParams) => {
-    console.log('[Reports] onOpenReport called, setting params:', {
-      submissionId: params.submissionId,
-      mountId: mountIdRef.current
+  const handleOpenReport = (params: OpenReportParams) => {
+    router.push({
+      pathname: ROUTES.CREATE_REPORT,
+      params: {
+        submissionId: params.submissionId.toString(),
+        templateId: params.templateId.toString(),
+        managementId: params.managementId.toString(),
+        unitId: params.unitId.toString(),
+        mode: params.mode,
+        status: params.status,
+      },
     });
-    setOpenReportParams(params);
   };
-
-  const handleBackFromReport = () => {
-    console.log('[Reports] onBackOverride called, clearing params. mountId:', mountIdRef.current);
-    setOpenReportParams(null);
-  };
-
-  // Clear persisted report params on logout to prevent stale data for next user
-  const isAuthenticated = useSelector(selectIsAuthenticated);
-  useEffect(() => {
-    if (!isAuthenticated) {
-      persistedOpenReportParams = null;
-      setOpenReportParamsState(null);
-    }
-  }, [isAuthenticated]);
 
   // Get selected unit for dashboard
   const selectedUnit = useSelector(selectDashboardSelectedUnit);
@@ -70,16 +38,6 @@ const Reports: React.FC = () => {
   // Use selected unit if available, otherwise fall back to user unit
   const displayUnit = selectedUnit || userUnit;
   const displayUnitId = selectedUnitId || userUnit?.id;
-
-  if (openReportParams) {
-    console.log('[Reports] Rendering CreateReportScreen in-tab. mountId:', mountIdRef.current, 'renderCount:', renderCountRef.current);
-    return (
-      <CreateReportScreen
-        initialParams={openReportParams}
-        onBackOverride={handleBackFromReport}
-      />
-    );
-  }
 
   if (!displayUnitId) {
     return (

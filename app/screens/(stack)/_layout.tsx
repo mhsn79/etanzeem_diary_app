@@ -1,13 +1,10 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import Header from '../../components/Header';
 import { SCREENS } from '@/app/constants/screens';
-import { navigationService } from '@/app/services/navigation';
 import AuthGuard from '@/app/components/AuthGuard';
 
 export default function StackLayout() {
-  const router = useRouter();
-
   return (
     <AuthGuard requireAuth={true}>
       <Stack
@@ -15,7 +12,7 @@ export default function StackLayout() {
           header: ({ navigation, route }) => (
             <Header
               title="E-Tanzeem"
-              onBack={navigationService.goBack}
+              onBack={() => navigation.goBack()}
               showBack={true}
             />
           ),
@@ -66,7 +63,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="آمدنی"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -91,7 +88,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="میٹنگز"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -106,7 +103,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="یونٹ سیلیکشن"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -121,7 +118,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="ورک فورس"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -136,7 +133,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header
                 title="فرد کی تفصیل"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -150,7 +147,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header
                 title="فرد شامل کریں/ترمیم کریں"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -164,7 +161,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header
                 title="فرد کی تفصیل"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -179,7 +176,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="پروفائل"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -193,7 +190,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="پروفائل ترمیم کریں"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -215,7 +212,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="سرگرمیاں شیڈول کریں"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )
@@ -230,7 +227,7 @@ export default function StackLayout() {
             header: ({ navigation }) => (
               <Header 
                 title="میٹنگ"
-                onBack={navigationService.goBack}
+                onBack={() => navigation.goBack()}
                 showBack={true}
               />
             )

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Platform, TouchableOpacity, StyleSheet, View, Text, InteractionManager } from 'react-native';
+import { Platform, TouchableOpacity, StyleSheet, View, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeIconBlack from '../../assets/images/home-icon-black.svg';
@@ -11,6 +11,7 @@ import ArkanIconWhite from '../../assets/images/arkan-icon-white.svg';
 import ActivitiesIconWhite from '../../assets/images/activities-icon-white.svg';
 import ReportIcon2White from '../../assets/images/report-icon-2-white.svg';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { startNavigationMetric } from '../utils/navigationMetrics';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 const VALID_LABELS = ['صفحہ اول', 'افراد', 'سرگرمیاں', 'رپورٹس'] as const;
@@ -43,9 +44,6 @@ function getIcon(label: ValidLabel, focused: boolean) {
   const IconComponent = icons[label];
   return <IconComponent style={iconStyle} />;
 }
-
-// Keep a short delay so tab switches stay smooth without feeling sluggish.
-const TAB_SWITCH_DELAY_MS = 120;
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -88,17 +86,11 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
           if (!isFocused && !event.defaultPrevented && !pendingRef.current) {
             pendingRef.current = true;
             const tabName = LABEL_TO_TAB_NAME[validLabel];
-            const releaseGuard = setTimeout(() => {
+            const completeMetric = startNavigationMetric(`tab_press_to_navigate:${tabName}`);
+            navigation.navigate(tabName);
+            requestAnimationFrame(() => {
               pendingRef.current = false;
-            }, 900);
-
-            // Defer only once to let ongoing interactions finish, then switch quickly.
-            InteractionManager.runAfterInteractions(() => {
-              setTimeout(() => {
-                navigation.navigate(tabName);
-                pendingRef.current = false;
-                clearTimeout(releaseGuard);
-              }, TAB_SWITCH_DELAY_MS);
+              completeMetric();
             });
           }
         };

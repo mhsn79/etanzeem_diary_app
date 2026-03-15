@@ -13,8 +13,7 @@ import {
   useWindowDimensions,
   StatusBar,
   ActivityIndicator,
-  TextInput,
-  InteractionManager
+  TextInput
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -66,6 +65,7 @@ import { getUrduMonth } from '../constants/urduLocalization';
 // Theme and constants
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '../constants/theme';
 import i18n from '../i18n';
+import { startNavigationMetric } from '../utils/navigationMetrics';
 
 // Types
 interface EditModalProps {
@@ -677,27 +677,13 @@ export default function Workforce() {
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    let navigated = false;
-    const fallbackTimer = setTimeout(() => {
-      if (navigated) return;
-      navigated = true;
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/screens/(tabs)/Dashboard');
-      }
-    }, 450);
-
-    InteractionManager.runAfterInteractions(() => {
-      if (navigated) return;
-      navigated = true;
-      clearTimeout(fallbackTimer);
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/screens/(tabs)/Dashboard');
-      }
-    });
+    const completeMetric = startNavigationMetric('workforce_back_to_route_change');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/screens/(tabs)/Dashboard');
+    }
+    requestAnimationFrame(completeMetric);
   }, [router]);
 
   // Handle navigation to Arkan screen with optional contact type filter

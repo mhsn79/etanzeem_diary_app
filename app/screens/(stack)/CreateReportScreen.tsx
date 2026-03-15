@@ -1,16 +1,16 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useCallback, useRef, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpacity, Clipboard, Alert, Platform, InteractionManager } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpacity, Clipboard, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { ROUTES } from '@/app/constants/navigation';
+import { startNavigationMetric } from '@/app/utils/navigationMetrics';
 import UrduText from '@/app/components/UrduText';
 import CustomButton from '@/app/components/CustomButton';
 import FormInput from '@/app/components/FormInput';
 import Dialog from '@/app/components/Dialog';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
-import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import {
   initializeReportData,
   selectOverallProgress,
@@ -51,15 +51,13 @@ export type CreateReportInitialParams = {
 };
 
 type CreateReportScreenProps = {
-  /** When opening from Reports tab in-place, params are passed so we don't rely on router (avoids empty params / immediate back). */
+  /** Optional params for direct embedding; route params remain the default source. */
   initialParams?: CreateReportInitialParams | null;
-  /** When opening from Reports tab, parent provides back handler so we stay in tab. */
-  onBackOverride?: () => void;
 };
 
-const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }: CreateReportScreenProps = {}) => {
+const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportScreenProps = {}) => {
   // Log mount immediately to confirm CreateReportScreen ever renders
-  console.log('[CreateReportScreen] MOUNT/RE-RENDER', { hasInitialParams: !!initialParamsProp, hasOnBackOverride: !!onBackOverride, submissionId: initialParamsProp?.submissionId });
+  console.log('[CreateReportScreen] MOUNT/RE-RENDER', { hasInitialParams: !!initialParamsProp, submissionId: initialParamsProp?.submissionId });
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
@@ -240,7 +238,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
   // Force token refresh on screen focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('[CreateReportScreen] useFocusEffect RUN (screen focused)', { submissionId, hasOnBackOverride: !!onBackOverride });
+      console.log('[CreateReportScreen] useFocusEffect RUN (screen focused)', { submissionId });
       // Clear answers when screen comes into focus to ensure clean state
       if (submissionId && currentSubmissionId !== submissionId) {
         console.log('[CreateReportScreen] Clearing QA state for new submission:', {
@@ -255,13 +253,10 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
         .catch((error) => {
           console.log('[CreateReportScreen] useFocusEffect ensureFreshToken REJECTED', error?.message ?? error);
           dispatch(setError('Your session has expired. Please log in again.'));
-          // When in-place (onBackOverride), do NOT call onBackOverride on token failure - that would send user back immediately. Only navigate to Login when opened via stack.
-          if (!onBackOverride) {
-            router.replace('/screens/LoginScreen');
-          }
+          router.replace('/screens/LoginScreen');
         });
       return () => console.log('[CreateReportScreen] useFocusEffect CLEANUP (screen unfocused / unmount)');
-    }, [dispatch, submissionId, currentSubmissionId, onBackOverride])
+    }, [dispatch, submissionId, currentSubmissionId])
   );
 
   // Ensure we have a fresh token before initializing report data
@@ -439,33 +434,14 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
 
   // Must be called before any early return (React hooks rule)
   const handleBack = useCallback(() => {
-    if (onBackOverride) {
-      console.log('[CreateReportScreen] Back: calling onBackOverride (in-tab)');
-      onBackOverride();
+    const completeMetric = startNavigationMetric('create_report_back_to_route_change');
+    if (router.canGoBack()) {
+      navigation.goBack();
     } else {
-      let navigated = false;
-      const fallbackTimer = setTimeout(() => {
-        if (navigated) return;
-        navigated = true;
-        if (router.canGoBack()) {
-          navigation.goBack();
-        } else {
-          router.replace(ROUTES.DASHBOARD);
-        }
-      }, 450);
-
-      InteractionManager.runAfterInteractions(() => {
-        if (navigated) return;
-        navigated = true;
-        clearTimeout(fallbackTimer);
-        if (router.canGoBack()) {
-          navigation.goBack();
-        } else {
-          router.replace(ROUTES.DASHBOARD);
-        }
-      });
+      router.replace(ROUTES.DASHBOARD);
     }
-  }, [onBackOverride, router, navigation]);
+    requestAnimationFrame(completeMetric);
+  }, [router, navigation]);
 
   // Show loading state (after all hooks)
   if (status === 'loading') {
@@ -573,7 +549,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp, onBackOverride }
               {
                 // When rendered in-tab (onBackOverride), the TabBar is position:absolute
                 // so we need extra bottom margin to clear it (paddingTop + button height + bottom padding)
-                marginBottom: onBackOverride ? (hp(2) + SPACING.xs + Math.max(insets.bottom, SPACING.sm)) : 0,
+                marginBottom: 0,
                 paddingBottom: Math.max(insets.bottom, SPACING.sm),
                 transform: [{ scale: scaleAnim }],
               }

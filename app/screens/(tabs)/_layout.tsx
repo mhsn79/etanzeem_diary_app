@@ -8,10 +8,11 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          lazy: true,
         }}
         initialRouteName="Dashboard"
         tabBar={(props) => <TabBar {...props} />}
-        detachInactiveScreens={false}
+        detachInactiveScreens={true}
       >
         <Tabs.Screen
           name="Dashboard"
@@ -30,14 +31,12 @@ export default function TabLayout() {
           options={{
             tabBarLabel: "سرگرمیاں",
             headerShown: false,
-            lazy: false,
           }}
         />
         <Tabs.Screen
           name="Reports"
           options={{
             tabBarLabel: "رپورٹس",
-            lazy: false,
           }}
         />
       </Tabs>

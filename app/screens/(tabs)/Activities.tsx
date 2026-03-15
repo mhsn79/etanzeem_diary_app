@@ -14,7 +14,6 @@ import {
   Platform,
   ScrollView,
   Alert,
-  InteractionManager,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -55,13 +54,15 @@ const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ children, headerTitle, on
       backgroundColor={COLORS.primary}
       translucent={true}
     />
-    <View style={styles.headerArea}>
-      <Header
-        title={headerTitle}
-        onBack={onBack}
-        showBack={showBack}
-      />
-    </View>
+    {showBack && (
+      <View style={styles.headerArea}>
+        <Header
+          title={headerTitle}
+          onBack={onBack}
+          showBack={showBack}
+        />
+      </View>
+    )}
     <View style={styles.contentWrapper}>{children}</View>
   </SafeAreaView>
 );
@@ -130,12 +131,9 @@ export default function Activities() {
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController();
-      const task = InteractionManager.runAfterInteractions(() => {
-        dispatch(fetchActivities({ signal: controller.signal }));
-      });
+      dispatch(fetchActivities({ signal: controller.signal }));
       return () => {
         controller.abort();
-        task.cancel();
         clearTimeout(deleteToastTimerRef.current);
         clearTimeout(completionToastTimerRef.current);
       };

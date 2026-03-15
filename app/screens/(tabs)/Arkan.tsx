@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar, InteractionManager } from 'react-native';
+import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import i18n from '../../i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
@@ -115,24 +115,19 @@ export default function Arkan() {
   }, [contactTypeParam, contactTypes]);
 
   // Fetch persons from ALL accessible units (collective view).
-  // Defer so we don't run in same frame as tab transition (avoids Fabric viewState crash).
   useEffect(() => {
     if (allAccessibleUnitIds.length === 0 && (!displayUnitId || typeof displayUnitId !== 'number')) return;
-    const id = setTimeout(() => {
-      InteractionManager.runAfterInteractions(() => {
-        if (allAccessibleUnitIds.length > 1) {
-          console.log('Arkan: Fetching persons for', allAccessibleUnitIds.length, 'accessible units');
-          dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds));
-        } else {
-          const unitId = allAccessibleUnitIds[0] || displayUnitId;
-          if (unitId && typeof unitId === 'number') {
-            console.log('Arkan: Fetching persons for single unit:', unitId);
-            dispatch(fetchPersonsByUnitId(unitId));
-          }
-        }
-      });
-    }, 120);
-    return () => clearTimeout(id);
+    if (allAccessibleUnitIds.length > 1) {
+      console.log('Arkan: Fetching persons for', allAccessibleUnitIds.length, 'accessible units');
+      dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds));
+      return;
+    }
+
+    const unitId = allAccessibleUnitIds[0] || displayUnitId;
+    if (unitId && typeof unitId === 'number') {
+      console.log('Arkan: Fetching persons for single unit:', unitId);
+      dispatch(fetchPersonsByUnitId(unitId));
+    }
   }, [allAccessibleUnitIds, displayUnitId, dispatch]);
 
   // Filter persons based on search query and selected tab

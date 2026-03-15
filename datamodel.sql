@@ -602,3 +602,65 @@ ALTER TABLE public.strength_targets ADD CONSTRAINT strength_targets_strength_typ
 ALTER TABLE public.strength_targets ADD CONSTRAINT strength_targets_unit_foreign FOREIGN KEY (unit) REFERENCES public."Tanzeemi_Unit"(id) ON DELETE SET NULL;
 ALTER TABLE public.strength_targets ADD CONSTRAINT strength_targets_user_created_foreign FOREIGN KEY (user_created) REFERENCES public.directus_users(id);
 ALTER TABLE public.strength_targets ADD CONSTRAINT strength_targets_user_updated_foreign FOREIGN KEY (user_updated) REFERENCES public.directus_users(id);
+
+
+-- public.baitulmal_type definition
+
+-- Drop table
+
+-- DROP TABLE public.baitulmal_type;
+
+CREATE TABLE public.baitulmal_type (
+	id serial4 NOT NULL,
+	status varchar(255) DEFAULT 'draft'::character varying NOT NULL,
+	sort int4 NULL,
+	user_created uuid NULL,
+	date_created timestamptz NULL,
+	user_updated uuid NULL,
+	date_updated timestamptz NULL,
+	"Name" varchar(255) NULL,
+	"Name_en" varchar(255) NULL,
+	main_category varchar(255) NULL,
+	"Reporting_Unit_Level" int4 NULL,
+	CONSTRAINT baitulmal_type_pkey PRIMARY KEY (id)
+);
+
+
+-- public.baitulmal_type foreign keys
+
+ALTER TABLE public.baitulmal_type ADD CONSTRAINT baitulmal_type_reporting_unit_level_foreign FOREIGN KEY ("Reporting_Unit_Level") REFERENCES public."Tanzeemi_Level"(id) ON DELETE SET NULL;
+ALTER TABLE public.baitulmal_type ADD CONSTRAINT baitulmal_type_user_created_foreign FOREIGN KEY (user_created) REFERENCES public.directus_users(id);
+ALTER TABLE public.baitulmal_type ADD CONSTRAINT baitulmal_type_user_updated_foreign FOREIGN KEY (user_updated) REFERENCES public.directus_users(id);
+
+
+-- public.baitulmal_records definition
+
+-- Drop table
+
+-- DROP TABLE public.baitulmal_records;
+
+CREATE TABLE public.baitulmal_records (
+	id serial4 NOT NULL,
+	status varchar(255) DEFAULT 'draft'::character varying NOT NULL,
+	sort int4 NULL,
+	user_created uuid NULL,
+	date_created timestamptz NULL,
+	user_updated uuid NULL,
+	date_updated timestamptz NULL,
+	"Tanzeemi_Unit" int4 NULL,
+	"Type" int4 NULL,
+	amount int4 DEFAULT 0 NULL,
+	notes varchar(255) NULL,
+	report_year int4 NULL,
+	report_month int4 NULL,
+	CONSTRAINT baitulmal_records_pkey PRIMARY KEY (id)
+);
+
+
+-- public.baitulmal_records foreign keys
+
+ALTER TABLE public.baitulmal_records ADD CONSTRAINT baitulmal_records_tanzeemi_unit_foreign FOREIGN KEY ("Tanzeemi_Unit") REFERENCES public."Tanzeemi_Unit"(id) ON DELETE SET NULL;
+ALTER TABLE public.baitulmal_records ADD CONSTRAINT baitulmal_records_type_foreign FOREIGN KEY ("Type") REFERENCES public.baitulmal_type(id) ON DELETE SET NULL;
+ALTER TABLE public.baitulmal_records ADD CONSTRAINT baitulmal_records_user_created_foreign FOREIGN KEY (user_created) REFERENCES public.directus_users(id);
+ALTER TABLE public.baitulmal_records ADD CONSTRAINT baitulmal_records_user_updated_foreign FOREIGN KEY (user_updated) REFERENCES public.directus_users(id);
+

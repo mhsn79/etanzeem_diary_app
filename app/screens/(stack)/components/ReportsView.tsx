@@ -649,18 +649,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     useCallback(() => {
       console.log('[ReportsView] useFocusEffect triggered');
       shouldResetHighlightedRef.current = true;
-      const id = setTimeout(() => {
-        if (displayUnit?.id) {
-          fetchAllData(false)
-            .catch(error => {
-              console.error('[ReportsView] Error fetching data on focus:', error);
-            });
-        } else {
-          console.log('[ReportsView] No display unit ID available on focus');
-        }
-      }, 100);
+      if (displayUnit?.id) {
+        fetchAllData(false)
+          .catch(error => {
+            console.error('[ReportsView] Error fetching data on focus:', error);
+          });
+      } else {
+        console.log('[ReportsView] No display unit ID available on focus');
+      }
       return () => {
-        clearTimeout(id);
         console.log('[ReportsView] Screen losing focus');
       };
     }, [fetchAllData, displayUnit?.id])

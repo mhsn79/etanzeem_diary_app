@@ -1,15 +1,14 @@
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { I18nManager, StyleSheet, Pressable, useColorScheme, TouchableOpacity, Platform, ActivityIndicator, InteractionManager } from "react-native";
+import { I18nManager, StyleSheet, Pressable, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useFonts } from 'expo-font';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LanguageProvider from "../app/context/LanguageContext";
-import { useLanguage } from "../app/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
 import UrduText from "./components/UrduText";
 import i18n from './i18n';
@@ -17,8 +16,8 @@ import { useNavigationState } from '@react-navigation/native';
 import { COLORS, SPACING } from "./constants/theme";
 import { store, persistor } from '@/app/store';              // ← adjust paths if needed
 import { usePushNotifications } from "@/src/hooks/usePushNotifications";
-import AuthGuard from './components/AuthGuard';
 import { useTokenRefresh } from './utils/tokenRefresh';
+import { startNavigationMetric } from './utils/navigationMetrics';
 // import DebugPanel from './components/DebugPanel';
 
 // Force RTL layout for the entire app
@@ -48,10 +47,8 @@ function getFullPathFromState(state: any): string {
 }
 
 function CustomHeader({ navigation, route, title }: HeaderProps) {
-  const [menuVisible, setMenuVisible] = useState(false);
   // Subscribe only to the path string to avoid re-renders from whole state reference changes
   const fullPath = useNavigationState((state) => (state ? getFullPathFromState(state) : 'No route'));
-  const { currentLanguage, changeLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -61,26 +58,19 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
   const isCreateReportScreen = fullPath?.includes?.('CreateReportScreen') ?? false;
 
   const handleBack = useCallback(() => {
-    // Defer to avoid Fabric "Unable to find viewState for tag" when going back from stack screens
-    InteractionManager.runAfterInteractions(() => {
-      router.back();
-    });
+    const completeMetric = startNavigationMetric('header_back_to_route_change');
+    router.back();
+    requestAnimationFrame(completeMetric);
   }, [router]);
 
-  // Defer profile navigation to break out of any synchronous update cycle (avoids "Maximum update depth exceeded")
   const handleProfilePress = useCallback(() => {
-    setTimeout(() => router.push('/screens/ProfileView'), 0);
+    const completeMetric = startNavigationMetric('profile_press_to_route_change');
+    router.push('/screens/ProfileView');
+    requestAnimationFrame(completeMetric);
   }, [router]);
 
   // Only show back button on non-tab screens (except login). Hide on CreateReportScreen so its own header handles back (avoids accidental root back when opening report from tabs).
   const showBackButton = !isInTabs && !isLoginScreen && !isCreateReportScreen;
-
-  // Collapse header for Activities tab (it has its own ScreenWrapper header).
-  // IMPORTANT: we keep the view tree identical (no conditional mount/unmount)
-  // and only change styles — this prevents the Fabric "Unable to find viewState"
-  // crash that occurs when headerShown toggles and native views are created/destroyed
-  // during tab transitions.
-  const isActivitiesTab = fullPath?.includes?.('Activities') ?? false;
 
   return (
     <View style={[
@@ -88,7 +78,6 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
       {
         paddingTop: insets.top,
       },
-      isActivitiesTab && styles.headerCollapsed,
     ]}>
       <View style={styles.header}>
         <View style={styles.leftSection}>
@@ -234,11 +223,6 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     backgroundColor: COLORS.primary,
-  },
-  headerCollapsed: {
-    height: 0,
-    overflow: 'hidden',
-    paddingTop: 0,
   },
   headerContainerSubscreen: {
     backgroundColor: COLORS.primary,
