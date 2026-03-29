@@ -444,7 +444,12 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
   }, [router, navigation]);
 
   // Show loading state (after all hooks)
-  if (status === 'loading') {
+  const isFormReady = 
+    status === 'succeeded' && 
+    ((submissionId != null && currentSubmissionId === submissionId) || 
+     (submissionId == null && currentSubmissionId != null));
+
+  if (status === 'loading' || !isFormReady) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -572,25 +577,26 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
           </Animated.View>
         )}
         
-        {/* Status indicators */}
-        {/* {saveStatus === 'loading' && (
-          <View style={styles.statusIndicator}>
-            <UrduText style={styles.statusText}>جواب محفوظ ہو رہا ہے...</UrduText>
-          </View>
-        )}
-        
-        {saveStatus === 'succeeded' && (
-          <View style={[styles.statusIndicator, styles.successIndicator]}>
-            <UrduText style={styles.successText}>جواب محفوظ ہو گیا</UrduText>
-          </View>
-        )}
-        
-        {saveStatus === 'failed' && saveError && (
-          <View style={[styles.statusIndicator, styles.errorIndicator]}>
-            <UrduText style={styles.errorText}>{saveError}</UrduText>
-          </View>
-        )} */}
-        
+        {/* Global Auto-Save Status indicator */}
+        <View style={styles.globalSaveIndicatorContainer}>
+          {saveStatus === 'loading' && (
+            <View style={[styles.statusBadge, styles.loadingBadge]}>
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ transform: [{ scale: 0.7 }] }} />
+              <UrduText style={styles.statusBadgeText}>محفوظ ہو رہا ہے...</UrduText>
+            </View>
+          )}
+          {saveStatus === 'succeeded' && (
+            <View style={[styles.statusBadge, styles.successBadge]}>
+              <UrduText style={styles.statusBadgeSuccessText}>تمام تبدیلیاں محفوظ ہو گئیں</UrduText>
+            </View>
+          )}
+          {saveStatus === 'failed' && (
+            <View style={[styles.statusBadge, styles.errorBadge]}>
+              <UrduText style={styles.statusBadgeErrorText}>محفوظ کرنے میں ناکامی</UrduText>
+            </View>
+          )}
+        </View>
+
         {/* Low Progress Warning Dialog */}
         {!isViewMode && (
           <Dialog
@@ -656,7 +662,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F0F2F5', // Google Forms like light grey background
   },
   scrollContainer: {
     flex: 1,
@@ -737,6 +743,48 @@ const styles = StyleSheet.create({
   copyDebugButtonText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.textSecondary,
+  },
+  globalSaveIndicatorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+    pointerEvents: 'none',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderBottomLeftRadius: BORDER_RADIUS.md,
+    borderBottomRightRadius: BORDER_RADIUS.md,
+  },
+  loadingBadge: {
+    backgroundColor: '#E0F2FE', // Light blue
+  },
+  successBadge: {
+    backgroundColor: '#D1FAE5', // Light green
+  },
+  errorBadge: {
+    backgroundColor: '#FEE2E2', // Light red
+  },
+  statusBadgeText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.primary,
+    marginLeft: 4,
+    writingDirection: 'rtl',
+  },
+  statusBadgeSuccessText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#065F46', // Dark green
+    writingDirection: 'rtl',
+  },
+  statusBadgeErrorText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: '#991B1B', // Dark red
+    writingDirection: 'rtl',
   },
 });
 

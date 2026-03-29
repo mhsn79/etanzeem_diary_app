@@ -96,7 +96,7 @@ const Question = memo(({
           });
           
           if (!submissionId) {
-            console.error('[SectionList] No submissionId available for saving answer');
+            console.warn('[SectionList] No submissionId available for saving answer');
             return;
           }
           
@@ -128,7 +128,6 @@ const Question = memo(({
   
   // Track validation status and messages
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Update local state when prop value changes
   useEffect(() => {
@@ -148,7 +147,6 @@ const Question = memo(({
     
     // Clear previous messages
     setError(null);
-    setSuccessMessage(null);
     
     // Set saving state to show loading indicator
     setIsSaving(true);
@@ -165,13 +163,7 @@ const Question = memo(({
     dispatch(saveAnswer(answerData))
       .unwrap()
       .then(() => {
-        // Show success message
-        setSuccessMessage('جواب کامیابی سے محفوظ ہو گیا');
-        
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => {
-          setSuccessMessage(null);
-        }, 3000);
+        // Success is now handled by the global save indicator
       })
       .catch((error) => {
         console.error(`Error saving answer for question ${question.id}:`, error);
@@ -214,7 +206,6 @@ const Question = memo(({
   const handleInputChange = useCallback((text: string) => {
     // Clear previous messages
     setError(null);
-    setSuccessMessage(null);
     
     switch (question.input_type) {
       case 'number':
@@ -317,26 +308,18 @@ const Question = memo(({
         numberOfLines={isMultiline ? 3 : 1}
         error={error}
       />
-      
-      {/* Success message */}
-      {successMessage && (
-        <View style={styles.messageContainer}>
-          <UrduText style={styles.successMessage}>{successMessage}</UrduText>
-        </View>
-      )}
     </View>
   );
 });
 
 // Memoized Accordion Section component
-const AccordionSection = memo(({
+const SectionBlock = memo(({
   section,
   questions,
   answers,
   submissionId,
   disabled,
   currentUnitId,
-  initiallyExpanded
 }: {
   section: ReportSection & { progress: number };
   questions: ReportQuestion[];
@@ -344,49 +327,38 @@ const AccordionSection = memo(({
   submissionId: number | null;
   disabled?: boolean;
   currentUnitId?: number | null;
-  initiallyExpanded?: boolean;
 }) => {
-  const [isOpen, setIsOpen] = useState(initiallyExpanded ?? false);
-
-  const handleToggleSection = useCallback(() => {
-    setIsOpen(prev => !prev);
-  }, []);
-  
   // Memoize the section title to avoid unnecessary re-renders
   const sectionTitle = useMemo(() => {
-    return section.section_label.length > 50 
-      ? `${section.section_label.slice(0, 50)}...` 
-      : section.section_label;
+    return section.section_label;
   }, [section.section_label]);
   
   // Memoize the question components to avoid unnecessary re-renders
   const questionComponents = useMemo(() => {
-    if (!isOpen) return null;
-    
     return questions.map((question) => {
       const answerValue = getAnswerValue(answers, question.id, question.input_type);
       
       return (
-        <Question
-          key={question.id}
-          question={question}
-          value={answerValue}
-          submissionId={submissionId}
-          disabled={disabled}
-          currentUnitId={currentUnitId}
-        />
+        <View key={question.id} style={styles.cardContainer}>
+          <Question
+            question={question}
+            value={answerValue}
+            submissionId={submissionId}
+            disabled={disabled}
+            currentUnitId={currentUnitId}
+          />
+        </View>
       );
     });
-  }, [isOpen, questions, answers, submissionId]);
+  }, [questions, answers, submissionId, disabled, currentUnitId]);
 
   return (
     <View style={styles.sectionContainer}>
-      <TouchableOpacity 
+      <View 
         style={[
           styles.sectionHeader,
           section.progress === 100 && styles.completedSectionHeader
         ]} 
-        onPress={handleToggleSection}
       >
         <View style={styles.headerTextContainer}>
           <UrduText style={styles.sectionTitle}>
@@ -401,19 +373,19 @@ const AccordionSection = memo(({
             >
               {section.progress}%
             </Text>
-            <Ionicons 
-              name={isOpen ? "chevron-up" : "chevron-down"} 
-              size={24} 
-              color={section.progress === 100 ? COLORS.success : COLORS.primary} 
-            />
+            {section.progress === 100 && (
+              <Ionicons 
+                name="checkmark-circle" 
+                size={20} 
+                color={COLORS.success} 
+              />
+            )}
           </View>
         </View>
-      </TouchableOpacity>
-      {isOpen && (
-        <View style={styles.questionsContainer}>
-          {questionComponents}
-        </View>
-      )}
+      </View>
+      <View style={styles.questionsContainer}>
+        {questionComponents}
+      </View>
     </View>
   );
 });
@@ -447,7 +419,7 @@ const SectionList: React.FC<SectionListProps> = ({
       const sectionQuestions = questions.filter((q) => q.section_id === section.id);
 
       return (
-        <AccordionSection
+        <SectionBlock
           key={section.id}
           section={section}
           questions={sectionQuestions}
@@ -455,7 +427,6 @@ const SectionList: React.FC<SectionListProps> = ({
           submissionId={finalSubmissionId}
           disabled={disabled}
           currentUnitId={currentUnitId}
-          initiallyExpanded={index === 0}
         />
       );
     });
@@ -474,40 +445,26 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.lg,
     marginHorizontal: SPACING.md
   },
-  messageContainer: {
-    paddingHorizontal: SPACING.sm,
-    marginTop: -SPACING.xs,
-    marginBottom: SPACING.xs,
-  },
-  successMessage: {
-    color: COLORS.success,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    textAlign: 'right',
-    fontWeight: '500',
-  },
   sectionContainer: {
-    marginBottom: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    ...SHADOWS.medium,
+    marginBottom: SPACING.lg,
   },
   sectionHeader: {
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.lightPrimary,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
   completedSectionHeader: {
-    backgroundColor: COLORS.success + '20', // 20% opacity success color
+    // optional success styling for section header text
   },
   headerTextContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: TYPOGRAPHY.fontSize.xl,
     textAlign: 'left',
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.primary,
     flex: 1,
   },
@@ -517,7 +474,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.primary,
+    color: COLORS.textSecondary,
     marginRight: SPACING.xs,
     fontWeight: '600',
   },
@@ -525,15 +482,19 @@ const styles = StyleSheet.create({
     color: COLORS.success,
   },
   questionsContainer: {
+    gap: SPACING.md, // Add spacing between individual question cards
+  },
+  cardContainer: {
     backgroundColor: COLORS.white,
-    borderBottomLeftRadius: BORDER_RADIUS.md,
-    borderBottomRightRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden', // to keep border radius intact with inner items
   },
   questionItem: {
-    padding: SPACING.xs,
+    padding: SPACING.md,
     backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
   },
 });
 

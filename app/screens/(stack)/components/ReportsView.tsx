@@ -147,7 +147,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 }) => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const [selectedTab, setSelectedTab] = useState(0);
   
   // Use our token refresh hook
   const { refreshTokenIfNeeded, ensureFreshTokenBeforeOperation } = useTokenRefresh();
@@ -409,15 +408,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       submission.unit_id === displayUnitId
     );
     
-    // Then filter by status based on selected tab
-    const statusFiltered = unitFiltered.filter((submission) =>
-      selectedTab === 0
-        ? submission.status === 'draft' || submission.status === 'pending'
-        : submission.status === 'published'
-    );
-    
     // Exclude the active submission from the filtered list
-    const excludeActive = statusFiltered.filter((submission) => {
+    const excludeActive = unitFiltered.filter((submission) => {
       // If we have an active submission, exclude it from the list below
       if (existingSubmission && submission.id === existingSubmission.id) {
         return false; // Exclude active submission
@@ -444,7 +436,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // Sort in descending order (newest start_date first)
       return startDateB - startDateA;
     });
-  }, [reportSubmissions.length, selectedTab, displayUnitId, existingSubmission?.id, reportMgmtDetails.length]);
+  }, [reportSubmissions.length, displayUnitId, existingSubmission?.id, reportMgmtDetails.length]);
 
   // Default back handler if none provided (defer to avoid Fabric viewState crash)
   const defaultBackHandler = useCallback(() => {
@@ -1014,22 +1006,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         </View>
 
         <View style={styles.reportSection}>
-          <TabGroup
-            tabs={[
-              { label: 'ڈیو/اوور ڈیو رپورٹس', value: 0 },
-              { label: 'سابقہ/جمع شدہ رپورٹس', value: 1 },
-            ]}
-            selectedTab={selectedTab}
-            onTabChange={setSelectedTab}
-          />
-          {/* <TouchableOpacity onPress={handleViewAllReports} style={styles.viewAllButton}>
-            <UrduText style={styles.sectionTitle}>تمام رپورٹس دیکھیں</UrduText>
-          </TouchableOpacity> */}
+          <UrduText style={styles.pastReportsTitle}>سابقہ رپورٹس</UrduText>
         </View>
 
         <View style={styles.reportContainer}>
           {filteredSubmissions.length > 0 ? (
-            filteredSubmissions.slice(0, 3).map((submission, index) => {
+            filteredSubmissions.map((submission, index) => {
               const formattedDate = submission.date_created
                 ? new Date(submission.date_created).toLocaleDateString('ur-PK', {
                     year: 'numeric',
@@ -1246,9 +1228,19 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.sm,
     // backgroundColor is now set dynamically based on completion percentage
   },
+  pastReportsTitle: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: '700',
+    color: COLORS.black,
+    textAlign: 'left',
+    writingDirection: 'rtl',
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.md,
+  },
   reportSection: {
     backgroundColor: COLORS.background,
     padding: SPACING.sm,
+    marginTop: SPACING.md,
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,

@@ -12,6 +12,15 @@ This document provides comprehensive guidelines for AI assistants (like Claude) 
 **Primary Language**: Urdu with RTL support
 **Platform**: iOS and Android
 
+### Sister projects (monorepo)
+
+This repository shares a Directus + PostgreSQL backend with other apps in the same tree:
+
+- **`E-Tanzeem-Dashboard/`** — Next.js admin analytics and panel. **Use this for all new web admin and dashboard development.**
+- **`E-Tanzeem-Admin-Frontend/`** — Older react-admin UI. **Obsolete — read-only reference** for field mappings, `dataProvider` / resource patterns, and legacy behavior when porting features to the Dashboard. Do not treat it as a target for new production work.
+
+Repo-wide context: [`../AGENTS.md`](../AGENTS.md). Dashboard-focused notes: [`../CLAUDE.md`](../CLAUDE.md) and [`../E-Tanzeem-Dashboard/CLAUDE.md`](../E-Tanzeem-Dashboard/CLAUDE.md).
+
 ### Key Characteristics
 - Enterprise-grade organizational management application
 - Hierarchical organizational structure (Tanzeem units)
@@ -74,6 +83,8 @@ app/
 ---
 
 ## Database Schema & Field Naming Conventions
+
+**Canonical reference:** [`datamodel.sql`](datamodel.sql) in this app directory — PostgreSQL `CREATE TABLE` definitions for tables and **exact column names** (use it when unsure of spelling, casing, or types). This document summarizes common fields; `datamodel.sql` is authoritative for the full datamodel.
 
 ### Critical: Database Field Naming
 
@@ -1833,7 +1844,7 @@ Person_files
 
 See [docs/SPECS.md](docs/SPECS.md) for complete TypeScript interfaces and detailed field descriptions.
 
-For the actual SQL schema, refer to [datamodel.sql](datamodel.sql) at the project root.
+For the full SQL schema and field names, use **[datamodel.sql](datamodel.sql)** (same directory as this file).
 
 ---
 
@@ -1923,7 +1934,7 @@ When working on this codebase:
 
 1. **Always follow existing patterns** - This codebase has established conventions; maintain consistency
 2. **Use exact database field names** - Database uses PascalCase (e.g., `Name`, `Phone_Number`, `Tanzeemi_Unit`) - never guess field names
-3. **Reference the schema** - Always check [datamodel.sql](datamodel.sql) or [docs/SPECS.md](docs/SPECS.md) for actual field names before writing queries
+3. **Reference the schema** — **[datamodel.sql](datamodel.sql)** for tables and SQL field names; [docs/SPECS.md](docs/SPECS.md) for TypeScript-oriented specs. Prefer `datamodel.sql` when names or types must match PostgreSQL exactly.
 4. **Prioritize Urdu support** - All UI text should support Urdu with proper RTL layout
 5. **Use Redux properly** - Follow the entity adapter pattern for collections
 6. **Don't break authentication** - Token refresh is critical; don't modify auth flow without understanding

@@ -115,18 +115,14 @@ export default function BaitulmalScreen() {
   useEffect(() => {
     if (createStatus === 'succeeded') {
       dispatch(resetCreateStatus());
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => router.back(), 50);
-      });
+      router.back();
     }
   }, [createStatus, dispatch, router]);
 
   useEffect(() => {
     if (editStatus === 'succeeded') {
       dispatch(resetEditStatus());
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => router.back(), 50);
-      });
+      router.back();
     }
   }, [editStatus, dispatch, router]);
 
@@ -176,9 +172,7 @@ export default function BaitulmalScreen() {
   }, [validate, isEditMode, recordId, selectedTypeId, amount, notes, month, year, dispatch]);
 
   const handleBack = useCallback(() => {
-    InteractionManager.runAfterInteractions(() => {
-      setTimeout(() => router.back(), 50);
-    });
+    router.back();
   }, [router]);
 
   const isSaving = createStatus === 'loading' || editStatus === 'loading';

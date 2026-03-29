@@ -989,7 +989,288 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
 
   // Determine if input should be editable based on category only
   const isEditable = question.category === 'manual';
-  
+
+  // Auto-fetch on mount if empty and has auto-calculate capability
+  useEffect(() => {
+    if (hasAutoCalculateCapability && !isEditable && !value && !isCalculating && !calculationSuccess && !disabled) {
+      handleFetchCount();
+    }
+  }, [hasAutoCalculateCapability, isEditable, value, disabled]);
+
+  // Remove success message after a few seconds
+  useEffect(() => {
+    if (calculationSuccess) {
+      const timer = setTimeout(() => setCalculationSuccess(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [calculationSuccess]);
+
+  // If manual, still use FormInput but styled as card if needed, or rely on parent for Card style.
+  // We'll return a read-only Stat Card if it's auto-calculated and not manual.
+  if (hasAutoCalculateCapability && !isEditable) {
+    return (
+      <View style={[styles.container, styles.statCard]}>
+        <View style={styles.statCardHeader}>
+          <UrduText style={styles.statCardTitle}>{question.question_text}</UrduText>
+          <View style={styles.statCardActions}>
+            <TouchableOpacity onPress={handleNavigateToSource} style={styles.iconButton}>
+              <Ionicons name="open-outline" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            {!disabled && (
+              <TouchableOpacity onPress={handleFetchCount} disabled={isCalculating} style={styles.iconButton}>
+                <Ionicons name={isCalculating ? "hourglass-outline" : "sync-outline"} size={20} color={isCalculating ? COLORS.textSecondary : COLORS.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.statCardContent}>
+          {isCalculating ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ alignSelf: 'flex-start' }} />
+          ) : (
+            <UrduText style={styles.statCardValue}>{inputValue || '0'}</UrduText>
+          )}
+          {typeLabel ? <UrduText style={styles.statCardLabel}>{typeLabel}</UrduText> : null}
+        </View>
+        
+        {calculationError && (
+          <UrduText style={styles.errorMessage}>{calculationError}</UrduText>
+        )}
+
+        {/* Modals remain the same */}
+        <Modal
+          visible={showContactsPopup}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handlePopupClose}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <UrduText style={styles.modalTitle}>
+                  {question.aggregate_func === 'plus' ? `نئے ${getContactTypeLabel()}` : 
+                   question.aggregate_func === 'minus' ? `کمی ${getContactTypeLabel()}` : 
+                   `کل ${getContactTypeLabel()}`}
+                </UrduText>
+                <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {contactsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
+                </View>
+              ) : contactsError ? (
+                <View style={styles.errorContainer}>
+                  <UrduText style={styles.errorText}>{contactsError}</UrduText>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.listHeader}>
+                    <UrduText style={styles.listHeaderText}>
+                      کل {contactsList.length} {getTypeLabel()}
+                    </UrduText>
+                  </View>
+                  
+                  <FlatList
+                    data={contactsList}
+                    renderItem={renderContactItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    style={styles.contactsList}
+                    contentContainerStyle={styles.contactsListContent}
+                    showsVerticalScrollIndicator={true}
+                    ListEmptyComponent={
+                      <View style={styles.emptyContainer}>
+                        <UrduText style={styles.emptyText}>کوئی {getContactTypeLabel()} نہیں ملے</UrduText>
+                      </View>
+                    }
+                    getItemLayout={(data, index) => ({
+                      length: 50, // Height of each compact item
+                      offset: 50 * index,
+                      index,
+                    })}
+
+                  />
+
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={handlePopupClose}
+                    >
+                      <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.okButton}
+                      onPress={handleContactsPopupOK}
+                    >
+                      <UrduText style={styles.okButtonText}>ٹھیک ہے ({contactsList.length})</UrduText>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showActivitiesPopup}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handlePopupClose}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <UrduText style={styles.modalTitle}>
+                  {`${getActivityTypeLabel()} کی سرگرمیاں`}
+                </UrduText>
+                <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {activitiesLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
+                </View>
+              ) : activitiesError ? (
+                <View style={styles.errorContainer}>
+                  <UrduText style={styles.errorText}>{activitiesError}</UrduText>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.listHeader}>
+                    <UrduText style={styles.listHeaderText}>
+                      کل {activitiesList.length} سرگرمی (جمع شدہ: {publishedActivitiesCount})
+                    </UrduText>
+                  </View>
+                  
+                  <FlatList
+                    data={activitiesList}
+                    renderItem={renderActivityItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    style={styles.contactsList}
+                    contentContainerStyle={styles.contactsListContent}
+                    showsVerticalScrollIndicator={true}
+                    ListEmptyComponent={
+                      <View style={styles.emptyContainer}>
+                        <UrduText style={styles.emptyText}>کوئی سرگرمی نہیں ملی</UrduText>
+                      </View>
+                    }
+                    getItemLayout={(data, index) => ({
+                      length: 60, // Height of each activity item
+                      offset: 60 * index,
+                      index,
+                    })}
+                  />
+
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={handlePopupClose}
+                    >
+                      <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.okButton}
+                      onPress={handleActivitiesPopupOK}
+                    >
+                      <UrduText style={styles.okButtonText}>ٹھیک ہے ({activitiesPopupValue})</UrduText>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showBaitulmalPopup}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handlePopupClose}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <UrduText style={styles.modalTitle}>
+                  {getBaitulmalTypeLabel()}
+                </UrduText>
+                <TouchableOpacity onPress={handlePopupClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {baitulmalLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <UrduText style={styles.loadingText}>معلومات حاصل کی جا رہی ہیں...</UrduText>
+                </View>
+              ) : baitulmalError ? (
+                <View style={styles.errorContainer}>
+                  <UrduText style={styles.errorText}>{baitulmalError}</UrduText>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.listHeader}>
+                    <UrduText style={styles.listHeaderText}>
+                      {question.aggregate_func === 'count'
+                        ? `کل ${baitulmalList.length} اندراجات`
+                        : `کل رقم: ${baitulmalPopupValue.toLocaleString('en-US')} روپے (${baitulmalList.length} اندراجات)`}
+                    </UrduText>
+                  </View>
+
+                  <FlatList
+                    data={baitulmalList}
+                    renderItem={renderBaitulmalItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    style={styles.contactsList}
+                    contentContainerStyle={styles.contactsListContent}
+                    showsVerticalScrollIndicator={true}
+                    ListEmptyComponent={
+                      <View style={styles.emptyContainer}>
+                        <UrduText style={styles.emptyText}>کوئی {getBaitulmalTypeLabel()} کا اندراج نہیں ملا</UrduText>
+                      </View>
+                    }
+                    getItemLayout={(data, index) => ({
+                      length: 50,
+                      offset: 50 * index,
+                      index,
+                    })}
+                  />
+
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={handlePopupClose}
+                    >
+                      <UrduText style={styles.cancelButtonText}>منسوخ کریں</UrduText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.okButton}
+                      onPress={handleBaitulmalPopupOK}
+                    >
+                      <UrduText style={styles.okButtonText}>
+                        ٹھیک ہے ({question.aggregate_func === 'count' ? baitulmalList.length : baitulmalPopupValue.toLocaleString('en-US')})
+                      </UrduText>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FormInput
@@ -1029,13 +1310,6 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
       {calculationError && (
         <View style={styles.messageContainer}>
           <UrduText style={styles.errorMessage}>{calculationError}</UrduText>
-        </View>
-      )}
-
-      {/* Success message */}
-      {calculationSuccess && (
-        <View style={styles.messageContainer}>
-          <UrduText style={styles.successMessage}>{calculationSuccess}</UrduText>
         </View>
       )}
 
@@ -1555,6 +1829,53 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.tertiary,
+  },
+  statCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.sm,
+  },
+  statCardTitle: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'left',
+    writingDirection: 'rtl',
+  },
+  statCardActions: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
+  iconButton: {
+    padding: SPACING.xs,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statCardContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: SPACING.xs,
+  },
+  statCardValue: {
+    fontSize: TYPOGRAPHY.fontSize.xxxl,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  statCardLabel: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import i18n from '@/app/i18n';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,11 +30,19 @@ import {
   fetchUserTanzeemiUnit,
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { selectParentUnitWithLevel } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectUserDetails, selectNazimDetails, fetchNazimDetails } from '@/app/features/persons/personSlice';
+import {
+  selectUserDetails,
+  selectNazimDetails,
+  fetchNazimDetails,
+  fetchContactTypes,
+  selectContactTypes,
+  selectContactTypesStatus,
+} from '@/app/features/persons/personSlice';
 import { AppDispatch } from '@/app/store/types';
 import { selectPendingSubmissionCountByUnitId, fetchReportSubmissions } from '@/app/features/reports/reportsSlice';
 import UnitSelectionModal from './components/UnitSelectionModal';
 import { formatUnitName } from '@/app/utils/formatUnitName';
+import SpeedDialFAB, { SpeedDialAction } from '@/app/components/SpeedDialFAB';
 
 // Theme-aligned button colors (primary, tertiary, orange, accent)
 const DASHBOARD_BUTTON_COLORS = {
@@ -49,6 +58,8 @@ const GRID_GAP = 6;
 const SIDE_MARGIN = SPACING.lg;
 // Scale down button size so they fit better on screen
 const BUTTON_SIZE_SCALE = 0.9;
+// Shorter than grid tiles so FAB can sit above tab bar without crowding
+const REPORTS_BUTTON_HEIGHT_TRIM = 30;
 
 const Dashboard = () => {
   const router = useRouter();
@@ -59,6 +70,7 @@ const Dashboard = () => {
   const fullSquare = Math.floor((contentWidth - GRID_GAP) / 2);
   const squareSize = Math.floor(fullSquare * BUTTON_SIZE_SCALE);
   const buttonHeight = squareSize;
+  const reportsButtonHeight = Math.max(squareSize - REPORTS_BUTTON_HEIGHT_TRIM, 96);
   // Horizontal gap between the two boxes in a row (space-between leaves this space)
   const horizontalGap = contentWidth - 2 * squareSize;
   // Use half for vertical and horizontal gaps (was too much)
@@ -76,6 +88,23 @@ const Dashboard = () => {
   const nazimDetails = useSelector(selectNazimDetails);
   const dispatch = useDispatch<AppDispatch>();
   const pendingReportCount = useSelector((state: any) => selectPendingSubmissionCountByUnitId(state, displayUnitId));
+  const contactTypes = useSelector(selectContactTypes);
+  const contactTypesStatus = useSelector(selectContactTypesStatus);
+
+  const umeedwarContactTypeId = useMemo(
+    () => contactTypes?.find(ct => ct.type === 'umeedwar')?.id,
+    [contactTypes]
+  );
+  const karkunContactTypeId = useMemo(
+    () => contactTypes?.find(ct => ct.type === 'karkun')?.id,
+    [contactTypes]
+  );
+
+  useEffect(() => {
+    if (contactTypesStatus === 'idle') {
+      dispatch(fetchContactTypes());
+    }
+  }, [dispatch, contactTypesStatus]);
 
   // Fetch report submissions so badge stays up-to-date
   useEffect(() => {
@@ -127,14 +156,96 @@ const Dashboard = () => {
     if (userUnit && !selectedUnitId) {
       dispatch(setDashboardSelectedUnit(userUnit.id));
     }
-  }, [userUnit, selectedUnitId]);
+  }, [dispatch, userUnit, selectedUnitId]);
 
   const gridButtons = [
-    { key: 'initial_info', label: i18n.t('initial_info'), color: DASHBOARD_BUTTON_COLORS.initialInfo, onPress: () => router.push('/screens/Workforce') },
-    { key: 'activities', label: i18n.t('activities'), color: DASHBOARD_BUTTON_COLORS.activities, onPress: () => (navigation as any).navigate('Activities') },
-    { key: 'contacts', label: i18n.t('contacts'), color: DASHBOARD_BUTTON_COLORS.contacts, onPress: () => (navigation as any).navigate('Arkan') },
-    { key: 'money', label: i18n.t('money'), color: DASHBOARD_BUTTON_COLORS.baitulMal, onPress: () => router.push('/screens/Baitulmal') },
+    { key: 'initial_info', label: i18n.t('initial_info'), color: DASHBOARD_BUTTON_COLORS.initialInfo, onPress: () => router.push('/screens/Workforce'), fabNotch: false },
+    { key: 'activities', label: i18n.t('activities'), color: DASHBOARD_BUTTON_COLORS.activities, onPress: () => (navigation as any).navigate('Activities'), fabNotch: false },
+    { key: 'contacts', label: i18n.t('contacts'), color: DASHBOARD_BUTTON_COLORS.contacts, onPress: () => (navigation as any).navigate('Arkan'), fabNotch: true },
+    { key: 'money', label: i18n.t('money'), color: DASHBOARD_BUTTON_COLORS.baitulMal, onPress: () => router.push('/screens/Baitulmal'), fabNotch: true },
   ] as const;
+
+  // Speed dial is 60×60 (r=30). Notch: circle centered on the bottom-edge midpoint of the tile (same x as button
+  // center), radius a bit larger than the FAB so the arc clears overlap without eating the label.
+  const fabNotchRadius = useMemo(() => {
+    const fabHalf = 30;
+    return Math.round(fabHalf + 10 + Math.min(12, squareSize * 0.04));
+  }, [squareSize]);
+
+  // Inner corners toward FAB: Baitulmal (money) shifts toward +x, Afrad (contacts) toward -x in LTR coords.
+  // With `direction: 'rtl'` on the screen, absolute `left` is mirrored — flip so notches stay inner in Urdu.
+  const { fabNotchShiftMoney, fabNotchShiftContacts } = useMemo(() => {
+    const h = Math.round(squareSize * 0.5);
+    return isRtl
+      ? { fabNotchShiftMoney: -h, fabNotchShiftContacts: h }
+      : { fabNotchShiftMoney: h, fabNotchShiftContacts: -h };
+  }, [squareSize, isRtl]);
+
+  const fabActions: SpeedDialAction[] = useMemo(
+    () => [
+      {
+        icon: 'document-text',
+        label: 'رپورٹ بنائیں',
+        color: COLORS.primary,
+        onPress: () => (navigation as any).navigate('Reports'),
+      },
+      {
+        icon: 'person-add',
+        label: 'نیا امیدوار',
+        color: DASHBOARD_BUTTON_COLORS.contacts,
+        onPress: () => {
+          if (!umeedwarContactTypeId) {
+            Alert.alert('', 'رکن کی اقسام ابھی لوڈ نہیں ہوئیں۔ دوبارہ کوشش کریں۔');
+            return;
+          }
+          (navigation as any).navigate('screens/RukunAddEdit', { contactTypeId: umeedwarContactTypeId });
+        },
+      },
+      {
+        icon: 'people',
+        label: 'نیا کارکن',
+        color: DASHBOARD_BUTTON_COLORS.contacts,
+        onPress: () => {
+          if (!karkunContactTypeId) {
+            Alert.alert('', 'رکن کی اقسام ابھی لوڈ نہیں ہوئیں۔ دوبارہ کوشش کریں۔');
+            return;
+          }
+          (navigation as any).navigate('screens/RukunAddEdit', { contactTypeId: karkunContactTypeId });
+        },
+      },
+      {
+        icon: 'calendar',
+        label: 'سرگرمی شیڈول کریں',
+        color: DASHBOARD_BUTTON_COLORS.activities,
+        onPress: () => router.push({ pathname: '/screens/ActivityScreen', params: { mode: 'schedule' } }),
+      },
+      {
+        icon: 'clipboard',
+        label: 'سرگرمی کی رپورٹ',
+        color: DASHBOARD_BUTTON_COLORS.activities,
+        onPress: () => router.push({ pathname: '/screens/ActivityScreen', params: { mode: 'report' } }),
+      },
+      {
+        icon: 'barbell',
+        label: 'تنظیمی قوت میں اضافہ/کمی',
+        color: DASHBOARD_BUTTON_COLORS.initialInfo,
+        onPress: () => router.push('/screens/Workforce'),
+      },
+      {
+        icon: 'trending-up',
+        label: 'آمدنی کا اندراج',
+        color: DASHBOARD_BUTTON_COLORS.baitulMal,
+        onPress: () => router.push({ pathname: '/screens/BaitulmalScreen', params: { mode: 'income' } }),
+      },
+      {
+        icon: 'trending-down',
+        label: 'خرچ کا اندراج',
+        color: DASHBOARD_BUTTON_COLORS.baitulMal,
+        onPress: () => router.push({ pathname: '/screens/BaitulmalScreen', params: { mode: 'expense' } }),
+      },
+    ],
+    [navigation, router, umeedwarContactTypeId, karkunContactTypeId]
+  );
 
   return (
     <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>
@@ -164,7 +275,7 @@ const Dashboard = () => {
             >
               <View style={styles.reportsButtonWrapper}>
                 <TouchableOpacity
-                  style={[styles.reportsButton, { height: buttonHeight }]}
+                  style={[styles.reportsButton, { height: reportsButtonHeight }]}
                   onPress={() => (navigation as any).navigate('Reports')}
                   activeOpacity={0.85}
                 >
@@ -182,14 +293,37 @@ const Dashboard = () => {
               <View style={styles.gridContainer}>
                 {[0, 1].map((rowIndex) => (
                   <View key={rowIndex} style={styles.gridRow}>
-                    {gridButtons.slice(rowIndex * 2, rowIndex * 2 + 2).map(({ key, label, color, onPress }) => (
+                    {gridButtons.slice(rowIndex * 2, rowIndex * 2 + 2).map(({ key, label, color, onPress, fabNotch }) => (
                       <TouchableOpacity
                         key={key}
-                        style={[styles.gridButton, { backgroundColor: color, width: squareSize, height: squareSize }]}
+                        style={[
+                          styles.gridButton,
+                          fabNotch && styles.gridButtonFabNotch,
+                          { backgroundColor: color, width: squareSize, height: squareSize },
+                        ]}
                         onPress={onPress}
                         activeOpacity={0.85}
                       >
                         <UrduText style={styles.gridButtonText} numberOfLines={2}>{label}</UrduText>
+                        {fabNotch && (
+                          <View
+                            pointerEvents="none"
+                            style={[
+                              styles.fabNotchCircle,
+                              styles.fabNotchFill,
+                              {
+                                width: fabNotchRadius * 2,
+                                height: fabNotchRadius * 2,
+                                borderRadius: fabNotchRadius,
+                                left:
+                                  squareSize / 2 -
+                                  fabNotchRadius +
+                                  (key === 'money' ? fabNotchShiftMoney : fabNotchShiftContacts),
+                                top: squareSize - fabNotchRadius,
+                              },
+                            ]}
+                          />
+                        )}
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -205,6 +339,8 @@ const Dashboard = () => {
           isRtl={isRtl}
           colorScheme={colorScheme}
         />
+        
+        <SpeedDialFAB actions={fabActions} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -295,6 +431,16 @@ const getStyles = (
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: SPACING.xs,
+      position: 'relative',
+    },
+    gridButtonFabNotch: {
+      overflow: 'hidden',
+    },
+    fabNotchCircle: {
+      position: 'absolute',
+    },
+    fabNotchFill: {
+      backgroundColor: isDark ? '#23242D' : '#EBEBEB',
     },
     dashboardButtonText: {
       color: COLORS.white,
