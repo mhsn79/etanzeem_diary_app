@@ -77,7 +77,7 @@ const FormInput: React.FC<FormInputProps> = ({
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
-                multiline ? { minHeight: 80, paddingTop: SPACING.xs } : null,
+                multiline ? { height: 120, paddingTop: SPACING.sm } : null,
               ]}
               value={value}
               onChangeText={onChange}
@@ -87,9 +87,11 @@ const FormInput: React.FC<FormInputProps> = ({
               keyboardType={keyboardType}
               maxLength={maxLength}
               textAlignVertical={multiline ? "top" : "center"}
-              editable={editable && !disabled && !loading}
+              editable={editable && !disabled && (!loading || multiline)}
               multiline={multiline}
-              numberOfLines={numberOfLines || (multiline ? 3 : 1)}
+              numberOfLines={numberOfLines || (multiline ? 4 : 1)}
+              submitBehavior={multiline ? 'newline' : 'blurAndSubmit'}
+              scrollEnabled={multiline}
             />
             {rightIcon && (
               <View style={styles.iconContainer}>
@@ -130,7 +132,7 @@ const FormInput: React.FC<FormInputProps> = ({
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
-                multiline ? { minHeight: 80, paddingTop: SPACING.xs } : null,
+                multiline ? { height: 120, paddingTop: SPACING.sm } : null,
               ]}
               value={value}
               onChangeText={onChange}
@@ -140,9 +142,11 @@ const FormInput: React.FC<FormInputProps> = ({
               keyboardType={keyboardType}
               maxLength={maxLength}
               textAlignVertical={multiline ? "top" : "center"}
-              editable={editable && !disabled && !loading}
+              editable={editable && !disabled && (!loading || multiline)}
               multiline={multiline}
-              numberOfLines={numberOfLines || (multiline ? 3 : 1)}
+              numberOfLines={numberOfLines || (multiline ? 4 : 1)}
+              submitBehavior={multiline ? 'newline' : 'blurAndSubmit'}
+              scrollEnabled={multiline}
             />
             {rightIcon && (
               <View style={styles.iconContainer}>
@@ -237,7 +241,7 @@ const styles = StyleSheet.create({
   twoLineInput: {
     flex: 1,
     height: 45,
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     paddingHorizontal: SPACING.sm,

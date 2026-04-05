@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -10,10 +10,16 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
+  TextInput,
   View,
   Dimensions,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '../i18n';
@@ -70,6 +76,42 @@ export default function LoginScreen() {
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  /* Refs for keyboard flow */
+  const passwordRef = useRef<TextInput>(null);
+
+  /* Keyboard animation */
+  const keyboardVisible = useSharedValue(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      keyboardVisible.value = withTiming(1, { duration: 250 });
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardVisible.value = withTiming(0, { duration: 200 });
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const animatedLogoStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      keyboardVisible.value,
+      [0, 1],
+      [screenHeight * 0.45, screenHeight * 0.12]
+    ),
+    overflow: 'hidden' as const,
+  }));
+
+  const animatedLogoOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(keyboardVisible.value, [0, 0.5], [1, 0]),
+  }));
+
   /* Redirect when auth succeeds */
   useEffect(() => {
     if (isAuthenticated) {
@@ -121,6 +163,7 @@ export default function LoginScreen() {
       return;
     }
 
+    Keyboard.dismiss();
     setLoginInProgress(true);
     dispatch(loginAndFetchUserDetails({ email, password }));
   };
@@ -142,35 +185,37 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          contentContainerStyle={[styles.scrollContainer, styles.scrollContainerPadding]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets={true}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <StatusBar hidden />
-          <View style={styles.background}>
-          {/* Logo & Banner */}
-          <View style={styles.logoContainer}>
-            <ImageBackground
-              source={require('../../assets/images/pattern.png')}
-              style={styles.pattern}
-            >
-              <View style={styles.overlay}>
-                <Text style={[styles.title, { marginTop: titleTop }]}>{i18n.t('appname')}</Text>
-                <Image
-                  source={require('../../assets/images/jamat-logo.png')}
-                  style={styles.logo}
-                />
-              </View>
-            </ImageBackground>
-          </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={true}
+        showsVerticalScrollIndicator={false}
+      >
+        <StatusBar hidden />
+        <View style={styles.background}>
+          {/* Logo & Banner — animates smaller when keyboard opens */}
+          <Pressable onPress={Keyboard.dismiss}>
+            <Animated.View style={[styles.logoContainer, animatedLogoStyle]}>
+              <ImageBackground
+                source={require('../../assets/images/pattern.png')}
+                style={styles.pattern}
+              >
+                <View style={styles.overlay}>
+                  <Text style={[styles.title, { marginTop: titleTop }]}>{i18n.t('appname')}</Text>
+                  <Animated.View style={animatedLogoOpacity}>
+                    <Image
+                      source={require('../../assets/images/jamat-logo.png')}
+                      style={styles.logo}
+                    />
+                  </Animated.View>
+                </View>
+              </ImageBackground>
+            </Animated.View>
+          </Pressable>
 
           {/* Login form */}
           <View style={styles.loginContainer}>
@@ -183,27 +228,15 @@ export default function LoginScreen() {
                 placeholderTextColor="#2D2327"
                 onChangeText={(v) => {
                   setEmail(v);
-                  // Clear empty state when user starts typing
-                  if (emailEmptyOnBlur) {
-                    setEmailEmptyOnBlur(false);
-                  }
-                  // Only clear error if there was one, to prevent unnecessary re-renders
-                  if (emailError) {
-                    setEmailError(null);
-                  }
-                  if (formError) {
-                    setFormError(null);
-                  }
-                  if (authError) {
-                    dispatch(clearError());
-                  }
+                  if (emailEmptyOnBlur) setEmailEmptyOnBlur(false);
+                  if (emailError) setEmailError(null);
+                  if (formError) setFormError(null);
+                  if (authError) dispatch(clearError());
                 }}
                 onBlur={() => {
-                  // Highlight with red outline if empty on blur
-                  if (!email.trim()) {
-                    setEmailEmptyOnBlur(true);
-                  }
+                  if (!email.trim()) setEmailEmptyOnBlur(true);
                 }}
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 value={email}
                 error={!!emailError || emailEmptyOnBlur}
                 autoComplete="email"
@@ -217,33 +250,22 @@ export default function LoginScreen() {
             <View style={styles.inputContainer}>
               <Text style={styles.inputText}>{i18n.t('password')}</Text>
               <CustomTextInput
+                ref={passwordRef}
                 style={styles.ltrInput}
                 placeholder="********"
                 placeholderTextColor="#2D2327"
                 secureTextEntry
                 onChangeText={(v) => {
                   setPassword(v);
-                  // Clear empty state when user starts typing
-                  if (passwordEmptyOnBlur) {
-                    setPasswordEmptyOnBlur(false);
-                  }
-                  // Only clear error if there was one, to prevent unnecessary re-renders
-                  if (passwordError) {
-                    setPasswordError(null);
-                  }
-                  if (formError) {
-                    setFormError(null);
-                  }
-                  if (authError) {
-                    dispatch(clearError());
-                  }
+                  if (passwordEmptyOnBlur) setPasswordEmptyOnBlur(false);
+                  if (passwordError) setPasswordError(null);
+                  if (formError) setFormError(null);
+                  if (authError) dispatch(clearError());
                 }}
                 onBlur={() => {
-                  // Highlight with red outline if empty on blur
-                  if (!password.trim()) {
-                    setPasswordEmptyOnBlur(true);
-                  }
+                  if (!password.trim()) setPasswordEmptyOnBlur(true);
                 }}
+                onSubmitEditing={handleLogin}
                 value={password}
                 error={!!passwordError || passwordEmptyOnBlur}
                 autoComplete="password"
@@ -268,21 +290,20 @@ export default function LoginScreen() {
               {showLoading ? (
                 <ActivityIndicator size="large" color="#008CFF" />
               ) : (
-                <CustomButton 
-                  text={i18n.t('login')} 
+                <CustomButton
+                  text={i18n.t('login')}
                   onPress={handleLogin}
                   disabled={!email.trim() || !password.trim()}
                 />
               )}
             </View>
           </View>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-      
+        </View>
+      </ScrollView>
+
       {/* Regular toast for other errors */}
       {authError && !authError.includes("don't have any access to the app") && <Toast />}
-      
+
 
     </KeyboardAvoidingView>
   );
@@ -300,16 +321,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
   },
-  scrollContainerPadding: {
-    paddingBottom: Platform.OS === 'ios' ? 40 : 80,
-  },
   background: {
     flex: 1,
     backgroundColor: '#0077ff',
   },
   logoContainer: {
     width: '100%',
-    height: screenHeight * 0.45,
   },
   pattern: {
     width: '100%',
@@ -343,7 +360,6 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 40,
     marginTop: -40,
-    minHeight: screenHeight * 0.55 + 40,
   },
   inputContainer: {
     width: '100%',

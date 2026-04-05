@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
-import { version as appVersion } from '../../package.json';
+import Constants from 'expo-constants';
 import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
@@ -40,6 +40,8 @@ import {
   selectLevelsById,
   fetchUserTanzeemiUnit
 } from '@/app/features/tanzeem/tanzeemSlice';
+
+const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
 /* ──────────────────────
    Compact read-only field row

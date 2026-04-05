@@ -51,6 +51,8 @@ const ActivityScreen = () => {
   const isEditMode = mode === 'edit' && activityId !== undefined;
   const presetMonth = params.reportMonth ? String(params.reportMonth) : '';
   const presetYear = params.reportYear ? String(params.reportYear) : '';
+  const presetActivityType = params.activityType ? String(params.activityType) : '';
+  const editContext = params.editContext ? String(params.editContext) as 'schedule' | 'report' : null;
   
   // Get initial date based on mode and preset period
   const getInitialDate = () => {
@@ -80,7 +82,7 @@ const ActivityScreen = () => {
   // Initialize state with default values
   const [selectedActivityDate, setSelectedActivityDate] = useState<Date | null>(getInitialDate());
   const [activityDetails, setActivityDetails] = useState({
-    activityType: '',
+    activityType: presetActivityType,
     location: '',
     locationLabel: '',
     tanzeemiUnit: '',
@@ -125,13 +127,16 @@ const ActivityScreen = () => {
   const activity = isEditMode && activityId ? useAppSelector(getActivityById(activityId)) : null;
 
   // Determine effective mode for date bounds:
-  // In edit mode, use the activity's status to decide (published = report rules, draft = schedule rules)
+  // In edit mode, use editContext (which tab the edit was triggered from),
+  // then fall back to activity status, then default to schedule.
   const effectiveDateMode = React.useMemo(() => {
-    if (isEditMode && activity) {
-      return activity.status === 'published' ? 'report' : 'schedule';
+    if (isEditMode) {
+      if (editContext) return editContext;
+      if (activity) return activity.status === 'published' ? 'report' : 'schedule';
+      return 'schedule'; // fallback while activity is loading
     }
     return mode === 'edit' ? 'schedule' : mode;
-  }, [isEditMode, activity, mode]);
+  }, [isEditMode, activity, mode, editContext]);
 
   // Compute date bounds for the reporting period
   const dateBounds = React.useMemo(() => {
@@ -539,8 +544,9 @@ const ActivityScreen = () => {
     return userTanzeemiLevelDetails?.Name || userTanzeemiLevelDetails?.name || '';
   }, [activityDetails.tanzeemiUnit, displayUnit, childUnits, levelsById, userTanzeemiLevelDetails]);
 
-  // Auto-populate activity details when activity type or unit changes
+  // Auto-populate activity details when activity type or unit changes (only for new activities)
   useEffect(() => {
+    if (isEditMode) return; // Don't overwrite existing details in edit mode
     if (activityDetails.activityType && activityDetails.activityType !== 'other') {
       const selectedType = activityTypes.find(type => String(type.id) === activityDetails.activityType);
 
@@ -552,7 +558,7 @@ const ActivityScreen = () => {
         }));
       }
     }
-  }, [activityDetails.activityType, activityTypes, selectedUnitLevelName]);
+  }, [activityDetails.activityType, activityTypes, selectedUnitLevelName, isEditMode]);
 
   const navigateBack = () => {
     // Defer to avoid Fabric "Unable to find viewState for tag" when going back
@@ -690,8 +696,8 @@ const ActivityScreen = () => {
       return 'براہ کرم دیگر جگہ کی تفصیل درج کریں۔';
     }
     
-    // Additional validation for report mode or past published activities
-    if (mode === 'report' || (isEditMode && activity && activity.status === 'published')) {
+    // Additional validation for report mode or report-context edits
+    if (mode === 'report' || effectiveDateMode === 'report') {
       if (!activityDetails.attendance) {
         return 'براہ کرم حاضری درج کریں۔';
       }
@@ -746,8 +752,11 @@ const ActivityScreen = () => {
       attendance = parseInt(activityDetails.attendance);
     } else if (isEditMode) {
       status = activity?.status || 'draft';
-      if (activity && activity.status === 'published') {
+      // Include attendance and reporting month/year for report-context edits or published activities
+      if (effectiveDateMode === 'report' || (activity && activity.status === 'published')) {
         attendance = parseInt(activityDetails.attendance);
+        if (activityDetails.reportingMonth) reportMonth = parseInt(activityDetails.reportingMonth);
+        if (activityDetails.reportingYear) reportYear = parseInt(activityDetails.reportingYear);
       }
     }
     
@@ -906,8 +915,8 @@ const ActivityScreen = () => {
               numberOfLines={3}
             />
             
-            {/* Attendance field for report mode or published activities in edit mode */}
-            {(mode === 'report' || (isEditMode && activity && activity.status === 'published')) && (
+            {/* Attendance field for report mode, report-context edits, or published activities in edit mode */}
+            {(mode === 'report' || effectiveDateMode === 'report') && (
               <FormInput
                 inputTitle="حاضری"
                 value={activityDetails.attendance}
@@ -918,8 +927,8 @@ const ActivityScreen = () => {
               />
             )}
 
-            {/* Month/year dropdowns only in report mode when no preset values */}
-            {mode === 'report' && !presetMonth && !presetYear && (
+            {/* Month/year dropdowns in report mode (no presets) or report-context edits */}
+            {((mode === 'report' && !presetMonth && !presetYear) || (isEditMode && effectiveDateMode === 'report')) && (
               <>
                 <CustomDropdown
                   options={urduMonths}

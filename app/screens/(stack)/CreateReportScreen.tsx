@@ -84,6 +84,8 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
 
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
+  const submissionStatus = fromRouter ? (params.status as string || '') : (initialParamsProp?.status ?? '');
+  const isAlreadyPublished = submissionStatus === 'published';
 
   // Log params on mount/change to debug report not opening (always use submission's own mgmt_id)
   useEffect(() => {
@@ -444,10 +446,12 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
   }, [router, navigation]);
 
   // Show loading state (after all hooks)
-  const isFormReady = 
-    status === 'succeeded' && 
-    ((submissionId != null && currentSubmissionId === submissionId) || 
-     (submissionId == null && currentSubmissionId != null));
+  // Also treat as ready when report was just submitted (currentSubmissionId cleared to null)
+  const isFormReady =
+    status === 'succeeded' &&
+    ((submissionId != null && currentSubmissionId === submissionId) ||
+     (submissionId == null && currentSubmissionId != null) ||
+     submitStatus === 'succeeded');
 
   if (status === 'loading' || !isFormReady) {
     return (
@@ -561,7 +565,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
             ]}
           >
             <CustomButton
-              text="جمع کروائیں"
+              text={isAlreadyPublished ? "اپ ڈیٹ کریں" : "جمع کروائیں"}
               onPress={handleSubmit}
               viewStyle={{
                 backgroundColor: COLORS.primary,
@@ -578,22 +582,35 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
         )}
         
         {/* Global Auto-Save Status indicator */}
+        {/* During batch auto-fill, show a single loading indicator instead of
+            per-answer save status flickering for each question */}
         <View style={styles.globalSaveIndicatorContainer}>
-          {saveStatus === 'loading' && (
+          {batchFillStatus === 'loading' ? (
             <View style={[styles.statusBadge, styles.loadingBadge]}>
               <ActivityIndicator size="small" color={COLORS.primary} style={{ transform: [{ scale: 0.7 }] }} />
-              <UrduText style={styles.statusBadgeText}>محفوظ ہو رہا ہے...</UrduText>
+              <UrduText style={styles.statusBadgeText}>
+                خودکار بھرا جا رہا ہے... ({batchFillProgress.current}/{batchFillProgress.total})
+              </UrduText>
             </View>
-          )}
-          {saveStatus === 'succeeded' && (
-            <View style={[styles.statusBadge, styles.successBadge]}>
-              <UrduText style={styles.statusBadgeSuccessText}>تمام تبدیلیاں محفوظ ہو گئیں</UrduText>
-            </View>
-          )}
-          {saveStatus === 'failed' && (
-            <View style={[styles.statusBadge, styles.errorBadge]}>
-              <UrduText style={styles.statusBadgeErrorText}>محفوظ کرنے میں ناکامی</UrduText>
-            </View>
+          ) : (
+            <>
+              {saveStatus === 'loading' && (
+                <View style={[styles.statusBadge, styles.loadingBadge]}>
+                  <ActivityIndicator size="small" color={COLORS.primary} style={{ transform: [{ scale: 0.7 }] }} />
+                  <UrduText style={styles.statusBadgeText}>محفوظ ہو رہا ہے...</UrduText>
+                </View>
+              )}
+              {saveStatus === 'succeeded' && (
+                <View style={[styles.statusBadge, styles.successBadge]}>
+                  <UrduText style={styles.statusBadgeSuccessText}>تمام تبدیلیاں محفوظ ہو گئیں</UrduText>
+                </View>
+              )}
+              {saveStatus === 'failed' && (
+                <View style={[styles.statusBadge, styles.errorBadge]}>
+                  <UrduText style={styles.statusBadgeErrorText}>محفوظ کرنے میں ناکامی</UrduText>
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -609,7 +626,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
             onClose={() => setShowLowProgressWarning(false)}
             title="نامکمل رپورٹ"
             description={`رپورٹ صرف ${overallProgress}% مکمل ہے۔ کیا آپ پھر بھی جمع کروانا چاہتے ہیں؟`}
-            confirmText="جمع کروائیں"
+            confirmText={isAlreadyPublished ? "اپ ڈیٹ کریں" : "جمع کروائیں"}
             cancelText="واپس جائیں"
             type="confirm"
             showWarningIcon={true}
@@ -623,9 +640,9 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
             onConfirm={handleConfirmSubmit}
             onCancel={() => setShowSubmitDialog(false)}
             onClose={() => setShowSubmitDialog(false)}
-            title="رپورٹ جمع کروائیں"
-            description="کیا آپ رپورٹ جمع کروانا چاہتے ہیں؟"
-            confirmText="جمع کروائیں"
+            title={isAlreadyPublished ? "رپورٹ اپ ڈیٹ کریں" : "رپورٹ جمع کروائیں"}
+            description={isAlreadyPublished ? "کیا آپ رپورٹ اپ ڈیٹ کرنا چاہتے ہیں؟" : "کیا آپ رپورٹ جمع کروانا چاہتے ہیں؟"}
+            confirmText={isAlreadyPublished ? "اپ ڈیٹ کریں" : "جمع کروائیں"}
             cancelText="منسوخ کریں"
             type="confirm"
             showWarningIcon={true}
@@ -644,8 +661,8 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
               setShowSuccessDialog(false);
               handleBack();
             }}
-            title="رپورٹ جمع ہو گئی"
-            description="آپ کی رپورٹ جمع کروا دی گئی ہے۔"
+            title={isAlreadyPublished ? "رپورٹ اپ ڈیٹ ہو گئی" : "رپورٹ جمع ہو گئی"}
+            description={isAlreadyPublished ? "آپ کی رپورٹ اپ ڈیٹ کر دی گئی ہے۔" : "آپ کی رپورٹ جمع کروا دی گئی ہے۔"}
             confirmText="ٹھیک ہے"
             type="success"
             showSuccessIcon={true}

@@ -17,7 +17,7 @@ This document provides comprehensive guidelines for AI assistants (like Claude) 
 This repository shares a Directus + PostgreSQL backend with other apps in the same tree:
 
 - **`E-Tanzeem-Dashboard/`** — Next.js admin analytics and panel. **Use this for all new web admin and dashboard development.**
-- **`E-Tanzeem-Admin-Frontend/`** — Older react-admin UI. **Obsolete — read-only reference** for field mappings, `dataProvider` / resource patterns, and legacy behavior when porting features to the Dashboard. Do not treat it as a target for new production work.
+- **`E-Tanzeem-Admin-Frontend/`** — Older react-admin UI. **Obsolete — read-only reference** for field mappings, `dataProvider` / resource patterns, and legacy behavior when porting features to the Dashboard. Do not treat the app as a target for new production work; its **`scripts/`** directory is still maintained for one-off data-update scripts.
 
 Repo-wide context: [`../AGENTS.md`](../AGENTS.md). Dashboard-focused notes: [`../CLAUDE.md`](../CLAUDE.md) and [`../E-Tanzeem-Dashboard/CLAUDE.md`](../E-Tanzeem-Dashboard/CLAUDE.md).
 
@@ -1885,8 +1885,8 @@ When creating or editing activities, date selection is restricted based on mode:
 
 **File**: `app/features/qa/qaSlice.ts`
 
-- **Published/submitted reports**: Fetch ALL sections and questions (including archived) so all historical answers are visible
 - **Draft reports**: Exclude archived sections and questions (`status: { _neq: 'archived' }`)
+- **Published/submitted reports**: Exclude archived by default, but re-include any archived question/section that has a submitted answer. Submitted answers are the source of truth for what was in the report at the time of submission.
 - Answers are always fetched regardless of question status
 
 ### Baitulmal (Financial Records)

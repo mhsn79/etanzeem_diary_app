@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Modal, FlatList, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/app/constants/theme';
 import FormInput from '@/app/components/FormInput';
@@ -20,7 +20,7 @@ import {
   selectStrengthTypes, 
   selectStrengthState 
 } from '@/app/features/strength/strengthSlice';
-import { fetchActivityCount } from '@/app/features/activities/activitySlice';
+import { fetchActivityCount, editActivity } from '@/app/features/activities/activitySlice';
 import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
 import {
   fetchBaitulmalTypes,
@@ -938,36 +938,124 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
     );
   }, []);
 
+  // State for inline draft submission within the activities popup
+  const [inlineSubmitId, setInlineSubmitId] = useState<number | null>(null);
+  const [inlineAttendance, setInlineAttendance] = useState('');
+  const [inlineSubmitting, setInlineSubmitting] = useState(false);
+
+  const handleInlineSubmit = useCallback(async (activityId: number) => {
+    if (!inlineAttendance.trim()) {
+      Alert.alert('غلطی', 'براہ کرم حاضری درج کریں');
+      return;
+    }
+    setInlineSubmitting(true);
+    try {
+      await dispatch(editActivity({
+        id: activityId,
+        activityData: {
+          attendance: parseInt(inlineAttendance, 10),
+          status: 'published',
+        },
+      })).unwrap();
+      // Update the local list — mark the activity as published
+      setActivitiesList(prev =>
+        prev.map(a =>
+          a.id === activityId
+            ? { ...a, status: 'published', attendance: parseInt(inlineAttendance, 10) }
+            : a
+        )
+      );
+      setInlineSubmitId(null);
+      setInlineAttendance('');
+    } catch (e: any) {
+      Alert.alert('خرابی', e || 'سرگرمی جمع نہیں ہو سکی');
+    } finally {
+      setInlineSubmitting(false);
+    }
+  }, [dispatch, inlineAttendance]);
+
   // Render activity item for popup
   const renderActivityItem = useCallback(({ item }: { item: Activity }) => {
-    const activityDate = item.activity_date_and_time 
+    const activityDate = item.activity_date_and_time
       ? new Date(item.activity_date_and_time).toLocaleDateString('ur-PK')
       : 'تاریخ دستیاب نہیں';
-    const activityStatus = item.status === 'published' ? 'جمع شدہ' : 
-                          item.status === 'draft' ? 'مسودہ' : 
-                          item.status === 'archived' ? 'محفوظ شدہ' : item.status;
-    
+    const isDraft = item.status !== 'published';
+
     // Get activity type name
     const activityType = activityTypes.find(type => type.id === item.activity_type);
     const activityTypeName = activityType?.name || item.activity_details;
-    
+    const isExpanded = inlineSubmitId === item.id;
+
     return (
-      <View style={styles.activityItem}>
-        <View style={styles.activityItemLeft}>
-          <UrduText style={styles.activityTypeName}>{activityTypeName}</UrduText>
+      <View style={[styles.activityItem, isDraft && styles.activityItemDraft]}>
+        <View style={styles.activityItemRow}>
+          <View style={styles.activityItemLeft}>
+            <UrduText style={styles.activityTypeName}>{activityTypeName}</UrduText>
+          </View>
+          <View style={styles.activityItemRight}>
+            <UrduText style={styles.activityDate}>{activityDate}</UrduText>
+            {isDraft ? (
+              <TouchableOpacity
+                style={styles.inlineSubmitBtn}
+                onPress={() => {
+                  setInlineSubmitId(isExpanded ? null : item.id);
+                  setInlineAttendance('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-up-circle" size={14} color={COLORS.white} />
+                <Text style={styles.inlineSubmitBtnText}>جمع کریں</Text>
+              </TouchableOpacity>
+            ) : (
+              <UrduText style={[styles.activityStatus, { color: COLORS.success }]}>
+                جمع شدہ
+              </UrduText>
+            )}
+          </View>
         </View>
-        <View style={styles.activityItemRight}>
-          <UrduText style={styles.activityDate}>{activityDate}</UrduText>
-          <UrduText style={[
-            styles.activityStatus, 
-            { color: item.status === 'published' ? COLORS.success : COLORS.error }
-          ]}>
-            {activityStatus}
-          </UrduText>
-        </View>
+        {isDraft && !isExpanded && (
+          <View style={styles.draftReasonRow}>
+            <Ionicons name="alert-circle" size={12} color="#E65100" />
+            <UrduText style={styles.draftReasonText}>
+              رپورٹ میں شامل نہیں — حاضری درج نہیں ہوئی
+            </UrduText>
+          </View>
+        )}
+        {isExpanded && (
+          <View style={styles.inlineSubmitRow}>
+            <TextInput
+              style={styles.inlineAttendanceInput}
+              value={inlineAttendance}
+              onChangeText={setInlineAttendance}
+              placeholder="حاضری"
+              placeholderTextColor={COLORS.textSecondary}
+              keyboardType="numeric"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.inlineConfirmBtn, inlineSubmitting && { opacity: 0.5 }]}
+              onPress={() => handleInlineSubmit(item.id)}
+              disabled={inlineSubmitting}
+              activeOpacity={0.7}
+            >
+              {inlineSubmitting ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Ionicons name="checkmark" size={18} color={COLORS.white} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.inlineCancelBtn}
+              onPress={() => { setInlineSubmitId(null); setInlineAttendance(''); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
-  }, [activityTypes]);
+  }, [activityTypes, inlineSubmitId, inlineAttendance, inlineSubmitting, handleInlineSubmit]);
 
   // Render baitulmal item for popup
   const renderBaitulmalItem = useCallback(({ item }: { item: BaitulmalRecord }) => {
@@ -990,10 +1078,71 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   // Determine if input should be editable based on category only
   const isEditable = question.category === 'manual';
 
+  // Silent auto-calculation on mount (no popups).
+  // For contacts/activity/baitulmal, fetches count silently and saves the value.
+  // Popups are only shown when user explicitly taps the sync button.
+  const handleSilentAutoCalculate = useCallback(async () => {
+    if (isCalculating) return;
+    setIsCalculating(true);
+    setCalculationError(null);
+    try {
+      if (!question.linked_to_id) {
+        setIsCalculating(false);
+        return;
+      }
+
+      let result: number | string = 0;
+
+      if (question.linked_to_type === 'contacts') {
+        const contacts = await fetchContactsForPopup();
+        result = contacts.length;
+      } else if (question.linked_to_type === 'activity') {
+        const activities = await fetchActivitiesForPopup();
+        if (question.aggregate_func === 'avg') {
+          const published = activities.filter(
+            (a: any) => a.status === 'published' && a.attendance != null && a.attendance > 0
+          );
+          result = published.length > 0
+            ? Math.round(published.reduce((sum: number, a: any) => sum + Number(a.attendance), 0) / published.length)
+            : 0;
+        } else if (question.aggregate_func === 'array') {
+          const published = activities.filter(
+            (a: any) => a.status === 'published' && a.attendance != null
+          );
+          result = published.map((a: any) => String(a.attendance)).join(', ');
+        } else {
+          result = activities.filter((a: any) => a.status === 'published').length;
+        }
+      } else if (question.linked_to_type === 'baitulmal') {
+        const records = await fetchBaitulmalForPopup();
+        if (question.aggregate_func === 'count') {
+          result = records.length;
+        } else {
+          result = records.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+        }
+      } else if (question.linked_to_type === 'strength') {
+        // Strength doesn't use popups, delegate to handleFetchCount
+        setIsCalculating(false);
+        handleFetchCount();
+        return;
+      }
+
+      setInputValue(String(result));
+      if (onValueChange) {
+        onValueChange(result);
+      }
+    } catch (error: any) {
+      // Silently fail on mount — user can manually retry
+      console.warn('[AutoQuestionInput] Silent auto-calculate failed:', error.message);
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [question, fetchContactsForPopup, fetchActivitiesForPopup, fetchBaitulmalForPopup, handleFetchCount, onValueChange, isCalculating]);
+
   // Auto-fetch on mount if empty and has auto-calculate capability
   useEffect(() => {
     if (hasAutoCalculateCapability && !isEditable && !value && !isCalculating && !calculationSuccess && !disabled) {
-      handleFetchCount();
+      handleSilentAutoCalculate();
     }
   }, [hasAutoCalculateCapability, isEditable, value, disabled]);
 
@@ -1009,7 +1158,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
   // We'll return a read-only Stat Card if it's auto-calculated and not manual.
   if (hasAutoCalculateCapability && !isEditable) {
     return (
-      <View style={[styles.container, styles.statCard]}>
+      <View style={styles.statCard}>
         <View style={styles.statCardHeader}>
           <UrduText style={styles.statCardTitle}>{question.question_text}</UrduText>
           <View style={styles.statCardActions}>
@@ -1755,19 +1904,83 @@ const styles = StyleSheet.create({
   },
   // Activity item styles
   activityItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
     backgroundColor: COLORS.white,
-    minHeight: 60,
+  },
+  activityItemDraft: {
+    backgroundColor: '#FFF8E1',
+  },
+  activityItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 44,
   },
   activityItemLeft: {
     alignItems: 'flex-start',
     flex: 1,
+  },
+  draftReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    paddingBottom: 2,
+  },
+  draftReasonText: {
+    fontSize: TYPOGRAPHY.fontSize.xs - 1,
+    color: '#E65100',
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  inlineSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  inlineSubmitBtnText: {
+    fontSize: 11,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  inlineSubmitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  inlineAttendanceInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 14,
+    textAlign: 'right',
+    backgroundColor: COLORS.white,
+  },
+  inlineConfirmBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineCancelBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   activityTypeName: {
     fontSize: TYPOGRAPHY.fontSize.md,

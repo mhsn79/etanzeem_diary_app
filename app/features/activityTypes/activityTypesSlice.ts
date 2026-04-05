@@ -16,7 +16,6 @@ export interface ActivityType {
  * ────────────────────────────────────────────────────────────────────────────────*/
 const activityTypesAdapter = createEntityAdapter<ActivityType>({
   selectId: activityType => activityType.id,
-  sortComparer: (a, b) => a.Name.localeCompare(b.Name),
 });
 
 interface ActivityTypesExtraState {
@@ -49,7 +48,7 @@ export const fetchActivityTypes = createAsyncThunk<
 
     // Use directApiRequest which uses fetch directly for more reliable results
     const response = await directApiRequest<{ data: ActivityType[] }>(
-      '/items/Activity_Type?fields=id,Name,Name_plural,Level_id',
+      '/items/Activity_Type?fields=id,Name,Name_plural,Level_id&sort=sort,id',
       'GET'
     );
     

@@ -1,7 +1,7 @@
 {
   "name": "etanzeem_diary_app",
   "main": "expo-router/entry",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "scripts": {
     "start": "cross-env CI=false expo start",
     "predev:android": "adb reverse tcp:8081 tcp:8081 || true",

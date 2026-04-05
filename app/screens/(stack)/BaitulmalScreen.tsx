@@ -39,11 +39,12 @@ import {
 export default function BaitulmalScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { mode, recordId, reportMonth, reportYear } = useLocalSearchParams<{
+  const { mode, recordId, reportMonth, reportYear, baitulmalType } = useLocalSearchParams<{
     mode?: string;  // 'income' | 'expense' | 'edit'
     recordId?: string;
     reportMonth?: string;
     reportYear?: string;
+    baitulmalType?: string;
   }>();
 
   const isEditMode = mode === 'edit';
@@ -79,7 +80,7 @@ export default function BaitulmalScreen() {
   }, [availableTypes]);
 
   // Form state
-  const [selectedTypeId, setSelectedTypeId] = useState<string>('');
+  const [selectedTypeId, setSelectedTypeId] = useState<string>(baitulmalType || '');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<{ type?: string; amount?: string }>({});

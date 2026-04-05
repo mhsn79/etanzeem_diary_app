@@ -99,7 +99,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '700',
     color: COLORS.black,
     textAlign: 'left',
     writingDirection: 'rtl',
@@ -131,7 +130,6 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: '700',
     writingDirection: 'rtl',
   },
   progressContainer: {
@@ -161,7 +159,6 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.textSecondary,
-    fontWeight: '600',
   },
 });
 

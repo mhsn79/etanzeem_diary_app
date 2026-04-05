@@ -43,6 +43,8 @@ import { selectPendingSubmissionCountByUnitId, fetchReportSubmissions } from '@/
 import UnitSelectionModal from './components/UnitSelectionModal';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 import SpeedDialFAB, { SpeedDialAction } from '@/app/components/SpeedDialFAB';
+import ActivityTypePicker from '@/app/components/ActivityTypePicker';
+import BaitulmalTypePicker from '@/app/components/BaitulmalTypePicker';
 
 // Theme-aligned button colors (primary, tertiary, orange, accent)
 const DASHBOARD_BUTTON_COLORS = {
@@ -136,6 +138,8 @@ const Dashboard = () => {
   });
 
   const [showUnitSelectionModal, setShowUnitSelectionModal] = React.useState(false);
+  const [activityPickerMode, setActivityPickerMode] = React.useState<'schedule' | 'report' | null>(null);
+  const [baitulmalPickerCategory, setBaitulmalPickerCategory] = React.useState<'income' | 'expense' | null>(null);
   const userAssignedUnits = useSelector(selectUserAssignedUnits);
 
   // Fetch hierarchies for all assigned units (multi-unit support)
@@ -217,13 +221,13 @@ const Dashboard = () => {
         icon: 'calendar',
         label: 'سرگرمی شیڈول کریں',
         color: DASHBOARD_BUTTON_COLORS.activities,
-        onPress: () => router.push({ pathname: '/screens/ActivityScreen', params: { mode: 'schedule' } }),
+        onPress: () => setActivityPickerMode('schedule'),
       },
       {
         icon: 'clipboard',
         label: 'سرگرمی کی رپورٹ',
         color: DASHBOARD_BUTTON_COLORS.activities,
-        onPress: () => router.push({ pathname: '/screens/ActivityScreen', params: { mode: 'report' } }),
+        onPress: () => setActivityPickerMode('report'),
       },
       {
         icon: 'barbell',
@@ -235,13 +239,13 @@ const Dashboard = () => {
         icon: 'trending-up',
         label: 'آمدنی کا اندراج',
         color: DASHBOARD_BUTTON_COLORS.baitulMal,
-        onPress: () => router.push({ pathname: '/screens/BaitulmalScreen', params: { mode: 'income' } }),
+        onPress: () => setBaitulmalPickerCategory('income'),
       },
       {
         icon: 'trending-down',
         label: 'خرچ کا اندراج',
         color: DASHBOARD_BUTTON_COLORS.baitulMal,
-        onPress: () => router.push({ pathname: '/screens/BaitulmalScreen', params: { mode: 'expense' } }),
+        onPress: () => setBaitulmalPickerCategory('expense'),
       },
     ],
     [navigation, router, umeedwarContactTypeId, karkunContactTypeId]
@@ -341,6 +345,28 @@ const Dashboard = () => {
         />
         
         <SpeedDialFAB actions={fabActions} />
+
+        <ActivityTypePicker
+          visible={activityPickerMode !== null}
+          mode={activityPickerMode || 'schedule'}
+          onSelect={(activityTypeId, reportMonth, reportYear) => {
+            const m = activityPickerMode!;
+            setActivityPickerMode(null);
+            router.push({ pathname: '/screens/ActivityScreen', params: { mode: m, activityType: activityTypeId, reportMonth, reportYear } });
+          }}
+          onCancel={() => setActivityPickerMode(null)}
+        />
+
+        <BaitulmalTypePicker
+          visible={baitulmalPickerCategory !== null}
+          category={baitulmalPickerCategory || 'income'}
+          onSelect={(typeId, reportMonth, reportYear) => {
+            const cat = baitulmalPickerCategory!;
+            setBaitulmalPickerCategory(null);
+            router.push({ pathname: '/screens/BaitulmalScreen', params: { mode: cat, baitulmalType: typeId, reportMonth, reportYear } });
+          }}
+          onCancel={() => setBaitulmalPickerCategory(null)}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

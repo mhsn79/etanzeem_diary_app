@@ -5,6 +5,7 @@
 import { ReportQuestion } from './types';
 import { directApiRequest, ensureFreshToken } from '@/app/services/apiClient';
 import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
+import { getOrCreateStrengthRecord } from '@/app/features/strength/strengthSync';
 import { AppDispatch } from '@/app/store';
 
 export interface ContactType {
@@ -79,7 +80,9 @@ export async function fetchAutoValueForQuestion(
 }
 
 /**
- * Fetch strength record value based on aggregate_func
+ * Fetch strength record value based on aggregate_func.
+ * Auto-creates the Strength_Records row if it doesn't exist yet,
+ * carrying forward previous_total from the most recent prior month.
  */
 async function fetchStrengthValue(
   question: ReportQuestion,
@@ -97,23 +100,13 @@ async function fetchStrengthValue(
     return aggResult.avg;
   }
 
-  // Fetch single monthly record
-  const filter = JSON.stringify({
-    _and: [
-      { Type: { _eq: question.linked_to_id } },
-      { Tanzeemi_Unit: { _eq: unitId } },
-      { report_year: { _eq: year } },
-      { report_month: { _eq: month } },
-    ],
-  });
-
-  const response = await directApiRequest<{ data: StrengthRecord[] }>(
-    `/items/Strength_Records?filter=${encodeURIComponent(filter)}&limit=1`,
-    'GET'
+  // Get or create the strength record (carries forward from previous month)
+  const record = await getOrCreateStrengthRecord(
+    unitId,
+    question.linked_to_id!,
+    year,
+    month,
   );
-
-  const record = response.data?.[0];
-  if (!record) return 0;
 
   switch (question.aggregate_func) {
     case 'plus':

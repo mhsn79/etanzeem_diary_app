@@ -42,7 +42,8 @@ import {
   initializeReportData,
   selectOverallProgressForSubmission,
   selectCurrentSubmissionId,
-  selectQAState
+  selectQAState,
+  selectSubmitStatus,
 } from '@/app/features/qa/qaSlice';
 
 export type OpenReportParams = {
@@ -186,6 +187,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   const reportMgmtDetails = useSelector(selectManagementReportsList) ?? [];
   const loading = useSelector(selectReportsLoading);
   const error = useSelector(selectReportsError);
+  const qaSubmitStatus = useSelector(selectSubmitStatus);
   
   // QA module state
   const qaState = useSelector(selectQAState);
@@ -641,8 +643,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     useCallback(() => {
       console.log('[ReportsView] useFocusEffect triggered');
       shouldResetHighlightedRef.current = true;
+      // Force refresh if a report was just submitted (cache would otherwise skip re-fetch)
+      const forceRefresh = qaSubmitStatus === 'succeeded';
+      if (forceRefresh) {
+        lastFetchTimeRef.current = 0;
+      }
       if (displayUnit?.id) {
-        fetchAllData(false)
+        fetchAllData(forceRefresh)
           .catch(error => {
             console.error('[ReportsView] Error fetching data on focus:', error);
           });
@@ -652,7 +659,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       return () => {
         console.log('[ReportsView] Screen losing focus');
       };
-    }, [fetchAllData, displayUnit?.id])
+    }, [fetchAllData, displayUnit?.id, qaSubmitStatus])
   );
   
   // Effect to highlight the latest submission when reportSubmissions changes
@@ -715,9 +722,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // Use the selected submission's own management for card title and days (never mix with open mgmt)
   const currentManagement = submissionManagementAndTemplate.management ?? currentlyOpenManagement;
 
-  // Calculate progress for the موجودہ رپورٹ card ONLY when QA state belongs to the current report.
-  // When the user opens a different report (old/overdue), QA state gets overwritten with that
-  // report's data. We cache the current report's progress so it doesn't get corrupted.
+  // Calculate progress for the موجودہ رپورٹ card.
+  // The selector computes progress from the QA state (sections/questions/answers).
+  // IMPORTANT: Only trust the selector when QA state is loaded for THIS submission
+  // (currentSubmissionId matches), otherwise stale data from a previously opened report leaks through.
   const currentReportSubmissionId = existingSubmission?.id || null;
   const [cachedCurrentReportProgress, setCachedCurrentReportProgress] = useState(0);
 
@@ -725,13 +733,25 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     currentReportSubmissionId ? (selectOverallProgressForSubmission(state, currentReportSubmissionId) || 0) : 0
   );
 
+  // Reset cached progress when the current report submission changes
+  const prevSubmissionIdRef = useRef<number | null>(null);
   useEffect(() => {
-    // Only update cached progress when QA state actually contains the current report's data
+    if (currentReportSubmissionId !== prevSubmissionIdRef.current) {
+      // Submission changed — reset to 0 until QA state loads for this submission
+      setCachedCurrentReportProgress(0);
+      prevSubmissionIdRef.current = currentReportSubmissionId;
+    }
+  }, [currentReportSubmissionId]);
+
+  useEffect(() => {
+    // Only update cached progress when QA state is loaded for THIS submission.
+    // This prevents stale progress from a previously viewed report from leaking in.
     if (currentReportSubmissionId && currentSubmissionId === currentReportSubmissionId) {
       setCachedCurrentReportProgress(qaProgressForCurrentReport);
     }
   }, [currentSubmissionId, currentReportSubmissionId, qaProgressForCurrentReport]);
 
+  const isPublished = existingSubmission?.status === 'published';
   const completionPercentage = cachedCurrentReportProgress;
 
   // Determine progress color based on completion percentage
@@ -930,9 +950,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 </View>
                 <View style={[styles.reportSummaryItemValueContainer, styles.reportSummaryItemValueContainerThirdRow]}>
                   <View style={[styles.reportSummaryItemValueContainerItem, styles.reportSummaryItemLeft]}>
-                    <UrduText style={styles.reportSummaryItemValue}>پروگریس</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
-                    <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
+                    {!isPublished && (
+                      <>
+                        <UrduText style={styles.reportSummaryItemValue}>پروگریس</UrduText>
+                        <UrduText style={styles.reportSummaryItemValue}>:</UrduText>
+                        <UrduText style={styles.reportSummaryItemValue}>{`${completionPercentage}% مکمل`}</UrduText>
+                      </>
+                    )}
                   </View>
                   <View style={[styles.reportSummaryItemValueContainerItem, styles.reportSummaryItemRight]}>
                     <UrduText style={styles.reportSummaryItemValue}>
@@ -960,19 +984,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     </UrduText>
                   </View>
                 </View>
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View 
-                      style={[
-                        styles.progressFill, 
-                        { 
-                          width: `${completionPercentage}%`,
-                          backgroundColor: getProgressColor(completionPercentage)
-                        }
-                      ]} 
-                    />
+                {!isPublished && (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${completionPercentage}%`,
+                            backgroundColor: getProgressColor(completionPercentage)
+                          }
+                        ]}
+                      />
+                    </View>
                   </View>
-                </View>
+                )}
                 {__DEV__ && (
                   <TouchableOpacity
                     style={styles.copyDebugButton}
@@ -1166,7 +1192,6 @@ const styles = StyleSheet.create({
   },
   subTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxxl,
-    fontWeight: '600',
     marginLeft: SPACING.lg,
     color: COLORS.background,
     textAlign: 'left',
@@ -1182,13 +1207,11 @@ const styles = StyleSheet.create({
   reportSummaryItemTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     color: COLORS.primary,
-    fontWeight: '600',
     textAlign: 'left',
     lineHeight: 40,
   },
   reportSummaryItemValue: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
     marginBottom: SPACING.xs,
     lineHeight: 40,
     textAlign: 'right',
@@ -1229,8 +1252,7 @@ const styles = StyleSheet.create({
     // backgroundColor is now set dynamically based on completion percentage
   },
   pastReportsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.fontSize.xxl,
     color: COLORS.black,
     textAlign: 'left',
     writingDirection: 'rtl',
@@ -1244,7 +1266,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: '600',
     textAlign: 'right',
     writingDirection: 'rtl',
     textDecorationLine: 'underline',
@@ -1287,7 +1308,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: COLORS.background,
     fontSize: TYPOGRAPHY.fontSize.md,
-    fontWeight: '600',
   },
   noReportsContainer: {
     justifyContent: 'center',

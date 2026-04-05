@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, memo, useEffect, useMemo, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import UrduText from '@/app/components/UrduText';
@@ -27,8 +27,9 @@ const getAnswerValue = (
       return answer.number_value !== null && answer.number_value !== undefined 
         ? String(answer.number_value) 
         : '';
-    case 'string':
     case 'text':
+      return answer.text_value || answer.string_value || '';
+    case 'string':
     default:
       return answer.string_value || '';
   }
@@ -73,7 +74,10 @@ const Question = memo(({
   currentUnitId?: number | null;
 }) => {
   const dispatch = useDispatch<AppDispatch>();
-  
+
+  // Track whether the input is currently focused (must be before early return to satisfy hooks rules)
+  const isFocusedRef = useRef(false);
+
   // Check if this is an auto-calculated question
   const isAuto = isAutoQuestion(question);
   
@@ -103,12 +107,13 @@ const Question = memo(({
           const answerData = {
             submission_id: submissionId,
             question_id: question.id,
-            string_value: question.input_type === 'number' ? null : String(newValue),
+            string_value: question.input_type === 'number' || question.input_type === 'text' ? null : String(newValue),
+            text_value: question.input_type === 'text' ? String(newValue) : null,
             number_value: question.input_type === 'number' ? Number(newValue) : null,
           };
-          
+
           console.log('[SectionList] Dispatching saveAnswer with data:', answerData);
-          
+
           dispatch(saveAnswer(answerData));
         }}
       />
@@ -122,16 +127,18 @@ const Question = memo(({
   
   // Store the current input value in state to track changes
   const [inputValue, setInputValue] = useState<string>(stringValue);
-  
+
   // Track save status
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Track validation status and messages
   const [error, setError] = useState<string | null>(null);
-  
-  // Update local state when prop value changes
+
+  // Update local state when prop value changes — but skip while user is typing (focused)
   useEffect(() => {
-    setInputValue(stringValue);
+    if (!isFocusedRef.current) {
+      setInputValue(stringValue);
+    }
   }, [stringValue]);
   
   // Debounce timer ref to avoid excessive API calls
@@ -155,8 +162,9 @@ const Question = memo(({
     const answerData = {
       submission_id: submissionId,
       question_id: question.id,
-      string_value: question.input_type === 'number' ? null : valueToSave as string | null,
-      number_value: question.input_type === 'number' ? valueToSave as number : null
+      string_value: question.input_type === 'number' || question.input_type === 'text' ? null : valueToSave as string | null,
+      text_value: question.input_type === 'text' ? valueToSave as string | null : null,
+      number_value: question.input_type === 'number' ? valueToSave as number : null,
     };
     
     // Dispatch the saveAnswer action - the Redux thunk will handle create vs update logic
@@ -204,6 +212,7 @@ const Question = memo(({
   
   // Handle input change with debounce for auto-save
   const handleInputChange = useCallback((text: string) => {
+    isFocusedRef.current = true;
     // Clear previous messages
     setError(null);
     
@@ -251,6 +260,7 @@ const Question = memo(({
   
   // Handle blur event — save immediately (cancels any pending debounce)
   const handleBlur = useCallback(() => {
+    isFocusedRef.current = false;
     if (inputValue !== stringValue) {
       debouncedSave(inputValue, true);
     }
@@ -462,9 +472,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontSize: TYPOGRAPHY.fontSize.xxl,
+    fontFamily: TYPOGRAPHY.fontFamily.regular,
     textAlign: 'left',
-    fontWeight: '700',
     color: COLORS.primary,
     flex: 1,
   },

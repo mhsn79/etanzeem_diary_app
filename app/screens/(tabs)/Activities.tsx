@@ -38,6 +38,8 @@ import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
 import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById, selectDashboardSelectedUnitId } from '@/app/features/tanzeem/tanzeemSlice';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import ActivityTypePicker from '../../components/ActivityTypePicker';
+import { selectActivityTypeEntities } from '@/app/features/activityTypes/activityTypesSlice';
 
 // Reusable component to wrap content with consistent status bar and background
 interface ScreenWrapperProps {
@@ -106,11 +108,17 @@ export default function Activities() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [attendanceValue, setAttendanceValue] = useState('');
+  const [completionActivityTypeId, setCompletionActivityTypeId] = useState<string>('');
+  const [showCompletionTypePicker, setShowCompletionTypePicker] = useState(false);
 
-  // Reset attendance when completion target changes
+  // Reset attendance and activity type when completion target changes
   useEffect(() => {
-    if (completionTarget) setAttendanceValue('');
-  }, [completionTarget]);
+    if (completionTarget) {
+      setAttendanceValue('');
+      const raw = activities.find(a => a.id.toString() === completionTarget.id);
+      setCompletionActivityTypeId(raw?.activity_type ? String(raw.activity_type) : '');
+    }
+  }, [completionTarget, activities]);
 
   // Tanzeem selectors for location conversion and filtering
   const userUnitDetails = useAppSelector(selectUserUnitDetails);
@@ -118,6 +126,14 @@ export default function Activities() {
   const displayUnitId = selectedUnitId || userUnitDetails?.id;
   const allTanzeemiUnits = useAppSelector(selectAllTanzeemiUnits);
   const levelsById = useAppSelector(selectLevelsById);
+  const activityTypeEntities = useAppSelector(selectActivityTypeEntities);
+
+  // Get activity type name for completion dialog (from editable state)
+  const completionActivityTypeName = useMemo(() => {
+    if (!completionActivityTypeId) return '';
+    const typeEntity = activityTypeEntities[Number(completionActivityTypeId)];
+    return typeEntity?.Name || '';
+  }, [completionActivityTypeId, activityTypeEntities]);
 
 
   const onRefresh = useCallback(() => {
@@ -334,13 +350,20 @@ export default function Activities() {
 
   // --- Action handlers ---
 
+  const [showActivityTypePicker, setShowActivityTypePicker] = useState(false);
+
   const handleAdd = useCallback(() => {
+    setShowActivityTypePicker(true);
+  }, []);
+
+  const handleActivityTypeSelected = useCallback((activityTypeId: string, reportMonth: string, reportYear: string) => {
+    setShowActivityTypePicker(false);
     const mode = selectedTab === 0 ? 'schedule' : 'report';
     router.push({
       pathname: '/screens/ActivityScreen',
-      params: { mode, reportMonth: String(selectedMonth), reportYear: String(selectedYear) },
+      params: { mode, reportMonth, reportYear, activityType: activityTypeId },
     });
-  }, [router, selectedTab, selectedMonth, selectedYear]);
+  }, [router, selectedTab]);
 
   const handleDeleteSuccess = useCallback(() => {
     setShowDeleteSuccessToast(true);
@@ -368,8 +391,9 @@ export default function Activities() {
   }, []);
 
   const handleEditPress = useCallback((id: string) => {
-    router.push({ pathname: '/screens/ActivityScreen', params: { activityId: id, mode: 'edit' } });
-  }, [router]);
+    const editContext = selectedTab === 0 ? 'schedule' : 'report';
+    router.push({ pathname: '/screens/ActivityScreen', params: { activityId: id, mode: 'edit', editContext } });
+  }, [router, selectedTab]);
 
   const handleDeletePress = useCallback((id: string) => {
     setDeleteTargetId(id);
@@ -391,6 +415,10 @@ export default function Activities() {
 
   const handleCompletionSubmit = useCallback(async () => {
     if (!completionTarget) return;
+    if (!completionActivityTypeId) {
+      Alert.alert('غلطی', 'براہ کرم سرگرمی کی قسم منتخب کریں');
+      return;
+    }
     if (!attendanceValue.trim()) {
       Alert.alert('غلطی', 'براہ کرم حاضری درج کریں');
       return;
@@ -400,6 +428,7 @@ export default function Activities() {
       await dispatch(editActivity({
         id: parseInt(completionTarget.id),
         activityData: {
+          activity_type: parseInt(completionActivityTypeId),
           attendance: parseInt(attendanceValue),
           report_month: parseInt(reportMonthStr),
           report_year: parseInt(reportYearStr),
@@ -413,7 +442,7 @@ export default function Activities() {
     } finally {
       setIsCompleting(false);
     }
-  }, [completionTarget, attendanceValue, reportMonthStr, reportYearStr, dispatch, handleCompletionSuccess]);
+  }, [completionTarget, completionActivityTypeId, attendanceValue, reportMonthStr, reportYearStr, dispatch, handleCompletionSuccess]);
 
   // Loading state
   if (status === 'loading' && !refreshing) {
@@ -546,6 +575,13 @@ export default function Activities() {
         </TouchableOpacity>
       )}
 
+      <ActivityTypePicker
+        visible={showActivityTypePicker}
+        mode={selectedTab === 0 ? 'schedule' : 'report'}
+        onSelect={handleActivityTypeSelected}
+        onCancel={() => setShowActivityTypePicker(false)}
+      />
+
       {/* Delete confirmation — inline overlay, NO Modal */}
       {deleteTargetId !== null && (
         <View style={StyleSheet.absoluteFill} collapsable={false}>
@@ -586,7 +622,17 @@ export default function Activities() {
           <View style={styles.overlayCenter}>
             <View style={styles.dialogBox}>
               <UrduText style={styles.dialogTitle}>سرگرمی کی رپورٹ</UrduText>
-              <UrduText style={styles.dialogDesc}>براہ کرم حاضری درج کریں</UrduText>
+              {/* Activity type selector */}
+              <UrduText style={styles.inputLabel}>سرگرمی کی قسم</UrduText>
+              <TouchableOpacity
+                style={[styles.textInput, { alignItems: 'flex-start' }]}
+                onPress={() => setShowCompletionTypePicker(true)}
+                activeOpacity={0.7}
+              >
+                <UrduText style={{ fontSize: TYPOGRAPHY.fontSize.md, fontFamily: 'JameelNooriNastaleeq', color: completionActivityTypeName ? COLORS.black : COLORS.textSecondary }}>
+                  {completionActivityTypeName || 'سرگرمی کی قسم منتخب کریں ▼'}
+                </UrduText>
+              </TouchableOpacity>
               {/* Period info bar */}
               <View style={styles.periodInfoBar}>
                 <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
@@ -626,6 +672,17 @@ export default function Activities() {
           </View>
         </View>
       )}
+
+      {/* Activity type picker for completion dialog */}
+      <ActivityTypePicker
+        visible={showCompletionTypePicker}
+        mode="report"
+        onSelect={(activityTypeId) => {
+          setCompletionActivityTypeId(activityTypeId);
+          setShowCompletionTypePicker(false);
+        }}
+        onCancel={() => setShowCompletionTypePicker(false)}
+      />
 
       {/* Success Toast for Archive */}
       {showDeleteSuccessToast && (
@@ -867,7 +924,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.black,
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
     marginBottom: SPACING.xs,
   },
   textInput: {

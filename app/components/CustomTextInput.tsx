@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { forwardRef, useState, useCallback, useMemo } from "react";
 import { ImageStyle, StyleSheet, TextInput, TextInputProps, TextStyle, ViewStyle } from "react-native";
 import { ImageSource } from "react-native-vector-icons/Icon";
 
@@ -10,7 +10,7 @@ interface CustomTextInputProps extends TextInputProps {
   iconStyle?: [ImageStyle?];
 }
 
-export default function CustomTextInput({ error, ...rest }: CustomTextInputProps) {
+const CustomTextInput = forwardRef<TextInput, CustomTextInputProps>(({ error, ...rest }, ref) => {
 
   const [focused, setFocused] = useState(false);
 
@@ -27,6 +27,7 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
 
   return (
     <TextInput
+      ref={ref}
       autoCapitalize="none"
       {...rest}
       style={inputStyle}
@@ -40,7 +41,9 @@ export default function CustomTextInput({ error, ...rest }: CustomTextInputProps
       }}
     />
   );
-}
+});
+
+export default CustomTextInput;
 
 const styles = StyleSheet.create({
   inputField: {

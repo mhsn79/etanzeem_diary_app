@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/mohsinsiddiqui/src/mhsn79/E-Tanzeem/src/etanzeem_diary_app/**)",
+      "Bash(while read file lines)",
+      "Bash(do echo \"$file: $lines\")",
+      "Bash(done)",
+      "Bash(npx tsc:*)",
+      "Bash(wc -l /Users/mohsinsiddiqui/src/mhsn79/E-Tanzeem/src/etanzeem_diary_app/app/screens/\\\\\\(stack\\\\\\)/ActivityScreen.tsx)",
+      "Bash(du -sh /Users/mohsinsiddiqui/src/mhsn79/E-Tanzeem/src/etanzeem_diary_app/node_modules/*)",
+      "Bash(adb devices -l)",
+      "Bash(unzip -l android/app/build/outputs/apk/release/app-release.apk)"
+    ]
+  }
+}

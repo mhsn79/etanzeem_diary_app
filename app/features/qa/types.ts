@@ -51,6 +51,7 @@ export interface ReportAnswer {
   submission_id: number;
   number_value?: number | null;
   string_value?: string | null;
+  text_value?: string | null;
   question_id: number;
   [key: string]: any;
 }
@@ -90,6 +91,7 @@ export interface SaveAnswerParams {
   question_id: number;
   number_value?: number | null;
   string_value?: string | null;
+  text_value?: string | null;
 }
 
 export interface SubmitReportParams {

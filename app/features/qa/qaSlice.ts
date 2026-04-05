@@ -95,7 +95,7 @@ const createAnswerIndexByQuestion = (
   Object.values(answers.byId).forEach(answer => {
     if (answer &&
         answer.submission_id === currentSubmissionId &&
-        (answer.string_value !== null || answer.number_value !== null)) {
+        (answer.string_value !== null || answer.number_value !== null || answer.text_value !== null)) {
       index.set(answer.question_id, answer);
     }
   });
@@ -295,19 +295,19 @@ export const initializeReportData = createAsyncThunk<
       }
     }
     
-    // Step 3: Fetch sections for the template
-    // For published/submitted reports, include all sections (even archived) to show historical answers.
-    // For draft reports, exclude archived sections.
-    const isPublished = submission.status === 'published' || submission.status === 'submitted';
-    const sectionsFilterObj: any = { template_id: { _eq: params.template_id } };
-    const sectionsFilter = isPublished
-      ? JSON.stringify(sectionsFilterObj)
-      : JSON.stringify({ _and: [sectionsFilterObj, { status: { _neq: 'archived' } }] });
+    // Step 3: Fetch sections for the template (exclude archived)
+    const sectionsFilterObj: any = {
+      _and: [
+        { template_id: { _eq: params.template_id } },
+        { status: { _neq: 'archived' } },
+      ],
+    };
+    const sectionsFilter = JSON.stringify(sectionsFilterObj);
     const sectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
-      `/items/report_sections?filter=${encodeURIComponent(sectionsFilter)}&sort=sort`,
+      `/items/report_sections?filter=${encodeURIComponent(sectionsFilter)}&sort=sort,id`,
       'GET'
     );
-    
+
     // Handle both response formats: direct array or {data: array}
     let sections: ReportSection[] = [];
     if (Array.isArray(sectionsResponse)) {
@@ -318,26 +318,27 @@ export const initializeReportData = createAsyncThunk<
       reduxLogger.error('Invalid response format for Report Sections:', sectionsResponse);
       return rejectWithValue('رپورٹ کے سیکشنز حاصل نہیں ہو سکے');
     }
-    
-    // Step 4: Fetch all questions for the template in a single batch
+
+    // Step 4: Fetch non-archived questions for these sections
     const sectionIds = sections.map(section => section.id);
-    
+
     if (sectionIds.length === 0) {
       reduxLogger.error('No sections found for template:', params.template_id);
       return rejectWithValue('اس رپورٹ میں کوئی سیکشن نہیں ملا');
     }
-    
-    // For published reports, include all questions (even archived) to show historical answers.
-    // For draft reports, exclude archived questions.
-    const questionsFilterObj: any = { section_id: { _in: sectionIds } };
-    const questionsFilter = isPublished
-      ? JSON.stringify(questionsFilterObj)
-      : JSON.stringify({ _and: [questionsFilterObj, { status: { _neq: 'archived' } }] });
+
+    const questionsFilterObj: any = {
+      _and: [
+        { section_id: { _in: sectionIds } },
+        { status: { _neq: 'archived' } },
+      ],
+    };
+    const questionsFilter = JSON.stringify(questionsFilterObj);
     const questionsResponse = await directApiRequest<{ data: ReportQuestion[] }>(
-      `/items/report_questions?filter=${encodeURIComponent(questionsFilter)}&sort=sort&limit=-1`,
+      `/items/report_questions?filter=${encodeURIComponent(questionsFilter)}&sort=sort,id&limit=-1`,
       'GET'
     );
-    
+
     // Handle both response formats: direct array or {data: array}
     let questions: ReportQuestion[] = [];
     if (Array.isArray(questionsResponse)) {
@@ -348,7 +349,7 @@ export const initializeReportData = createAsyncThunk<
       reduxLogger.error('Invalid response format for Report Questions:', questionsResponse);
       return rejectWithValue('رپورٹ کے سوالات حاصل نہیں ہو سکے');
     }
-    
+
     // Step 5: Fetch answers for the submission if it exists
     let answers: ReportAnswer[] = [];
     if (submission.id) {
@@ -359,7 +360,7 @@ export const initializeReportData = createAsyncThunk<
           `/items/report_answers?filter=${encodeURIComponent(answersFilter)}&limit=-1`,
           'GET'
         );
-        
+
         // Handle both response formats: direct array or {data: array}
         if (Array.isArray(answersResponse)) {
           answers = answersResponse;
@@ -372,7 +373,73 @@ export const initializeReportData = createAsyncThunk<
         answers = [];
       }
     }
-    
+
+    // Step 6: For published/submitted reports, include archived questions that have submitted answers.
+    // These are historical questions that were active when the report was filled — their answers
+    // are the source of truth and should remain visible.
+    const isPublished = submission.status === 'published';
+    if (isPublished && answers.length > 0) {
+      const fetchedQuestionIds = new Set(questions.map(q => q.id));
+      const missingQuestionIds = answers
+        .map(a => a.question_id)
+        .filter(qId => qId && !fetchedQuestionIds.has(qId));
+
+      if (missingQuestionIds.length > 0) {
+        const uniqueMissingIds = [...new Set(missingQuestionIds)];
+        reduxLogger.debug(`[QA] Found ${uniqueMissingIds.length} answered archived questions, fetching...`);
+
+        try {
+          const missingFilter = JSON.stringify({ id: { _in: uniqueMissingIds } });
+          const missingQResponse = await directApiRequest<{ data: ReportQuestion[] }>(
+            `/items/report_questions?filter=${encodeURIComponent(missingFilter)}&sort=sort,id&limit=-1`,
+            'GET'
+          );
+
+          let missingQuestions: ReportQuestion[] = [];
+          if (Array.isArray(missingQResponse)) {
+            missingQuestions = missingQResponse;
+          } else if (missingQResponse?.data && Array.isArray(missingQResponse.data)) {
+            missingQuestions = missingQResponse.data;
+          }
+
+          if (missingQuestions.length > 0) {
+            questions = [...questions, ...missingQuestions];
+
+            // Also fetch any archived sections these questions belong to
+            const fetchedSectionIds = new Set(sections.map(s => s.id));
+            const missingSectionIds = [...new Set(
+              missingQuestions
+                .map(q => q.section_id)
+                .filter((sId): sId is number => sId !== null && !fetchedSectionIds.has(sId))
+            )];
+
+            if (missingSectionIds.length > 0) {
+              reduxLogger.debug(`[QA] Fetching ${missingSectionIds.length} archived sections for answered questions...`);
+              const missingSectionsFilter = JSON.stringify({ id: { _in: missingSectionIds } });
+              const missingSectionsResponse = await directApiRequest<{ data: ReportSection[] }>(
+                `/items/report_sections?filter=${encodeURIComponent(missingSectionsFilter)}&sort=sort,id`,
+                'GET'
+              );
+
+              let missingSections: ReportSection[] = [];
+              if (Array.isArray(missingSectionsResponse)) {
+                missingSections = missingSectionsResponse;
+              } else if (missingSectionsResponse?.data && Array.isArray(missingSectionsResponse.data)) {
+                missingSections = missingSectionsResponse.data;
+              }
+
+              if (missingSections.length > 0) {
+                sections = [...sections, ...missingSections];
+              }
+            }
+          }
+        } catch (error) {
+          reduxLogger.error('Error fetching archived answered questions:', error);
+          // Non-fatal — we still have the non-archived questions
+        }
+      }
+    }
+
     // Return all the fetched data
     const result = {
       submission,
@@ -412,7 +479,7 @@ export const saveAnswer = createAsyncThunk<
     }
     
     // Check if at least one value is provided
-    if (answerData.string_value === undefined && answerData.number_value === undefined) {
+    if (answerData.string_value === undefined && answerData.number_value === undefined && answerData.text_value === undefined) {
       return rejectWithValue('جواب محفوظ نہیں ہو سکا: کوئی جواب درج نہیں کیا گیا');
     }
     
@@ -507,17 +574,18 @@ export const saveAnswer = createAsyncThunk<
     }
     
     // Make API request
+    const patchPayload = {
+      string_value: updatedAnswerData.string_value,
+      number_value: updatedAnswerData.number_value,
+      text_value: updatedAnswerData.text_value,
+    };
     reduxLogger.debug(`Making ${method} request to: ${path}`);
-    reduxLogger.debug('Request payload:', method === 'PATCH' 
-      ? { string_value: updatedAnswerData.string_value, number_value: updatedAnswerData.number_value }
-      : updatedAnswerData);
-    
+    reduxLogger.debug('Request payload:', method === 'PATCH' ? patchPayload : updatedAnswerData);
+
     const response = await apiRequest<ReportAnswer | { data: ReportAnswer }>(() => ({
       path,
       method,
-      body: JSON.stringify(method === 'PATCH' 
-        ? { string_value: updatedAnswerData.string_value, number_value: updatedAnswerData.number_value }
-        : updatedAnswerData),
+      body: JSON.stringify(method === 'PATCH' ? patchPayload : updatedAnswerData),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -533,18 +601,67 @@ export const saveAnswer = createAsyncThunk<
     
     reduxLogger.debug('Successfully saved answer:', data);
     reduxLogger.debug('Answer details - ID:', data.id, 'Question ID:', data.question_id, 'Submission ID:', data.submission_id);
+
+    // ── Sync strength-linked manual answers back to Strength_Records ──
+    // Skip during batch auto-fill (records are already created there)
+    const qaState = getState().qa;
+    if (qaState.batchFillStatus !== 'loading') {
+      const question = qaState.questions.byId[answerData.question_id];
+      if (
+        question?.linked_to_type === 'strength' &&
+        question.linked_to_id &&
+        question.aggregate_func
+      ) {
+        const numValue =
+          answerData.number_value ??
+          (answerData.string_value ? parseInt(answerData.string_value, 10) : null);
+
+        if (numValue !== null && !isNaN(numValue)) {
+          // Get unit_id and month/year from the current submission's mgmt record
+          const submission = Object.values(qaState.submissions.byId).find(
+            (s) => s.id === submissionId
+          );
+          if (submission?.unit_id && submission?.mgmt_id) {
+            try {
+              const { syncStrengthFromAnswer, fetchMgmtPeriod } = await import(
+                '../strength/strengthSync'
+              );
+              const mgmt = await fetchMgmtPeriod(submission.mgmt_id);
+              if (mgmt) {
+                await syncStrengthFromAnswer(
+                  submission.unit_id,
+                  question.linked_to_id,
+                  mgmt.year,
+                  mgmt.month,
+                  question.aggregate_func,
+                  numValue,
+                );
+                reduxLogger.debug(
+                  `[QA] Synced strength record: type=${question.linked_to_id}, ` +
+                    `func=${question.aggregate_func}, value=${numValue}`
+                );
+              }
+            } catch (syncErr: any) {
+              // Best-effort — don't fail the answer save
+              reduxLogger.error('[QA] Strength sync error (non-fatal):', syncErr.message);
+            }
+          }
+        }
+      }
+    }
+
     return data;
   } catch (error: any) {
     reduxLogger.error('Error saving answer:', error);
-    
+
     // Check if it's an authentication error
-    if (error.message?.includes('Authentication expired') || 
+    if (error.message?.includes('Authentication expired') ||
         error.message?.includes('Token expired') ||
         error.message?.includes('401')) {
       // Dispatch logout action if it's an auth error
       dispatch(logout());
     }
-    
+
     return rejectWithValue(
       error.message || 'جواب محفوظ نہیں ہو سکا'
     );

@@ -42,7 +42,7 @@ export const calculateSectionProgress = (
   const answeredQuestions = sectionQuestions.filter(question => 
     answers.some(answer => 
       answer.question_id === question.id && 
-      (answer.string_value !== null || answer.number_value !== null)
+      (answer.string_value !== null || answer.number_value !== null || answer.text_value !== null)
     )
   ).length;
   
@@ -120,7 +120,7 @@ export const isQuestionAnswered = (
   answers: ReportAnswer[]
 ): boolean => {
   const answer = findAnswerForQuestion(questionId, answers);
-  return !!answer && (answer.string_value !== null || answer.number_value !== null);
+  return !!answer && (answer.string_value !== null || answer.number_value !== null || answer.text_value !== null);
 };
 
 /**

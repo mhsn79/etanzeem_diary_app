@@ -147,7 +147,7 @@ function EditModal({
     }
   }, []);
 
-  // Fetch fresh previousTotal from API every time modal opens
+  // Fetch fresh previousTotal AND auto-create Strength_Record if missing
   useEffect(() => {
     if (visible && typeId) {
       setLoadingPrevTotal(true);
@@ -161,8 +161,25 @@ function EditModal({
           // Keep the prop fallback
         })
         .finally(() => setLoadingPrevTotal(false));
+
+      // Auto-create the Strength_Record if it doesn't exist yet.
+      // This ensures carry-forward values are persisted even when user
+      // opens the dialog but makes no plus/minus changes.
+      if (!existingRecord && userUnitId) {
+        import('@/app/features/strength/strengthSync')
+          .then(({ getOrCreateStrengthRecord }) =>
+            getOrCreateStrengthRecord(userUnitId, typeId, year, month)
+          )
+          .then(() => {
+            // Refresh records so the parent list picks up the new row
+            dispatch(refreshStrengthData({ year, month }));
+          })
+          .catch(err =>
+            console.warn('[Workforce] Auto-create strength record failed:', err)
+          );
+      }
     }
-  }, [visible, typeId, year, month, dispatch, previousTotalProp]);
+  }, [visible, typeId, year, month, dispatch, previousTotalProp, existingRecord, userUnitId]);
 
   // Pre-populate from existing record when modal opens
   useEffect(() => {
@@ -213,10 +230,9 @@ function EditModal({
     setVisible(false);
   }, [setVisible]);
 
-  // Allow saving if there's any change (plus/minus) OR if notes are provided
-  const hasChanges = plusValue > 0 || minusValue > 0;
-  const hasNotes = notesInput.trim().length > 0;
-  const isDisabled = !hasChanges && !hasNotes;
+  // Always allow saving — even with 0 changes, this persists the carry-forward
+  // record so the value propagates to future months correctly.
+  const isDisabled = false;
 
   return (
     <Modal
@@ -385,25 +401,20 @@ function EditModal({
  */
 const WorkforceItem = ({ label, value, onEdit, typeId, editable = true, ...accessibilityProps }: WorkforceItemProps) => {
   return (
-    <View style={styles.detailBox}>
+    <Pressable
+      style={styles.detailBox}
+      onPress={editable ? onEdit : undefined}
+      disabled={!editable}
+      accessibilityRole="button"
+      accessibilityLabel={`${i18n.t('edit')} ${label}`}
+      {...accessibilityProps}
+    >
       <UrduText style={styles.detailText}>{label}</UrduText>
       <Text style={styles.detailNum}>{value}</Text>
-      {editable ? (
-        <Pressable
-          style={styles.editIcon}
-          onPress={onEdit}
-          accessibilityRole="button"
-          accessibilityLabel={`${i18n.t('edit')} ${label}`}
-          {...accessibilityProps}
-        >
-          <EditIcon />
-        </Pressable>
-      ) : (
-        <View style={[styles.editIcon, { opacity: 0.25 }]}>
-          <EditIcon />
-        </View>
-      )}
-    </View>
+      <View style={[styles.editIcon, !editable && { opacity: 0.25 }]}>
+        <EditIcon />
+      </View>
+    </Pressable>
   );
 };
 

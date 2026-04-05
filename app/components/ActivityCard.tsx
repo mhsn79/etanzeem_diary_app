@@ -48,9 +48,12 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   const cardContent = (
     <>
       {showReportHint && (
-        <View style={styles.markAsReportedHint}>
-          <Feather name="check-circle" size={14} color={COLORS.primary} />
-          <UrduText style={styles.markAsReportedText}>سرگرمی مکمل ہو گئی تو رپورٹ کریں:</UrduText>
+        <View style={styles.draftWarningBanner}>
+          <Feather name="alert-circle" size={16} color={COLORS.white} />
+          <UrduText style={styles.draftWarningText}>
+            رپورٹ میں شامل نہیں — پروگرام اور حاضری درج کریں
+          </UrduText>
+          <Feather name="chevron-left" size={16} color={COLORS.white} />
         </View>
       )}
       <View style={styles.titleContainer}>
@@ -172,16 +175,23 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: COLORS.primary,
   },
-  markAsReportedHint: {
+  draftWarningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
-    gap: 4,
+    justifyContent: 'center',
+    backgroundColor: '#E65100',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: SPACING.sm,
+    gap: 6,
   },
-  markAsReportedText: {
+  draftWarningText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.primary,
+    color: COLORS.white,
     fontFamily: 'JameelNooriNastaleeq',
+    flex: 1,
+    textAlign: 'center',
   },
 });
 
