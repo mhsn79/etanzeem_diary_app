@@ -961,11 +961,18 @@ export const checkAndRefreshTokenIfNeeded = createAsyncThunk<
  * Thunk to initialize auth state on app startup
  * This will check for stored tokens, refresh if needed, and fetch user data
  */
+let _initializingAuth = false;
 export const initializeAuth = createAsyncThunk<
   boolean,
   void,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >('auth/initialize', async (_, { dispatch, getState, rejectWithValue }) => {
+  // Prevent concurrent executions
+  if (_initializingAuth) {
+    authLogger.debug('Auth initialization already in progress, skipping');
+    return true;
+  }
+  _initializingAuth = true;
   try {
     authLogger.debug('Starting auth initialization...');
     
@@ -1045,9 +1052,9 @@ export const initializeAuth = createAsyncThunk<
     return true;
   } catch (error: any) {
     authLogger.error('Auth initialization failed:', error);
-    // Don't reject, just return false to indicate initialization failed
-    // This allows the app to continue in an unauthenticated state
     return false;
+  } finally {
+    _initializingAuth = false;
   }
 });
 

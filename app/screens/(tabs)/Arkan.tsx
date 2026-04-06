@@ -32,6 +32,8 @@ import UrduText from '@/app/components/UrduText';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, router, useLocalSearchParams } from 'expo-router';
 import { TabGroup } from '@/app/components/Tab';
+import UnitSelectorBar from '@/app/components/UnitSelectorBar';
+import { selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -58,8 +60,29 @@ export default function Arkan() {
   const displayUnit = selectedUnit || userUnit;
   const displayUnitId = selectedUnitId || userUnit?.id;
 
-  // All accessible unit IDs (for collective persons view)
-  const allAccessibleUnitIds = useSelector(selectAllAccessibleUnitIds);
+  // All accessible unit IDs (for collective persons view) — stabilize reference
+  const allAccessibleIdsRaw = useSelector(selectAllAccessibleUnitIds);
+  const allAccessibleIdsKey = useMemo(() => allAccessibleIdsRaw.join(','), [allAccessibleIdsRaw]);
+  const allAccessibleUnitIds = useMemo(() => allAccessibleIdsRaw, [allAccessibleIdsKey]);
+  const allTanzeemiUnits = useSelector(selectAllTanzeemiUnits);
+
+  // Unit IDs to filter contacts by — selected unit + all its descendants
+  const contactUnitIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!displayUnitId) return ids;
+    ids.add(displayUnitId);
+    const addDescendants = (parentId: number) => {
+      allTanzeemiUnits.forEach(u => {
+        const pid = Number(u.Parent_id || u.parent_id);
+        if (pid === parentId && !ids.has(u.id)) {
+          ids.add(u.id);
+          addDescendants(u.id);
+        }
+      });
+    };
+    addDescendants(displayUnitId);
+    return ids;
+  }, [displayUnitId, allTanzeemiUnits]);
 
   // Local state
   const [filteredData, setFilteredData] = useState<Person[]>([]);
@@ -69,7 +92,15 @@ export default function Arkan() {
 
   // Define tabs with badges in custom order
   const tabs = useMemo(() => {
-    const activePersons = persons.filter(person => person.status !== 'archived');
+    const activePersons = persons.filter(person => {
+      if (person.status === 'archived') return false;
+      if (contactUnitIds.size > 0) {
+        const rawUnit = person.Tanzeemi_Unit;
+        const unitId = typeof rawUnit === 'object' && rawUnit !== null ? Number((rawUnit as any).id) : Number(rawUnit);
+        if (isNaN(unitId) || !contactUnitIds.has(unitId)) return false;
+      }
+      return true;
+    });
     const typeCounts = (contactTypes || []).reduce((acc, type) => {
       acc[type.id] = activePersons.filter(person => person.contact_type === type.id).length;
       return acc;
@@ -95,7 +126,7 @@ export default function Arkan() {
     }
 
     return tabs;
-  }, [persons, contactTypes, i18n, selectedTab]);
+  }, [persons, contactTypes, i18n, selectedTab, contactUnitIds]);
 
   // Fetch persons and contact types on component mount
   useEffect(() => {
@@ -114,27 +145,36 @@ export default function Arkan() {
     }
   }, [contactTypeParam, contactTypes]);
 
-  // Fetch persons from ALL accessible units (collective view).
+  // Fetch persons when accessible units are available and user is authenticated
+  const isAuthenticated = useSelector((state: any) => !!state.auth?.tokens?.accessToken);
   useEffect(() => {
-    if (allAccessibleUnitIds.length === 0 && (!displayUnitId || typeof displayUnitId !== 'number')) return;
+    if (!isAuthenticated) return;
+    if (!displayUnitId || typeof displayUnitId !== 'number') return;
+    if (allAccessibleUnitIds.length === 0) return;
+
     if (allAccessibleUnitIds.length > 1) {
-      console.log('Arkan: Fetching persons for', allAccessibleUnitIds.length, 'accessible units');
       dispatch(fetchPersonsByMultipleUnits(allAccessibleUnitIds));
-      return;
+    } else {
+      const unitId = allAccessibleUnitIds[0] || displayUnitId;
+      if (unitId && typeof unitId === 'number') {
+        dispatch(fetchPersonsByUnitId(unitId));
+      }
     }
+  }, [allAccessibleIdsKey, displayUnitId, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const unitId = allAccessibleUnitIds[0] || displayUnitId;
-    if (unitId && typeof unitId === 'number') {
-      console.log('Arkan: Fetching persons for single unit:', unitId);
-      dispatch(fetchPersonsByUnitId(unitId));
-    }
-  }, [allAccessibleUnitIds, displayUnitId, dispatch]);
-
-  // Filter persons based on search query and selected tab
+  // Filter persons based on unit selection, search query and selected tab
   const filteredPersons = useMemo(() => {
-    // First, exclude archived persons
-    const activePersons = persons.filter(person => person.status !== 'archived');
-    
+    // First, exclude archived persons and filter by selected unit + descendants
+    const activePersons = persons.filter(person => {
+      if (person.status === 'archived') return false;
+      if (contactUnitIds.size > 0) {
+        const rawUnit = person.Tanzeemi_Unit;
+        const unitId = typeof rawUnit === 'object' && rawUnit !== null ? Number((rawUnit as any).id) : Number(rawUnit);
+        if (isNaN(unitId) || !contactUnitIds.has(unitId)) return false;
+      }
+      return true;
+    });
+
     // Then filter by tab selection
     let tabFilteredPersons = activePersons;
     
@@ -153,7 +193,7 @@ export default function Arkan() {
       const phoneMatch = person.Phone_Number?.includes(query);
       return nameMatch || addressMatch || phoneMatch;
     });
-  }, [persons, searchQuery, selectedTab, tabs]);
+  }, [persons, searchQuery, selectedTab, tabs, contactUnitIds]);
 
   // Update filtered data
   useEffect(() => {
@@ -351,6 +391,7 @@ export default function Arkan() {
                   style={styles.searchInput}
                 />
               </View>
+              <UnitSelectorBar />
               {contactTypes && contactTypes.length > 0 && (
                 <View style={styles.tabSection}>
                   <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />

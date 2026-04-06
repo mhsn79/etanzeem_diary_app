@@ -31,6 +31,7 @@ import {
   selectAllActivities,
   selectActivitiesStatus,
   selectActivitiesError,
+  selectActivitiesPermissionDenied,
   deleteActivity,
   editActivity,
 } from '@/app/features/activities/activitySlice';
@@ -40,6 +41,7 @@ import { formatUnitName } from '@/app/utils/formatUnitName';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import ActivityTypePicker from '../../components/ActivityTypePicker';
 import { selectActivityTypeEntities } from '@/app/features/activityTypes/activityTypesSlice';
+import UnitSelectorBar from '../../components/UnitSelectorBar';
 
 // Reusable component to wrap content with consistent status bar and background
 interface ScreenWrapperProps {
@@ -90,6 +92,7 @@ export default function Activities() {
   const activities = useAppSelector(selectAllActivities);
   const status = useAppSelector(selectActivitiesStatus);
   const error = useAppSelector(selectActivitiesError);
+  const permissionDenied = useAppSelector(selectActivitiesPermissionDenied);
   const [showDeleteSuccessToast, setShowDeleteSuccessToast] = useState(false);
   const [showCompletionSuccessToast, setShowCompletionSuccessToast] = useState(false);
 
@@ -254,7 +257,7 @@ export default function Activities() {
     return d;
   }, []);
 
-  // Allowed unit IDs — only the selected unit (not its children)
+  // Allowed unit IDs — only the selected unit
   const allowedUnitIds = useMemo(() => {
     const ids = new Set<number>();
     if (displayUnitId) ids.add(displayUnitId);
@@ -475,6 +478,7 @@ export default function Activities() {
       <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => {}} showBack={false}>
       <View style={styles.container} collapsable={false}>
         <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
+        <UnitSelectorBar />
         <View style={styles.monthSelector}>
           <Pressable
             onPress={() => handleMonthChange('prev')}
@@ -515,9 +519,16 @@ export default function Activities() {
           }
         >
           {formattedActivities.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {selectedTab === 0 ? 'کوئی شیڈول شدہ سرگرمیاں نہیں ملیں' : 'کوئی رپورٹ شدہ سرگرمیاں نہیں ملیں'}
-            </Text>
+            <>
+              <Text style={styles.emptyText}>
+                {selectedTab === 0 ? 'کوئی شیڈول شدہ سرگرمیاں نہیں ملیں' : 'کوئی رپورٹ شدہ سرگرمیاں نہیں ملیں'}
+              </Text>
+              {permissionDenied && (
+                <Text style={[styles.emptyText, { fontSize: 13, marginTop: SPACING.sm }]}>
+                  اس یونٹ کی سرگرمیاں دیکھنے کی اجازت نہیں ہے۔ براہ کرم ایڈمن سے رابطہ کریں۔
+                </Text>
+              )}
+            </>
           ) : (
             formattedActivities.map((item) => {
               if (item.type === 'separator') {

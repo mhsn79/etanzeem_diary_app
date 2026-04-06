@@ -193,7 +193,7 @@ export async function syncStrengthFromAnswer(
     await cascadeSubsequentMonths(unitId, typeId, year, month, finalNewTotal);
   } catch (error) {
     // Log but don't throw — sync is best-effort; the report answer is already saved
-    console.error('[STRENGTH_SYNC] syncStrengthFromAnswer failed:', error);
+    console.warn('[STRENGTH_SYNC] syncStrengthFromAnswer failed:', error);
   }
 }
 
@@ -212,7 +212,7 @@ export async function fetchMgmtPeriod(mgmtId: number): Promise<MgmtPeriod | null
     );
     return response.data ?? (response as unknown as MgmtPeriod);
   } catch {
-    console.error(`[STRENGTH_SYNC] Failed to fetch reports_mgmt id=${mgmtId}`);
+    console.warn(`[STRENGTH_SYNC] Failed to fetch reports_mgmt id=${mgmtId}`);
     return null;
   }
 }
@@ -283,7 +283,7 @@ async function cascadeSubsequentMonths(
       carryForward = newTotal;
     }
   } catch (error) {
-    console.error('[STRENGTH_SYNC] cascadeSubsequentMonths error:', error);
+    console.warn('[STRENGTH_SYNC] cascadeSubsequentMonths error:', error);
   }
 }
 

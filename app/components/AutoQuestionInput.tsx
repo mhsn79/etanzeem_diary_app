@@ -365,7 +365,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return [];
       }
     } catch (error: any) {
-      console.error('Error fetching contacts:', error);
+      console.warn('Error fetching contacts:', error);
       setContactsError(`${getContactTypeLabel()} حاصل کرنے میں ناکامی`);
       return [];
     } finally {
@@ -425,7 +425,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return [];
       }
     } catch (error: any) {
-      console.error('Error fetching activities:', error);
+      console.warn('Error fetching activities:', error);
       setActivitiesError(`${getActivityTypeLabel()} حاصل کرنے میں ناکامی`);
       return [];
     } finally {
@@ -477,7 +477,7 @@ const AutoQuestionInput: React.FC<AutoQuestionInputProps> = ({
         return [];
       }
     } catch (error: any) {
-      console.error('Error fetching baitulmal records:', error);
+      console.warn('Error fetching baitulmal records:', error);
       setBaitulmalError(`${getBaitulmalTypeLabel()} حاصل کرنے میں ناکامی`);
       return [];
     } finally {

@@ -25,6 +25,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Vibration } from 'react-native';
 
 // SVG Icons
+import UnitSelectorBar from '../components/UnitSelectorBar';
 import EditIcon from '../../assets/images/edit-icon.svg';
 import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
 
@@ -59,7 +60,7 @@ import {
   StrengthRecord,
 } from '@/app/features/strength/strengthSlice';
 import { AppDispatch } from '@/app/store/types';
-import { selectDashboardSelectedUnitId, selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 import { getUrduMonth } from '../constants/urduLocalization';
 
 // Theme and constants
@@ -490,15 +491,33 @@ export default function Workforce() {
   const selectedUnitId = useSelector(selectDashboardSelectedUnitId);
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const displayUnitId = selectedUnitId || userUnitDetails?.id;
+  const allTanzeemiUnits = useSelector(selectAllTanzeemiUnits);
+
+  // Unit IDs for filtering counts — selected unit + all descendants
+  const countUnitIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!displayUnitId) return ids;
+    ids.add(displayUnitId);
+    const addDescendants = (parentId: number) => {
+      allTanzeemiUnits.forEach(u => {
+        const pid = Number(u.Parent_id || u.parent_id);
+        if (pid === parentId && !ids.has(u.id)) {
+          ids.add(u.id);
+          addDescendants(u.id);
+        }
+      });
+    };
+    addDescendants(displayUnitId);
+    return ids;
+  }, [displayUnitId, allTanzeemiUnits]);
 
   // Fetch strength data
+  const prevStrengthUnitRef = React.useRef<number | undefined>();
   useEffect(() => {
-    // Set the display unit ID in the strength slice
-    if (displayUnitId) {
-      dispatch(setUserUnitId(displayUnitId));
-    }
-
-    // Refresh strength data (this will fetch types and records)
+    if (!displayUnitId) return;
+    if (displayUnitId === prevStrengthUnitRef.current) return;
+    prevStrengthUnitRef.current = displayUnitId;
+    dispatch(setUserUnitId(displayUnitId));
     dispatch(refreshStrengthData());
   }, [dispatch, displayUnitId]);
 
@@ -534,8 +553,16 @@ export default function Workforce() {
       };
     }
     
-    // Filter out archived persons
-    const activePersons = persons.filter(person => person.status !== 'archived');
+    // Filter out archived persons and apply unit filter
+    const activePersons = persons.filter(person => {
+      if (person.status === 'archived') return false;
+      if (countUnitIds.size > 0) {
+        const rawUnit = person.Tanzeemi_Unit;
+        const unitId = typeof rawUnit === 'object' && rawUnit !== null ? Number((rawUnit as any).id) : Number(rawUnit);
+        if (isNaN(unitId) || !countUnitIds.has(unitId)) return false;
+      }
+      return true;
+    });
     
     const result = {
       rukun: 0,
@@ -555,7 +582,7 @@ export default function Workforce() {
     });
     
     return result;
-  }, [persons, contactTypes]);
+  }, [persons, contactTypes, countUnitIds]);
 
   // Calculate total members for display
   const totalMembers = useMemo(() => {
@@ -849,6 +876,7 @@ export default function Workforce() {
 
       
         
+        <UnitSelectorBar />
         {/* Month/Year Selector */}
         <View style={styles.monthSelector}>
           <Pressable

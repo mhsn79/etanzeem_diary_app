@@ -54,8 +54,10 @@ export const fetchActivityTypes = createAsyncThunk<
     
     return response.data ?? [];
   } catch (error: any) {
-    console.error('Fetch activity types error:', error);
-    return rejectWithValue(error.message || 'Failed to fetch activity types');
+    console.warn('Fetch activity types error:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) return [];
+    return rejectWithValue('ڈیٹا لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 

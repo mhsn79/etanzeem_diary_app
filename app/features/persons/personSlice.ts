@@ -111,7 +111,7 @@ export const fetchPersonsByUnitId = createAsyncThunk<
     const auth = getState().auth;
     if (!auth.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping fetch persons by unit ID (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return [];
     }
     
     if (!unitId) {
@@ -175,7 +175,7 @@ export const fetchPersonsByMultipleUnits = createAsyncThunk<
   try {
     const auth = getState().auth;
     if (!auth.tokens?.accessToken) {
-      return rejectWithValue('User not authenticated');
+      return [];
     }
 
     if (!unitIds || unitIds.length === 0) {
@@ -229,7 +229,7 @@ export const fetchPersonsByUnit = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping fetch persons by unit (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return [];
     }
     
     const { tanzeem } = getState();
@@ -488,7 +488,7 @@ export const fetchNazimDetails = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping fetch Nazim details (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
     
     reduxLogger.debug(`[Persons] Fetching Nazim details... (${Platform.OS})`);
@@ -533,7 +533,7 @@ export const fetchContactTypes = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping fetch contact types (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return [];
     }
     
     reduxLogger.debug(`[Persons] Fetching contact types... (${Platform.OS})`);
@@ -620,7 +620,7 @@ export const transferRukun = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping transfer rukun (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
     
     reduxLogger.debug(`[Persons] Transferring Rukun ID ${transferData.id} to unit ${transferData.contact_id} (${Platform.OS})`);
@@ -730,7 +730,7 @@ export const checkExistingTransfer = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping check existing transfer (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return [];
     }
     
     reduxLogger.debug(`[Persons] Checking existing transfers for contact ID ${contactId} (${Platform.OS})`);
@@ -770,7 +770,7 @@ export const createRukunTransfer = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] User not authenticated, skipping create transfer (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
     
     reduxLogger.debug(`[Persons] Creating transfer request for contact ID ${transferData.contact_id} (${Platform.OS})`);
@@ -844,7 +844,7 @@ export const fetchRukunUpdateRequest = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] ❌ User not authenticated for contact_id: ${contactId} (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return [];
     }
 
     reduxLogger.debug(`[Persons] ✅ Authentication verified for contact_id: ${contactId} (${Platform.OS})`);
@@ -915,7 +915,7 @@ export const submitRukunUpdateRequest = createAsyncThunk<
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
       reduxLogger.debug(`[Persons] ❌ User not authenticated for contact_id: ${requestData.contact_id} (${Platform.OS})`);
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
 
     reduxLogger.debug(`[Persons] ✅ Authentication verified for contact_id: ${requestData.contact_id} (${Platform.OS})`);
@@ -1156,7 +1156,7 @@ export const fetchPersonCount = createAsyncThunk<
     
     if (!userId) {
       reduxLogger.error(`[PERSON_COUNT] ❌ No user ID found in auth state`);
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('token_not_ready');
     }
 
     if (!linkedToId) {
@@ -1217,7 +1217,7 @@ export const checkPhoneExists = createAsyncThunk<
   try {
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
 
     let queryString = `/items/Person?filter[Phone_Number][_eq]=${encodeURIComponent(phone)}&filter[status][_neq]=archived&fields=id&limit=1`;
@@ -1242,7 +1242,7 @@ export const archivePerson = createAsyncThunk<
   try {
     const authState = getState().auth;
     if (!authState.tokens?.accessToken) {
-      return rejectWithValue('User not authenticated');
+      return rejectWithValue('token_not_ready');
     }
 
     const apiPayload = {
@@ -1427,6 +1427,7 @@ const personsSlice = createSlice({
         personsAdapter.upsertOne(state, action.payload);
       })
       .addCase(fetchNazimDetails.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         state.nazimDetailsStatus = 'failed';
         state.nazimDetailsError = action.payload ?? 'Failed to fetch Nazim details';
       })
@@ -1466,6 +1467,7 @@ const personsSlice = createSlice({
         personsAdapter.upsertOne(state, action.payload);
       })
       .addCase(transferRukun.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         state.transferStatus = 'failed';
         state.transferError = action.payload ?? 'Failed to transfer rukun';
       })
@@ -1504,6 +1506,7 @@ const personsSlice = createSlice({
         state.existingTransfers.push(action.payload);
       })
       .addCase(createRukunTransfer.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         state.createTransferStatus = 'failed';
         state.createTransferError = action.payload ?? 'Failed to create transfer request';
       })
@@ -1554,6 +1557,7 @@ const personsSlice = createSlice({
         }
       })
       .addCase(submitRukunUpdateRequest.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         reduxLogger.debug(`[PersonsSlice] ❌ submitRukunUpdateRequest.rejected for contact_id: ${action.meta.arg.contact_id}`, {
           error: action.payload,
           errorMessage: action.error?.message
@@ -1571,6 +1575,7 @@ const personsSlice = createSlice({
         state.personCount = action.payload;
       })
       .addCase(fetchPersonCount.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         state.personCountStatus = 'failed';
         state.personCountError = action.payload ?? 'Failed to fetch person count';
       })
@@ -1584,6 +1589,7 @@ const personsSlice = createSlice({
         personsAdapter.removeOne(state, action.payload.id);
       })
       .addCase(archivePerson.rejected, (state, action) => {
+        if (action.payload === 'token_not_ready') return;
         state.archiveStatus = 'failed';
         state.archiveError = action.payload ?? 'Failed to archive person';
       });

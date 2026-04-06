@@ -109,7 +109,7 @@ const normalizeResponse = <T>(response: T | { data: T }, entity: string): T => {
     return response as T;
   }
   
-  console.error(`[NORMALIZE_DEBUG] Invalid ${entity} response format:`, response);
+  console.warn(`[NORMALIZE_DEBUG] Invalid ${entity} response format:`, response);
   throw new Error(`Invalid ${entity} response format`);
 };
 
@@ -155,8 +155,10 @@ export const fetchStrengthTypes = createAsyncThunk<
     const strengthTypes = response.data || [];
     return strengthTypes;
   } catch (error: any) {
-    console.error('Error in fetchStrengthTypes:', error);
-    return rejectWithValue(error.message || 'Failed to fetch strength types');
+    console.warn('Error in fetchStrengthTypes:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) return [];
+    return rejectWithValue('ڈیٹا لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 
@@ -203,8 +205,10 @@ export const fetchStrengthRecords = createAsyncThunk<
 
     return strengthRecords;
   } catch (error: any) {
-    console.error('Error in fetchStrengthRecords:', error);
-    return rejectWithValue(error.message || 'Failed to fetch strength records');
+    console.warn('Error in fetchStrengthRecords:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) return [];
+    return rejectWithValue('ڈیٹا لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 
@@ -260,7 +264,7 @@ export const fetchCarryForwardTotals = createAsyncThunk<
     }
     return totals;
   } catch (error: any) {
-    console.error('[STRENGTH] Error fetching carry-forward totals:', error);
+    console.warn('[STRENGTH] Error fetching carry-forward totals:', error);
     return rejectWithValue(error.message || 'Failed to fetch carry-forward totals');
   }
 });
@@ -302,7 +306,7 @@ async function fetchPreviousTotal(
     }
     return 0;
   } catch (error) {
-    console.error('[STRENGTH] Error fetching previous total:', error);
+    console.warn('[STRENGTH] Error fetching previous total:', error);
     return 0;
   }
 }
@@ -369,7 +373,7 @@ async function cascadeSubsequentMonths(
     }
   } catch (error) {
     // Log but don't fail the main upsert — cascade is best-effort
-    console.error('[STRENGTH_CASCADE] Error cascading subsequent months:', error);
+    console.warn('[STRENGTH_CASCADE] Error cascading subsequent months:', error);
   }
 }
 
@@ -484,7 +488,7 @@ export const upsertStrengthRecord = createAsyncThunk<
 
     return resultRecord;
   } catch (error: any) {
-    console.error('Error in upsertStrengthRecord:', error);
+    console.warn('Error in upsertStrengthRecord:', error);
     return rejectWithValue(error.message || 'Failed to save strength record');
   }
 });
@@ -520,7 +524,7 @@ export const refreshStrengthData = createAsyncThunk<
     // Fetch carry-forward totals from previous months (for types without a current month record)
     dispatch(fetchCarryForwardTotals({ year, month }));
   } catch (error) {
-    console.error('[STRENGTH_REFRESH] Error:', error);
+    console.warn('[STRENGTH_REFRESH] Error:', error);
   }
 });
 

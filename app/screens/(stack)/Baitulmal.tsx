@@ -20,6 +20,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BaitulmalCard from '../../components/BaitulmalCard';
 import { TabGroup } from '@/app/components/Tab';
+import UnitSelectorBar from '@/app/components/UnitSelectorBar';
 import Header from '../../components/Header';
 import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
@@ -274,6 +275,7 @@ export default function Baitulmal() {
       <ScreenWrapper headerTitle="بیت المال" onBack={handleBack}>
         <View style={styles.container} collapsable={false}>
           <TabGroup tabs={tabs} selectedTab={selectedTab} onTabChange={setSelectedTab} />
+          <UnitSelectorBar />
 
           {/* Month selector */}
           <View style={styles.monthSelector}>

@@ -31,6 +31,7 @@ interface ActivitiesExtraState {
   activityCountError: string | null;
   activityCount: number | null;
   lastFetchTime: number;
+  permissionDenied: boolean;
 }
 
 export type ActivitiesState = ReturnType<typeof activitiesAdapter.getInitialState<ActivitiesExtraState>>;
@@ -50,6 +51,7 @@ const initialState: ActivitiesState = activitiesAdapter.getInitialState<Activiti
   activityCountError: null,
   activityCount: null,
   lastFetchTime: 0,
+  permissionDenied: false,
 });
 
 // The centralized API client handles token refresh automatically
@@ -85,7 +87,7 @@ export const createActivity = createAsyncThunk<
     const userId = state.auth.user?.id;
     
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
   
     
@@ -110,7 +112,7 @@ export const createActivity = createAsyncThunk<
     if (!response.data) throw new Error('Failed to create activity');
     return response.data;
   } catch (error: any) {
-    console.error('Create activity error:', error);
+    console.warn('Create activity error:', error);
     return rejectWithValue(error.message || 'Failed to create activity');
   }
 });
@@ -130,7 +132,7 @@ export const deleteActivity = createAsyncThunk<
     const userId = state.auth.user?.id;
     
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
     
     // First, fetch the activity to verify ownership
@@ -160,7 +162,7 @@ export const deleteActivity = createAsyncThunk<
     
     return activityId;
   } catch (error: any) {
-    console.error('Delete activity error:', error);
+    console.warn('Delete activity error:', error);
     return rejectWithValue(error.message || 'Failed to delete activity');
   }
 });
@@ -182,7 +184,7 @@ export const fetchActivityById = createAsyncThunk<
     const userId = state.auth.user?.id;
     
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
     
     // Fetch the activity by ID
@@ -194,7 +196,7 @@ export const fetchActivityById = createAsyncThunk<
     if (!response.data) throw new Error('Activity not found');
     return response.data;
   } catch (error: any) {
-    console.error('Fetch activity by ID error:', error);
+    console.warn('Fetch activity by ID error:', error);
     return rejectWithValue(error.message || 'Failed to fetch activity');
   }
 });
@@ -216,7 +218,7 @@ export const editActivity = createAsyncThunk<
     const userId = state.auth.user?.id;
     
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
     
     // First, fetch the activity to verify ownership
@@ -251,7 +253,7 @@ export const editActivity = createAsyncThunk<
     
     return updateResponse.data;
   } catch (error: any) {
-    console.error('Edit activity error:', error);
+    console.warn('Edit activity error:', error);
     return rejectWithValue(error.message || 'Failed to edit activity');
   }
 });
@@ -273,7 +275,7 @@ export const fetchActivities = createAsyncThunk<
     const userId = state.auth.user?.id;
     
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
     
     // Filter by user's unit and sub-unit hierarchy (backend filter, not UI)
@@ -306,7 +308,11 @@ export const fetchActivities = createAsyncThunk<
       ? `filter[tanzeemi_unit][_eq]=${unitIds[0]}`
       : `filter[tanzeemi_unit][_in]=${unitIds.join(',')}`;
     const endpoint = `/items/Activities?sort=-activity_date_and_time&fields=*&filter[status][_neq]=archived&${unitFilter}`;
-    
+    console.log('[Activities] API endpoint:', endpoint);
+    console.log('[Activities] unitIds:', JSON.stringify(unitIds));
+    console.log('[Activities] userUnitHierarchyIds:', JSON.stringify(userUnitHierarchyIds));
+    console.log('[Activities] userUnitId:', userUnitId);
+
     const response = await directApiRequest<{ data: Activity[] }>(
       endpoint,
       'GET',
@@ -322,8 +328,13 @@ export const fetchActivities = createAsyncThunk<
     if (error?.name === 'AbortError') {
       return rejectWithValue('aborted');
     }
-    console.error('Fetch activities error:', error);
-    return rejectWithValue(error.message || 'Failed to fetch activities');
+    console.warn('Fetch activities error:', error);
+    // Permission errors — return empty list instead of failing the whole screen
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) {
+      return rejectWithValue('permission_denied');
+    }
+    return rejectWithValue('سرگرمیاں لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 
@@ -353,8 +364,8 @@ export const fetchActivityCount = createAsyncThunk<
     console.log(`[ACTIVITY_COUNT] 🏢 User unit hierarchy IDs:`, userUnitHierarchyIds);
     
     if (!userId) {
-      console.error(`[ACTIVITY_COUNT] ❌ No user ID found in auth state`);
-      return rejectWithValue('User not authenticated. Please log in again.');
+      console.warn(`[ACTIVITY_COUNT] ❌ No user ID found in auth state`);
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
 
     if (!linkedToId) {
@@ -416,8 +427,8 @@ export const fetchActivityCount = createAsyncThunk<
     console.log(`[ACTIVITY_COUNT] 🎯 Final activity count result: ${activityCount}`);
     return activityCount;
   } catch (error: any) {
-    console.error('[ACTIVITY_COUNT] 💥 Critical error in fetchActivityCount:', error);
-    console.error('[ACTIVITY_COUNT] 📋 Error details:', {
+    console.warn('[ACTIVITY_COUNT] 💥 Critical error in fetchActivityCount:', error);
+    console.warn('[ACTIVITY_COUNT] 📋 Error details:', {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -454,11 +465,21 @@ const activitiesSlice = createSlice({
       })
       .addCase(fetchActivities.fulfilled, (state, action: PayloadAction<Activity[]>) => {
         state.status = 'succeeded';
+        state.permissionDenied = false;
         state.lastFetchTime = Date.now();
         activitiesAdapter.setAll(state, action.payload);
       })
       .addCase(fetchActivities.rejected, (state, action) => {
-        if (action.payload === 'aborted') return; // Screen blurred; don't update UI
+        if (action.payload === 'aborted') {
+          if (state.status === 'loading') state.status = 'idle';
+          return;
+        }
+        if (action.payload === 'permission_denied') {
+          state.status = 'succeeded';
+          state.permissionDenied = true;
+          state.lastFetchTime = Date.now();
+          return;
+        }
         state.status = 'failed';
         state.error = action.payload ?? 'Failed to fetch activities';
       })
@@ -524,14 +545,10 @@ const activitiesSlice = createSlice({
         state.activityCountStatus = 'failed';
         state.activityCountError = action.payload ?? 'Failed to fetch activity count';
       })
-      // Clear activities when user unit changes to prevent UI crashes
+      // When user unit changes, just reset fetch time so next focus triggers fresh fetch
+      // Don't clear existing data — it prevents flickering during token refresh
       .addCase(setUserUnitDetails, (state) => {
-        console.log('[Activities] Clearing activities due to user unit change');
-        activitiesAdapter.removeAll(state);
-        state.status = 'idle';
-        state.error = null;
-        state.lastFetchTime = 0; // Reset fetch time to force fresh fetch
-        console.log('[Activities] Activities cleared, status reset to idle');
+        state.lastFetchTime = 0;
       });
   },
 });
@@ -556,6 +573,7 @@ export const {
 
 export const selectActivitiesStatus = (state: RootState) => selectActivitiesState(state).status;
 export const selectActivitiesError = (state: RootState) => selectActivitiesState(state).error;
+export const selectActivitiesPermissionDenied = (state: RootState) => selectActivitiesState(state).permissionDenied;
 export const selectCreateActivityStatus = (state: RootState) => selectActivitiesState(state).createStatus;
 export const selectCreateActivityError = (state: RootState) => selectActivitiesState(state).createError;
 export const selectDeleteActivityStatus = (state: RootState) => selectActivitiesState(state).deleteStatus;

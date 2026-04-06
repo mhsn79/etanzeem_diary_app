@@ -108,17 +108,24 @@ const Dashboard = () => {
     }
   }, [dispatch, contactTypesStatus]);
 
-  // Fetch report submissions so badge stays up-to-date
+  // Fetch report submissions so badge stays up-to-date (only when unit actually changes)
+  const prevDisplayUnitIdRef = React.useRef<number | undefined>();
   useEffect(() => {
-    dispatch(fetchReportSubmissions());
+    if (displayUnitId && displayUnitId !== prevDisplayUnitIdRef.current) {
+      prevDisplayUnitIdRef.current = displayUnitId;
+      dispatch(fetchReportSubmissions());
+    }
   }, [dispatch, displayUnitId]);
 
-  // Fetch Nazim details when selected unit changes
+  // Fetch Nazim details when nazim actually changes
+  const nazimId = displayUnit?.Nazim_id;
+  const prevNazimIdRef = React.useRef<number | undefined>();
   useEffect(() => {
-    if (displayUnit?.Nazim_id) {
-      dispatch(fetchNazimDetails(displayUnit.Nazim_id));
+    if (nazimId && nazimId !== prevNazimIdRef.current) {
+      prevNazimIdRef.current = nazimId;
+      dispatch(fetchNazimDetails(nazimId));
     }
-  }, [dispatch, displayUnit?.Nazim_id]);
+  }, [dispatch, nazimId]);
 
   // Show Nazim name from the selected unit's Nazim, fallback to logged-in user
   const displayNazimName = nazimDetails?.Name || userDetails?.Name || '';
@@ -141,20 +148,22 @@ const Dashboard = () => {
   const [activityPickerMode, setActivityPickerMode] = React.useState<'schedule' | 'report' | null>(null);
   const [baitulmalPickerCategory, setBaitulmalPickerCategory] = React.useState<'income' | 'expense' | null>(null);
   const userAssignedUnits = useSelector(selectUserAssignedUnits);
+  // Stabilize assigned unit IDs to prevent re-render loops
+  const assignedUnitIdsKey = useMemo(() => userAssignedUnits.map(u => u.id).join(','), [userAssignedUnits]);
 
   // Fetch hierarchies for all assigned units (multi-unit support)
   useEffect(() => {
-    const assignedIds = userAssignedUnits.map(u => u.id);
+    const assignedIds = assignedUnitIdsKey.split(',').filter(Boolean).map(Number);
     if (assignedIds.length > 0) {
       dispatch(fetchAllAssignedUnitHierarchies(assignedIds));
     } else if (userDetails && (userDetails.Tanzeemi_Unit || userDetails.unit)) {
-      // Fallback for legacy/single-unit case (assigned units not yet loaded)
       const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
       if (typeof unitId === 'number') {
         dispatch(fetchUserTanzeemiUnit(unitId));
       }
     }
-  }, [dispatch, userAssignedUnits, userDetails]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, assignedUnitIdsKey]);
 
   useEffect(() => {
     if (userUnit && !selectedUnitId) {

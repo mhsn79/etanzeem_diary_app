@@ -37,6 +37,7 @@ import { BORDER_RADIUS, COLORS, SHADOWS, SIZES, SPACING, TYPOGRAPHY } from '@/ap
 import { COMMON_IMAGES } from '@/app/constants/images';
 import { TabGroup } from '@/app/components/Tab';
 import ReportCard from './ReportCard';
+import UnitSelectorBar from '@/app/components/UnitSelectorBar';
 import { logout } from '@/app/features/auth/authSlice';
 import {
   initializeReportData,
@@ -853,6 +854,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         showsVerticalScrollIndicator={false}
       >
         {showHeader && <Header title={title} onBack={handleBack} />}
+        <UnitSelectorBar />
         <View style={styles.content}>
           <UrduText style={styles.subTitle}>موجودہ رپورٹ</UrduText>
           <TouchableOpacity

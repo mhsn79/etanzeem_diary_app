@@ -135,7 +135,7 @@ const fetchAndProcessParentHierarchy = async (
     
     return { parentUnits: allUnits };
   } catch (error) {
-    console.error(`Error fetching parent unit ${unitId} in hierarchy:`, error);
+    console.warn(`Error fetching parent unit ${unitId} in hierarchy:`, error);
     return { parentUnits: allUnits };
   }
 };
@@ -232,7 +232,7 @@ const fetchAndProcessSubordinateHierarchy = async (
     
     return { subordinateUnits: allUnits };
   } catch (error) {
-    console.error(`Error fetching subordinate unit ${unitId} in hierarchy:`, error);
+    console.warn(`Error fetching subordinate unit ${unitId} in hierarchy:`, error);
     return { subordinateUnits: allUnits };
   }
 };

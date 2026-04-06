@@ -12,6 +12,9 @@ interface AuthGuardProps {
   requireAuth?: boolean;
 }
 
+// Prevent multiple AuthGuard instances from navigating simultaneously
+let _navigatingToLogin = false;
+
 export default function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -26,12 +29,15 @@ export default function AuthGuard({ children, requireAuth = true }: AuthGuardPro
     setIsMounted(true);
   }, []);
 
+  // Initialize auth once when user is authenticated (not on every re-render)
+  const hasInitializedRef = React.useRef(false);
   useEffect(() => {
-    // If user is authenticated but we're on a screen that requires auth,
-    // initialize auth to ensure we have fresh data
-    if (isAuthenticated && requireAuth) {
-      console.log('[AuthGuard] User is authenticated, initializing auth...');
+    if (isAuthenticated && requireAuth && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       dispatch(initializeAuth());
+    }
+    if (!isAuthenticated) {
+      hasInitializedRef.current = false;
     }
   }, [isAuthenticated, requireAuth, dispatch]);
 
@@ -42,11 +48,15 @@ export default function AuthGuard({ children, requireAuth = true }: AuthGuardPro
     // If authentication is required but user is not authenticated,
     // redirect to login screen
     if (requireAuth && !isAuthenticated && authStatus !== 'loading') {
-      console.log('[AuthGuard] User not authenticated, redirecting to login...');
-      // Use setTimeout to ensure navigation happens after render
-      setTimeout(() => {
-        router.replace('/screens/LoginScreen');
-      }, 100);
+      if (!_navigatingToLogin) {
+        _navigatingToLogin = true;
+        console.log('[AuthGuard] User not authenticated, redirecting to login...');
+        setTimeout(() => {
+          router.replace('/screens/LoginScreen');
+          // Reset after navigation completes
+          setTimeout(() => { _navigatingToLogin = false; }, 500);
+        }, 100);
+      }
       return;
     }
 

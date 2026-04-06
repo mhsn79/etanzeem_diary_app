@@ -110,8 +110,10 @@ export const fetchBaitulmalTypes = createAsyncThunk<
     if (!response.data) throw new Error('Failed to fetch baitulmal types');
     return response.data;
   } catch (error: any) {
-    console.error('Fetch baitulmal types error:', error);
-    return rejectWithValue(error.message || 'Failed to fetch baitulmal types');
+    console.warn('Fetch baitulmal types error:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) return [];
+    return rejectWithValue('ڈیٹا لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 
@@ -126,7 +128,7 @@ export const fetchBaitulmalRecords = createAsyncThunk<
     const state = getState();
     const userId = state.auth.user?.id;
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
 
     const userUnitHierarchyIds = state.tanzeem?.userUnitHierarchyIds ?? [];
@@ -168,8 +170,10 @@ export const fetchBaitulmalRecords = createAsyncThunk<
     if (error?.name === 'AbortError') {
       return rejectWithValue('aborted');
     }
-    console.error('Fetch baitulmal records error:', error);
-    return rejectWithValue(error.message || 'Failed to fetch baitulmal records');
+    console.warn('Fetch baitulmal records error:', error);
+    const errorMsg = error?.message || '';
+    if (errorMsg.includes('permission') || errorMsg.includes('FORBIDDEN')) return [];
+    return rejectWithValue('ڈیٹا لوڈ کرنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔');
   }
 });
 
@@ -183,7 +187,7 @@ export const createBaitulmalRecord = createAsyncThunk<
     const state = getState();
     const userId = state.auth.user?.id;
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
 
     // Get unit ID from tanzeem state
@@ -206,7 +210,7 @@ export const createBaitulmalRecord = createAsyncThunk<
     if (!response.data) throw new Error('Failed to create baitulmal record');
     return response.data;
   } catch (error: any) {
-    console.error('Create baitulmal record error:', error);
+    console.warn('Create baitulmal record error:', error);
     return rejectWithValue(error.message || 'Failed to create baitulmal record');
   }
 });
@@ -221,7 +225,7 @@ export const editBaitulmalRecord = createAsyncThunk<
     const state = getState();
     const userId = state.auth.user?.id;
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
 
     // Verify ownership
@@ -249,7 +253,7 @@ export const editBaitulmalRecord = createAsyncThunk<
 
     return updateResponse.data;
   } catch (error: any) {
-    console.error('Edit baitulmal record error:', error);
+    console.warn('Edit baitulmal record error:', error);
     return rejectWithValue(error.message || 'Failed to edit baitulmal record');
   }
 });
@@ -264,7 +268,7 @@ export const deleteBaitulmalRecord = createAsyncThunk<
     const state = getState();
     const userId = state.auth.user?.id;
     if (!userId) {
-      return rejectWithValue('User not authenticated. Please log in again.');
+      return rejectWithValue('صارف کی تصدیق نہیں ہوئی۔ براہ کرم دوبارہ لاگ ان کریں۔');
     }
 
     await directApiRequest(
@@ -278,7 +282,7 @@ export const deleteBaitulmalRecord = createAsyncThunk<
 
     return recordId;
   } catch (error: any) {
-    console.error('Delete baitulmal record error:', error);
+    console.warn('Delete baitulmal record error:', error);
     return rejectWithValue(error.message || 'Failed to delete baitulmal record');
   }
 });
