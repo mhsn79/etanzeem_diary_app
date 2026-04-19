@@ -3,7 +3,7 @@
     "name": "e-tanzeem-diary",
     "slug": "e-tanzeem-diary",
     "owner": "jiislamabad",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "etanzeemdiary",
@@ -21,6 +21,9 @@
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#008CFF"
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -34,7 +37,8 @@
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#008CFF"
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "bundler": "metro",
@@ -78,6 +82,9 @@
     },
     "assets": [
       "./assets/images/splash-icon.png"
-    ]
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/c94ec490-9e85-465c-bc59-cc7825b5312a"
+    }
   }
 }
