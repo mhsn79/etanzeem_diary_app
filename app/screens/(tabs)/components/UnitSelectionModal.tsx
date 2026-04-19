@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
-import { View, TouchableOpacity, Modal, StyleSheet, Text, ScrollView } from 'react-native';
+import { View, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
 import UrduText from '@/app/components/UrduText';
@@ -15,6 +15,7 @@ import {
 } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
+import { formatUnitDisplay as formatUnitDisplayShared } from '@/app/utils/formatUnitDisplay';
 
 interface UnitSelectionModalProps {
   visible: boolean;
@@ -48,28 +49,14 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
     }
   }, [visible, currentSelectedUnitId, userUnit?.id]);
 
-  // Helper: format unit name with description
-  const formatUnitName = useCallback((unit: any) => {
-    const name = unit.Name || unit.name || '';
-    const description = unit.Description || unit.description || '';
-    if (description && description !== name) {
-      return `${name} (${description})`;
-    }
-    return name;
-  }, []);
+  // Shared formatter — standard template is:
+  //   {Level_Name} {Unit_Name}{ - Unit Description | if not empty}
+  const formatUnitDisplay = useCallback(
+    (unit: any) => formatUnitDisplayShared(unit, levelsById),
+    [levelsById]
+  );
 
-  // Helper: format unit display with level name
-  const formatUnitDisplay = useCallback((unit: any) => {
-    if (!unit) return '';
-    const levelId = unit.Level_id;
-    let levelName = '';
-    if (levelId && typeof levelId === 'number' && levelsById[levelId]) {
-      levelName = levelsById[levelId].Name || '';
-    }
-    return levelName ? `${levelName}: ${formatUnitName(unit)}` : formatUnitName(unit) || '';
-  }, [levelsById, formatUnitName]);
-
-  // Build grouped list: assigned units with their children
+  // Build grouped list: assigned units with their children (sorted by Name)
   const groupedUnits = useMemo((): UnitGroup[] => {
     // Use assigned units if available, otherwise fall back to user unit
     const assignedUnits = userAssignedUnits.length > 0
@@ -78,9 +65,20 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
 
     if (assignedUnits.length === 0) return [];
 
-    return assignedUnits.map(assignedUnit => ({
+    // Sort assigned units by name for stable display order
+    const sortedAssigned = [...assignedUnits].sort((a, b) =>
+      (a.Name || a.name || '').localeCompare(b.Name || b.name || '')
+    );
+
+    return sortedAssigned.map(assignedUnit => ({
       unit: assignedUnit,
-      children: allUnits.filter(u => u.Parent_id === assignedUnit.id),
+      // Sort child units by name as well
+      children: allUnits
+        .filter(u => u.Parent_id === assignedUnit.id)
+        .slice()
+        .sort((a, b) =>
+          (a.Name || a.name || '').localeCompare(b.Name || b.name || '')
+        ),
     }));
   }, [userAssignedUnits, userUnit, allUnits]);
 
@@ -129,7 +127,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
           color={isSelected ? (isDark ? '#FFB30F' : COLORS.primary) : (isDark ? '#888' : '#999')}
         />
         <View style={styles.unitRowTextContainer}>
-          <Text
+          <UrduText
             style={[
               styles.unitRowText,
               isSelected && styles.unitRowTextSelected,
@@ -138,7 +136,7 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
             numberOfLines={2}
           >
             {formatUnitDisplay(unit)}
-          </Text>
+          </UrduText>
         </View>
       </TouchableOpacity>
     );
@@ -160,8 +158,8 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
             {/* Parent context (read-only) */}
             {parentUnit && (
               <View style={styles.fixedUnitContainer}>
-                <Text style={styles.fixedUnitLabel}>بالائی یونٹ</Text>
-                <Text style={styles.fixedUnitText}>{formatUnitDisplay(parentUnit)}</Text>
+                <UrduText style={styles.fixedUnitLabel}>بالائی یونٹ</UrduText>
+                <UrduText style={styles.fixedUnitText}>{formatUnitDisplay(parentUnit)}</UrduText>
               </View>
             )}
 
@@ -169,8 +167,8 @@ const UnitSelectionModal = memo(({ visible, onClose, isRtl, colorScheme }: UnitS
               // Leaf-only: show read-only current unit
               <>
                 <View style={styles.fixedUnitContainer}>
-                  <Text style={styles.fixedUnitLabel}>موجودہ یونٹ</Text>
-                  <Text style={styles.fixedUnitText}>{formatUnitDisplay(groupedUnits[0]?.unit)}</Text>
+                  <UrduText style={styles.fixedUnitLabel}>موجودہ یونٹ</UrduText>
+                  <UrduText style={styles.fixedUnitText}>{formatUnitDisplay(groupedUnits[0]?.unit)}</UrduText>
                 </View>
                 <View style={styles.infoContainer}>
                   <UrduText style={styles.infoText}>
@@ -260,8 +258,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
     modalTitle: {
       color: isDark ? COLORS.white : COLORS.primary,
       fontSize: 24,
-      fontWeight: 'bold',
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     closeButton: {
       padding: 5,
@@ -279,15 +276,13 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     fixedUnitLabel: {
       color: isDark ? '#FFB30F' : '#666666',
-      fontSize: 12,
-      fontWeight: 'bold',
+      fontSize: 14,
       marginBottom: 5,
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     fixedUnitText: {
       color: isDark ? COLORS.white : COLORS.black,
       fontSize: 16,
-      fontWeight: '500',
       fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     unitListScroll: {
@@ -319,7 +314,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
     },
     unitRowTextSelected: {
       color: isDark ? '#FFB30F' : COLORS.primary,
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     unitRowTextChild: {
       fontSize: 15,
@@ -366,12 +361,12 @@ const getStyles = (colorScheme: string | null | undefined) => {
     confirmTextStyle: {
       color: COLORS.white,
       fontSize: 16,
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     cancelTextStyle: {
       color: isDark ? COLORS.white : COLORS.black,
       fontSize: 16,
-      fontFamily: TYPOGRAPHY.fontFamily.bold,
+      fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
   });
 };

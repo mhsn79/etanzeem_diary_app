@@ -18,6 +18,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../store';
 import { logout } from '@/app/features/auth/authSlice';
+import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
 import { selectUserDetails } from '../features/persons/personSlice';
 import { useAppDispatch } from '../../src/hooks/useAppDispatch';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
@@ -31,18 +32,10 @@ interface Option {
 export default function UnitSelection() {
   const dispatch = useAppDispatch();
 
-  // Helper function to format unit name with description
-  const formatUnitName = (unit: any) => {
-    const name = unit.Name || unit.name || '';
-    const description = unit.Description || unit.description || '';
-    
-    // If description exists and is different from name, append it
-    if (description && description !== name) {
-      return `${name} (${description})`;
-    }
-    
-    return name;
-  };
+  // Use the shared display template — because each dropdown on this screen
+  // is already scoped to a single level, we intentionally pass no level_name
+  // (the formatter will just produce "{Name}{ - Description}").
+  const formatUnitName = (unit: any) => formatUnitDisplay(unit);
 
   // State for dropdown options and selections
   const [districtOptions, setDistrictOptions] = useState<Option[]>([]);

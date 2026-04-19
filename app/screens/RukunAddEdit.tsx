@@ -61,6 +61,7 @@ import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
 import UrduText from '@/app/components/UrduText';
 import TransferRukunModal from '@/app/components/TransferRukunModal';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../constants/theme';
+import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 type RukunAddEditRouteProp = RouteProp<RootStackParamList, 'screens/RukunAddEdit'>;
@@ -94,17 +95,10 @@ export default function RukunAddEdit() {
   const userUnit = useSelector(selectUserUnitDetails);
   const levelsById = useSelector(selectLevelsById);
   const currentUnitId = selectedUnitId || userUnit?.id;
-  const currentUnitName = useMemo(() => {
-    const unit = dashboardSelectedUnit || userUnit;
-    if (!unit) return '';
-    const unitName = unit.Name || unit.name || '';
-    const levelId = unit.Level_id || unit.level_id;
-    if (levelId && levelsById[levelId]) {
-      const levelName = levelsById[levelId].Name || levelsById[levelId].name || '';
-      if (levelName) return `${levelName}: ${unitName}`;
-    }
-    return unitName;
-  }, [dashboardSelectedUnit, userUnit, levelsById]);
+  const currentUnitName = useMemo(
+    () => formatUnitDisplay(dashboardSelectedUnit || userUnit, levelsById),
+    [dashboardSelectedUnit, userUnit, levelsById]
+  );
 
   // Transfer status
   const transferStatus = useSelector(selectTransferStatus);

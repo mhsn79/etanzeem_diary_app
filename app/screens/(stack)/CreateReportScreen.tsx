@@ -33,6 +33,7 @@ import {
   selectBatchFillProgress,
 } from '@/app/features/qa/qaSlice';
 import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/app/features/tanzeem/tanzeemSlice';
+import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
 import { selectManagementReportsList } from '@/app/features/reports/reportsSlice';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import SectionList from '@/app/components/SectionList';
@@ -69,18 +70,8 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
   const unitId = fromRouter ? (params.unitId ? Number(params.unitId) : null) : (initialParamsProp?.unitId ?? null);
   const mode = (fromRouter ? params.mode : initialParamsProp?.mode) as 'view' | 'edit' | undefined;
   
-  // Helper function to format unit name with description
-  const formatUnitName = (unit: any) => {
-    const name = unit.Name || unit.name || '';
-    const description = unit.Description || unit.description || '';
-    
-    // If description exists and is different from name, append it
-    if (description && description !== name) {
-      return `${name} (${description})`;
-    }
-    
-    return name;
-  };
+  // Unit display is centralized in @/app/utils/formatUnitDisplay — see `unitName`
+  // memoization below.
 
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
@@ -137,16 +128,15 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
     currentSubmissionId ? selectAnswersBySubmissionId(state, currentSubmissionId) : []
   );
 
-  // Memoized values
-  const unitName = useMemo(() => {
-    if (!userUnitDetails?.Name) return '';
-    
-    // Get level name if available
-    const levelName = userTanzeemiLevelDetails?.Name || '';
-    
-    // Format: "Level Name: Unit Name" or just "Unit Name" if no level
-    return levelName ? `${levelName}: ${formatUnitName(userUnitDetails)}` : formatUnitName(userUnitDetails);
-  }, [userUnitDetails?.Name, userTanzeemiLevelDetails?.Name]);
+  // Memoized values — consistent app-wide "{Level} {Name}{ - Description}" format
+  const unitName = useMemo(
+    () =>
+      formatUnitDisplay({
+        ...userUnitDetails,
+        Level_Name: userTanzeemiLevelDetails?.Name,
+      }),
+    [userUnitDetails, userTanzeemiLevelDetails?.Name]
+  );
   // Function to fetch management details if not available in state
   const fetchManagementDetails = useCallback(async (mgmtId: number) => {
     try {

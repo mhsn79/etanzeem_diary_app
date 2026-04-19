@@ -346,52 +346,102 @@ export const login = createAsyncThunk<
         avatar: userData.data.avatar?.id
       } as User;
 
-      // Now fetch Tanzeemi_Unit using the user ID
+      // Now fetch Tanzeemi_Unit for the user.
+      //
+      // Primary source: the `Unit_User_Assignment` junction table (many-to-many).
+      // Fallback:       legacy single `Tanzeemi_Unit.user_id` column.
+      //
+      // This keeps older app builds working against new backend, and new builds
+      // working against old backend, until the data migration is fully rolled out.
       try {
-        authLogger.debug('Starting Tanzeemi_Unit fetch for user ID:', userId);
-        const tanzeemiData = await loginApiRequest<{ data: any[] }>(
-          `/items/Tanzeemi_Unit?filter[user_id][_eq]=${userId}&fields=*`,
-          'GET',
-          authResponse.access_token
-        );
-        
-        authLogger.debug('Tanzeemi_Unit data:', tanzeemiData);
-        
-        if (tanzeemiData.data && tanzeemiData.data.length > 0) {
-          const tanzeemiUnit = tanzeemiData.data[0];
+        authLogger.debug('Starting unit assignment fetch for user ID:', userId);
+
+        let assignedUnits: any[] = [];
+
+        // --- Primary path: junction table ---------------------------------
+        try {
+          const junctionData = await loginApiRequest<{ data: any[] }>(
+            `/items/Unit_User_Assignment?filter[User_id][_eq]=${userId}` +
+              `&fields=Tanzeemi_Unit_id.*&limit=-1`,
+            'GET',
+            authResponse.access_token
+          );
+          if (junctionData.data && junctionData.data.length > 0) {
+            assignedUnits = junctionData.data
+              .map((row) =>
+                typeof row.Tanzeemi_Unit_id === 'object'
+                  ? row.Tanzeemi_Unit_id
+                  : null
+              )
+              .filter((u) => u && typeof u.id === 'number');
+            authLogger.debug(
+              'Unit_User_Assignment: got',
+              assignedUnits.length,
+              'unit(s) from junction table'
+            );
+          }
+        } catch (junctionError: any) {
+          authLogger.debug(
+            'Unit_User_Assignment not available yet, falling back:',
+            junctionError?.message
+          );
+        }
+
+        // --- Legacy fallback: Tanzeemi_Unit.user_id -----------------------
+        if (assignedUnits.length === 0) {
+          const tanzeemiData = await loginApiRequest<{ data: any[] }>(
+            `/items/Tanzeemi_Unit?filter[user_id][_eq]=${userId}&fields=*`,
+            'GET',
+            authResponse.access_token
+          );
+          authLogger.debug('Legacy Tanzeemi_Unit data:', tanzeemiData);
+          assignedUnits = tanzeemiData.data || [];
+        }
+
+        if (assignedUnits.length > 0) {
+          const tanzeemiUnit = assignedUnits[0];
           const nazimId = tanzeemiUnit.Nazim_id;
-          
+
           // Note: The person slice will handle fetching the tanzeemi unit when it fetches person data
-          authLogger.debug('Found tanzeemi unit ID:', tanzeemiUnit.id);
-          
-          // Store Tanzeemi_Unit in tanzeem slice (primary unit for backward compat)
+          authLogger.debug('Found primary tanzeemi unit ID:', tanzeemiUnit.id);
+
+          // Store primary unit in tanzeem slice (backward compat)
           authLogger.debug('Dispatching setUserUnitDetails with unit:', tanzeemiUnit);
           dispatch(setUserUnitDetails(tanzeemiUnit));
           // Store ALL assigned units (multi-unit support)
-          authLogger.debug('Found', tanzeemiData.data.length, 'assigned unit(s) for user');
-          dispatch(setUserAssignedUnits(tanzeemiData.data));
+          authLogger.debug('Found', assignedUnits.length, 'assigned unit(s) for user');
+          dispatch(setUserAssignedUnits(assignedUnits));
 
+          // Fetch the logged-in user's own Person record (by User_id)
+          try {
+            const userPersonResponse = await loginApiRequest<{ data: any[] }>(
+              `/items/Person?filter[User_id][_eq]=${userId}&fields=*&limit=1`,
+              'GET',
+              authResponse.access_token
+            );
+
+            if (userPersonResponse.data && userPersonResponse.data.length > 0) {
+              authLogger.info('Logged-in user Person record fetched successfully');
+              dispatch(setUserDetails(userPersonResponse.data[0]));
+            }
+          } catch (personError: any) {
+            authLogger.warn('Failed to fetch logged-in user Person record:', personError.message);
+          }
+
+          // Fetch Nazim details separately (for unit display)
           if (nazimId) {
-            authLogger.debug('Found Nazim_id:', nazimId);
-            // Fetch Person record using Nazim_id and store as user details
-            authLogger.debug('Fetching Nazim details for Nazim_id:', nazimId);
             try {
               const nazimResponse = await loginApiRequest<{ data: any }>(
                 `/items/Person/${nazimId}?fields=*`,
                 'GET',
                 authResponse.access_token
               );
-              
+
               if (nazimResponse.data) {
-                authLogger.info('Nazim details fetched successfully:', nazimResponse.data);
-                // Set user details in person slice (this is the logged-in user's details)
-                dispatch(setUserDetails(nazimResponse.data));
-                // Also set as nazim details for consistency
                 dispatch(setNazimDetails(nazimResponse.data));
               }
             } catch (nazimError: any) {
-              authLogger.error('Failed to fetch Nazim details:', nazimError.message);
-              // Continue with login even if Nazim details can't be fetched
+              authLogger.warn('Failed to fetch Nazim details:', nazimError.message);
             }
           }
         } else {
@@ -1033,16 +1083,27 @@ export const initializeAuth = createAsyncThunk<
           dispatch(setUserAssignedUnits(tanzeemiData.data));
           dispatch(setLastUnitFetchAt(Date.now()));
 
+          // Fetch logged-in user's own Person record
+          try {
+            const userPersonResponse = await directApiRequest<{ data: any[] }>(
+              `/items/Person?filter[User_id][_eq]=${userId}&fields=*&limit=1`,
+              'GET'
+            );
+            if (userPersonResponse.data && userPersonResponse.data.length > 0) {
+              dispatch(setUserDetails(userPersonResponse.data[0]));
+            }
+          } catch (personError: any) {
+            authLogger.warn('Failed to fetch user Person record:', personError.message);
+          }
+
           if (nazimId) {
-            authLogger.debug('Found Nazim_id:', nazimId);
-            authLogger.debug('Dispatching fetchNazimDetails for Nazim_id:', nazimId);
             await dispatch(fetchNazimDetails(nazimId));
           }
         } else {
           authLogger.warn('No Tanzeemi_Unit found for user:', userId);
         }
       } catch (tanzeemiError: any) {
-        authLogger.error('Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
+        authLogger.warn('Failed to fetch Tanzeemi_Unit for user:', userId, tanzeemiError.message);
         // Continue without Tanzeemi_Unit data
       }
     } else {
