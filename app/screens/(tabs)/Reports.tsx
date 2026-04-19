@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import ReportsView from '../(stack)/components/ReportsView';
 import { OpenReportParams } from '../(stack)/components/ReportsView';
@@ -8,8 +8,8 @@ import {
   selectDashboardSelectedUnitId,
   selectUserUnitDetails
 } from '@/app/features/tanzeem/tanzeemSlice';
-import UrduText from '@/app/components/UrduText';
 import { COLORS } from '@/app/constants/theme';
+import NoUnitMessage from '@/app/components/NoUnitMessage';
 import { useRouter } from 'expo-router';
 import { ROUTES } from '@/app/constants/navigation';
 
@@ -40,12 +40,7 @@ const Reports: React.FC = () => {
   const displayUnitId = selectedUnitId || userUnit?.id;
 
   if (!displayUnitId) {
-    return (
-      <View style={styles.fallbackContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <UrduText style={styles.fallbackText}>یونٹ ڈیٹا لوڈ ہو رہا ہے...</UrduText>
-      </View>
-    );
+    return <NoUnitMessage />;
   }
 
   return (

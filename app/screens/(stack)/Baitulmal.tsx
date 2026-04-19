@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import BaitulmalCard from '../../components/BaitulmalCard';
 import { TabGroup } from '@/app/components/Tab';
 import UnitSelectorBar from '@/app/components/UnitSelectorBar';
+import NoUnitMessage from '@/app/components/NoUnitMessage';
 import Header from '../../components/Header';
 import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
 import { getUrduMonth } from '@/app/constants/urduLocalization';
@@ -265,6 +266,16 @@ export default function Baitulmal() {
           <View style={styles.center}>
             <Text style={styles.errorText}>{error || 'ریکارڈ لوڈ کرنے میں ناکامی'}</Text>
           </View>
+        </ScreenWrapper>
+      </ErrorBoundary>
+    );
+  }
+
+  if (!displayUnitId) {
+    return (
+      <ErrorBoundary>
+        <ScreenWrapper headerTitle="بیت المال" onBack={handleBack}>
+          <NoUnitMessage />
         </ScreenWrapper>
       </ErrorBoundary>
     );

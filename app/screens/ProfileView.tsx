@@ -1,12 +1,14 @@
 // app/screens/ProfileView.tsx
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   Text,
-  RefreshControl,
+  TouchableOpacity,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router } from 'expo-router';
@@ -14,8 +16,10 @@ import Constants from 'expo-constants';
 import { useDispatch, useSelector } from 'react-redux';
 
 import i18n from '../i18n';
-import { logout } from '@/app/features/auth/authSlice';
+import { logout, selectUser } from '@/app/features/auth/authSlice';
 import { AppDispatch } from '@/app/store/types';
+import { directApiRequest } from '@/app/services/apiClient';
+import { Ionicons } from '@expo/vector-icons';
 
 // Import components
 import CustomButton from '@/app/components/CustomButton';
@@ -24,22 +28,13 @@ import ProfileHeader from '@/app/components/ProfileHeader';
 import { COMMON_IMAGES } from '@/app/constants/images';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../constants/theme';
 
-// Selectors for person data
+// Selectors for tanzeem data
 import {
-  selectUserDetails,
-  selectUserDetailsStatus,
-  selectUserDetailsError
-} from '@/app/features/persons/personSlice';
-
-// Selectors for tanzeem level data
-import {
-  selectUserTanzeemiLevelDetails,
-  selectUserTanzeemiLevelStatus,
-  selectUserTanzeemiLevelError,
   selectUserUnitDetails,
   selectLevelsById,
-  fetchUserTanzeemiUnit
+  selectUserAssignedUnits,
 } from '@/app/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/app/utils/formatUnitName';
 
 const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
@@ -86,147 +81,119 @@ export default function ProfileView() {
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation();
   
-  // Get user details from Redux store
-  const userDetails = useSelector(selectUserDetails);
-  const userDetailsStatus = useSelector(selectUserDetailsStatus);
-  const userDetailsError = useSelector(selectUserDetailsError);
-  
-  // Get tanzeem level details from Redux store
-  const tanzeemLevelDetails = useSelector(selectUserTanzeemiLevelDetails);
-  const tanzeemLevelStatus = useSelector(selectUserTanzeemiLevelStatus);
-  const tanzeemLevelError = useSelector(selectUserTanzeemiLevelError);
-  
-  // Get user unit details and levels from Redux store
+  // Directus user (logged-in user)
+  const authUser = useSelector(selectUser);
+
+  // Unit details for display
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const levelsById = useSelector(selectLevelsById);
-  
+
+  const assignedUnits = useSelector(selectUserAssignedUnits);
+
   // Local state
-  const [refreshing, setRefreshing] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [firstName, setFirstName] = useState(authUser?.first_name || '');
+  const [lastName, setLastName] = useState(authUser?.last_name || '');
+  const [savingName, setSavingName] = useState(false);
 
-  // Format date if available - only date format, no time
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return 'N/A';
+  const handleChangePassword = useCallback(async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert('غلطی', 'براہ کرم تمام خانے پر کریں');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('غلطی', 'نیا پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('غلطی', 'نیا پاس ورڈ اور تصدیقی پاس ورڈ مختلف ہیں');
+      return;
+    }
+    setChangingPassword(true);
     try {
-      const date = new Date(dateString);
-      // Use toLocaleDateString with options to ensure only date is shown, no time
-      return date.toLocaleDateString('ur-PK', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return dateString;
+      await directApiRequest(
+        '/users/me',
+        'PATCH',
+        JSON.stringify({ password: newPassword })
+      );
+      Alert.alert('کامیابی', 'پاس ورڈ تبدیل ہو گیا');
+      setShowChangePassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      Alert.alert('غلطی', 'پاس ورڈ تبدیل نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔');
+    } finally {
+      setChangingPassword(false);
     }
-  };
+  }, [newPassword, confirmPassword]);
 
-  // Extract user data from Person collection
-  const displayData = useMemo(() => {
-    if (!userDetails) return {};
-
-    // Format unit with level, name, and description
-    let formattedUnit = '';
-    if (userUnitDetails) {
-      const unitName = userUnitDetails.Name || '';
-      const unitDescription = userUnitDetails.Description || '';
-      const unitLevelId = userUnitDetails.Level_id;
-      
-      // Get level name if available
-      let unitLevelName = '';
-      if (unitLevelId && levelsById[unitLevelId]) {
-        unitLevelName = levelsById[unitLevelId].Name || '';
-      }
-      
-      // Build formatted unit string: "Level Name: Unit Name - Unit Description"
-      if (unitLevelName && unitName) {
-        formattedUnit = `${unitLevelName}: ${unitName}`;
-      } else if (unitName) {
-        formattedUnit = unitName;
-      }
-      
-      // Append description if available
-      if (unitDescription && unitDescription.trim()) {
-        formattedUnit += formattedUnit ? ` - ${unitDescription}` : unitDescription;
-      }
+  // Format unit display
+  const formattedUnit = useMemo(() => {
+    if (!userUnitDetails) return '';
+    const unitName = userUnitDetails.Name || '';
+    const unitLevelId = userUnitDetails.Level_id;
+    let levelName = '';
+    if (unitLevelId && levelsById[unitLevelId]) {
+      levelName = levelsById[unitLevelId].Name || '';
     }
+    return levelName ? `${levelName}: ${unitName}` : unitName;
+  }, [userUnitDetails, levelsById]);
 
-    return {
-      id: userDetails.id,
-      name: userDetails.Name || userDetails.name,
-      address: userDetails.Address || userDetails.address,
-      phone: userDetails.Phone_Number || userDetails.phone,
-      whatsApp: userDetails.additional_phones,
-      picture: userDetails.picture,
-      parent: userDetails.Father_Name || userDetails.parent,
-      dob: formatDate(userDetails.Date_of_birth || userDetails.dob),
-      cnic: userDetails.CNIC || userDetails.cnic,
-      unit: formattedUnit || (userDetails.Tanzeemi_Unit?.toString() || userDetails.unit?.toString()),
-      status: userDetails.status,
-      email: userDetails.Email || userDetails.email,
-      role: userDetails.role,
-    };
-  }, [userDetails, userUnitDetails, levelsById]);
-
-  // Refresh user details
-  const refreshUserDetails = async () => {
-    if (userDetails?.email || userDetails?.Email) {
-      setRefreshing(true);
-      try {
-        // If user has a Tanzeemi unit, fetch it (which will also fetch the Tanzeem level)
-        if (userDetails.Tanzeemi_Unit || userDetails.unit) {
-          const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
-          if (typeof unitId === 'number') {
-            await dispatch(fetchUserTanzeemiUnit(unitId)).unwrap();
-          }
-        }
-      } catch (error) {
-        console.error('Error refreshing user details:', error);
-      } finally {
-        setRefreshing(false);
-      }
+  // Save name
+  const handleSaveName = useCallback(async () => {
+    if (!firstName.trim() && !lastName.trim()) return;
+    setSavingName(true);
+    try {
+      await directApiRequest(
+        '/users/me',
+        'PATCH',
+        JSON.stringify({ first_name: firstName.trim(), last_name: lastName.trim() })
+      );
+      Alert.alert('کامیابی', 'نام تبدیل ہو گیا');
+      setEditingName(false);
+    } catch {
+      Alert.alert('غلطی', 'نام تبدیل نہیں ہو سکا');
+    } finally {
+      setSavingName(false);
     }
-  };
+  }, [firstName, lastName]);
 
   // Handle logout
   const handleLogout = () => {
     dispatch(logout())
-      .then(() => {
-        router.replace('/screens/LoginScreen');
-      })
-      .catch((err) => {
-        console.error('Error during logout:', err);
-        router.replace('/screens/LoginScreen');
-      });
+      .then(() => router.replace('/screens/LoginScreen'))
+      .catch(() => router.replace('/screens/LoginScreen'));
   };
-  
+
   // Hide header on focus
   useFocusEffect(() => {
     navigation.setOptions({ headerShown: false });
   });
-  
-  // Fetch Tanzeemi unit when component mounts
-  useEffect(() => {
-    if (userDetails && (userDetails.Tanzeemi_Unit || userDetails.unit)) {
-      const unitId = userDetails.Tanzeemi_Unit || userDetails.unit;
-      if (typeof unitId === 'number') {
-        dispatch(fetchUserTanzeemiUnit(unitId));
-      }
-    }
-  }, [userDetails?.id, userDetails?.Tanzeemi_Unit, userDetails?.unit]);
 
-  // Show loading indicator when initially loading
-  if (userDetailsStatus === 'loading' && !refreshing && !userDetails) {
+  // Sync name fields when authUser changes
+  useEffect(() => {
+    if (authUser) {
+      setFirstName(authUser.first_name || '');
+      setLastName(authUser.last_name || '');
+    }
+  }, [authUser?.first_name, authUser?.last_name]);
+
+  if (!authUser) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>{i18n.t('loading_profile')}</Text>
       </View>
     );
   }
 
+  const displayName = [authUser.first_name, authUser.last_name].filter(Boolean).join(' ') || authUser.email;
+
   return (
     <View style={styles.root}>
-      {/*──────────── Header (wave + avatar) ────────────*/}
       <ProfileHeader
         title={i18n.t('profile')}
         backgroundSource={COMMON_IMAGES.profileBackground}
@@ -235,28 +202,116 @@ export default function ProfileView() {
         headerHeight={160}
       />
 
-      {/*──────────── Content ────────────*/}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollWrapper}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshUserDetails}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-          />
-        }
       >
-        <UrduText style={styles.personName}>{displayData.name || ''}</UrduText>
+        <UrduText style={styles.personName}>{displayName}</UrduText>
 
-        {displayData.parent && <InfoRow label={i18n.t('parent')} value={displayData.parent} />}
-        {displayData.phone && <InfoRow label={i18n.t('phone_number')} value={displayData.phone} />}
-        {displayData.whatsApp && <InfoRow label={i18n.t('whatsapp_number')} value={displayData.whatsApp} />}
-        {displayData.email && <InfoRow label={i18n.t('email')} value={displayData.email} />}
-        {displayData.address && <InfoRow label={i18n.t('address')} value={displayData.address} />}
-        {displayData.unit && <InfoRow label={i18n.t('unit')} value={displayData.unit} />}
+        <InfoRow label="ای میل" value={authUser.email} />
+        {formattedUnit ? <InfoRow label="یونٹ" value={formattedUnit} /> : null}
+
+        {/* Assigned units list */}
+        {assignedUnits.length > 0 && (
+          <View style={styles.assignedUnitsContainer}>
+            <UrduText style={styles.assignedUnitsLabel}>تفویض شدہ یونٹس</UrduText>
+            {assignedUnits.map(unit => {
+              const levelId = unit.Level_id || unit.level_id;
+              const levelName = levelId && levelsById[levelId] ? levelsById[levelId].Name || '' : '';
+              const unitName = formatUnitName(unit);
+              return (
+                <View key={unit.id} style={styles.assignedUnitRow}>
+                  <Ionicons name="business-outline" size={16} color={COLORS.primary} />
+                  <UrduText style={styles.assignedUnitText}>
+                    {levelName ? `${levelName}: ${unitName}` : unitName}
+                  </UrduText>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* TODO: Edit name section (commented out for now)
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setEditingName(!editingName)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+            <UrduText style={styles.actionButtonText}>نام میں ترمیم</UrduText>
+          </TouchableOpacity>
+        </View>
+
+        {editingName && (
+          <View style={styles.changePasswordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="پہلا نام"
+              placeholderTextColor={COLORS.textSecondary}
+              textAlign="right"
+            />
+            <TextInput
+              style={styles.passwordInput}
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="آخری نام"
+              placeholderTextColor={COLORS.textSecondary}
+              textAlign="right"
+            />
+            <CustomButton
+              text={savingName ? 'محفوظ ہو رہا ہے...' : 'نام محفوظ کریں'}
+              onPress={handleSaveName}
+              viewStyle={styles.changePasswordBtn}
+              disabled={savingName}
+            />
+          </View>
+        )}
+        */}
+
+        {/* Change password section */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowChangePassword(!showChangePassword)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} />
+            <UrduText style={styles.actionButtonText}>پاس ورڈ تبدیل کریں</UrduText>
+          </TouchableOpacity>
+        </View>
+
+        {showChangePassword && (
+          <View style={styles.changePasswordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="نیا پاس ورڈ"
+              placeholderTextColor={COLORS.textSecondary}
+              secureTextEntry
+              textAlign="right"
+            />
+            <TextInput
+              style={styles.passwordInput}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="نیا پاس ورڈ دوبارہ"
+              placeholderTextColor={COLORS.textSecondary}
+              secureTextEntry
+              textAlign="right"
+            />
+            <CustomButton
+              text={changingPassword ? 'تبدیل ہو رہا ہے...' : 'پاس ورڈ تبدیل کریں'}
+              onPress={handleChangePassword}
+              viewStyle={styles.changePasswordBtn}
+              disabled={changingPassword}
+            />
+          </View>
+        )}
 
         <View style={styles.logoutContainer}>
           <CustomButton
@@ -328,5 +383,68 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: 'center',
     fontFamily: 'JameelNooriNastaleeq',
+  },
+  actionButtonsContainer: {
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.lightGray,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  actionButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.primary,
+  },
+  changePasswordContainer: {
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  passwordInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.black,
+    textAlign: 'right',
+    fontFamily: 'JameelNooriNastaleeq',
+  },
+  changePasswordBtn: {
+    backgroundColor: COLORS.primary,
+  },
+  assignedUnitsContainer: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+  },
+  assignedUnitsLabel: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+    textAlign: 'left',
+  },
+  assignedUnitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  assignedUnitText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontFamily: 'JameelNooriNastaleeq',
+    color: COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'left',
   },
 });

@@ -44,6 +44,7 @@ import UnitSelectionModal from './components/UnitSelectionModal';
 import { formatUnitName } from '@/app/utils/formatUnitName';
 import SpeedDialFAB, { SpeedDialAction } from '@/app/components/SpeedDialFAB';
 import ActivityTypePicker from '@/app/components/ActivityTypePicker';
+import NoUnitMessage from '@/app/components/NoUnitMessage';
 import BaitulmalTypePicker from '@/app/components/BaitulmalTypePicker';
 
 // Theme-aligned button colors (primary, tertiary, orange, accent)
@@ -259,6 +260,15 @@ const Dashboard = () => {
     ],
     [navigation, router, umeedwarContactTypeId, karkunContactTypeId]
   );
+
+  if (!displayUnit && !userUnit) {
+    return (
+      <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={Platform.OS === 'android'} />
+        <NoUnitMessage />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeAreaContainer} edges={['left', 'right', 'bottom']}>

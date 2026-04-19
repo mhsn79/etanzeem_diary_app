@@ -38,6 +38,7 @@ import { COMMON_IMAGES } from '@/app/constants/images';
 import { TabGroup } from '@/app/components/Tab';
 import ReportCard from './ReportCard';
 import UnitSelectorBar from '@/app/components/UnitSelectorBar';
+import NoUnitMessage from '@/app/components/NoUnitMessage';
 import { logout } from '@/app/features/auth/authSlice';
 import {
   initializeReportData,
@@ -768,26 +769,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       )
     : 0;
 
-  // Keep a visible fallback state while unit context is restoring after navigation.
   if (!displayUnitId) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <UrduText style={styles.loadingText}>یونٹ ڈیٹا بحال ہو رہا ہے...</UrduText>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            refreshTokenIfNeeded()
-              .then(() => fetchAllData(true))
-              .catch((retryError) => {
-                console.error('[ReportsView] Retry failed while unit context missing:', retryError);
-              });
-          }}
-        >
-          <UrduText style={styles.retryButtonText}>دوبارہ کوشش کریں</UrduText>
-        </TouchableOpacity>
-      </View>
-    );
+    return <NoUnitMessage />;
   }
 
   // Render loading state

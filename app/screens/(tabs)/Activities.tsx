@@ -42,6 +42,7 @@ import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import ActivityTypePicker from '../../components/ActivityTypePicker';
 import { selectActivityTypeEntities } from '@/app/features/activityTypes/activityTypesSlice';
 import UnitSelectorBar from '../../components/UnitSelectorBar';
+import NoUnitMessage from '../../components/NoUnitMessage';
 
 // Reusable component to wrap content with consistent status bar and background
 interface ScreenWrapperProps {
@@ -455,6 +456,17 @@ export default function Activities() {
           <View style={styles.center}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
+        </ScreenWrapper>
+      </ErrorBoundary>
+    );
+  }
+
+  // No unit assigned
+  if (!displayUnitId) {
+    return (
+      <ErrorBoundary>
+        <ScreenWrapper headerTitle="سرگرمیاں" onBack={() => {}} showBack={false}>
+          <NoUnitMessage />
         </ScreenWrapper>
       </ErrorBoundary>
     );

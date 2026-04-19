@@ -33,6 +33,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, router, useLocalSearchParams } from 'expo-router';
 import { TabGroup } from '@/app/components/Tab';
 import UnitSelectorBar from '@/app/components/UnitSelectorBar';
+import NoUnitMessage from '@/app/components/NoUnitMessage';
 import { selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -262,6 +263,15 @@ export default function Arkan() {
       contactTypeLabel 
     });
   }, [navigation, getContactTypeLabel]);
+
+  // No unit assigned
+  if (!displayUnitId) {
+    return (
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <NoUnitMessage />
+      </SafeAreaView>
+    );
+  }
 
   // Render loading state
   if ((status === 'loading' || contactTypesStatus === 'loading') && !refreshing) {

@@ -26,6 +26,7 @@ import { Vibration } from 'react-native';
 
 // SVG Icons
 import UnitSelectorBar from '../components/UnitSelectorBar';
+import NoUnitMessage from '../components/NoUnitMessage';
 import EditIcon from '../../assets/images/edit-icon.svg';
 import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
 
@@ -732,6 +733,15 @@ export default function Workforce() {
       router.push('/screens/(tabs)/Arkan');
     }
   }, [router]);
+
+  // No unit assigned
+  if (!displayUnitId) {
+    return (
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <NoUnitMessage />
+      </SafeAreaView>
+    );
+  }
 
   // Render loading state
   if ((status === 'loading' || contactTypesStatus === 'loading') && !modalVisible) {
