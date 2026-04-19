@@ -43,3 +43,4 @@ yarn-error.*
 app-example
 __pycache__/
 *.log
+fastlane/*.json

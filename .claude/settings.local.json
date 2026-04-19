@@ -9,7 +9,18 @@
       "Bash(wc -l /Users/mohsinsiddiqui/src/mhsn79/E-Tanzeem/src/etanzeem_diary_app/app/screens/\\\\\\(stack\\\\\\)/ActivityScreen.tsx)",
       "Bash(du -sh /Users/mohsinsiddiqui/src/mhsn79/E-Tanzeem/src/etanzeem_diary_app/node_modules/*)",
       "Bash(adb devices -l)",
-      "Bash(unzip -l android/app/build/outputs/apk/release/app-release.apk)"
+      "Bash(unzip -l android/app/build/outputs/apk/release/app-release.apk)",
+      "Bash(adb install:*)",
+      "Bash(firebase --version)",
+      "Bash(gem list:*)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(adb shell:*)",
+      "Bash(./gradlew assembleRelease)",
+      "Bash(fastlane android:*)",
+      "Bash(./gradlew bundleRelease)",
+      "Bash(adb devices:*)",
+      "Bash(emulator -avd Pixel_7_API_33 -no-snapshot-load)",
+      "Bash(adb wait-for-device:*)"
     ]
   }
 }
