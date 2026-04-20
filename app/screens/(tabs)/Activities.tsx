@@ -420,7 +420,7 @@ export default function Activities() {
   const handleCompletionSubmit = useCallback(async () => {
     if (!completionTarget) return;
     if (!completionActivityTypeId) {
-      Alert.alert('غلطی', 'براہ کرم سرگرمی کی قسم منتخب کریں');
+      Alert.alert('غلطی', 'شائع کرنے سے پہلے سرگرمی کی قسم منتخب کریں۔');
       return;
     }
     if (!attendanceValue.trim()) {
@@ -537,7 +537,7 @@ export default function Activities() {
               </Text>
               {permissionDenied && (
                 <Text style={[styles.emptyText, { fontSize: 13, marginTop: SPACING.sm }]}>
-                  اس یونٹ کی سرگرمیاں دیکھنے کی اجازت نہیں ہے۔ براہ کرم ایڈمن سے رابطہ کریں۔
+                  آپ کو اس یونٹ کی سرگرمیاں دیکھنے کی اجازت نہیں ہے۔ اپنی مجاز یونٹس پر سوئچ کریں یا ایڈمن سے رابطہ کریں۔
                 </Text>
               )}
             </>

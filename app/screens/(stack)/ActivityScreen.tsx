@@ -681,13 +681,13 @@ const ActivityScreen = () => {
 
   const validateForm = () => {
     if (!selectedActivityDate) {
-      return 'براہ کرم تاریخ اور وقت منتخب کریں۔';
+      return 'تاریخ اور وقت منتخب کریں۔';
     }
     if (!activityDetails.activityType) {
-      return 'براہ کرم سرگرمی کی قسم منتخب کریں۔';
+      return 'شائع کرنے سے پہلے سرگرمی کی قسم منتخب کریں۔';
     }
     if (!activityDetails.tanzeemiUnit) {
-      return 'براہ کرم تنظیمی یونٹ منتخب کریں۔';
+      return 'تنظیمی یونٹ منتخب کریں۔';
     }
     if (!activityDetails.location) {
       return 'براہ کرم جگہ منتخب کریں۔';
