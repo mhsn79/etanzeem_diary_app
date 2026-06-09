@@ -53,6 +53,9 @@ export interface ReportData {
 export interface ReportsState {
   reports: Record<number, ReportData>;
   reportSubmissions: ReportSubmission[];
+  // Submissions for the current window, kept separate so the موجودہ رپورٹ card stays
+  // pinned to the live/open report while the past list browses older windows.
+  currentReportSubmissions: ReportSubmission[];
   loading: boolean;
   reportSubmissionsLoading: boolean;
   error: string | null;
@@ -63,6 +66,7 @@ export interface ReportsState {
 const initialState: ReportsState = {
   reports: {},
   reportSubmissions: [],
+  currentReportSubmissions: [],
   loading: false,
   reportSubmissionsLoading: false,
   error: null,
@@ -95,50 +99,110 @@ const normalizeResponse = <T>(response: T | { data: T }, entity: string): T => {
 };
 
 // Async thunks: fetch submissions for logged-in user's unit and all units in hierarchy below it
+// Absolute month index helper (year * 12 + zero-based month) so a rolling window
+// can be expressed as a simple inclusive [monthFrom, monthTo] range.
+const managementMonthIndex = (mgmt: ReportManagement): number =>
+  mgmt.year * 12 + (mgmt.month - 1);
+
+export type ReportWindowArg = { monthFrom?: number; monthTo?: number } | void;
+
+// Shared fetch used by both the current-report card and the (windowed) past list.
+// Pulls submissions for the user's unit + entire descendant hierarchy, optionally
+// scoped to a [monthFrom, monthTo] rolling window (resolved via management month).
+const fetchSubmissionsForRange = async (
+  state: RootState,
+  arg: ReportWindowArg,
+): Promise<ReportSubmission[]> => {
+  const { tanzeem } = state;
+  const userUnitId = tanzeem?.userUnitDetails?.id;
+  const hierarchyIds = tanzeem?.userUnitHierarchyIds ?? [];
+  const unitIds = userUnitId != null
+    ? [...new Set([userUnitId, ...hierarchyIds])]
+    : hierarchyIds.length ? hierarchyIds : (tanzeem?.ids ?? []);
+
+  if (!unitIds.length) {
+    return [];
+  }
+
+  const monthFrom = arg && typeof arg === 'object' ? arg.monthFrom : undefined;
+  const monthTo = arg && typeof arg === 'object' ? arg.monthTo : undefined;
+
+  const filterAnd: any[] = [
+    { unit_id: { _in: unitIds } },
+    { status: { _neq: 'archived' } },
+  ];
+
+  // Scope to a rolling reporting window when requested. reports_submissions has no
+  // month/year column, so resolve the management-period ids whose month falls in the
+  // [monthFrom, monthTo] range from already-loaded reports state and filter on mgmt_id.
+  // This keeps the list bounded as submissions accumulate over time.
+  if (monthFrom != null && monthTo != null) {
+    const mgmtIdsForWindow = Object.values(state.reports.reports)
+      .flatMap((report) => report.managements)
+      .filter((mgmt) => {
+        const idx = managementMonthIndex(mgmt);
+        return idx >= monthFrom && idx <= monthTo;
+      })
+      .map((mgmt) => mgmt.id);
+    if (mgmtIdsForWindow.length === 0) {
+      return []; // no reporting periods exist in this window yet
+    }
+    filterAnd.push({ mgmt_id: { _in: mgmtIdsForWindow } });
+  }
+
+  const params = {
+    filter: { _and: filterAnd },
+    // A zone pulls submissions for its entire descendant hierarchy, which can
+    // exceed Directus's default 100-row cap. Without limit: -1 the response is
+    // truncated; combined with ascending id sort the newest (current month)
+    // report falls outside the window and disappears from the screen.
+    sort: '-id',
+    limit: -1,
+  };
+
+  const response = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
+    path: '/items/reports_submissions',
+    method: 'GET',
+    params,
+  }));
+
+  const data = normalizeResponse<ReportSubmission[]>(response, 'Report Submissions');
+  return data.map(submission => ({
+    ...submission,
+    unitDetails: tanzeem.entities?.[submission.unit_id] ?? null,
+  }));
+};
+
+// Past/history list — scoped to the currently selected rolling window.
 export const fetchReportSubmissions = createAsyncThunk<
   ReportSubmission[],
-  void,
+  ReportWindowArg,
   { state: RootState; dispatch: AppDispatch; rejectValue: string }
->('reports/fetchReportSubmissions', async (_, { getState, rejectWithValue }) => {
+>('reports/fetchReportSubmissions', async (arg, { getState, rejectWithValue }) => {
   try {
     const state = getState();
     if (!state.auth.tokens?.accessToken) return [];
-
-    const { tanzeem } = state;
-    const userUnitId = tanzeem?.userUnitDetails?.id;
-    const hierarchyIds = tanzeem?.userUnitHierarchyIds ?? [];
-    const unitIds = userUnitId != null
-      ? [...new Set([userUnitId, ...hierarchyIds])]
-      : hierarchyIds.length ? hierarchyIds : (tanzeem?.ids ?? []);
-
-    if (!unitIds.length) {
-      return [];
-    }
-
-    const params = {
-      filter: {
-        _and: [
-          { unit_id: { _in: unitIds } },
-          { status: { _neq: 'archived' } }
-        ]
-      },
-      sort: 'id',
-    };
-
-    const response = await apiRequest<ReportSubmission[] | { data: ReportSubmission[] }>(() => ({
-      path: '/items/reports_submissions',
-      method: 'GET',
-      params,
-    }));
-
-    const data = normalizeResponse<ReportSubmission[]>(response, 'Report Submissions');
-    return data.map(submission => ({
-      ...submission,
-      unitDetails: tanzeem.entities?.[submission.unit_id] ?? null,
-    }));
+    return await fetchSubmissionsForRange(state, arg);
   } catch (error: any) {
     reduxLogger.error('Error in fetchReportSubmissions:', error);
     return rejectWithValue(error.message || 'Failed to fetch report submissions');
+  }
+});
+
+// Current report card — always fetches the current window (window 0) independent of the
+// list's window selection, so the live/open report stays pinned while browsing history.
+export const fetchCurrentReportSubmissions = createAsyncThunk<
+  ReportSubmission[],
+  ReportWindowArg,
+  { state: RootState; dispatch: AppDispatch; rejectValue: string }
+>('reports/fetchCurrentReportSubmissions', async (arg, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    if (!state.auth.tokens?.accessToken) return [];
+    return await fetchSubmissionsForRange(state, arg);
+  } catch (error: any) {
+    reduxLogger.error('Error in fetchCurrentReportSubmissions:', error);
+    return rejectWithValue(error.message || 'Failed to fetch current report submission');
   }
 });
 
@@ -220,6 +284,7 @@ const reportsSlice = createSlice({
     },
     clearSubmissions: (state) => {
       state.reportSubmissions = [];
+      state.currentReportSubmissions = [];
       state.reportSubmissionsLoading = false;
       state.reportSubmissionsError = null;
     },
@@ -272,6 +337,9 @@ const reportsSlice = createSlice({
         state.reportSubmissionsLoading = false;
         state.reportSubmissions = action.payload;
       })
+      .addCase(fetchCurrentReportSubmissions.fulfilled, (state, action) => {
+        state.currentReportSubmissions = action.payload;
+      })
       .addCase(fetchReportSubmissions.rejected, (state, action) => {
         state.reportSubmissionsLoading = false;
         state.reportSubmissionsError = action.payload as string | null ?? 'Failed to fetch report submissions';
@@ -286,6 +354,7 @@ export const selectReportsLoading = (state: RootState) => state.reports.loading;
 export const selectReportsError = (state: RootState) => state.reports.error;
 export const selectAllReports = (state: RootState) => state.reports.reports;
 export const selectReportSubmissions = (state: RootState) => state.reports.reportSubmissions;
+export const selectCurrentReportSubmissions = (state: RootState) => state.reports.currentReportSubmissions;
 export const selectReportSubmissionsLoading = (state: RootState) => state.reports.reportSubmissionsLoading;
 export const selectReportSubmissionsError = (state: RootState) => state.reports.reportSubmissionsError;
 

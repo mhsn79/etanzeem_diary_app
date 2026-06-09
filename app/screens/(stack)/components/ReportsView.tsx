@@ -22,18 +22,21 @@ import {
   fetchReportsByUnitId,
   selectManagementReportsList,
   selectReportSubmissions,
+  selectCurrentReportSubmissions,
   selectReportsError,
   selectReportsLoading,
   fetchReportSubmissions,
+  fetchCurrentReportSubmissions,
 } from '@/app/features/reports/reportsSlice';
 import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
 import { AppDispatch } from '@/app/store/types';
-import { formatExpectedCompletion, getUrduMonth } from '@/app/constants/urduLocalization';
+import { toUrduDigits, formatExpectedCompletion, getUrduMonth } from '@/app/constants/urduLocalization';
 import { useTokenRefresh } from '@/app/utils/tokenRefresh';
 import { ROUTES } from '@/app/constants/navigation';
 import UrduText from '@/app/components/UrduText';
 import Header from '@/app/components/Header';
 import { BORDER_RADIUS, COLORS, SHADOWS, SIZES, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
+import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { COMMON_IMAGES } from '@/app/constants/images';
 import { TabGroup } from '@/app/components/Tab';
 import ReportCard from './ReportCard';
@@ -67,6 +70,9 @@ interface ReportsViewProps {
   /** When set, opening current report calls this instead of router (keeps flow inside Reports tab). */
   onOpenReport?: (params: OpenReportParams) => void;
 }
+
+// Size (in months) of each rolling window in the سابقہ رپورٹس year/period selector.
+const WINDOW_SIZE_MONTHS = 6;
 
 // Helper function to determine if a management period is currently open
 const isManagementPeriodOpen = (management: any): boolean => {
@@ -156,6 +162,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   
   // Track the latest submission ID to highlight it
   const [latestSubmissionId, setLatestSubmissionId] = useState<number | null>(null);
+
+  // Selected rolling window for the سابقہ رپورٹس list (0 = last 6 months, 1 = previous 6, …)
+  const [selectedWindow, setSelectedWindow] = useState<number>(0);
   
   // Animation value for highlighting new submissions
   const highlightAnim = useRef(new Animated.Value(0)).current;
@@ -186,6 +195,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   // Redux state
   const userUnitDetails = useSelector(selectUserUnitDetails);
   const reportSubmissions = useSelector(selectReportSubmissions) ?? [];
+  // Pinned current/open report — independent of the past list's window selection.
+  const currentReportSubmissions = useSelector(selectCurrentReportSubmissions) ?? [];
   const reportMgmtDetails = useSelector(selectManagementReportsList) ?? [];
   const loading = useSelector(selectReportsLoading);
   const error = useSelector(selectReportsError);
@@ -288,6 +299,51 @@ const ReportsView: React.FC<ReportsViewProps> = ({
   const currentlyOpenManagement = currentTemplateAndManagement.management;
   const currentTemplate = currentTemplateAndManagement.template;
 
+  // Rolling 6-month windows for the سابقہ رپورٹس list, anchored on the current month so
+  // window 0 (default) always contains the open report. Window k covers months
+  // [anchor - 6k - 5, anchor - 6k], expressed as absolute month indices (year*12 + month).
+  const anchorMonthIndex = useMemo(() => {
+    const now = new Date();
+    return now.getFullYear() * 12 + now.getMonth();
+  }, []);
+
+  const windowBounds = useCallback((offset: number) => {
+    const monthTo = anchorMonthIndex - offset * WINDOW_SIZE_MONTHS;
+    const monthFrom = monthTo - (WINDOW_SIZE_MONTHS - 1);
+    return { monthFrom, monthTo };
+  }, [anchorMonthIndex]);
+
+  // How many windows to expose, bounded by the earliest reporting period that exists.
+  const windowCount = useMemo(() => {
+    const managements = reportMgmtDetails.flatMap((r) => r.managements);
+    if (!managements.length) return 1;
+    const earliest = Math.min(
+      ...managements.map((m) => m.year * 12 + (m.month - 1))
+    );
+    return Math.max(1, Math.ceil((anchorMonthIndex - earliest + 1) / WINDOW_SIZE_MONTHS));
+  }, [reportMgmtDetails, anchorMonthIndex]);
+
+  const effectiveWindow = Math.min(selectedWindow, windowCount - 1);
+
+  // Human-readable chip label for a window (offset 0 = "گزشتہ ۶ ماہ", older = month range).
+  const formatWindowLabel = useCallback((offset: number) => {
+    if (offset === 0) return 'گزشتہ ۶ ماہ';
+    const { monthFrom, monthTo } = windowBounds(offset);
+    const fromYear = Math.floor(monthFrom / 12);
+    const fromMonth = (monthFrom % 12) + 1;
+    const toYear = Math.floor(monthTo / 12);
+    const toMonth = (monthTo % 12) + 1;
+    return fromYear === toYear
+      ? `${getUrduMonth(fromMonth)} – ${getUrduMonth(toMonth)} ${toUrduDigits(fromYear)}`
+      : `${getUrduMonth(fromMonth)} ${toUrduDigits(fromYear)} – ${getUrduMonth(toMonth)} ${toUrduDigits(toYear)}`;
+  }, [windowBounds]);
+
+  // Keep bounds in a ref so fetchAllData can read them without being recreated on change.
+  const effectiveBoundsRef = useRef(windowBounds(0));
+  useEffect(() => {
+    effectiveBoundsRef.current = windowBounds(effectiveWindow);
+  }, [effectiveWindow, windowBounds]);
+
   // Find existing submission for the selected unit (current management, else most recent)
   const existingSubmission = useMemo(() => {
     if (!displayUnitId) {
@@ -297,11 +353,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     
     // First try to find submission for current management if available
     if (currentlyOpenManagement) {
-      const existing = reportSubmissions.find(submission => 
+      const existing = currentReportSubmissions.find(submission =>
         submission.unit_id === displayUnitId &&
         submission.mgmt_id === currentlyOpenManagement.id
       );
-      
+
       if (existing) {
         console.log('[ReportsView] Found submission for current management:', {
           managementId: currentlyOpenManagement.id,
@@ -312,9 +368,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
         return existing;
       }
     }
-    
+
     // If no submission found for current management, find the most recent submission for this unit
-    const unitSubmissions = reportSubmissions.filter(submission => 
+    const unitSubmissions = currentReportSubmissions.filter(submission =>
       submission.unit_id === displayUnitId
     );
     
@@ -338,11 +394,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     
     console.log('[ReportsView] No submission found for unit:', {
       unitId: displayUnitId,
-      submissionsCount: reportSubmissions.length
+      submissionsCount: currentReportSubmissions.length
     });
-    
+
     return null;
-  }, [reportSubmissions.length, currentlyOpenManagement?.id, displayUnitId]);
+  }, [currentReportSubmissions, currentlyOpenManagement?.id, displayUnitId]);
 
   // Management and template for the selected submission (always use submission's own mgmt_id, never mix with open mgmt)
   const submissionManagementAndTemplate = useMemo(() => {
@@ -362,17 +418,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     
     // First try to find draft submission for current management if available
     if (currentlyOpenManagement) {
-      const draft = reportSubmissions.find(submission => 
+      const draft = currentReportSubmissions.find(submission =>
         submission.unit_id === displayUnitId &&
-        submission.mgmt_id === currentlyOpenManagement.id && 
+        submission.mgmt_id === currentlyOpenManagement.id &&
         (submission.status === 'draft' || submission.status === 'pending')
       );
-      
+
       if (draft) return draft;
     }
-    
+
     // If no draft found for current management, find the most recent draft for this unit
-    const unitDrafts = reportSubmissions.filter(submission => 
+    const unitDrafts = currentReportSubmissions.filter(submission =>
       submission.unit_id === displayUnitId &&
       (submission.status === 'draft' || submission.status === 'pending')
     );
@@ -387,7 +443,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     }
     
     return null;
-  }, [reportSubmissions.length, currentlyOpenManagement?.id, displayUnitId]);
+  }, [currentReportSubmissions, currentlyOpenManagement?.id, displayUnitId]);
 
 
 
@@ -404,6 +460,26 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     });
     return shouldShow;
   }, [existingSubmission?.id, displayUnitId]);
+
+  // Initialize QA data for the submission shown in the موجودہ رپورٹ card whenever it
+  // changes (e.g. on unit switch). This is what keeps the progress % in sync with the
+  // selected unit. Guarded on an existing submission so we never trigger initializeReportData
+  // for a unit with no report (which would reject and surface a full-screen error).
+  useEffect(() => {
+    if (
+      existingSubmission?.id &&
+      existingSubmission.template_id &&
+      existingSubmission.mgmt_id &&
+      existingSubmission.unit_id
+    ) {
+      dispatch(initializeReportData({
+        template_id: existingSubmission.template_id,
+        unit_id: existingSubmission.unit_id,
+        mgmt_id: existingSubmission.mgmt_id,
+        submission_id: existingSubmission.id,
+      }));
+    }
+  }, [existingSubmission?.id, dispatch]);
 
   // Memoized filtered submissions - exclude active submission from the list
   const filteredSubmissions = useMemo(() => {
@@ -440,7 +516,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       // Sort in descending order (newest start_date first)
       return startDateB - startDateA;
     });
-  }, [reportSubmissions.length, displayUnitId, existingSubmission?.id, reportMgmtDetails.length]);
+  }, [reportSubmissions, displayUnitId, existingSubmission?.id, reportMgmtDetails]);
 
   // Default back handler if none provided (defer to avoid Fabric viewState crash)
   const defaultBackHandler = useCallback(() => {
@@ -458,6 +534,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       router.push(ROUTES.ALL_REPORTS);
     });
   }, [router, refreshTokenIfNeeded]);
+
+  // Switch the سابقہ رپورٹس list to a different rolling window (refetches that window's submissions)
+  const handleWindowChange = useCallback((offset: number) => {
+    setSelectedWindow(offset);
+    ensureFreshTokenBeforeOperation()
+      .then(() => dispatch(fetchReportSubmissions(windowBounds(offset))))
+      .catch((err) => console.error('[ReportsView] Error fetching submissions for window:', offset, err));
+  }, [dispatch, ensureFreshTokenBeforeOperation, windowBounds]);
 
   const handleEdit = useCallback(() => {
     // Ensure we have a fresh token before navigation
@@ -557,63 +641,22 @@ const ReportsView: React.FC<ReportsViewProps> = ({
       
       // Step 1: Fetch reports data
       await dispatch(fetchReportsByUnitId(displayUnit.id));
-      
-      // Step 2: Fetch submissions
-      await dispatch(fetchReportSubmissions());
-      
-      // Step 3: Check if we need to initialize QA data
-      // Get current template and management from the updated state
-      const currentState = (dispatch as any).getState?.() || {};
-      const currentReportMgmtDetails = currentState.reports?.reports || [];
-      const currentSubmissions = currentState.reports?.reportSubmissions || [];
-      
-      // Find the current template and management
-      const currentTemplate = currentReportMgmtDetails.find((report: any) => 
-        report.template?.unit_level_id === displayUnit.Level_id
-      )?.template;
-      
-      const currentManagement = currentTemplate ? 
-        findCurrentlyOpenManagement(currentReportMgmtDetails.find((report: any) => 
-          report.template?.id === currentTemplate.id
-        )?.managements || []) : null;
-      
-      if (!currentTemplate?.id || !currentManagement) {
-        return;
-      }
-      
-      const templateId = currentTemplate.id;
-      const managementId = currentManagement.id;
-      
-      // Only initialize QA data if:
-      // 1. We're forcing a refresh, OR
-      // 2. We haven't initialized it yet, OR
-      // 3. The template or management ID has changed
-      if (
-        forceQARefresh || 
-        !qaInitializedRef.current || 
-        lastTemplateIdRef.current !== templateId ||
-        lastMgmtIdRef.current !== managementId
-      ) {
-        try {
-          await dispatch(initializeReportData({
-            template_id: templateId,
-            unit_id: displayUnit.id,
-            mgmt_id: managementId
-          }));
-          
-          // Update our refs to track that we've initialized QA data
-          qaInitializedRef.current = true;
-          lastTemplateIdRef.current = templateId;
-          lastMgmtIdRef.current = managementId;
-        } catch (qaError) {
-          console.error('[ReportsView] Error initializing QA data:', qaError);
-          // Don't rethrow - we want to continue even if QA initialization fails
-        }
-      }
+
+      // Step 2a: Current/open report for the موجودہ رپورٹ card — always the current window
+      // (window 0) so it stays pinned regardless of the past list's selected window.
+      await dispatch(fetchCurrentReportSubmissions(windowBounds(0)));
+
+      // Step 2b: Past list — scoped to the currently selected rolling window
+      await dispatch(fetchReportSubmissions(effectiveBoundsRef.current));
+
+      // QA data (used for the موجودہ رپورٹ progress %) is initialized reactively in a
+      // dedicated effect that watches the resolved submission — see below. It used to be
+      // done here, but relied on dispatch.getState() which is undefined on the store
+      // dispatch, so it never ran and the percentage went stale on unit switch.
     } catch (error) {
       console.error('[ReportsView] Error in fetchAllData:', error);
     }
-  }, [displayUnit?.id, displayUnit?.Level_id, dispatch, ensureFreshTokenBeforeOperation]);
+  }, [displayUnit?.id, displayUnit?.Level_id, dispatch, ensureFreshTokenBeforeOperation, windowBounds]);
 
 
 
@@ -1018,6 +1061,29 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
         <View style={styles.reportSection}>
           <UrduText style={styles.pastReportsTitle}>سابقہ رپورٹس</UrduText>
+          {windowCount > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.periodSelectorContent}
+            >
+              {Array.from({ length: windowCount }, (_, offset) => {
+                const isActive = offset === effectiveWindow;
+                return (
+                  <TouchableOpacity
+                    key={`window-${offset}`}
+                    style={[styles.periodChip, isActive && styles.periodChipActive]}
+                    onPress={() => handleWindowChange(offset)}
+                    activeOpacity={0.8}
+                  >
+                    <UrduText style={[styles.periodChipText, isActive && styles.periodChipTextActive]}>
+                      {formatWindowLabel(offset)}
+                    </UrduText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
 
         <View style={styles.reportContainer}>
@@ -1167,6 +1233,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     backgroundColor: COLORS.background,
+    // Clear the bottom tab bar so the last past-report card isn't clipped
+    paddingBottom: hp('12%'),
   },
   content: {
     backgroundColor: COLORS.primary,
@@ -1248,6 +1316,30 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: SPACING.sm,
     marginTop: SPACING.md,
+  },
+  periodSelectorContent: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xs,
+  },
+  periodChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.background,
+  },
+  periodChipActive: {
+    backgroundColor: COLORS.primary,
+  },
+  periodChipText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    color: COLORS.primary,
+  },
+  periodChipTextActive: {
+    color: COLORS.background,
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
