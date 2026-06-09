@@ -3,7 +3,7 @@
     "name": "e-tanzeem-diary",
     "slug": "e-tanzeem-diary",
     "owner": "jiislamabad",
-    "version": "1.0.7",
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "etanzeemdiary",
@@ -32,6 +32,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.jiislamabad.etanzeemdiaryapp",
+      "versionCode": 11,
       "googleServicesFile": "./google-services.json",
       "splash": {
         "image": "./assets/images/splash-icon.png",
