@@ -1248,6 +1248,7 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.lg,
     color: COLORS.background,
     textAlign: 'right',
+    width: '100%',
     writingDirection: 'rtl',
   },
   reportSummaryContainer: {
@@ -1308,6 +1309,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xxl,
     color: COLORS.black,
     textAlign: 'right',
+    width: '100%',
     writingDirection: 'rtl',
     marginBottom: SPACING.xs,
     marginLeft: SPACING.md,
