@@ -1245,7 +1245,7 @@ const styles = StyleSheet.create({
   },
   subTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxxl,
-    marginRight: SPACING.lg,
+    marginLeft: SPACING.lg,
     color: COLORS.background,
     textAlign: 'right',
     writingDirection: 'rtl',
@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
     marginBottom: SPACING.xs,
-    marginRight: SPACING.md,
+    marginLeft: SPACING.md,
   },
   reportSection: {
     backgroundColor: COLORS.background,

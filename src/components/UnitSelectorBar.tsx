@@ -52,7 +52,7 @@ const UnitSelectorBar: React.FC = () => {
         activeOpacity={hasMultipleUnits ? 0.7 : 1}
         disabled={!hasMultipleUnits}
       >
-        <UrduText style={styles.unitText}>
+        <UrduText style={styles.unitText} numberOfLines={1}>
           {(hasMultipleUnits ? '▼ ' : '') + (displayLabel || 'یونٹ')}
         </UrduText>
       </TouchableOpacity>
@@ -68,9 +68,10 @@ const UnitSelectorBar: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    // Full-width row: RTL flips it so the label hugs the right edge
-    // (textAlign:'right' alone is unreliable for this Text on Fabric/New Arch).
-    flexDirection: 'row',
+    // Container resolves to RTL layout, so the start edge is the right edge.
+    // alignItems:'flex-start' right-aligns the shrink-wrapped label — local fix,
+    // no global UrduText alignSelf / flexDirection:'row' hacks (those regressed others).
+    alignItems: 'flex-start',
     backgroundColor: COLORS.lightPrimary || '#E3F2FD',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,

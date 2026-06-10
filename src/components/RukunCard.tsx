@@ -98,9 +98,7 @@ const RukunCard: React.FC<RukunCardProps> = ({ item, onCardPress, contactTypes }
           style={styles.avatar}
         />
         <View style={styles.textContainer}>
-          <View style={styles.rowReverse}>
-            <UrduText style={styles.title}>{item.name || `Person #${item.id}`}</UrduText>
-          </View>
+          <UrduText style={styles.title}>{item.name || `Person #${item.id}`}</UrduText>
           <View style={styles.addressContainer}>
             <Image
               source={require('../../assets/images/location-icon-blue.png')}
@@ -203,13 +201,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: SPACING.sm,
   },
-  // Full-width row: RTL flips it so the single child hugs the right edge.
-  // (textAlign:'right' on a Text is unreliable inside a flex:1 column on Fabric;
-  // a full-width View + RTL row is deterministic.)
-  rowReverse: {
-    width: '100%',
-    flexDirection: 'row',
-  },
   title: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
@@ -223,7 +214,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   addressContainer: {
-    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
   },
