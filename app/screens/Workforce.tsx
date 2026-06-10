@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
   blueHeading: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     color: COLORS.primary,
-    textAlign:'left',
+    textAlign:'right',
     marginTop: SPACING.md,
     marginBottom: SPACING.sm
   },

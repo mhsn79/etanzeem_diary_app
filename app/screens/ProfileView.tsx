@@ -69,7 +69,7 @@ const infoRowStyles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'left',
+    textAlign: 'right',
     marginLeft: SPACING.sm,
   },
 });
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   assignedUnitRow: {
     flexDirection: 'row',
@@ -445,6 +445,6 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'left',
+    textAlign: 'right',
   },
 });

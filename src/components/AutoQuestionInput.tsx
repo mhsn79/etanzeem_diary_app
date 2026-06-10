@@ -1857,7 +1857,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    textAlign: 'left',
+    textAlign: 'right',
     flex: 1,
     marginLeft: SPACING.sm,
     writingDirection: 'rtl',
@@ -1986,7 +1986,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   activityDate: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -2030,7 +2030,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'left',
+    textAlign: 'right',
     writingDirection: 'rtl',
   },
   baitulmalNotes: {
@@ -2061,7 +2061,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'left',
+    textAlign: 'right',
     writingDirection: 'rtl',
   },
   statCardActions: {

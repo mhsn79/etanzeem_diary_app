@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: SPACING.md,
     color: COLORS.primary,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   buttonContainer: {
     position: 'absolute',

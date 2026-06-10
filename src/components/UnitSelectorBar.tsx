@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.primary,
-    textAlign: 'left',
+    textAlign: 'right',
   },
 });
 

@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'left',
+    textAlign: 'right',
     marginLeft: SPACING.sm,
   },
 

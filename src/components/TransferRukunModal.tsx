@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     marginRight: SPACING.xs,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   statusValue: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   currentUnit: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   transferTypeContainer: {
     marginBottom: SPACING.md,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily.bold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   dropdown: {
     marginBottom: SPACING.sm,

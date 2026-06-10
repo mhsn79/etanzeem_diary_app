@@ -1247,7 +1247,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xxxl,
     marginLeft: SPACING.lg,
     color: COLORS.background,
-    textAlign: 'left',
+    textAlign: 'right',
     writingDirection: 'rtl',
   },
   reportSummaryContainer: {
@@ -1260,7 +1260,7 @@ const styles = StyleSheet.create({
   reportSummaryItemTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     color: COLORS.primary,
-    textAlign: 'left',
+    textAlign: 'right',
     lineHeight: 40,
   },
   reportSummaryItemValue: {
@@ -1307,7 +1307,7 @@ const styles = StyleSheet.create({
   pastReportsTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     color: COLORS.black,
-    textAlign: 'left',
+    textAlign: 'right',
     writingDirection: 'rtl',
     marginBottom: SPACING.xs,
     marginLeft: SPACING.md,

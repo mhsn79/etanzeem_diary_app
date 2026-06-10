@@ -52,7 +52,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
     headerInfoText: {
       color: 'white',
       fontSize: 20,
-      textAlign: 'left',
+      textAlign: 'right',
       flex: 1,
     },
   });

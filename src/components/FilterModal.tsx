@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.xl,
     },
     sectionTitle: {
-        textAlign: 'left',
+        textAlign: 'right',
         fontSize: TYPOGRAPHY.fontSize.lg,
         fontFamily: TYPOGRAPHY.fontFamily.regular,
         color: COLORS.black,

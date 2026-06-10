@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
-    textAlign: 'left',
+    textAlign: 'right',
     width: '100%',
   },
   button: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   disabledText: {
     color: COLORS.textSecondary,

@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
   modalInfoUnit: {
     fontSize: TYPOGRAPHY?.fontSize?.sm || 14,
     color: COLORS.textSecondary,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   modalDropdown: {
     marginBottom: SPACING.md,
