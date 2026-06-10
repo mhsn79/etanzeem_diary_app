@@ -36,6 +36,7 @@ const styles = StyleSheet.create({
   urduText: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     writingDirection: 'rtl',
+    alignSelf: 'stretch',
     // New Architecture (RN 0.81) no longer auto-flips textAlign:'left' to the
     // start edge under RTL, so Urdu must be explicitly right-aligned.
     textAlign: 'right',
