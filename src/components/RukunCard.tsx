@@ -206,12 +206,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
     textAlign: 'right',
+    width: '100%',
     marginBottom: SPACING.xs,
   },
   detail: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
     textAlign: 'right',
+    width: '100%',
   },
   addressContainer: {
     flexDirection: 'row',

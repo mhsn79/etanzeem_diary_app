@@ -80,6 +80,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.primary,
     textAlign: 'right',
+    width: '100%',
   },
 });
 
