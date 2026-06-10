@@ -49,6 +49,7 @@ const styles = StyleSheet.create({
   inputField: {
     fontSize: 16,
     fontFamily: "JameelNooriNastaleeq",
+    color: "#1A1A1A",
     backgroundColor: "#F7F7F7",
     borderColor: "#EBEBEB",
     borderWidth: 1,

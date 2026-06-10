@@ -52,7 +52,7 @@ const UnitSelectorBar: React.FC = () => {
         activeOpacity={hasMultipleUnits ? 0.7 : 1}
         disabled={!hasMultipleUnits}
       >
-        <UrduText style={styles.unitText} numberOfLines={1}>
+        <UrduText style={styles.unitText}>
           {(hasMultipleUnits ? '▼ ' : '') + (displayLabel || 'یونٹ')}
         </UrduText>
       </TouchableOpacity>
@@ -80,7 +80,6 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.primary,
     textAlign: 'right',
-    width: '100%',
   },
 });
 

@@ -491,6 +491,8 @@ const getStyles = (
       color: COLORS.white,
       fontSize: 30,
       includeFontPadding: false,
+      textAlign: 'center',
+      alignSelf: 'center',
     },
     gridButtonText: {
       color: COLORS.white,

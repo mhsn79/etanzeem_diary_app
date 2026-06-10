@@ -311,6 +311,7 @@ const getStyles = (colorScheme: string | null | undefined) => {
       color: isDark ? COLORS.white : COLORS.black,
       fontSize: 16,
       fontFamily: TYPOGRAPHY.fontFamily.regular,
+      textAlign: 'right',
     },
     unitRowTextSelected: {
       color: isDark ? '#FFB30F' : COLORS.primary,

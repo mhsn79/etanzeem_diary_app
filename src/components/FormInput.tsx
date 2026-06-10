@@ -276,7 +276,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 35,
+    // Nastaliq glyphs are tall; height:35 + includeFontPadding:false clipped the
+    // top of the text. Give vertical room and keep Android font padding.
+    minHeight: 48,
+    paddingVertical: 6,
+    includeFontPadding: true,
+    textAlignVertical: 'center',
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamily.regular,
