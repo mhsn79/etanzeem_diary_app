@@ -1,10 +1,10 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import UrduText from '../components/UrduText';
+import UrduText from '@/src/components/UrduText';
 
 export default function Income() {
   const insets = useSafeAreaInsets();

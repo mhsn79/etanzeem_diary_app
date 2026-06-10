@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
-import TabBar from "@/app/components/TabBar";
-import AuthGuard from "@/app/components/AuthGuard";
+import TabBar from "@/src/components/TabBar";
+import AuthGuard from "@/src/components/AuthGuard";
 
 export default function TabLayout() {
   return (

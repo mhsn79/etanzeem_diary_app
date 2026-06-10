@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import ErrorBoundary from '../../components/ErrorBoundary';
+import ErrorBoundary from '@/src/components/ErrorBoundary';
 import {
   StyleSheet,
   View,
@@ -18,12 +18,12 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ActivityCard from '../../components/ActivityCard';
-import { TabGroup } from '@/app/components/Tab';
-import Header from '../../components/Header';
-import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
-import UrduText from '../../components/UrduText';
+import ActivityCard from '@/src/components/ActivityCard';
+import { TabGroup } from '@/src/components/Tab';
+import Header from '@/src/components/Header';
+import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
+import UrduText from '@/src/components/UrduText';
 import { useAppDispatch } from '@/src/hooks/useAppDispatch';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
 import {
@@ -34,15 +34,15 @@ import {
   selectActivitiesPermissionDenied,
   deleteActivity,
   editActivity,
-} from '@/app/features/activities/activitySlice';
-import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
-import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById, selectDashboardSelectedUnitId } from '@/app/features/tanzeem/tanzeemSlice';
-import { formatUnitName } from '@/app/utils/formatUnitName';
+} from '@/src/features/activities/activitySlice';
+import { selectUser as selectCurrentUser } from '@/src/features/auth/authSlice';
+import { selectUserUnitDetails, selectAllTanzeemiUnits, selectLevelsById, selectDashboardSelectedUnitId } from '@/src/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/src/utils/formatUnitName';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import ActivityTypePicker from '../../components/ActivityTypePicker';
-import { selectActivityTypeEntities } from '@/app/features/activityTypes/activityTypesSlice';
-import UnitSelectorBar from '../../components/UnitSelectorBar';
-import NoUnitMessage from '../../components/NoUnitMessage';
+import ActivityTypePicker from '@/src/components/ActivityTypePicker';
+import { selectActivityTypeEntities } from '@/src/features/activityTypes/activityTypesSlice';
+import UnitSelectorBar from '@/src/components/UnitSelectorBar';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
 
 // Reusable component to wrap content with consistent status bar and background
 interface ScreenWrapperProps {

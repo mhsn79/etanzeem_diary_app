@@ -15,26 +15,26 @@ import { useFocusEffect, useNavigation, router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useDispatch, useSelector } from 'react-redux';
 
-import i18n from '../i18n';
-import { logout, selectUser } from '@/app/features/auth/authSlice';
-import { AppDispatch } from '@/app/store/types';
-import { directApiRequest } from '@/app/services/apiClient';
+import i18n from '@/src/i18n';
+import { logout, selectUser } from '@/src/features/auth/authSlice';
+import { AppDispatch } from '@/src/store/types';
+import { directApiRequest } from '@/src/services/apiClient';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import components
-import CustomButton from '@/app/components/CustomButton';
-import UrduText from '@/app/components/UrduText';
-import ProfileHeader from '@/app/components/ProfileHeader';
-import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../constants/theme';
+import CustomButton from '@/src/components/CustomButton';
+import UrduText from '@/src/components/UrduText';
+import ProfileHeader from '@/src/components/ProfileHeader';
+import { COMMON_IMAGES } from '@/src/constants/images';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/src/constants/theme';
 
 // Selectors for tanzeem data
 import {
   selectUserUnitDetails,
   selectLevelsById,
   selectUserAssignedUnits,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { formatUnitName } from '@/app/utils/formatUnitName';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/src/utils/formatUnitName';
 
 const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 

@@ -22,10 +22,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import i18n from '../i18n';
-import CustomTextInput from '../components/CustomTextInput';
-import CustomButton from '../components/CustomButton';
-import Toast from '../components/Toast';
+import i18n from '@/src/i18n';
+import CustomTextInput from '@/src/components/CustomTextInput';
+import CustomButton from '@/src/components/CustomButton';
+import Toast from '@/src/components/Toast';
 import { useAppDispatch } from '../../src/hooks/useAppDispatch';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
 import {
@@ -34,10 +34,10 @@ import {
   selectAuthError,
   selectAuthStatus,
   selectIsAuthenticated,
-} from '../features/auth/authSlice';
+} from '@/src/features/auth/authSlice';
 import { ImageBackground } from 'react-native';
-import { COLORS } from '../constants/theme';
-import { debugLog, debugBreakpoint } from '../utils/debug';
+import { COLORS } from '@/src/constants/theme';
+import { debugLog, debugBreakpoint } from '@/src/utils/debug';
 
 /* ------------------------------------------------------------------ */
 /*                        FIELD-LEVEL VALIDATORS                      */

@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import UrduText from '@/app/components/UrduText';
+import UrduText from '@/src/components/UrduText';
 
 interface StatRowProps {
   label: string;

@@ -3,13 +3,13 @@ import { View, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, FlatL
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { TabGroup } from '../../components/Tab';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../constants/theme';
+import { TabGroup } from '@/src/components/Tab';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/src/constants/theme';
 import ReportCard from './components/ReportCard';
-import FilterModal from '../../components/FilterModal';
-import UrduText from '@/app/components/UrduText';
+import FilterModal from '@/src/components/FilterModal';
+import UrduText from '@/src/components/UrduText';
 import { useRouter } from 'expo-router';
-import { ROUTES } from '../../constants/navigation';
+import { ROUTES } from '@/src/constants/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchReportsByUnitId,
@@ -18,18 +18,18 @@ import {
   selectReportSubmissions,
   selectReportsError,
   selectReportsLoading,
-} from '@/app/features/reports/reportsSlice';
-import { selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
-import { AppDispatch } from '@/app/store';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
-import { useTokenRefresh } from '@/app/utils/tokenRefresh';
-import ScreenLayout from '@/app/components/ScreenLayout';
-import { COMMON_IMAGES } from '@/app/constants/images';
+} from '@/src/features/reports/reportsSlice';
+import { selectUserUnitDetails, selectAllTanzeemiUnits } from '@/src/features/tanzeem/tanzeemSlice';
+import { AppDispatch } from '@/src/store';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
+import { useTokenRefresh } from '@/src/utils/tokenRefresh';
+import ScreenLayout from '@/src/components/ScreenLayout';
+import { COMMON_IMAGES } from '@/src/constants/images';
 import {
   initializeReportData,
   selectOverallProgress,
   selectQAState,
-} from '@/app/features/qa/qaSlice';
+} from '@/src/features/qa/qaSlice';
 
 const AllReportsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();

@@ -14,12 +14,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Header from '../../components/Header';
-import FormInput from '../../components/FormInput';
-import CustomDropdown, { Option } from '../../components/CustomDropdown';
-import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
-import UrduText from '../../components/UrduText';
+import Header from '@/src/components/Header';
+import FormInput from '@/src/components/FormInput';
+import CustomDropdown, { Option } from '@/src/components/CustomDropdown';
+import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
+import UrduText from '@/src/components/UrduText';
 import { useAppDispatch } from '@/src/hooks/useAppDispatch';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
 import {
@@ -34,7 +34,7 @@ import {
   resetEditStatus,
   getBaitulmalRecordById,
   fetchBaitulmalTypes,
-} from '@/app/features/baitulmal/baitulmalSlice';
+} from '@/src/features/baitulmal/baitulmalSlice';
 
 export default function BaitulmalScreen() {
   const router = useRouter();

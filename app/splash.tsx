@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAppSelector } from '../src/hooks/useAppSelector';
 import { useAppDispatch } from '../src/hooks/useAppDispatch';
-import { selectIsAuthenticated, initializeAuth } from './features/auth/authSlice';
+import { selectIsAuthenticated, initializeAuth } from '@/src/features/auth/authSlice';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();

@@ -2,9 +2,9 @@ import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@r
 import { RootState, AppDispatch } from '../../store/types';
 import { fetchNazimDetails } from '../persons/personSlice';
 import { fetchTanzeemLevelById, selectAllTanzeemiUnits } from './tanzeemSlice';
-import { TanzeemiUnit, SingleTanzeemiUnitResponse } from '@/app/models/TanzeemiUnit';
-import { Person, PersonResponse } from '@/app/models/Person';
-import { normalizeTanzeemiUnitData, normalizePersonData } from '@/app/utils/apiNormalizer';
+import { TanzeemiUnit, SingleTanzeemiUnitResponse } from '@/src/models/TanzeemiUnit';
+import { Person, PersonResponse } from '@/src/models/Person';
+import { normalizeTanzeemiUnitData, normalizePersonData } from '@/src/utils/apiNormalizer';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────────

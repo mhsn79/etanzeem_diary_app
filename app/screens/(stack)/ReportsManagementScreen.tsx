@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ROUTES } from '../../constants/navigation';
+import { ROUTES } from '@/src/constants/navigation';
 import ReportsView from './components/ReportsView';
 import { OpenReportParams } from './components/ReportsView';
 

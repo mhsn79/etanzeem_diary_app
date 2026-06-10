@@ -1,15 +1,15 @@
 import React, { useState, useCallback, memo, useEffect, useMemo, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import UrduText from '@/app/components/UrduText';
-import FormInput from '@/app/components/FormInput';
-import AutoQuestionInput from '@/app/components/AutoQuestionInput';
+import UrduText from '@/src/components/UrduText';
+import FormInput from '@/src/components/FormInput';
+import AutoQuestionInput from '@/src/components/AutoQuestionInput';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/app/constants/theme';
-import { ReportSection, ReportQuestion, ReportAnswer } from '@/app/features/qa/types';
-import { saveAnswer, selectCurrentSubmissionId } from '@/app/features/qa/qaSlice';
-import { isAutoQuestion } from '@/app/features/qa/utils';
-import { AppDispatch } from '@/app/store';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/src/constants/theme';
+import { ReportSection, ReportQuestion, ReportAnswer } from '@/src/features/qa/types';
+import { saveAnswer, selectCurrentSubmissionId } from '@/src/features/qa/qaSlice';
+import { isAutoQuestion } from '@/src/features/qa/utils';
+import { AppDispatch } from '@/src/store';
 
 // Helper function to get the correct answer value based on question type
 const getAnswerValue = (

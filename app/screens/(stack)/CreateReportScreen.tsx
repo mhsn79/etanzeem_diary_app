@@ -4,13 +4,13 @@ import { View, StyleSheet, ScrollView, ActivityIndicator, Animated, TouchableOpa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { useNavigation, useLocalSearchParams, useFocusEffect, router } from 'expo-router';
-import { ROUTES } from '@/app/constants/navigation';
-import { startNavigationMetric } from '@/app/utils/navigationMetrics';
-import UrduText from '@/app/components/UrduText';
-import CustomButton from '@/app/components/CustomButton';
-import FormInput from '@/app/components/FormInput';
-import Dialog from '@/app/components/Dialog';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
+import { ROUTES } from '@/src/constants/navigation';
+import { startNavigationMetric } from '@/src/utils/navigationMetrics';
+import UrduText from '@/src/components/UrduText';
+import CustomButton from '@/src/components/CustomButton';
+import FormInput from '@/src/components/FormInput';
+import Dialog from '@/src/components/Dialog';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/src/constants/theme';
 import {
   initializeReportData,
   selectOverallProgress,
@@ -31,16 +31,16 @@ import {
   batchAutoFillAnswers,
   selectBatchFillStatus,
   selectBatchFillProgress,
-} from '@/app/features/qa/qaSlice';
-import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/app/features/tanzeem/tanzeemSlice';
-import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
-import { selectManagementReportsList } from '@/app/features/reports/reportsSlice';
-import { useTokenRefresh } from '@/app/utils/tokenRefresh';
-import SectionList from '@/app/components/SectionList';
-import ScreenLayout from '@/app/components/ScreenLayout';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
-import { ensureFreshToken, directApiRequest } from '@/app/services/apiClient';
-import { setError } from '@/app/features/auth/authSlice';
+} from '@/src/features/qa/qaSlice';
+import { selectUserUnitDetails, selectUserTanzeemiLevelDetails } from '@/src/features/tanzeem/tanzeemSlice';
+import { formatUnitDisplay } from '@/src/utils/formatUnitDisplay';
+import { selectManagementReportsList } from '@/src/features/reports/reportsSlice';
+import { useTokenRefresh } from '@/src/utils/tokenRefresh';
+import SectionList from '@/src/components/SectionList';
+import ScreenLayout from '@/src/components/ScreenLayout';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
+import { ensureFreshToken, directApiRequest } from '@/src/services/apiClient';
+import { setError } from '@/src/features/auth/authSlice';
 
 export type CreateReportInitialParams = {
   submissionId: number;
@@ -70,7 +70,7 @@ const CreateReportScreen = ({ initialParams: initialParamsProp }: CreateReportSc
   const unitId = fromRouter ? (params.unitId ? Number(params.unitId) : null) : (initialParamsProp?.unitId ?? null);
   const mode = (fromRouter ? params.mode : initialParamsProp?.mode) as 'view' | 'edit' | undefined;
   
-  // Unit display is centralized in @/app/utils/formatUnitDisplay — see `unitName`
+  // Unit display is centralized in @/src/utils/formatUnitDisplay — see `unitName`
   // memoization below.
 
   const isViewMode = mode === 'view';

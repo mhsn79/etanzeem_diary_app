@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { StyleSheet } from 'react-native';
-import CustomDropdown from '@/app/components/CustomDropdown';
-import Spacer from '@/app/components/Spacer';
+import CustomDropdown from '@/src/components/CustomDropdown';
+import Spacer from '@/src/components/Spacer';
 import { Option } from './types';
 
 interface DropdownSectionProps {

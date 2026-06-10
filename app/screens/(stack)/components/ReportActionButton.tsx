@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, View } from 'react-native';
-import UrduText from '../../../components/UrduText';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '@/src/constants/theme';
 
 interface ReportActionButtonProps {
   text: string;

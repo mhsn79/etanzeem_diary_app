@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigation } from 'expo-router';
-import ScreenLayout from '../../components/ScreenLayout';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
-import UrduText from '@/app/components/UrduText';
+import ScreenLayout from '@/src/components/ScreenLayout';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
+import UrduText from '@/src/components/UrduText';
 import { View, StyleSheet, FlatList, InteractionManager } from 'react-native';
-import FormInput from '@/app/components/FormInput';
-import CustomButton from '@/app/components/CustomButton';
-import Dialog from '@/app/components/Dialog';
+import FormInput from '@/src/components/FormInput';
+import CustomButton from '@/src/components/CustomButton';
+import Dialog from '@/src/components/Dialog';
 
 const reportSections = [
   {

@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { StyleSheet, FlatList, View, Text, Image, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
-import i18n from '../../i18n';
+import i18n from '@/src/i18n';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
-import { COLORS } from '@/app/constants/theme';
+import { COLORS } from '@/src/constants/theme';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchPersonsByUnit,
@@ -16,25 +16,25 @@ import {
   selectContactTypes,
   selectContactTypesStatus,
   selectContactTypesError
-} from '@/app/features/persons/personSlice';
-import { Person } from '@/app/models/Person';
-import { AppDispatch } from '@/app/store';
+} from '@/src/features/persons/personSlice';
+import { Person } from '@/src/models/Person';
+import { AppDispatch } from '@/src/store';
 import {
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
   selectUserUnitDetails,
   selectAllAccessibleUnitIds,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import RukunCard from '@/app/components/RukunCard';
-import CustomButton from '@/app/components/CustomButton';
-import CustomTextInput from '@/app/components/CustomTextInput';
-import UrduText from '@/app/components/UrduText';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import RukunCard from '@/src/components/RukunCard';
+import CustomButton from '@/src/components/CustomButton';
+import CustomTextInput from '@/src/components/CustomTextInput';
+import UrduText from '@/src/components/UrduText';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, router, useLocalSearchParams } from 'expo-router';
-import { TabGroup } from '@/app/components/Tab';
-import UnitSelectorBar from '@/app/components/UnitSelectorBar';
-import NoUnitMessage from '@/app/components/NoUnitMessage';
-import { selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
+import { TabGroup } from '@/src/components/Tab';
+import UnitSelectorBar from '@/src/components/UnitSelectorBar';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
+import { selectAllTanzeemiUnits } from '@/src/features/tanzeem/tanzeemSlice';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 

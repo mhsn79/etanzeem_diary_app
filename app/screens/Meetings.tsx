@@ -1,10 +1,10 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, InteractionManager } from 'react-native';
-import i18n from '../i18n';
-import CustomButton from '../components/CustomButton';
+import i18n from '@/src/i18n';
+import CustomButton from '@/src/components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Import theme constants
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING } from '@/src/constants/theme';
 import { Appearance, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons'; // Import the Ionicons for the back arrow
 import { router } from 'expo-router';

@@ -8,16 +8,16 @@ import { useFonts } from 'expo-font';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LanguageProvider from "../app/context/LanguageContext";
+import LanguageProvider from "@/src/context/LanguageContext";
 import SmallTarazu from "../assets/images/small-tarazu.svg";
-import UrduText from "./components/UrduText";
-import i18n from './i18n';
+import UrduText from "@/src/components/UrduText";
+import i18n from '@/src/i18n';
 import { useNavigationState } from '@react-navigation/native';
-import { COLORS, SPACING } from "./constants/theme";
-import { store, persistor } from '@/app/store';              // ← adjust paths if needed
+import { COLORS, SPACING } from "@/src/constants/theme";
+import { store, persistor } from '@/src/store';              // ← adjust paths if needed
 import { usePushNotifications } from "@/src/hooks/usePushNotifications";
-import { useTokenRefresh } from './utils/tokenRefresh';
-import { startNavigationMetric } from './utils/navigationMetrics';
+import { useTokenRefresh } from '@/src/utils/tokenRefresh';
+import { startNavigationMetric } from '@/src/utils/navigationMetrics';
 // import DebugPanel from './components/DebugPanel';
 
 // Force RTL layout for the entire app

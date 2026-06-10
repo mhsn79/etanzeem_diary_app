@@ -11,10 +11,10 @@ import {
   selectUserAssignedUnits,
   selectLevelsById,
   selectChildUnits,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { formatUnitName } from '@/app/utils/formatUnitName';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/src/utils/formatUnitName';
 import UnitSelectionModal from '@/app/screens/(tabs)/components/UnitSelectionModal';
-import i18n from '@/app/i18n';
+import i18n from '@/src/i18n';
 
 const UnitSelectorBar: React.FC = () => {
   const [showModal, setShowModal] = useState(false);

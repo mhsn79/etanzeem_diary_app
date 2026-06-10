@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, InteractionManager } from 'react-native';
-import { COLORS, SPACING } from '@/app/constants/theme';
-import UrduText from '@/app/components/UrduText';
-import ScreenLayout from '@/app/components/ScreenLayout';
+import { COLORS, SPACING } from '@/src/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import ScreenLayout from '@/src/components/ScreenLayout';
 import { useNavigation } from 'expo-router';
-import CustomDropdown from '@/app/components/CustomDropdown';
-import FormInput from '@/app/components/FormInput';
+import CustomDropdown from '@/src/components/CustomDropdown';
+import FormInput from '@/src/components/FormInput';
 import DateTimePickerModal from './components/DateTimePickerModal';
-import CustomButton from '@/app/components/CustomButton';
+import CustomButton from '@/src/components/CustomButton';
 import { Ionicons } from '@expo/vector-icons';
 
 const ScheduleActivitiesScreen = () => {

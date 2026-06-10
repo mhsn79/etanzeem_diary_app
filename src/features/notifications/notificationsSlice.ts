@@ -1,4 +1,4 @@
-import { RootState } from "@/app/store/types";
+import { RootState } from "@/src/store/types";
 import { createSlice, createEntityAdapter, PayloadAction } from "@reduxjs/toolkit";
 import * as Expo from "expo-notifications";
 

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import UrduText from '@/app/components/UrduText';
-import Spacer from '@/app/components/Spacer';
+import UrduText from '@/src/components/UrduText';
+import Spacer from '@/src/components/Spacer';
 import { IconProps } from './types';
 
 interface HeaderInfoItemProps {

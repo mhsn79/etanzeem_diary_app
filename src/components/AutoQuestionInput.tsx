@@ -1,34 +1,34 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Modal, FlatList, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/app/constants/theme';
-import FormInput from '@/app/components/FormInput';
-import UrduText from '@/app/components/UrduText';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/src/constants/theme';
+import FormInput from '@/src/components/FormInput';
+import UrduText from '@/src/components/UrduText';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import { 
   fetchContactTypes, 
   selectContactTypes, 
   selectContactTypesStatus 
-} from '@/app/features/persons/personSlice';
+} from '@/src/features/persons/personSlice';
 import { 
   fetchActivityTypes, 
   selectAllActivityTypes, 
   selectActivityTypesStatus 
-} from '@/app/features/activityTypes/activityTypesSlice';
+} from '@/src/features/activityTypes/activityTypesSlice';
 import { 
   fetchStrengthTypes, 
   selectStrengthTypes, 
   selectStrengthState 
-} from '@/app/features/strength/strengthSlice';
-import { fetchActivityCount, editActivity } from '@/app/features/activities/activitySlice';
-import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
+} from '@/src/features/strength/strengthSlice';
+import { fetchActivityCount, editActivity } from '@/src/features/activities/activitySlice';
+import { fetchStrengthCountAndTotals } from '@/src/features/strength/strengthSlice';
 import {
   fetchBaitulmalTypes,
   selectBaitulmalTypes
-} from '@/app/features/baitulmal/baitulmalSlice';
-import { directApiRequest } from '@/app/services/apiClient';
+} from '@/src/features/baitulmal/baitulmalSlice';
+import { directApiRequest } from '@/src/services/apiClient';
 import { router } from 'expo-router';
-import i18n from '@/app/i18n';
+import i18n from '@/src/i18n';
 import { ReportQuestion, ReportAnswer } from '../features/qa/types';
 import { saveAnswer } from '../features/qa/qaSlice';
 import { getCalculationButtonText } from '../features/qa/utils';

@@ -20,8 +20,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 
-import i18n from '../i18n';
-import { AppDispatch, RootState } from '@/app/store/types';
+import i18n from '@/src/i18n';
+import { AppDispatch, RootState } from '@/src/store/types';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
 import {
   updatePerson,
@@ -43,25 +43,25 @@ import {
   selectContactTypes,
   selectContactTypesStatus,
   selectContactTypesError
-} from '@/app/features/persons/personSlice';
+} from '@/src/features/persons/personSlice';
 import {
   selectSubordinateUnitsForDropdown
-} from '@/app/features/tanzeem/tanzeemHierarchySlice';
+} from '@/src/features/tanzeem/tanzeemHierarchySlice';
 import {
   selectDashboardSelectedUnitId,
   selectDashboardSelectedUnit,
   selectUserUnitDetails,
   selectLevelsById
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { Person, UpdatePersonPayload, CreatePersonPayload } from '@/app/models/Person';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { Person, UpdatePersonPayload, CreatePersonPayload } from '@/src/models/Person';
 
-import CustomButton from '@/app/components/CustomButton';
-import FormInput from '@/app/components/FormInput';
-import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
-import UrduText from '@/app/components/UrduText';
-import TransferRukunModal from '@/app/components/TransferRukunModal';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../constants/theme';
-import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
+import CustomButton from '@/src/components/CustomButton';
+import FormInput from '@/src/components/FormInput';
+import CustomDropdown, { Option } from '@/src/components/CustomDropdown';
+import UrduText from '@/src/components/UrduText';
+import TransferRukunModal from '@/src/components/TransferRukunModal';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '@/src/constants/theme';
+import { formatUnitDisplay } from '@/src/utils/formatUnitDisplay';
 import { FontAwesome6 } from '@expo/vector-icons';
 
 type RukunAddEditRouteProp = RouteProp<RootStackParamList, 'screens/RukunAddEdit'>;

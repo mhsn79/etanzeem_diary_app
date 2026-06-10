@@ -16,7 +16,7 @@ import {
   BORDER_RADIUS,
   SHADOWS,
   SIZES,
-} from '@/app/constants/theme';
+} from '@/src/constants/theme';
 import UrduText from './UrduText';
 
 /**

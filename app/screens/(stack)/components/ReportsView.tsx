@@ -27,29 +27,29 @@ import {
   selectReportsLoading,
   fetchReportSubmissions,
   fetchCurrentReportSubmissions,
-} from '@/app/features/reports/reportsSlice';
-import { selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
-import { AppDispatch } from '@/app/store/types';
-import { toUrduDigits, formatExpectedCompletion, getUrduMonth } from '@/app/constants/urduLocalization';
-import { useTokenRefresh } from '@/app/utils/tokenRefresh';
-import { ROUTES } from '@/app/constants/navigation';
-import UrduText from '@/app/components/UrduText';
-import Header from '@/app/components/Header';
-import { BORDER_RADIUS, COLORS, SHADOWS, SIZES, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
+} from '@/src/features/reports/reportsSlice';
+import { selectUserUnitDetails } from '@/src/features/tanzeem/tanzeemSlice';
+import { AppDispatch } from '@/src/store/types';
+import { toUrduDigits, formatExpectedCompletion, getUrduMonth } from '@/src/constants/urduLocalization';
+import { useTokenRefresh } from '@/src/utils/tokenRefresh';
+import { ROUTES } from '@/src/constants/navigation';
+import UrduText from '@/src/components/UrduText';
+import Header from '@/src/components/Header';
+import { BORDER_RADIUS, COLORS, SHADOWS, SIZES, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import { COMMON_IMAGES } from '@/app/constants/images';
-import { TabGroup } from '@/app/components/Tab';
+import { COMMON_IMAGES } from '@/src/constants/images';
+import { TabGroup } from '@/src/components/Tab';
 import ReportCard from './ReportCard';
-import UnitSelectorBar from '@/app/components/UnitSelectorBar';
-import NoUnitMessage from '@/app/components/NoUnitMessage';
-import { logout } from '@/app/features/auth/authSlice';
+import UnitSelectorBar from '@/src/components/UnitSelectorBar';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
+import { logout } from '@/src/features/auth/authSlice';
 import {
   initializeReportData,
   selectOverallProgressForSubmission,
   selectCurrentSubmissionId,
   selectQAState,
   selectSubmitStatus,
-} from '@/app/features/qa/qaSlice';
+} from '@/src/features/qa/qaSlice';
 
 export type OpenReportParams = {
   submissionId: number;

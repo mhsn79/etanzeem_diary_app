@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import ErrorBoundary from '../../components/ErrorBoundary';
+import ErrorBoundary from '@/src/components/ErrorBoundary';
 import {
   StyleSheet,
   View,
@@ -18,14 +18,14 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BaitulmalCard from '../../components/BaitulmalCard';
-import { TabGroup } from '@/app/components/Tab';
-import UnitSelectorBar from '@/app/components/UnitSelectorBar';
-import NoUnitMessage from '@/app/components/NoUnitMessage';
-import Header from '../../components/Header';
-import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/app/constants/theme';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
-import UrduText from '../../components/UrduText';
+import BaitulmalCard from '@/src/components/BaitulmalCard';
+import { TabGroup } from '@/src/components/Tab';
+import UnitSelectorBar from '@/src/components/UnitSelectorBar';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
+import Header from '@/src/components/Header';
+import { BORDER_RADIUS, COLORS, SHADOWS, SPACING, TYPOGRAPHY } from '@/src/constants/theme';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
+import UrduText from '@/src/components/UrduText';
 import { useAppDispatch } from '@/src/hooks/useAppDispatch';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
 import {
@@ -36,9 +36,9 @@ import {
   selectBaitulmalError,
   selectBaitulmalTypes,
   deleteBaitulmalRecord,
-} from '@/app/features/baitulmal/baitulmalSlice';
-import { selectUser as selectCurrentUser } from '@/app/features/auth/authSlice';
-import { selectDashboardSelectedUnitId, selectUserUnitDetails } from '@/app/features/tanzeem/tanzeemSlice';
+} from '@/src/features/baitulmal/baitulmalSlice';
+import { selectUser as selectCurrentUser } from '@/src/features/auth/authSlice';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails } from '@/src/features/tanzeem/tanzeemSlice';
 import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 interface ScreenWrapperProps {

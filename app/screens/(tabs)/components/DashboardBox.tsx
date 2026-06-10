@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import UrduText from '@/app/components/UrduText';
+import UrduText from '@/src/components/UrduText';
 import LeftUpArrowBlue from '@/assets/images/left-up-arrow-blue.svg';
 import StatRow from './StatRow';
 import { Stat } from './types';

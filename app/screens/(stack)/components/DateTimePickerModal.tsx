@@ -10,8 +10,8 @@ import {
   Easing,
   TextInput,
 } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
-import UrduText from '@/app/components/UrduText';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/src/constants/theme';
+import UrduText from '@/src/components/UrduText';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText, G } from 'react-native-svg';
 

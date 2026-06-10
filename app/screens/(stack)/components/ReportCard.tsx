@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import UrduText from '../../../components/UrduText';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../../constants/theme';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/src/constants/theme';
 
 interface ReportCardProps {
   title: string;

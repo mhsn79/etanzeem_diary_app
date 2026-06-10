@@ -1,5 +1,5 @@
-import { RukunData } from "@/app/models/RukunData";
-import { Person } from "@/app/models/Person";
+import { RukunData } from "@/src/models/RukunData";
+import { Person } from "@/src/models/Person";
 
 // Define your navigation params
 export type RootStackParamList = {

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import UrduText from '@/app/components/UrduText';
-import { COLORS, SPACING } from '@/app/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING } from '@/src/constants/theme';
 import { ScheduleItem } from './types';
 
 interface ScheduleCardProps {

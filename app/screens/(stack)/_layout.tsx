@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
-import { COLORS } from '../../constants/theme';
-import Header from '../../components/Header';
-import { SCREENS } from '@/app/constants/screens';
-import AuthGuard from '@/app/components/AuthGuard';
+import { COLORS } from '@/src/constants/theme';
+import Header from '@/src/components/Header';
+import { SCREENS } from '@/src/constants/screens';
+import AuthGuard from '@/src/components/AuthGuard';
 
 export default function StackLayout() {
   return (

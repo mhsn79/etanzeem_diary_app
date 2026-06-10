@@ -16,8 +16,8 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
 
-import i18n from '../i18n';
-import { AppDispatch, RootState } from '@/app/store';
+import i18n from '@/src/i18n';
+import { AppDispatch, RootState } from '@/src/store';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
 import { 
   fetchPersonById,
@@ -28,16 +28,16 @@ import {
   selectRukunUpdateRequestByContactId,
   submitRukunUpdateRequest,
   RukunUpdateRequest
-} from '@/app/features/persons/personSlice';
-import { Person } from '@/app/models/Person';
-import { getImageUrl } from '@/app/utils/imageUpload';
+} from '@/src/features/persons/personSlice';
+import { Person } from '@/src/models/Person';
+import { getImageUrl } from '@/src/utils/imageUpload';
 
-import CustomButton from '@/app/components/CustomButton';
-import FormInput from '@/app/components/FormInput';
-import UrduText from '@/app/components/UrduText';
-import ProfileHeader from '@/app/components/ProfileHeader';
-import { COMMON_IMAGES } from '@/app/constants/images';
-import { COLORS, SPACING } from '../constants/theme';
+import CustomButton from '@/src/components/CustomButton';
+import FormInput from '@/src/components/FormInput';
+import UrduText from '@/src/components/UrduText';
+import ProfileHeader from '@/src/components/ProfileHeader';
+import { COMMON_IMAGES } from '@/src/constants/images';
+import { COLORS, SPACING } from '@/src/constants/theme';
 
 type RukunUpdateRouteProp = RouteProp<RootStackParamList, 'screens/RukunUpdateScreen'>;
 

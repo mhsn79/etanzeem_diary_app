@@ -3,10 +3,10 @@
  * Replicates the fetch logic from AutoQuestionInput.tsx but without any UI state.
  */
 import { ReportQuestion } from './types';
-import { directApiRequest, ensureFreshToken } from '@/app/services/apiClient';
-import { fetchStrengthCountAndTotals } from '@/app/features/strength/strengthSlice';
-import { getOrCreateStrengthRecord } from '@/app/features/strength/strengthSync';
-import { AppDispatch } from '@/app/store';
+import { directApiRequest, ensureFreshToken } from '@/src/services/apiClient';
+import { fetchStrengthCountAndTotals } from '@/src/features/strength/strengthSlice';
+import { getOrCreateStrengthRecord } from '@/src/features/strength/strengthSync';
+import { AppDispatch } from '@/src/store';
 
 export interface ContactType {
   id: number;

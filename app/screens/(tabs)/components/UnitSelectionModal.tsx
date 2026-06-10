@@ -2,9 +2,9 @@ import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { View, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
-import UrduText from '@/app/components/UrduText';
-import Spacer from '@/app/components/Spacer';
-import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import Spacer from '@/src/components/Spacer';
+import { COLORS, SPACING, SHADOWS, BORDER_RADIUS, TYPOGRAPHY } from '@/src/constants/theme';
 import {
   selectUserUnitDetails,
   selectAllTanzeemiUnits,
@@ -12,10 +12,10 @@ import {
   selectUserAssignedUnits,
   selectDashboardSelectedUnitId,
   setDashboardSelectedUnit,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { AppDispatch } from '@/app/store';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { AppDispatch } from '@/src/store';
 import { useAppSelector } from '@/src/hooks/useAppSelector';
-import { formatUnitDisplay as formatUnitDisplayShared } from '@/app/utils/formatUnitDisplay';
+import { formatUnitDisplay as formatUnitDisplayShared } from '@/src/utils/formatUnitDisplay';
 
 interface UnitSelectionModalProps {
   visible: boolean;

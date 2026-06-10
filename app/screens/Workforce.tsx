@@ -25,14 +25,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Vibration } from 'react-native';
 
 // SVG Icons
-import UnitSelectorBar from '../components/UnitSelectorBar';
-import NoUnitMessage from '../components/NoUnitMessage';
+import UnitSelectorBar from '@/src/components/UnitSelectorBar';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
 import EditIcon from '../../assets/images/edit-icon.svg';
 import ModalCloseIcon from '../../assets/images/modal-close-icon.svg';
 
 // Components
-import CustomButton from '../components/CustomButton';
-import UrduText from '../components/UrduText';
+import CustomButton from '@/src/components/CustomButton';
+import UrduText from '@/src/components/UrduText';
 
 // Redux
 import { 
@@ -44,7 +44,7 @@ import {
   selectContactTypes,
   selectContactTypesStatus,
   selectContactTypesError
-} from '@/app/features/persons/personSlice';
+} from '@/src/features/persons/personSlice';
 import {
   refreshStrengthData,
   setUserUnitId,
@@ -59,15 +59,15 @@ import {
   selectCurrentYear,
   selectCurrentMonth,
   StrengthRecord,
-} from '@/app/features/strength/strengthSlice';
-import { AppDispatch } from '@/app/store/types';
-import { selectDashboardSelectedUnitId, selectUserUnitDetails, selectAllTanzeemiUnits } from '@/app/features/tanzeem/tanzeemSlice';
-import { getUrduMonth } from '../constants/urduLocalization';
+} from '@/src/features/strength/strengthSlice';
+import { AppDispatch } from '@/src/store/types';
+import { selectDashboardSelectedUnitId, selectUserUnitDetails, selectAllTanzeemiUnits } from '@/src/features/tanzeem/tanzeemSlice';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
 
 // Theme and constants
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '../constants/theme';
-import i18n from '../i18n';
-import { startNavigationMetric } from '../utils/navigationMetrics';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SIZES, SHADOWS, Z_INDEX, ANIMATION } from '@/src/constants/theme';
+import i18n from '@/src/i18n';
+import { startNavigationMetric } from '@/src/utils/navigationMetrics';
 
 // Types
 interface EditModalProps {
@@ -168,7 +168,7 @@ function EditModal({
       // This ensures carry-forward values are persisted even when user
       // opens the dialog but makes no plus/minus changes.
       if (!existingRecord && userUnitId) {
-        import('@/app/features/strength/strengthSync')
+        import('@/src/features/strength/strengthSync')
           .then(({ getOrCreateStrengthRecord }) =>
             getOrCreateStrengthRecord(userUnitId, typeId, year, month)
           )

@@ -1,4 +1,4 @@
-import ScheduleActivitiesScreen from "../screens/(stack)/ScheduleActivitiesScreen";
+import ScheduleActivitiesScreen from "@/app/screens/(stack)/ScheduleActivitiesScreen";
 
 // Screen Groups
 export const SCREEN_GROUPS = {

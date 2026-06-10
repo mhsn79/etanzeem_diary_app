@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Image, KeyboardAvoidingView, Platform, StyleSheet, ScrollView, Text, View, Pressable, TextInput, ActivityIndicator, InteractionManager } from 'react-native';
-import i18n from '../i18n';
-import CustomButton from '../components/CustomButton';
+import i18n from '@/src/i18n';
+import CustomButton from '@/src/components/CustomButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
-import { selectUserDetails, selectUserDetailsStatus } from '@/app/features/persons/personSlice';
-import { COLORS } from '@/app/constants/theme';
+import { selectUserDetails, selectUserDetailsStatus } from '@/src/features/persons/personSlice';
+import { COLORS } from '@/src/constants/theme';
 import { FontAwesome5 } from '@expo/vector-icons';
 
 export default function ProfileEdit() {

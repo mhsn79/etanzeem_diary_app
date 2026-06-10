@@ -15,15 +15,13 @@ import UrduText from './UrduText';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../constants/theme';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import {
-  fetchActivityTypes,
-  selectAllActivityTypes,
-  selectActivityTypesStatus,
-} from '@/app/features/activityTypes/activityTypesSlice';
-import {
-  selectUserUnitDetails,
-  selectDashboardSelectedUnit,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
+  fetchBaitulmalTypes,
+  selectIncomeTypes,
+  selectExpenseTypes,
+  selectBaitulmalTypesLoading,
+  selectBaitulmalTypes,
+} from '@/src/features/baitulmal/baitulmalSlice';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
 
 interface MonthOption {
   month: number;
@@ -31,80 +29,57 @@ interface MonthOption {
   label: string;
 }
 
-function getMonthOptions(mode: 'schedule' | 'report'): MonthOption[] {
+function getReportMonthOptions(): MonthOption[] {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-
-  if (mode === 'report') {
-    // RTL: first item = right side. Show prev on right, current on left. Current selected.
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    return [
-      { month: prevMonth, year: prevYear, label: `${getUrduMonth(prevMonth)} ${prevYear}` },
-      { month: currentMonth, year: currentYear, label: `${getUrduMonth(currentMonth)} ${currentYear}` },
-    ];
-  } else {
-    // RTL: first item = right side. Show current on right, next on left. Current selected.
-    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-    return [
-      { month: currentMonth, year: currentYear, label: `${getUrduMonth(currentMonth)} ${currentYear}` },
-      { month: nextMonth, year: nextYear, label: `${getUrduMonth(nextMonth)} ${nextYear}` },
-    ];
-  }
+  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  // RTL: first item = right side. Show prev on right, current on left. Current selected.
+  return [
+    { month: prevMonth, year: prevYear, label: `${getUrduMonth(prevMonth)} ${prevYear}` },
+    { month: currentMonth, year: currentYear, label: `${getUrduMonth(currentMonth)} ${currentYear}` },
+  ];
 }
 
-interface ActivityTypePickerProps {
+interface BaitulmalTypePickerProps {
   visible: boolean;
-  mode: 'schedule' | 'report';
-  onSelect: (activityTypeId: string, reportMonth: string, reportYear: string) => void;
+  category: 'income' | 'expense';
+  onSelect: (typeId: string, reportMonth: string, reportYear: string) => void;
   onCancel: () => void;
 }
 
-const ActivityTypePicker: React.FC<ActivityTypePickerProps> = ({
+const BaitulmalTypePicker: React.FC<BaitulmalTypePickerProps> = ({
   visible,
-  mode,
+  category,
   onSelect,
   onCancel,
 }) => {
   const dispatch = useAppDispatch();
-  const activityTypes = useAppSelector(selectAllActivityTypes);
-  const status = useAppSelector(selectActivityTypesStatus);
-  const userUnitDetails = useAppSelector(selectUserUnitDetails);
-  const selectedUnit = useAppSelector(selectDashboardSelectedUnit);
-  const displayUnit = selectedUnit || userUnitDetails;
+  const allTypes = useAppSelector(selectBaitulmalTypes);
+  const incomeTypes = useAppSelector(selectIncomeTypes);
+  const expenseTypes = useAppSelector(selectExpenseTypes);
+  const loading = useAppSelector(selectBaitulmalTypesLoading);
   const { height: windowHeight } = useWindowDimensions();
   const scrollMaxHeight = Math.min(windowHeight * 0.50, 420);
 
-  const monthOptions = useMemo(() => getMonthOptions(mode), [mode]);
-  const defaultMonthIdx = mode === 'report' ? 1 : 0; // current month
-  const [selectedMonthIdx, setSelectedMonthIdx] = useState(defaultMonthIdx);
+  const types = category === 'income' ? incomeTypes : expenseTypes;
+  const title = category === 'income' ? 'آمدنی کا اندراج' : 'خرچ کا اندراج';
+  const iconName: keyof typeof Ionicons.glyphMap = category === 'income' ? 'trending-up' : 'trending-down';
+
+  const monthOptions = useMemo(() => getReportMonthOptions(), []);
+  const [selectedMonthIdx, setSelectedMonthIdx] = useState(1); // current month at index 1
 
   // Reset month selection when modal opens
   useEffect(() => {
-    if (visible) setSelectedMonthIdx(defaultMonthIdx);
-  }, [visible, defaultMonthIdx]);
+    if (visible) setSelectedMonthIdx(1);
+  }, [visible]);
 
   useEffect(() => {
-    if (visible && (status === 'idle' || (status === 'succeeded' && activityTypes.length === 0))) {
-      dispatch(fetchActivityTypes());
+    if (visible && allTypes.length === 0) {
+      dispatch(fetchBaitulmalTypes());
     }
-  }, [visible, status, activityTypes.length, dispatch]);
-
-  const loading = status === 'loading';
-
-  const filteredTypes = useMemo(() => {
-    const levelId = displayUnit?.Level_id || displayUnit?.level_id || null;
-    return activityTypes.filter(type => {
-      if (!levelId) return true;
-      const typeLevelId = type.Level_id || type.level_id;
-      if (!typeLevelId) return true;
-      return typeLevelId === levelId;
-    });
-  }, [activityTypes, displayUnit]);
-
-  const title = mode === 'schedule' ? 'سرگرمی شیڈول کریں' : 'سرگرمی کی رپورٹ';
+  }, [visible, allTypes.length, dispatch]);
 
   const handleTypeSelect = (typeId: string) => {
     const selected = monthOptions[selectedMonthIdx];
@@ -142,7 +117,9 @@ const ActivityTypePicker: React.FC<ActivityTypePickerProps> = ({
             </View>
 
             {/* Type list */}
-            <UrduText style={styles.sectionLabel}>سرگرمی کی قسم منتخب کریں</UrduText>
+            <UrduText style={styles.sectionLabel}>
+              {category === 'income' ? 'آمدنی کی قسم منتخب کریں' : 'خرچ کی قسم منتخب کریں'}
+            </UrduText>
 
             {loading ? (
               <View style={styles.loadingContainer}>
@@ -155,15 +132,15 @@ const ActivityTypePicker: React.FC<ActivityTypePickerProps> = ({
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator
               >
-                {filteredTypes.map((type) => (
+                {types.map((type) => (
                   <TouchableOpacity
                     key={type.id}
                     style={styles.typeBtn}
                     onPress={() => handleTypeSelect(String(type.id))}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.typeIconCircle}>
-                      <Ionicons name="calendar-outline" size={20} color={COLORS.white} />
+                    <View style={[styles.typeIconCircle, { backgroundColor: category === 'income' ? COLORS.tertiary : '#E57373' }]}>
+                      <Ionicons name={iconName} size={20} color={COLORS.white} />
                     </View>
                     <UrduText style={styles.typeText}>{type.Name}</UrduText>
                   </TouchableOpacity>
@@ -274,7 +251,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -296,4 +272,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ActivityTypePicker;
+export default BaitulmalTypePicker;

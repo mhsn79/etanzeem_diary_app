@@ -13,18 +13,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, router, useLocalSearchParams } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { logout } from '@/app/features/auth/authSlice';
-import { AppDispatch } from '@/app/store';
-import { selectPersonById } from '@/app/features/persons/personSlice';
-import { COLORS } from '@/app/constants/theme';
+import { logout } from '@/src/features/auth/authSlice';
+import { AppDispatch } from '@/src/store';
+import { selectPersonById } from '@/src/features/persons/personSlice';
+import { COLORS } from '@/src/constants/theme';
 
-import CustomButton from '@/app/components/CustomButton';
-import CustomDropdown from '@/app/components/CustomDropdown';
-import FormInput from '@/app/components/FormInput';
-import UrduText from '@/app/components/UrduText';
-import ProfileHeader from '@/app/components/ProfileHeader';
-import { COMMON_IMAGES } from '@/app/constants/images';
-import i18n from '@/app/i18n';
+import CustomButton from '@/src/components/CustomButton';
+import CustomDropdown from '@/src/components/CustomDropdown';
+import FormInput from '@/src/components/FormInput';
+import UrduText from '@/src/components/UrduText';
+import ProfileHeader from '@/src/components/ProfileHeader';
+import { COMMON_IMAGES } from '@/src/constants/images';
+import i18n from '@/src/i18n';
 
 /* ──────────────────────
    Helper for read-only text fields

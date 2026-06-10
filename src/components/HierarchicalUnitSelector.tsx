@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
-import UrduText from '@/app/components/UrduText';
-import { COLORS, SPACING, SHADOWS, BORDER_RADIUS } from '@/app/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING, SHADOWS, BORDER_RADIUS } from '@/src/constants/theme';
 import { AntDesign } from '@expo/vector-icons';
-import i18n from '@/app/i18n';
+import i18n from '@/src/i18n';
 import LocationIcon from '@/assets/images/location-icon-yellow.svg';
 
 interface Unit {

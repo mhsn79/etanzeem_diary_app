@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
   Alert,
 } from 'react-native';
-import i18n from '@/app/i18n';
+import i18n from '@/src/i18n';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
@@ -18,8 +18,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import LocationIcon from '@/assets/images/location-icon-yellow.svg';
 import UserIcon from '@/assets/images/user-icon.svg';
 import LeftUpArrowWhite from '@/assets/images/left-up-arrow-white.svg';
-import UrduText from '@/app/components/UrduText';
-import { COLORS, SPACING, BORDER_RADIUS } from '@/app/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING, BORDER_RADIUS } from '@/src/constants/theme';
 import {
   selectUserUnitDetails,
   selectDashboardSelectedUnit,
@@ -28,8 +28,8 @@ import {
   setDashboardSelectedUnit,
   fetchAllAssignedUnitHierarchies,
   fetchUserTanzeemiUnit,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { selectParentUnitWithLevel } from '@/app/features/tanzeem/tanzeemSlice';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { selectParentUnitWithLevel } from '@/src/features/tanzeem/tanzeemSlice';
 import {
   selectUserDetails,
   selectNazimDetails,
@@ -37,15 +37,15 @@ import {
   fetchContactTypes,
   selectContactTypes,
   selectContactTypesStatus,
-} from '@/app/features/persons/personSlice';
-import { AppDispatch } from '@/app/store/types';
-import { selectPendingSubmissionCountByUnitId, fetchReportSubmissions } from '@/app/features/reports/reportsSlice';
+} from '@/src/features/persons/personSlice';
+import { AppDispatch } from '@/src/store/types';
+import { selectPendingSubmissionCountByUnitId, fetchReportSubmissions } from '@/src/features/reports/reportsSlice';
 import UnitSelectionModal from './components/UnitSelectionModal';
-import { formatUnitName } from '@/app/utils/formatUnitName';
-import SpeedDialFAB, { SpeedDialAction } from '@/app/components/SpeedDialFAB';
-import ActivityTypePicker from '@/app/components/ActivityTypePicker';
-import NoUnitMessage from '@/app/components/NoUnitMessage';
-import BaitulmalTypePicker from '@/app/components/BaitulmalTypePicker';
+import { formatUnitName } from '@/src/utils/formatUnitName';
+import SpeedDialFAB, { SpeedDialAction } from '@/src/components/SpeedDialFAB';
+import ActivityTypePicker from '@/src/components/ActivityTypePicker';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
+import BaitulmalTypePicker from '@/src/components/BaitulmalTypePicker';
 
 // Theme-aligned button colors (primary, tertiary, orange, accent)
 const DASHBOARD_BUTTON_COLORS = {

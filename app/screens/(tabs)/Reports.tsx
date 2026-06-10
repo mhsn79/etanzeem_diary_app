@@ -7,11 +7,11 @@ import {
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
   selectUserUnitDetails
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { COLORS } from '@/app/constants/theme';
-import NoUnitMessage from '@/app/components/NoUnitMessage';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { COLORS } from '@/src/constants/theme';
+import NoUnitMessage from '@/src/components/NoUnitMessage';
 import { useRouter } from 'expo-router';
-import { ROUTES } from '@/app/constants/navigation';
+import { ROUTES } from '@/src/constants/navigation';
 
 const Reports: React.FC = () => {
   const router = useRouter();

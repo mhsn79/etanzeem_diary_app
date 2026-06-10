@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator, InteractionManager, Pressable } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/app/constants/theme';
-import UrduText from '@/app/components/UrduText';
-import ScreenLayout from '@/app/components/ScreenLayout';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '@/src/constants/theme';
+import UrduText from '@/src/components/UrduText';
+import ScreenLayout from '@/src/components/ScreenLayout';
 import { useNavigation, useLocalSearchParams } from 'expo-router';
-import CustomDropdown from '@/app/components/CustomDropdown';
-import FormInput from '@/app/components/FormInput';
-import CustomButton from '@/app/components/CustomButton';
+import CustomDropdown from '@/src/components/CustomDropdown';
+import FormInput from '@/src/components/FormInput';
+import CustomButton from '@/src/components/CustomButton';
 // Dialog removed — inline View overlays used instead (no Modal = no Fabric viewState crash)
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { getUrduMonth } from '@/app/constants/urduLocalization';
+import { getUrduMonth } from '@/src/constants/urduLocalization';
 import { useAppDispatch, useAppSelector } from '@/src/hooks/redux';
 import {
   fetchActivityTypes,
   selectAllActivityTypes,
   selectActivityTypesStatus,
   selectActivityTypesError,
-} from '@/app/features/activityTypes/activityTypesSlice';
+} from '@/src/features/activityTypes/activityTypesSlice';
 import {
   createActivity,
   editActivity,
@@ -29,8 +29,8 @@ import {
   getActivityById,
   selectFetchActivityByIdStatus,
   selectFetchActivityByIdError,
-} from '@/app/features/activities/activitySlice';
-import DateTimePicker from '@/app/components/DateTimePicker';
+} from '@/src/features/activities/activitySlice';
+import DateTimePicker from '@/src/components/DateTimePicker';
 import {
   selectUserUnitDetails,
   selectUserTanzeemiLevelDetails,
@@ -39,8 +39,8 @@ import {
   selectLevelsById,
   selectDashboardSelectedUnit,
   selectDashboardSelectedUnitId,
-} from '@/app/features/tanzeem/tanzeemSlice';
-import { formatUnitName } from '@/app/utils/formatUnitName';
+} from '@/src/features/tanzeem/tanzeemSlice';
+import { formatUnitName } from '@/src/utils/formatUnitName';
 
 const ActivityScreen = () => {
   const navigation = useNavigation();

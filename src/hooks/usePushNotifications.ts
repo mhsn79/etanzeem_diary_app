@@ -6,7 +6,7 @@ import { Platform } from "react-native";
 
 // Uncomment if you want to forward every push into Redux inbox
 // import { useAppDispatch } from "./useAppDispatch";
-// import { receiveNotification } from "@/app/features/notifications/notificationsSlice";
+// import { receiveNotification } from "@/src/features/notifications/notificationsSlice";
 
 // -----------------------------------------------------------------------------
 // Hook signature

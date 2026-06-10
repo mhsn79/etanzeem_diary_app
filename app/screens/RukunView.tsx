@@ -41,25 +41,25 @@ import {
   selectContactTypes,
   fetchContactTypes,
   selectContactTypesStatus,
-} from '@/app/features/persons/personSlice';
-import { fetchTanzeemiUnits, selectTanzeemiUnitById, fetchTanzeemiUnitById } from '@/app/features/tanzeem/tanzeemSlice';
-import { selectSubordinateUnitsForDropdown } from '@/app/features/tanzeem/tanzeemHierarchySlice';
-import { getImageUrl } from '@/app/utils/imageUpload';
+} from '@/src/features/persons/personSlice';
+import { fetchTanzeemiUnits, selectTanzeemiUnitById, fetchTanzeemiUnitById } from '@/src/features/tanzeem/tanzeemSlice';
+import { selectSubordinateUnitsForDropdown } from '@/src/features/tanzeem/tanzeemHierarchySlice';
+import { getImageUrl } from '@/src/utils/imageUpload';
 
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '@/app/constants/theme';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '@/src/constants/theme';
 import { RootStackParamList } from '@/src/types/RootStackParamList';
-import { RootState, AppDispatch } from '@/app/store/types';
+import { RootState, AppDispatch } from '@/src/store/types';
 
-import i18n from '../i18n';
+import i18n from '@/src/i18n';
 
 // Components
-import CustomButton from '@/app/components/CustomButton';
-import CustomDropdown, { Option } from '@/app/components/CustomDropdown';
-import UrduText from '@/app/components/UrduText';
-import ProfileHeader from '@/app/components/ProfileHeader';
-import ContactActionButton from '../components/ContactActionButton';
-import TransferRukunModal from '@/app/components/TransferRukunModal';
-import { COMMON_IMAGES } from '@/app/constants/images';
+import CustomButton from '@/src/components/CustomButton';
+import CustomDropdown, { Option } from '@/src/components/CustomDropdown';
+import UrduText from '@/src/components/UrduText';
+import ProfileHeader from '@/src/components/ProfileHeader';
+import ContactActionButton from '@/src/components/ContactActionButton';
+import TransferRukunModal from '@/src/components/TransferRukunModal';
+import { COMMON_IMAGES } from '@/src/constants/images';
 
 type RukunDetailsRouteProp = RouteProp<RootStackParamList, 'screens/RukunView'>;
 

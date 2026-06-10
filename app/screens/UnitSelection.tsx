@@ -1,28 +1,28 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, ScrollView, View, StatusBar, Text, TouchableOpacity, Alert } from 'react-native';
-import i18n from '../i18n';
-import CustomDropdown from '../components/CustomDropdown';
+import i18n from '@/src/i18n';
+import CustomDropdown from '@/src/components/CustomDropdown';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 // import CustomTabbar from '../components/CustomTabbar';
-import Spacer from '../components/Spacer';
-import UrduText from '../components/UrduText';
-import { COLORS, SPACING } from '../constants/theme';
+import Spacer from '@/src/components/Spacer';
+import UrduText from '@/src/components/UrduText';
+import { COLORS, SPACING } from '@/src/constants/theme';
 import { 
   selectAllHierarchyUnits as selectAllCompleteHierarchyUnits,
   selectSubordinateUnits,
   selectParentUnits,
   selectUserUnit,
   selectHierarchyStatus
-} from '@/app/features/tanzeem/tanzeemHierarchySlice';
+} from '@/src/features/tanzeem/tanzeemHierarchySlice';
 import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch } from '../store';
-import { logout } from '@/app/features/auth/authSlice';
-import { formatUnitDisplay } from '@/app/utils/formatUnitDisplay';
-import { selectUserDetails } from '../features/persons/personSlice';
+import { AppDispatch } from '@/src/store';
+import { logout } from '@/src/features/auth/authSlice';
+import { formatUnitDisplay } from '@/src/utils/formatUnitDisplay';
+import { selectUserDetails } from '@/src/features/persons/personSlice';
 import { useAppDispatch } from '../../src/hooks/useAppDispatch';
 import { useAppSelector } from '../../src/hooks/useAppSelector';
-import { useAuthErrorHandler } from '../utils/useAuthErrorHandler';
+import { useAuthErrorHandler } from '@/src/utils/useAuthErrorHandler';
 interface Option {
   id: string;
   label: string;

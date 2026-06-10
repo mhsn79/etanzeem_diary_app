@@ -1,11 +1,11 @@
 import { createSlice, createAsyncThunk, PayloadAction, createEntityAdapter } from '@reduxjs/toolkit';
 import { RootState, AppDispatch } from '../../store/types';
 import { fetchUserTanzeemiUnit } from '../tanzeem/tanzeemSlice';
-import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/app/models/Person';
-import { normalizePersonData, normalizePersonDataArray } from '@/app/utils/apiNormalizer';
-import { uploadImage } from '@/app/utils/imageUpload';
+import { Person, CreatePersonPayload, UpdatePersonPayload, PersonResponse, SinglePersonResponse } from '@/src/models/Person';
+import { normalizePersonData, normalizePersonDataArray } from '@/src/utils/apiNormalizer';
+import { uploadImage } from '@/src/utils/imageUpload';
 import { Platform } from 'react-native';
-import { TanzeemiUnit } from '@/app/models/TanzeemiUnit';
+import { TanzeemiUnit } from '@/src/models/TanzeemiUnit';
 import apiRequest, { directApiRequest } from '../../services/apiClient';
 import { reduxLogger } from '../../utils/logger';
 
