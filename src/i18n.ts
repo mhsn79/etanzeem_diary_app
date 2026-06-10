@@ -12,8 +12,10 @@ let translations = {
 // Create i18n instance
 const i18n = new I18n(translations);
 
-// Set the locale once at the beginning of your app
-i18n.locale = Localization.locale.slice(0, 2); // Get first two chars of locale ('en', 'es', etc)
+// Set the locale once at the beginning of your app.
+// expo-localization (SDK 54) removed `Localization.locale`; use getLocales().
+// `languageCode` is already the 2-letter code ('en', 'ur', …); fall back to 'en'.
+i18n.locale = Localization.getLocales()?.[0]?.languageCode ?? 'en';
 i18n.enableFallback = true; // Use 'en' if a translation is missing
 
 export default i18n;
