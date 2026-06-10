@@ -292,8 +292,10 @@ const styles = StyleSheet.create({
     paddingRight: SPACING.sm,
   },
   disabledInput: {
-    opacity: 0.7,
-    color: COLORS.textSecondary,
+    // Keep submitted values readable in read-only / view mode. The previous faint
+    // grey + 0.7 opacity (compounded by the New-Arch native disabled grey) made
+    // values nearly invisible. Use dark text; the read-only cue comes from the bg.
+    color: COLORS.black,
   },
   leftIconContainer: {
     paddingHorizontal: SPACING.sm,
