@@ -3,7 +3,8 @@ import { RootState, AppDispatch } from '../../store/types';
 import directus from '../../services/directus';
 import { clearActivities } from '../activities/activitySlice';
 import { setUserDetails, setNazimDetails } from '../persons/personSlice';
-import * as FileSystem from 'expo-file-system';
+// SDK 54: uploadAsync / FileSystemUploadType live in the legacy API now.
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { RESET_STATE } from '../../store/_resetState';
 import { saveTokens, clearTokens } from '../../services/secureStorage';
