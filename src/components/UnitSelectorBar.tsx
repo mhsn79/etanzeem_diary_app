@@ -68,6 +68,9 @@ const UnitSelectorBar: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
+    // Full-width row: RTL flips it so the label hugs the right edge
+    // (textAlign:'right' alone is unreliable for this Text on Fabric/New Arch).
+    flexDirection: 'row',
     backgroundColor: COLORS.lightPrimary || '#E3F2FD',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
