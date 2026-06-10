@@ -1245,10 +1245,9 @@ const styles = StyleSheet.create({
   },
   subTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxxl,
-    marginLeft: SPACING.lg,
+    marginRight: SPACING.lg,
     color: COLORS.background,
     textAlign: 'right',
-    width: '100%',
     writingDirection: 'rtl',
   },
   reportSummaryContainer: {
@@ -1309,10 +1308,9 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xxl,
     color: COLORS.black,
     textAlign: 'right',
-    width: '100%',
     writingDirection: 'rtl',
     marginBottom: SPACING.xs,
-    marginLeft: SPACING.md,
+    marginRight: SPACING.md,
   },
   reportSection: {
     backgroundColor: COLORS.background,
