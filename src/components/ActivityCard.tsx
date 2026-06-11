@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   detail: {

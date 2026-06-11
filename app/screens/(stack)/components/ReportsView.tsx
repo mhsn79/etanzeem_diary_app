@@ -1247,7 +1247,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xxxl,
     marginLeft: SPACING.lg,
     color: COLORS.background,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   reportSummaryContainer: {
@@ -1260,14 +1260,14 @@ const styles = StyleSheet.create({
   reportSummaryItemTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
     lineHeight: 40,
   },
   reportSummaryItemValue: {
     fontSize: TYPOGRAPHY.fontSize.md,
     marginBottom: SPACING.xs,
     lineHeight: 40,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   reportSummaryItemValueContainer: {
@@ -1307,7 +1307,7 @@ const styles = StyleSheet.create({
   pastReportsTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     color: COLORS.black,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
     marginBottom: SPACING.xs,
     marginLeft: SPACING.md,
@@ -1343,7 +1343,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
     textDecorationLine: 'underline',
     color: COLORS.primary,

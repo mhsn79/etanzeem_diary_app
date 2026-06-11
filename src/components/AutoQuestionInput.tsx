@@ -1758,12 +1758,12 @@ const styles = StyleSheet.create({
   errorMessage: {
     color: COLORS.error,
     fontSize: TYPOGRAPHY.fontSize.sm,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   successMessage: {
     color: COLORS.success,
     fontSize: TYPOGRAPHY.fontSize.sm,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   // Modal styles
   modalOverlay: {
@@ -1848,7 +1848,7 @@ const styles = StyleSheet.create({
   contactPhone: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
     flex: 1,
     writingDirection: 'rtl',
 
@@ -1857,7 +1857,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    textAlign: 'right',
+    textAlign: 'left',
     flex: 1,
     marginLeft: SPACING.sm,
     writingDirection: 'rtl',
@@ -1963,7 +1963,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     fontSize: 14,
-    textAlign: 'right',
+    textAlign: 'left',
     backgroundColor: COLORS.white,
   },
   inlineConfirmBtn: {
@@ -1986,7 +1986,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   activityDate: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -2008,7 +2008,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   // Baitulmal item styles
   baitulmalItem: {
@@ -2030,7 +2030,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   baitulmalNotes: {
@@ -2061,7 +2061,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   statCardActions: {

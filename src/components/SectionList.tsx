@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontFamily: TYPOGRAPHY.fontFamily.regular,
-    textAlign: 'right',
+    textAlign: 'left',
     color: COLORS.primary,
     flex: 1,
   },

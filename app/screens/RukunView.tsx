@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
   modalInfoUnit: {
     fontSize: TYPOGRAPHY?.fontSize?.sm || 14,
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   modalDropdown: {
     marginBottom: SPACING.md,
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY?.fontSize?.md || 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
-    textAlign: 'right',
+    textAlign: 'left',
     minHeight: 100,
     textAlignVertical: 'top',
     fontFamily: 'JameelNooriNastaleeq',

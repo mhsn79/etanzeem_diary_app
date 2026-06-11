@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 12,
     height: 56,
-    textAlign: "right",
+    textAlign: "left",
     writingDirection: "rtl",
     // Add these to prevent layout shifts
     minHeight: 56,

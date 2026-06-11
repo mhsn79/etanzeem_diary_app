@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: '600',
     lineHeight: TYPOGRAPHY.lineHeight.lg,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
     marginRight:SPACING.sm
   },

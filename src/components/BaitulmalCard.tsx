@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
     flex: 1,
   },

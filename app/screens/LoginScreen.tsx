@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   ltrInput: {
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'ltr',
     backgroundColor: '#FFFFFF',
   },

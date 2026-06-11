@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     marginRight: SPACING.xs,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   statusValue: {
     fontSize: TYPOGRAPHY.fontSize.md,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   currentUnit: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   transferTypeContainer: {
     marginBottom: SPACING.md,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily.bold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   dropdown: {
     marginBottom: SPACING.sm,
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   multilineInput: {
     minHeight: 100,

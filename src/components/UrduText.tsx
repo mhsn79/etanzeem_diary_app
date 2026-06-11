@@ -36,9 +36,11 @@ const styles = StyleSheet.create({
   urduText: {
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     writingDirection: 'rtl',
-    // New Architecture (RN 0.81) no longer auto-flips textAlign:'left' to the
-    // start edge under RTL, so Urdu must be explicitly right-aligned.
-    textAlign: 'right',
+    // App runs in forced RTL (I18nManager.forceRTL(true) in app/_layout.tsx).
+    // With swapLeftAndRight (RN default under RTL), textAlign:'left' renders at the
+    // right (start) edge — which is what Urdu needs. Do NOT use 'right' here: it
+    // swaps to the physical left.
+    textAlign: 'left',
   },
   kasheedaText: {
     fontFamily: TYPOGRAPHY.fontFamily.kasheeda,

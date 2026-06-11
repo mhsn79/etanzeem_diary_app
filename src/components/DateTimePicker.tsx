@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
-    textAlign: 'right',
+    textAlign: 'left',
     width: '100%',
   },
   button: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   disabledText: {
     color: COLORS.textSecondary,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontSize: TYPOGRAPHY.fontSize.sm,
     marginTop: SPACING.xs,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   leftIcon: {
     marginRight: SPACING.sm,

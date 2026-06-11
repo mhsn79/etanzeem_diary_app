@@ -100,7 +100,7 @@ function CustomHeader({ navigation, route, title }: HeaderProps) {
 
           {isInTabs && (
             <Pressable onPress={handleProfilePress} style={styles.iconButton}>
-              <Ionicons name="person-circle-outline" size={42} color={COLORS.orange} />
+              <Ionicons name="person-circle-outline" size={32} color={COLORS.orange} />
             </Pressable>
           )}
           {showBackButton && (

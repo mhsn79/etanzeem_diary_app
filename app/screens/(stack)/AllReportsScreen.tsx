@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.black,
     paddingHorizontal: SPACING.sm,
-    textAlign: 'right',
+    textAlign: 'left',
     fontFamily: 'JameelNooriNastaleeq',
   },
   filterIcon: {

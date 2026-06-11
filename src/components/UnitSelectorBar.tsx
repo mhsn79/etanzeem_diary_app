@@ -68,10 +68,6 @@ const UnitSelectorBar: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    // Container resolves to RTL layout, so the start edge is the right edge.
-    // alignItems:'flex-start' right-aligns the shrink-wrapped label — local fix,
-    // no global UrduText alignSelf / flexDirection:'row' hacks (those regressed others).
-    alignItems: 'flex-start',
     backgroundColor: COLORS.lightPrimary || '#E3F2FD',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
@@ -83,7 +79,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
 });
 

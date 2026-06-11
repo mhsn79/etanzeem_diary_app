@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
     marginLeft: SPACING.sm,
   },
 
@@ -973,7 +973,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY?.fontSize?.md || 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
-    textAlign: 'right',
+    textAlign: 'left',
     minHeight: 100,
     textAlignVertical: 'top',
     fontFamily: 'JameelNooriNastaleeq',

@@ -205,13 +205,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: '600',
     color: COLORS.primary,
-    textAlign: 'right',
+    textAlign: 'left',
     marginBottom: SPACING.xs,
   },
   detail: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   addressContainer: {
     flexDirection: 'row',

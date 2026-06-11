@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: COLORS.error || 'red',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   buttonContainer: {
     position: 'absolute',

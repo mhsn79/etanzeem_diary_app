@@ -264,6 +264,9 @@ const getStyles = (colorScheme: string | null | undefined) => {
       padding: 5,
     },
     modalBody: {
+      // Fill the (maxHeight-capped) modal so the list can flex and the
+      // confirm/cancel buttons stay pinned + visible on short screens.
+      flexShrink: 1,
       paddingVertical: SPACING.sm,
     },
     fixedUnitContainer: {
@@ -286,7 +289,9 @@ const getStyles = (colorScheme: string | null | undefined) => {
       fontFamily: TYPOGRAPHY.fontFamily.regular,
     },
     unitListScroll: {
-      maxHeight: 280,
+      // Flex within the capped modal instead of a fixed 280px height — keeps the
+      // footer buttons visible on small screens while the list scrolls.
+      flexShrink: 1,
       marginBottom: 10,
     },
     unitRow: {

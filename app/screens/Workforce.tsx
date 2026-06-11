@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
   blueHeading: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     color: COLORS.primary,
-    textAlign:'right',
+    textAlign:'left',
     marginTop: SPACING.md,
     marginBottom: SPACING.sm
   },
@@ -1151,7 +1151,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
     minWidth: 80,
   },
   fieldRowValue: {
@@ -1216,7 +1216,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textPrimary,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
     minHeight: 44,
     marginTop: SPACING.xs,

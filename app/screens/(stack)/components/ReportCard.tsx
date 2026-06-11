@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     color: COLORS.black,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   locationContainer: {
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   location: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textSecondary,
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
   metaRow: {

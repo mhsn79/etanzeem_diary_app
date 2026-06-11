@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   dropdownTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
-    textAlign: 'right',
+    textAlign: 'left',
     marginBottom: SPACING.sm,
   },
   trigger: {
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   selectedOptionText: {
     color: COLORS.primary,
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     paddingVertical: SPACING.xs,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   clearButton: {
     marginLeft: SPACING.sm,

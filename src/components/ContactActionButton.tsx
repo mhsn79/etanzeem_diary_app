@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.xs,
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
-    textAlign: 'right',
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
 });

@@ -69,7 +69,7 @@ const infoRowStyles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
     marginLeft: SPACING.sm,
   },
 });
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
-    textAlign: 'right',
+    textAlign: 'left',
     fontFamily: 'JameelNooriNastaleeq',
   },
   changePasswordBtn: {
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   assignedUnitRow: {
     flexDirection: 'row',
@@ -445,6 +445,6 @@ const styles = StyleSheet.create({
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textPrimary,
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
   },
 });
