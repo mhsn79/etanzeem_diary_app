@@ -1216,7 +1216,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: 'JameelNooriNastaleeq',
     color: COLORS.textPrimary,
-    textAlign: 'left',
+    textAlign: 'right',
     writingDirection: 'rtl',
     minHeight: 44,
     marginTop: SPACING.xs,

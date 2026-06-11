@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
     paddingVertical: SPACING.xs,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   clearButton: {
     marginLeft: SPACING.sm,

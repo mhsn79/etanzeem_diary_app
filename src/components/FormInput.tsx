@@ -73,7 +73,7 @@ const FormInput: React.FC<FormInputProps> = ({
               style={[
                 styles.input,
                 styles.oneLineInput,
-                { textAlign: direction === 'rtl' ? 'left' : 'right' },
+                { textAlign: direction === 'rtl' ? 'right' : 'left' },
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
@@ -128,7 +128,7 @@ const FormInput: React.FC<FormInputProps> = ({
               style={[
                 styles.input,
                 styles.twoLineInput,
-                { textAlign: direction === 'rtl' ? 'left' : 'right' },
+                { textAlign: direction === 'rtl' ? 'right' : 'left' },
                 disabled ? styles.disabledInput : null,
                 leftIcon ? styles.inputWithLeftIcon : null,
                 rightIcon ? styles.inputWithRightIcon : null,
@@ -282,6 +282,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     includeFontPadding: true,
     textAlignVertical: 'center',
+    // Force RTL base direction so Latin/numeric values (e.g. names, "F-13",
+    // phone numbers) also align to the right edge — matches CustomTextInput /
+    // AutoQuestionInput. Without this, textAlign:'auto' drifts Latin text left.
+    writingDirection: 'rtl',
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamily.regular,

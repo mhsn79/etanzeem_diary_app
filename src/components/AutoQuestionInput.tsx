@@ -1963,7 +1963,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     fontSize: 14,
-    textAlign: 'left',
+    textAlign: 'right',
     backgroundColor: COLORS.white,
   },
   inlineConfirmBtn: {

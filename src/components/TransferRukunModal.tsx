@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
-    textAlign: 'left',
+    textAlign: 'right',
   },
   multilineInput: {
     minHeight: 100,

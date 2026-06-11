@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY?.fontSize?.md || 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.white,
-    textAlign: 'left',
+    textAlign: 'right',
     minHeight: 100,
     textAlignVertical: 'top',
     fontFamily: 'JameelNooriNastaleeq',

@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     fontSize: TYPOGRAPHY.fontSize.md,
     color: COLORS.black,
-    textAlign: 'left',
+    textAlign: 'right',
     fontFamily: 'JameelNooriNastaleeq',
   },
   changePasswordBtn: {
